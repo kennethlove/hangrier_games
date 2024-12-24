@@ -1,6 +1,6 @@
-mod items;
+pub mod items;
 mod name_generator;
 
-use items::Attribute;
-use items::Item;
-use items::ItemType;
+pub use items::Attribute;
+pub use items::Item;
+pub use items::ItemType;

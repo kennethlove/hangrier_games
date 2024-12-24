@@ -1,5 +1,5 @@
 use std::fmt::{Display, Formatter};
-use crate::animals::Animal;
+use crate::threats::animals::Animal;
 use crate::areas::Area;
 use crate::areas::events::AreaEvent;
 use crate::tributes::events::TributeEvent;

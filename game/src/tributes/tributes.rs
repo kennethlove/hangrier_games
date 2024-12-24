@@ -1,44 +1,28 @@
-use super::actions::{AttackOutcome, AttackResult, TributeAction};
+use super::actions::{AttackOutcome, AttackResult, Action, TributeAction};
 use super::brains::TributeBrain;
 use super::statuses::TributeStatus;
 use crate::areas::Area;
 use crate::tributes::events::TributeEvent;
 use rand::prelude::*;
 use std::str::FromStr;
+use serde::{Deserialize, Serialize};
 use crate::items::{Attribute, Item};
 use crate::messages::GameMessage;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Tribute {
     pub id: Option<i32>,
     pub game_id: Option<i32>,
     pub name: String,
-    pub health: i32,
-    pub sanity: i32,
-    pub movement: i32,
     pub district: i32,
     pub brain: TributeBrain,
     pub area: Option<Area>,
-    pub day_killed: Option<i32>,
-    pub killed_by: Option<String>,
-    pub kills: Option<i32>,
-    pub wins: Option<i32>,
-    pub defeats: Option<i32>,
-    pub draws: Option<i32>,
-    pub games: Option<i32>,
-    pub bravery: Option<i32>,
-    pub loyalty: Option<i32>,
-    pub speed: Option<i32>,
-    pub intelligence: Option<i32>,
-    pub persuasion: Option<i32>,
-    pub luck: Option<i32>,
-    pub strength: Option<i32>,
-    pub defense: Option<i32>,
-    pub is_hidden: Option<bool>,
-    pub dexterity: Option<i32>,
     pub status: TributeStatus,
     pub avatar: Option<String>,
     pub real_name: Option<String>,
+    pub statistics: Statistics,
+    pub attributes: Attributes,
+    pub actions: Vec<TributeAction>,
 }
 
 impl Tribute {
@@ -47,23 +31,11 @@ impl Tribute {
         let brain = TributeBrain::new();
         let mut rng = thread_rng();
         let district = district.unwrap_or(0);
-        Self {
-            id: None,
-            game_id: None,
-            name: name.clone(),
+
+        let attributes = Attributes {
             health: 100,
             sanity: 100,
             movement: 100,
-            district,
-            area: Some(Area::default()),
-            brain,
-            day_killed: None,
-            killed_by: None,
-            kills: Some(0),
-            wins: Some(0),
-            defeats: Some(0),
-            draws: Some(0),
-            games: Some(0),
             bravery: Some(rng.gen_range(1..=100)),
             loyalty: Some(rng.gen_range(1..=100)),
             speed: Some(rng.gen_range(1..=100)),
@@ -74,9 +46,31 @@ impl Tribute {
             defense: Some(rng.gen_range(1..=50)),
             is_hidden: Some(false),
             dexterity: Some(rng.gen_range(1..=100)),
+        };
+
+        let statistics = Statistics {
+            day_killed: None,
+            killed_by: None,
+            kills: Some(0),
+            wins: Some(0),
+            defeats: Some(0),
+            draws: Some(0),
+            games: Some(0),
+        };
+
+        Self {
+            id: None,
+            game_id: None,
+            name: name.clone(),
+            district,
+            area: Some(Area::default()),
+            brain,
             status: TributeStatus::Healthy,
             avatar,
             real_name: None,
+            attributes,
+            statistics,
+            actions: vec![]
         }
     }
 
@@ -93,9 +87,9 @@ impl Tribute {
         format!("assets/{}", self.avatar.clone().unwrap_or("hangry-games.png".to_string()))
     }
 
-    /// Reduces health, triggers death if health reaches 0.
+    /// Reduces health.
     pub fn takes_physical_damage(&mut self, damage: i32) {
-        self.health = std::cmp::max(0, self.health - damage);
+        self.attributes.health = std::cmp::max(0, self.health - damage);
     }
 
     /// Reduces mental health.
@@ -361,10 +355,10 @@ impl Tribute {
     }
 
     pub fn is_visible(&self) -> bool {
-        let is_hidden = self.is_hidden.unwrap_or(false);
+        let is_hidden = self.attributes.is_hidden.unwrap_or(false);
         if is_hidden {
             let mut rng = thread_rng();
-            !rng.gen_bool(self.intelligence.unwrap() as f64 / 100.0)
+            !rng.gen_bool(self.attributes.intelligence.unwrap() as f64 / 100.0)
         } else {
             true
         }
@@ -740,7 +734,7 @@ impl Tribute {
         }
     }
 
-    pub fn do_day_night(&mut self, suggested_action: Option<TributeAction>, probability: Option<f64>, day: bool) -> Tribute {
+    pub fn do_day_night(&mut self, suggested_action: Option<Action>, probability: Option<f64>, day: bool) -> Tribute {
         let mut tribute = Tribute::from(get_tribute_by_id(self.id.unwrap()));
 
         // Tribute is already dead, do nothing.
@@ -818,7 +812,7 @@ impl Tribute {
         let action = brain.act(&tribute, nearby_tributes, closed_areas.clone());
 
         match &action {
-            TributeAction::Move(area) => {
+            Action::Move(area) => {
                 match self.travels(closed_areas.clone(), area.clone()) {
                     TravelResult::Success(area) => {
                         tribute.changes_area(area.clone());
@@ -831,7 +825,7 @@ impl Tribute {
                     }
                 }
             },
-            TributeAction::Hide => {
+            Action::Hide => {
                 tribute.hides();
                 self.take_action(action.clone(), None);
                 create_full_log(
@@ -843,7 +837,7 @@ impl Tribute {
                     Some(self.id.unwrap())
                 );
             },
-            TributeAction::Rest | TributeAction::None => {
+            Action::Rest | Action::None => {
                 tribute.long_rests();
                 self.take_action(action, None);
                 create_full_log(
@@ -855,7 +849,7 @@ impl Tribute {
                     None
                 );
             },
-            TributeAction::Attack => {
+            Action::Attack => {
                 if let Some(mut target) = pick_target(tribute.clone().into()) {
                     if target.is_visible() {
                         match tribute.attacks(&mut target) {
@@ -888,11 +882,11 @@ impl Tribute {
                             Some(action.clone().as_str().to_string()),
                             Some(target.id.unwrap())
                         );
-                        self.take_action(TributeAction::Attack, None);
+                        self.take_action(Action::Attack, None);
                     }
                 }
             },
-            TributeAction::TakeItem => {
+            Action::TakeItem => {
                 let item = tribute.take_nearby_item(area);
                 self.take_action(action.clone(), Some(item.name.clone()));
                 create_full_log(
@@ -904,12 +898,12 @@ impl Tribute {
                     Some(item.id.unwrap())
                 );
             },
-            TributeAction::UseItem(None) => {
+            Action::UseItem(None) => {
                 // Get consumable items
                 let mut items = self.consumable_items();
                 if items.is_empty() {
                     tribute.long_rests();
-                    self.take_action(TributeAction::Rest, None);
+                    self.take_action(Action::Rest, None);
                 } else {
                     // Use random item
                     let item = items.choose_mut(&mut thread_rng()).unwrap();
@@ -935,12 +929,12 @@ impl Tribute {
                                 Some(item.id.unwrap())
                             );
                             tribute.short_rests();
-                            self.take_action(TributeAction::Rest, None);
+                            self.take_action(Action::Rest, None);
                         }
                     };
                 }
             }
-            TributeAction::UseItem(item) => {
+            Action::UseItem(item) => {
                 let items = tribute.consumable_items();
                 if let Some(item) = item {
                     let selected_item = items.iter().find(|i| i.name == item.clone());
@@ -967,7 +961,7 @@ impl Tribute {
                                     Some(selected_item.unwrap().id.unwrap())
                                 );
                                 tribute.short_rests();
-                                self.take_action(TributeAction::Rest, None);
+                                self.take_action(Action::Rest, None);
                             }
                         };
                     }
@@ -977,14 +971,8 @@ impl Tribute {
         tribute.clone()
     }
 
-    fn take_action(&self, action: TributeAction, target: Option<String>) {
-        todo!();
-        use models::tribute_action::take_action;
-        use models::action::get_action;
-
-        let tribute = TributeModel::from(self.clone());
-        let action = Action::from(get_action(action.as_str()));
-        take_action(&tribute, &action, target);
+    fn take_action(&mut self, action: &Action, target: Option<&Tribute>) {
+        self.actions.push(TributeAction::new(action.clone(), target));
     }
 
     fn take_nearby_item(&self, area: Area) -> Item {
@@ -1228,96 +1216,32 @@ impl Default for Tribute {
     }
 }
 
-impl From<TributeModel> for Tribute {
-    fn from(tribute: models::tribute::Tribute) -> Self {
-        use crate::areas::Area;
-        use crate::tributes::actions::TributeAction;
-        use crate::models::Area as AreaModel;
-
-        let area = tribute.area().unwrap_or(AreaModel::from(Area::default()));
-
-        let actions: Vec<TributeAction> = tribute.actions()
-            .iter()
-            .map(TributeAction::from)
-            .collect();
-
-        let brain = TributeBrain {
-            previous_actions: actions,
-            preferred_action: None,
-            preferred_action_percentage: 0.0,
-        };
-
-        Self {
-            id: Some(tribute.id),
-            game_id: tribute.game_id,
-            name: tribute.name.clone(),
-            health: tribute.health,
-            sanity: tribute.sanity,
-            movement: tribute.movement,
-            district: tribute.district,
-            brain,
-            area: Some(Area::from(area.clone())),
-            day_killed: tribute.day_killed,
-            killed_by: tribute.killed_by.clone(),
-            kills: tribute.kills,
-            wins: tribute.wins,
-            defeats: tribute.defeats,
-            draws: tribute.draws,
-            games: tribute.games,
-            bravery: tribute.bravery,
-            loyalty: tribute.loyalty,
-            speed: tribute.speed,
-            intelligence: tribute.intelligence,
-            persuasion: tribute.persuasion,
-            luck: tribute.luck,
-            strength: tribute.strength,
-            defense: tribute.defense,
-            is_hidden: tribute.is_hidden,
-            dexterity: tribute.dexterity,
-            status: TributeStatus::from_str(tribute.status.as_str()).unwrap(),
-            avatar: tribute.avatar.clone(),
-            real_name: tribute.real_name,
-        }
-    }
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct Statistics {
+    pub day_killed: Option<i32>,
+    pub killed_by: Option<String>,
+    pub kills: Option<i32>,
+    pub wins: Option<i32>,
+    pub defeats: Option<i32>,
+    pub draws: Option<i32>,
+    pub games: Option<i32>,
 }
 
-impl Into<UpdateTribute> for Tribute {
-    fn into(self) -> UpdateTribute {
-        let area = self.area.as_ref().unwrap();
-        let area: i32 = get_area(&area.as_str()).id;
-        let name = self.name.clone();
-
-        UpdateTribute {
-            id: self.id.unwrap(),
-            game_id: self.game_id.unwrap(),
-            name,
-            health: self.health,
-            sanity: self.sanity,
-            movement: self.movement,
-            district: self.district,
-            area_id: Some(area),
-            day_killed: self.day_killed,
-            killed_by: self.killed_by.clone(),
-            kills: self.kills,
-            wins: self.wins,
-            defeats: self.defeats,
-            draws: self.draws,
-            games: self.games,
-            bravery: self.bravery,
-            loyalty: self.loyalty,
-            speed: self.speed,
-            intelligence: self.intelligence,
-            persuasion: self.persuasion,
-            luck: self.luck,
-            strength: self.strength,
-            defense: self.defense,
-            is_hidden: self.is_hidden,
-            dexterity: self.dexterity,
-            status: self.status.to_string(),
-            avatar: self.avatar,
-            real_name: self.real_name.clone(),
-        }
-    }
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct Attributes {
+    pub health: i32,
+    pub sanity: i32,
+    pub movement: i32,
+    pub bravery: Option<i32>,
+    pub loyalty: Option<i32>,
+    pub speed: Option<i32>,
+    pub intelligence: Option<i32>,
+    pub persuasion: Option<i32>,
+    pub luck: Option<i32>,
+    pub strength: Option<i32>,
+    pub defense: Option<i32>,
+    pub is_hidden: Option<bool>,
+    pub dexterity: Option<i32>,
 }
 
 #[cfg(test)]
@@ -1327,9 +1251,9 @@ mod tests {
     #[test]
     fn new() {
         let tribute = Tribute::new("Katniss".to_string(), None, None);
-        assert_eq!(tribute.health, 100);
-        assert_eq!(tribute.sanity, 100);
-        assert_eq!(tribute.movement, 100);
+        assert_eq!(tribute.attributes.health, 100);
+        assert_eq!(tribute.attributes.sanity, 100);
+        assert_eq!(tribute.attributes.movement, 100);
         assert_eq!(tribute.status, TributeStatus::Healthy);
     }
 

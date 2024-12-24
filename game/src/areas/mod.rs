@@ -1,4 +1,4 @@
-mod areas;
-pub(crate) mod events;
+pub mod areas;
+pub mod events;
 
-use areas::Area;
+pub use areas::Area;

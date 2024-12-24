@@ -2,15 +2,16 @@ use rand::prelude::SliceRandom;
 use rand::Rng;
 use std::fmt::Display;
 use std::str::FromStr;
+use serde::{Deserialize, Serialize};
 use crate::areas::Area;
 use crate::items::Item;
 use crate::tributes::events::TributeEvent;
-use crate::tributes::actions::TributeAction;
+use crate::tributes::actions::Action;
 use crate::tributes::Tribute;
 use crate::tributes::statuses::TributeStatus;
 use crate::messages::GameMessage;
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Game {
     pub id: Option<i32>,
     pub name: String,
@@ -246,7 +247,7 @@ impl Game {
             match (self.day, day) {
                 (Some(1), true) => {
                     tribute = tribute.do_day_night(
-                        Some(TributeAction::Move(None)),
+                        Some(Action::Move(None)),
                         Some(0.5),
                         day
                     );
@@ -256,7 +257,7 @@ impl Game {
 
                     // Encourage tributes to move to the Cornucopia
                     tribute = tribute.do_day_night(
-                        Some(TributeAction::Move(Some(Area::Cornucopia.to_string()))),
+                        Some(Action::Move(Some(Area::Cornucopia.to_string()))),
                         Some(0.75),
                         day,
                     );

@@ -1,9 +1,10 @@
 use std::fmt::Display;
 use std::str::FromStr;
-use crate::animals::Animal;
+use serde::{Deserialize, Serialize};
+use crate::threats::animals::Animal;
 use strum::EnumIter;
 
-#[derive(Clone, Debug, Default, EnumIter, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, Deserialize, EnumIter, Eq, PartialEq, Serialize)]
 pub enum TributeStatus {
     #[default]
     Healthy,

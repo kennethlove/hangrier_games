@@ -1,13 +1,13 @@
 use rand::{thread_rng, Rng};
-use crate::tributes::actions::TributeAction;
+use crate::tributes::actions::Action;
 use crate::areas::Area;
 use crate::items::Item;
 use crate::tributes::Tribute;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TributeBrain {
-    pub(crate) previous_actions: Vec<TributeAction>,
-    pub(crate) preferred_action: Option<TributeAction>,
+    pub(crate) previous_actions: Vec<Action>,
+    pub(crate) preferred_action: Option<Action>,
     pub(crate) preferred_action_percentage: f64,
 }
 
@@ -20,7 +20,7 @@ impl TributeBrain {
         }
     }
 
-    pub fn set_preferred_action(&mut self, action: TributeAction, percentage: f64) {
+    pub fn set_preferred_action(&mut self, action: Action, percentage: f64) {
         self.preferred_action = Some(action);
         self.preferred_action_percentage = percentage;
     }
@@ -32,13 +32,13 @@ impl TributeBrain {
 
     /// Decide on an action for the tribute to take
     /// First weighs any preferred actions, then decides based on current state
-    pub fn act(&mut self, tribute: &Tribute, nearby_tributes: usize, closed_areas: Vec<Area>) -> TributeAction {
-        if tribute.health == 0 { return TributeAction::None; }
+    pub fn act(&mut self, tribute: &Tribute, nearby_tributes: usize, closed_areas: Vec<Area>) -> Action {
+        if tribute.health == 0 { return Action::None; }
 
         // If the tribute is in a closed area, move them.
         if closed_areas.contains(tribute.area.as_ref().unwrap()) {
-            self.previous_actions.push(TributeAction::Move(None));
-            return TributeAction::Move(None);
+            self.previous_actions.push(Action::Move(None));
+            return Action::Move(None);
         }
 
         let action = self.decide_on_action(tribute, nearby_tributes);
@@ -50,22 +50,22 @@ impl TributeBrain {
     }
 
     /// Get the last action taken by the tribute
-    pub fn last_action(&self) -> TributeAction {
+    pub fn last_action(&self) -> Action {
         if let Some(previous_action) = self.previous_actions.last() {
             previous_action.clone()
         } else {
-            TributeAction::None
+            Action::None
         }
     }
 
     /// The AI for a tribute. Automatic decisions based on current state.
-    fn decide_on_action(&mut self, tribute: &Tribute, nearby_tributes: usize) -> TributeAction {
+    fn decide_on_action(&mut self, tribute: &Tribute, nearby_tributes: usize) -> Action {
         // If the tribute isn't in the arena, they do nothing
         if tribute.area.is_none() {
-            return TributeAction::None;
+            return Action::None;
         }
         if tribute.movement <= 0 {
-            return TributeAction::Rest;
+            return Action::Rest;
         }
 
         let _area = tribute.area.as_ref().unwrap();
@@ -86,36 +86,36 @@ impl TributeBrain {
             // Are there items with sufficient quantities?
             if area_items.iter().filter(|i| i.quantity > 0).cloned().collect::<Vec<Item>>().len() > 0 {
                 // Take an item
-                return TributeAction::TakeItem;
+                return Action::TakeItem;
             }
         }
 
         // Does the tribute have items?
         if !tribute.consumable_items().is_empty() {
             // Use an item
-            return TributeAction::UseItem(None);
+            return Action::UseItem(None);
         }
 
         match &nearby_tributes {
             0 => {
                 match tribute.health {
                     // health is low, rest
-                    1..=20 => TributeAction::Rest,
+                    1..=20 => Action::Rest,
                     // health isn't great, hide
                     // unless sanity is also low, then move
                     21..=30 => {
                         if tribute.sanity > 20 && tribute.is_visible() {
-                            TributeAction::Hide
+                            Action::Hide
                         } else {
-                            TributeAction::Move(None)
+                            Action::Move(None)
                         }
                     },
                     // health is good, move
                     _ => {
                         // If the tribute has movement, move
                         match tribute.movement {
-                            0 => TributeAction::Rest,
-                            _ => TributeAction::Move(None),
+                            0 => Action::Rest,
+                            _ => Action::Move(None),
                         }
                     }
                 }
@@ -126,21 +126,21 @@ impl TributeBrain {
                     // health is low, hide
                     1..=5 => {
                         if tribute.sanity > 20 && tribute.is_visible() {
-                            TributeAction::Hide
+                            Action::Hide
                         } else {
-                            TributeAction::Attack
+                            Action::Attack
                         }
                     },
                     // health isn't great, run away
                     6..=10 => {
                         if tribute.sanity > 20 {
-                            TributeAction::Move(None)
+                            Action::Move(None)
                         } else {
-                            TributeAction::Attack
+                            Action::Attack
                         }
                     },
                     // health is good, attack
-                    _ => TributeAction::Attack,
+                    _ => Action::Attack,
                 }
             },
             _ => {
@@ -148,11 +148,11 @@ impl TributeBrain {
                 let sense = 100 - tribute.intelligence.unwrap() - tribute.sanity;
                 match sense {
                     // Too dumb to know better, attacks
-                    0..36 => TributeAction::Attack,
+                    0..36 => Action::Attack,
                     // Smart enough to know better, hides
-                    85..101 => TributeAction::Hide,
+                    85..101 => Action::Hide,
                     // Average intelligence, moves
-                    _ => TributeAction::Move(None),
+                    _ => Action::Move(None),
                 }
             }
         }
@@ -162,7 +162,7 @@ impl TributeBrain {
 #[cfg(test)]
 mod tests {
     use crate::tributes::Tribute;
-    use crate::tributes::actions::TributeAction;
+    use crate::tributes::actions::Action;
     #[test]
     fn decide_on_action_default() {
         // If there are no enemies nearby, the tribute should move
@@ -170,7 +170,7 @@ mod tests {
         tribute.id = Some(1);
         tribute.game_id = Some(1);
         let action = tribute.brain.act(&tribute.clone(),2, vec![]);
-        assert_eq!(action, TributeAction::Attack);
+        assert_eq!(action, Action::Attack);
     }
 
     #[test]
@@ -181,7 +181,7 @@ mod tests {
         tribute.game_id = Some(1);
         tribute.takes_physical_damage(90);
         let action = tribute.brain.act(&tribute.clone(), 2, vec![]);
-        assert_eq!(action, TributeAction::Move(None));
+        assert_eq!(action, Action::Move(None));
     }
 
     #[test]
@@ -194,7 +194,7 @@ mod tests {
         tribute.moves();
         tribute.moves();
         let action = tribute.brain.act(&tribute.clone(),2, vec![]);
-        assert_eq!(action, TributeAction::Rest);
+        assert_eq!(action, Action::Rest);
     }
 
     #[test]
@@ -204,7 +204,7 @@ mod tests {
         tribute.id = Some(1);
         tribute.game_id = Some(1);
         let action = tribute.brain.act(&tribute.clone(), 2, vec![]);
-        assert_eq!(action, TributeAction::Attack);
+        assert_eq!(action, Action::Attack);
     }
 
     #[test]
@@ -216,6 +216,6 @@ mod tests {
         tribute.game_id = Some(1);
         tribute.takes_physical_damage(90);
         let action = tribute.brain.act(&tribute.clone(), 2, vec![]);
-        assert_eq!(action, TributeAction::Move(None));
+        assert_eq!(action, Action::Move(None));
     }
 }

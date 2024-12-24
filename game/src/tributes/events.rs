@@ -2,7 +2,7 @@ use rand::Rng;
 use std::fmt::Display;
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
-use crate::animals::Animal;
+use crate::threats::animals::Animal;
 
 #[derive(Clone, Debug, PartialOrd, PartialEq, Serialize, Deserialize)]
 pub enum TributeEvent {
@@ -113,7 +113,6 @@ impl TributeEvent {
 
 #[cfg(test)]
 mod tests {
-    use crate::animals::Animal::Wolf;
     use super::*;
 
     #[test]
@@ -124,7 +123,7 @@ mod tests {
 
     #[test]
     fn tribute_event_from_str() {
-        assert_eq!(TributeEvent::from_str("animal attack wolf").unwrap(), TributeEvent::AnimalAttack(Wolf));
+        assert_eq!(TributeEvent::from_str("animal attack wolf").unwrap(), TributeEvent::AnimalAttack(Animal::Wolf));
     }
 
     #[test]

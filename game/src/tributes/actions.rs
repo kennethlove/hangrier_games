@@ -75,3 +75,23 @@ pub enum AttackOutcome {
     Wound(Tribute, Tribute),
     Miss(Tribute, Tribute),
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn action_to_str() {
+        assert_eq!(Action::None.as_str(), "none");
+    }
+
+    #[test]
+    fn action_from_str() {
+        assert_eq!(Action::from_str("none").unwrap(), Action::None);
+    }
+
+    #[test]
+    fn tribute_action_new() {
+        assert_eq!(TributeAction::new(Action::None, None), TributeAction { action: Action::None, target: None });
+    }
+}

@@ -1,7 +1,7 @@
-pub(crate) mod events;
-pub(crate) mod actions;
-mod brains;
-pub(crate) mod statuses;
-mod tributes;
+pub mod events;
+pub mod actions;
+pub mod brains;
+pub mod statuses;
+pub mod tributes;
 
-use tributes::Tribute;
+pub use tributes::Tribute;

@@ -87,37 +87,19 @@ impl Display for TributeStatus {
     }
 }
 
-impl TributeStatus {
-    fn as_str(&self) -> &str {
-        match self {
-            TributeStatus::Healthy => "healthy",
-            TributeStatus::Wounded => "wounded",
-            TributeStatus::Starving => "starving",
-            TributeStatus::Dehydrated => "dehydrated",
-            TributeStatus::Sick => "sick",
-            TributeStatus::Poisoned => "poisoned",
-            TributeStatus::RecentlyDead => "recently dead",
-            TributeStatus::Dead => "dead",
-            TributeStatus::Electrocuted => "electrocuted",
-            TributeStatus::Frozen => "frozen",
-            TributeStatus::Overheated => "overheated",
-            TributeStatus::Broken => "broken",
-            TributeStatus::Infected => "infected",
-            TributeStatus::Drowned => "drowned",
-            TributeStatus::Burned => "burned",
-            TributeStatus::Buried => "buried",
-            TributeStatus::Mauled(animal) => format!("mauled {}", animal.to_string()).as_str(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn tribute_status_to_str() {
+    fn tribute_status_to_string() {
         let ts = TributeStatus::Healthy;
-        assert_eq!("healthy", ts.as_str());
+        assert_eq!(String::from("healthy"), ts.to_string());
+    }
+
+    #[test]
+    fn tribute_status_from_str() {
+        let ts = TributeStatus::from_str("mauled bear").unwrap();
+        assert_eq!(String::from("mauled bear"), ts.to_string());
     }
 }

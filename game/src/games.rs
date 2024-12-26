@@ -3,6 +3,7 @@ use rand::Rng;
 use std::fmt::Display;
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 use crate::areas::Area;
 use crate::items::Item;
 use crate::tributes::events::TributeEvent;
@@ -11,52 +12,46 @@ use crate::tributes::Tribute;
 use crate::tributes::statuses::TributeStatus;
 use crate::messages::GameMessage;
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Game {
-    pub id: Option<i32>,
+    pub id: Uuid,
     pub name: String,
-    pub day: Option<i32>,
-    pub closed_areas: Option<Vec<Area>>,
+    pub day: Option<u32>,
+    pub closed_areas: Vec<Area>,
     pub status: GameStatus,
 }
 
+impl Default for Game {
+    fn default() -> Game {
+        let wpgen = witty_phrase_generator::WPGen::new();
+        let mut name = String::new();
+        if let Some(words) = wpgen.with_words(3) {
+            name = words.join("-").to_string();
+        };
+
+        Game {
+            id: Uuid::new_v4(),
+            name,
+            day: None,
+            closed_areas: vec![],
+            status: Default::default(),
+        }
+
+    }
+}
+
 impl Game {
-    pub fn new(game_name: &str) -> Game {
-        todo!();
-        Game::from(create_game(Some(game_name)))
+    pub fn new(name: &str) -> Self {
+        let mut game = Game::default();
+        game.name = name.to_string();
+        game
     }
 
     pub fn delete(game_id: i32) {
         todo!();
-        delete_game_logs(game_id);
-        delete_game_area_events(game_id);
-        delete_game_items(game_id);
-        delete_game_tribute_actions(game_id);
-        delete_game_tributes(game_id);
-        delete_game(game_id);
     }
 
-    pub fn as_str(&self) -> &str {
-        todo!();
-        self.name.as_str()
-    }
-
-    pub fn default() -> Game {
-        todo!();
-        Game {
-            id: None,
-            name: "".to_string(),
-            day: Some(0),
-            closed_areas: None,
-            status: GameStatus::NotStarted,
-        }
-    }
-
-    pub fn end(&self) {
-        todo!();
-        let game = get_game(self.name.as_str()).expect("Error loading game");
-        game.end();
-    }
+    pub fn end(&mut self) { self.status = GameStatus::Finished }
 
     // Runs at the start of the game
     pub fn start(&self) {

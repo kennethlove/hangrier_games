@@ -33,7 +33,7 @@ impl TributeBrain {
     /// Decide on an action for the tribute to take
     /// First weighs any preferred actions, then decides based on current state
     pub fn act(&mut self, tribute: &Tribute, nearby_tributes: usize, closed_areas: Vec<Area>) -> Action {
-        if tribute.health == 0 { return Action::None; }
+        if tribute.attributes.health == 0 { return Action::None; }
 
         // If the tribute is in a closed area, move them.
         if closed_areas.contains(tribute.area.as_ref().unwrap()) {

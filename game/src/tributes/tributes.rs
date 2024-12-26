@@ -4,73 +4,63 @@ use super::statuses::TributeStatus;
 use crate::areas::Area;
 use crate::tributes::events::TributeEvent;
 use rand::prelude::*;
-use std::str::FromStr;
 use serde::{Deserialize, Serialize};
+use crate::games::Game;
 use crate::items::{Attribute, Item};
 use crate::messages::GameMessage;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Tribute {
+    /// What is their identifier?
     pub id: Option<i32>,
-    pub game_id: Option<i32>,
-    pub name: String,
-    pub district: i32,
-    pub brain: TributeBrain,
+    /// What game do they belong to?
+    pub game: Option<Game>,
+    /// Where are they in the game?
     pub area: Option<Area>,
+    /// What is their current status?
     pub status: TributeStatus,
+    /// This is their thinker
+    pub brain: TributeBrain,
+    /// How they present themselves to the real world
     pub avatar: Option<String>,
-    pub real_name: Option<String>,
+    /// Who created them in the real world
+    pub human_player_name: Option<String>,
+    /// What they like to go by
+    pub name: String,
+    /// Where they're from
+    pub district: i32,
+    /// Stats like fights won
     pub statistics: Statistics,
+    /// Attributes like health
     pub attributes: Attributes,
-    pub actions: Vec<TributeAction>,
+    /// Actions the tribute has taken
+    pub previous_actions: Vec<TributeAction>,
+    /// Items the tribute owns
+    pub items: Vec<Item>,
 }
 
 impl Tribute {
     /// Creates a new Tribute with full health, sanity, and movement.
     pub fn new(name: String, district: Option<i32>, avatar: Option<String>) -> Self {
         let brain = TributeBrain::new();
-        let mut rng = thread_rng();
         let district = district.unwrap_or(0);
-
-        let attributes = Attributes {
-            health: 100,
-            sanity: 100,
-            movement: 100,
-            bravery: Some(rng.gen_range(1..=100)),
-            loyalty: Some(rng.gen_range(1..=100)),
-            speed: Some(rng.gen_range(1..=100)),
-            intelligence: Some(rng.gen_range(1..=100)),
-            persuasion: Some(rng.gen_range(1..=100)),
-            luck: Some(rng.gen_range(1..=100)),
-            strength: Some(rng.gen_range(1..=50)),
-            defense: Some(rng.gen_range(1..=50)),
-            is_hidden: Some(false),
-            dexterity: Some(rng.gen_range(1..=100)),
-        };
-
-        let statistics = Statistics {
-            day_killed: None,
-            killed_by: None,
-            kills: Some(0),
-            wins: Some(0),
-            defeats: Some(0),
-            draws: Some(0),
-            games: Some(0),
-        };
+        let attributes = Attributes::new();
+        let statistics = Statistics::default();
 
         Self {
             id: None,
-            game_id: None,
+            game: None,
             name: name.clone(),
             district,
             area: Some(Area::default()),
             brain,
             status: TributeStatus::Healthy,
             avatar,
-            real_name: None,
+            human_player_name: None,
             attributes,
             statistics,
-            actions: vec![]
+            previous_actions: vec![],
+            items: vec![],
         }
     }
 
@@ -89,33 +79,33 @@ impl Tribute {
 
     /// Reduces health.
     pub fn takes_physical_damage(&mut self, damage: i32) {
-        self.attributes.health = std::cmp::max(0, self.health - damage);
+        self.attributes.health = std::cmp::max(0, self.attributes.health - damage);
     }
 
     /// Reduces mental health.
     pub fn takes_mental_damage(&mut self, damage: i32) {
-        self.sanity = std::cmp::max(0, self.sanity - damage);
+        self.sanity = std::cmp::max(0, self.attributes.sanity - damage);
     }
 
     /// Restores health.
     pub fn heals(&mut self, health: i32) {
-        self.health = std::cmp::min(100, self.health + health);
+        self.attributes.health = std::cmp::min(100, self.attributes.health + health);
     }
 
     /// Restores mental health.
     pub fn heals_mental_damage(&mut self, health: i32) {
-        self.sanity = std::cmp::min(100, self.sanity + health);
+        self.attributes.sanity = std::cmp::min(100, self.attributes.sanity + health);
     }
 
     /// Consumes movement and removes hidden status.
     pub fn moves(&mut self) {
-        self.movement = std::cmp::max(0, self.movement - self.speed.unwrap());
-        self.is_hidden = Some(false);
+        self.attributes.movement = std::cmp::max(0, self.attributes.movement - self.attributes.speed.unwrap());
+        self.attributes.is_hidden = Some(false);
     }
 
     /// Restores movement.
     pub fn short_rests(&mut self) {
-        self.movement = 100;
+        self.attributes.movement = 100;
     }
 
     pub fn long_rests(&mut self) {
@@ -127,11 +117,11 @@ impl Tribute {
     /// Marks the tribute as recently dead and reveals them.
     pub fn dies(&mut self) {
         self.status = TributeStatus::RecentlyDead;
-        self.is_hidden = Some(false);
+        self.attributes.is_hidden = Some(false);
     }
 
     pub fn is_alive(&self) -> bool {
-        match (self.status.clone(), self.health) {
+        match (self.status.clone(), self.attributes.health) {
             (_, 0) => false,
             (TributeStatus::RecentlyDead | TributeStatus::Dead, _) => false,
             _ => true,
@@ -141,23 +131,23 @@ impl Tribute {
     /// Moves the tribute from one area to another, removes hidden status.
     pub fn changes_area(&mut self, area: Area) {
         self.area = Some(area);
-        self.is_hidden = Some(false);
+        self.attributes.is_hidden = Some(false);
     }
 
     /// Removes the tribute from the game arena, removes hidden status.
     pub fn leaves_area(&mut self) {
         self.area = None;
-        self.is_hidden = Some(false);
+        self.attributes.is_hidden = Some(false);
     }
 
     /// Hides the tribute from view.
     pub fn hides(&mut self) {
-        self.is_hidden = Some(true);
+        self.attributes.is_hidden = Some(true);
     }
 
     /// Reveals the tribute to view.
     pub fn reveals(&mut self) {
-        self.is_hidden = Some(false);
+        self.attributes.is_hidden = Some(false);
     }
 
     /// Tribute is lonely/homesick/etc., loses some sanity.
@@ -168,14 +158,14 @@ impl Tribute {
             .filter(|t| self.area == Some(Area::from(get_area_by_id(t.area_id).unwrap())))
             .count() as f64;
 
-        let loneliness = self.bravery.unwrap_or(0) as f64 / 100.0;  // how lonely is the tribute?
-        let terror = (self.sanity as f64 / 100.0) * game.day.unwrap() as f64; // how scared are they?
+        let loneliness = self.attributes.bravery.unwrap_or(0) as f64 / 100.0;  // how lonely is the tribute?
+        let terror = (self.attributes.sanity as f64 / 100.0) * game.day.unwrap() as f64; // how scared are they?
         let connectedness = district_mates * loneliness;
         let terror = terror - connectedness;
 
         if terror.round() > 1.0 {
             create_full_log(
-                self.game_id.unwrap(),
+                self.game.unwrap().id.clone(),
                 GameMessage::TributeSuffer(self.clone()).to_string(),
                 Some(self.area.clone().unwrap().id()),
                 Some(self.id.unwrap()),
@@ -200,12 +190,12 @@ impl Tribute {
 
         match attack_contest(self.clone(), target.clone()) {
             AttackResult::AttackerWins => {
-                target.takes_physical_damage(self.strength.unwrap());
-                target.defeats = Some(target.defeats.unwrap_or(0) + 1);
-                self.wins = Some(self.wins.unwrap_or(0) + 1);
+                target.takes_physical_damage(self.attributes.strength.unwrap());
+                target.statistics.defeats = Some(target.statistics.defeats.unwrap_or(0) + 1);
+                self.statistics.defeats = Some(self.statistics.defeatswrap_or(0) + 1);
 
                 create_full_log(
-                    self.game_id.unwrap(),
+                    self.game.unwrap().id.unwrap(),
                     GameMessage::TributeAttackWin(self.clone(), target.clone()).to_string(),
                     Some(self.area.clone().unwrap().id()),
                     Some(self.id.unwrap()),
@@ -226,9 +216,9 @@ impl Tribute {
                 }
             }
             AttackResult::AttackerWinsDecisively => {
-                target.takes_physical_damage(self.strength.unwrap() * 2);
-                target.defeats = Some(target.defeats.unwrap_or(0) + 1);
-                self.wins = Some(self.wins.unwrap_or(0) + 1);
+                target.takes_physical_damage(self.attributes.strength.unwrap() * 2);
+                target.statistics.defeats = Some(target.statistics.defeats.unwrap_or(0) + 1);
+                self.statistics.wins = Some(self.statistics.wins.unwrap_or(0) + 1);
 
                 create_full_log(
                     self.game_id.unwrap(),
@@ -252,9 +242,9 @@ impl Tribute {
                 }
             }
             AttackResult::DefenderWins => {
-                self.takes_physical_damage(target.strength.unwrap());
-                self.defeats = Some(self.defeats.unwrap() + 1);
-                target.wins = Some(target.wins.unwrap() + 1);
+                self.takes_physical_damage(target.attributes.strength.unwrap());
+                self.statistics.defeats = Some(self.statistics.defeats.unwrap() + 1);
+                target.statistics.wins = Some(target.statistics.wins.unwrap() + 1);
 
                 create_full_log(
                     self.game_id.unwrap(),
@@ -278,9 +268,9 @@ impl Tribute {
                 }
             }
             AttackResult::DefenderWinsDecisively => {
-                self.takes_physical_damage(target.strength.unwrap() * 2);
-                self.defeats = Some(self.defeats.unwrap() + 1);
-                target.wins = Some(target.wins.unwrap() + 1);
+                self.takes_physical_damage(target.attributes.strength.unwrap() * 2);
+                self.statistics.defeats = Some(self.statistics.defeats.unwrap() + 1);
+                target.statistics.wins = Some(target.statistics.wins.unwrap() + 1);
 
                 create_full_log(
                     self.game_id.unwrap(),
@@ -312,14 +302,14 @@ impl Tribute {
                     Some("attack".to_string()),
                     Some(target.id.unwrap())
                 );
-                self.draws = Some(self.draws.unwrap() + 1);
-                target.draws = Some(target.draws.unwrap() + 1);
+                self.statistics.draws = Some(self.statistics.draws.unwrap() + 1);
+                target.statistics.draws = Some(target.statistics.draws.unwrap() + 1);
 
                 return AttackOutcome::Miss(self.clone(), target.clone())
             }
         };
 
-        if self.health <= 0 {
+        if self.attributes.health <= 0 {
             // Attacker was killed by target
             create_full_log(
                 self.game_id.unwrap(),
@@ -329,11 +319,11 @@ impl Tribute {
                 Some("attack".to_string()),
                 Some(self.id.unwrap())
             );
-            self.killed_by = Some(target.name.clone());
+            self.statistics.killed_by = Some(target.name.clone());
             self.status = TributeStatus::RecentlyDead;
             self.dies();
             AttackOutcome::Kill(target.clone(), self.clone())
-        } else if target.health <= 0 {
+        } else if target.attributes.health <= 0 {
             // Target was killed by attacker
             create_full_log(
                 self.game_id.unwrap(),
@@ -343,7 +333,7 @@ impl Tribute {
                 Some("attack".to_string()),
                 Some(target.id.unwrap())
             );
-            target.killed_by = Some(self.name.clone());
+            target.statistics.killed_by = Some(self.name.clone());
             target.status = TributeStatus::RecentlyDead;
             target.dies();
             AttackOutcome::Kill(self.clone(), target.clone())
@@ -409,7 +399,7 @@ impl Tribute {
             TravelResult::Failure
         };
 
-        match self.movement {
+        match self.attributes.movement {
             // No movement left, can't move
             0 => {
                 create_full_log(
@@ -511,8 +501,8 @@ impl Tribute {
                 );
             },
             TributeStatus::Sick => {
-                self.strength = Some(std::cmp::max(1, self.strength.unwrap() - 1));
-                self.speed = Some(std::cmp::max(1, self.speed.unwrap() - 1));
+                self.attributes.strength = Some(std::cmp::max(1, self.attributes.strength.unwrap() - 1));
+                self.attributes.speed = Some(std::cmp::max(1, self.attributes.speed.unwrap() - 1));
                 create_full_log(
                     self.game_id.unwrap(),
                     GameMessage::TributeSick(self.clone()).to_string(),
@@ -534,7 +524,7 @@ impl Tribute {
                 );
             },
             TributeStatus::Frozen => {
-                self.speed = Some(std::cmp::max(1, self.speed.unwrap() - 1));
+                self.attributes.speed = Some(std::cmp::max(1, self.attributes.speed.unwrap() - 1));
                 create_full_log(
                     self.game_id.unwrap(),
                     GameMessage::TributeFrozen(self.clone()).to_string(),
@@ -545,7 +535,7 @@ impl Tribute {
                 );
             },
             TributeStatus::Overheated => {
-                self.speed = Some(std::cmp::max(1, self.speed.unwrap() - 1));
+                self.attributes.speed = Some(std::cmp::max(1, self.attributes.speed.unwrap() - 1));
                 create_full_log(
                     self.game_id.unwrap(),
                     GameMessage::TributeOverheated(self.clone()).to_string(),
@@ -556,7 +546,7 @@ impl Tribute {
                 );
             },
             TributeStatus::Dehydrated => {
-                self.strength = Some(std::cmp::max(1, self.strength.unwrap() - 1));
+                self.attributes.strength = Some(std::cmp::max(1, self.attributes.strength.unwrap() - 1));
                 create_full_log(
                     self.game_id.unwrap(),
                     GameMessage::TributeDehydrated(self.clone()).to_string(),
@@ -567,7 +557,7 @@ impl Tribute {
                 );
             },
             TributeStatus::Starving => {
-                self.strength = Some(std::cmp::max(1, self.strength.unwrap() - 1));
+                self.attributes.strength = Some(std::cmp::max(1, self.attributes.strength.unwrap() - 1));
                 create_full_log(
                     self.game_id.unwrap(),
                     GameMessage::TributeStarving(self.clone()).to_string(),
@@ -595,7 +585,7 @@ impl Tribute {
                 // TODO: Add in other bones? Ribs and skull make sense.
 
                 if leg_bone {
-                    self.speed = Some(std::cmp::max(1, self.speed.unwrap() - 5));
+                    self.attributes.speed = Some(std::cmp::max(1, self.attributes.speed.unwrap() - 5));
                     create_full_log(
                         self.game_id.unwrap(),
                         GameMessage::TributeBrokenLeg(self.clone()).to_string(),
@@ -605,7 +595,7 @@ impl Tribute {
                         None
                     );
                 } else {
-                    self.strength = Some(std::cmp::max(1, self.strength.unwrap() - 5));
+                    self.attributes.strength = Some(std::cmp::max(1, self.attributes.strength.unwrap() - 5));
                     create_full_log(
                         self.game_id.unwrap(),
                         GameMessage::TributeBrokenArm(self.clone()).to_string(),
@@ -667,7 +657,7 @@ impl Tribute {
             _ => {}
         }
 
-        if self.health <= 0 {
+        if self.attributes.health <= 0 {
             create_full_log(
                 self.game_id.unwrap(),
                 GameMessage::TributeDiesFromStatus(self.clone(), self.status.clone()).to_string(),
@@ -676,7 +666,7 @@ impl Tribute {
                 None,
                 None
             );
-            self.killed_by = Some(self.status.to_string());
+            self.statistics.killed_by = Some(self.status.to_string());
             self.status = TributeStatus::RecentlyDead;
         }
     }
@@ -720,7 +710,7 @@ impl Tribute {
                 self.status = TributeStatus::Burned;
             },
         }
-        if self.health <= 0 {
+        if self.attributes.health <= 0 {
             create_full_log(
                 self.game_id.unwrap(),
                 GameMessage::TributeDiesFromTributeEvent(self.clone(), tribute_event.clone()).to_string(),
@@ -729,7 +719,7 @@ impl Tribute {
                 None,
                 None
             );
-            self.killed_by = Some(self.status.to_string());
+            self.statistics.killed_by = Some(self.status.to_string());
             self.status = TributeStatus::RecentlyDead;
         }
     }
@@ -781,7 +771,7 @@ impl Tribute {
         }
 
         // Tribute died to the period's events.
-        if tribute.status == TributeStatus::RecentlyDead || tribute.health <= 0 {
+        if tribute.status == TributeStatus::RecentlyDead || tribute.attributes.health <= 0 {
             create_full_log(
                 self.game_id.unwrap(),
                 GameMessage::TributeDead(tribute.clone()).to_string(),
@@ -854,16 +844,16 @@ impl Tribute {
                     if target.is_visible() {
                         match tribute.attacks(&mut target) {
                             AttackOutcome::Kill(mut attacker, mut target) => {
-                                if attacker.health <= 0 {
+                                if attacker.attributes.health <= 0 {
                                     attacker.dies();
                                 }
-                                if target.health <= 0 {
+                                if target.attributes.health <= 0 {
                                     target.dies();
                                 }
                                 if attacker.id == target.id {
-                                    attacker.health = target.health.clone();
-                                    attacker.day_killed = target.day_killed.clone();
-                                    attacker.killed_by = target.killed_by.clone();
+                                    attacker.attributes.health = target.attributes.health.clone();
+                                    attacker.statistics.day_killed = target.statistics.day_killed.clone();
+                                    attacker.statistics.killed_by = target.statistics.killed_by.clone();
                                     attacker.status = target.status.clone();
                                     return target;
                                 }
@@ -972,7 +962,7 @@ impl Tribute {
     }
 
     fn take_action(&mut self, action: &Action, target: Option<&Tribute>) {
-        self.actions.push(TributeAction::new(action.clone(), target));
+        self.actions.push(TributeAction::new(action.clone(), target.cloned()));
     }
 
     fn take_nearby_item(&self, area: Area) -> Item {
@@ -1012,16 +1002,16 @@ impl Tribute {
                 self.heals_mental_damage(item.effect);
             },
             Attribute::Movement => {
-                self.movement = std::cmp::min(100, self.movement + item.effect);
+                self.attributes.movement = std::cmp::min(100, self.attributes.movement + item.effect);
             },
             Attribute::Bravery => {
-                self.bravery = Some(std::cmp::min(100, self.bravery.unwrap() + item.effect));
+                self.attributes.bravery = Some(std::cmp::min(100, self.attributes.bravery.unwrap() + item.effect));
             },
             Attribute::Speed => {
-                self.speed = Some(std::cmp::min(100, self.speed.unwrap() + item.effect));
+                self.attributes.speed = Some(std::cmp::min(100, self.attributes.speed.unwrap() + item.effect));
             },
             Attribute::Strength => {
-                self.strength = Some(std::cmp::min(50, self.strength.unwrap() + item.effect));
+                self.attributes.strength = Some(std::cmp::min(50, self.attributes.strength.unwrap() + item.effect));
             },
             _ => ()
         }
@@ -1063,9 +1053,9 @@ pub enum TravelResult {
 
 #[allow(dead_code)]
 fn apply_violence_stress(tribute: &mut Tribute) {
-    let kills = tribute.kills.unwrap_or(0);
-    let wins = tribute.wins.unwrap_or(0);
-    let sanity = tribute.sanity;
+    let kills = tribute.statistics.kills.unwrap_or(0);
+    let wins = tribute.statistics.wins.unwrap_or(0);
+    let sanity = tribute.attributes.sanity;
     let mut terror = 20.0;
 
     if kills + wins > 0 {
@@ -1087,7 +1077,7 @@ fn apply_violence_stress(tribute: &mut Tribute) {
 
 fn attack_contest(attacker: Tribute, target: Tribute) -> AttackResult {
     let mut tribute1_roll = thread_rng().gen_range(1..=20); // Base roll
-    tribute1_roll += attacker.strength.unwrap(); // Add strength
+    tribute1_roll += attacker.attributes.strength.unwrap(); // Add strength
 
     if let Some(weapon) = attacker.weapons().iter_mut().last() {
         tribute1_roll += weapon.effect; // Add weapon damage
@@ -1109,7 +1099,7 @@ fn attack_contest(attacker: Tribute, target: Tribute) -> AttackResult {
     // Add luck in here?
 
     let mut tribute2_roll = thread_rng().gen_range(1..=20); // Base roll
-    tribute2_roll += target.defense.unwrap(); // Add defense
+    tribute2_roll += target.attributes.defense.unwrap(); // Add defense
 
     if let Some(shield) = target.items().iter_mut().filter(|i| i.is_defensive()).next() {
         tribute2_roll += shield.effect; // Add weapon defense
@@ -1218,30 +1208,94 @@ impl Default for Tribute {
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct Statistics {
-    pub day_killed: Option<i32>,
+    /// What day, if any, were they killed?
+    pub day_killed: Option<u32>,
+    /// Who or what killed them?
     pub killed_by: Option<String>,
-    pub kills: Option<i32>,
-    pub wins: Option<i32>,
-    pub defeats: Option<i32>,
-    pub draws: Option<i32>,
-    pub games: Option<i32>,
+    /// How many tributes did they kill?
+    pub kills: u32,
+    /// How many fights did they win?
+    pub wins: u32,
+    /// How many fights did they lose?
+    pub defeats: u32,
+    /// How many fights ended in a draw?
+    pub draws: u32,
+    /// How many games have they survived?
+    pub games: u32,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Attributes {
-    pub health: i32,
-    pub sanity: i32,
-    pub movement: i32,
-    pub bravery: Option<i32>,
-    pub loyalty: Option<i32>,
-    pub speed: Option<i32>,
-    pub intelligence: Option<i32>,
-    pub persuasion: Option<i32>,
-    pub luck: Option<i32>,
-    pub strength: Option<i32>,
-    pub defense: Option<i32>,
-    pub is_hidden: Option<bool>,
-    pub dexterity: Option<i32>,
+    /// How much damage can they take?
+    pub health: u32,
+    /// How much suffering can they handle? Are they still sane?
+    pub sanity: u32,
+    /// How far can they move before they need a rest?
+    pub movement: u32,
+    /// How hard do they hit?
+    pub strength: u32,
+    /// How hard of a hit can they take?
+    pub defense: u32,
+    /// Will they jump into dangerous situations?
+    pub bravery: u32,
+    /// Are they a backstabber?
+    pub loyalty: u32,
+    /// How far can they move each turn?
+    pub speed: u32,
+    /// How well do they avoid attacks?
+    pub dexterity: u32,
+    /// How well do they avoid traps?
+    pub intelligence: u32,
+    /// Can they talk their way out of, or into, things?
+    pub persuasion: u32,
+    /// Are they likely to get gifts or come out slightly ahead?
+    pub luck: u32,
+    /// Can other tributes see them?
+    pub is_hidden: bool,
+}
+
+impl Default for Attributes {
+    /// Provides a maxed-out set of Attributes
+    fn default() -> Self {
+        Self {
+            health: 100,
+            sanity: 100,
+            movement: 100,
+            strength: 50,
+            defense: 50,
+            bravery: 100,
+            loyalty: 100,
+            speed: 100,
+            dexterity: 100,
+            intelligence: 100,
+            persuasion: 100,
+            luck: 100,
+            is_hidden: false,
+        }
+    }
+}
+
+impl Attributes {
+    /// Provides a randomized set of Attributes
+    fn new() -> Self {
+        let mut rng = thread_rng();
+
+        Self {
+            health: 100,
+            sanity: 100,
+            movement: 100,
+            strength: rng.gen_range(1..=50),
+            defense: rng.gen_range(1..=50),
+            bravery: rng.gen_range(1..=100),
+            loyalty: rng.gen_range(1..=100),
+            speed: rng.gen_range(1..=100),
+            dexterity: rng.gen_range(1..=100),
+            intelligence: rng.gen_range(1..=100),
+            persuasion: rng.gen_range(1..=100),
+            luck: rng.gen_range(1..=100),
+            is_hidden: false,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1261,31 +1315,31 @@ mod tests {
     fn takes_physical_damage() {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         tribute.takes_physical_damage(10);
-        assert_eq!(tribute.health, 90);
+        assert_eq!(tribute.attributes.health, 90);
     }
 
     #[test]
     fn takes_mental_damage() {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         tribute.takes_mental_damage(10);
-        assert_eq!(tribute.sanity, 90);
+        assert_eq!(tribute.attributes.sanity, 90);
     }
 
     #[test]
     fn moves_and_rests() {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
-        tribute.speed = Some(50);
+        tribute.attributes.speed = 50;
         tribute.moves();
-        assert_eq!(tribute.movement, 50);
+        assert_eq!(tribute.attributes.movement, 50);
         tribute.short_rests();
-        assert_eq!(tribute.movement, 100);
+        assert_eq!(tribute.attributes.movement, 100);
     }
 
     #[test]
     fn is_hidden_true() {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
-        tribute.intelligence = Some(100);
-        tribute.is_hidden = Some(true);
+        tribute.attributes.intelligence = 100;
+        tribute.attributes.is_hidden = true;
         assert!(!tribute.is_visible());
     }
 }

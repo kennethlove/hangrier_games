@@ -1,11 +1,12 @@
 use rand::Rng;
 use std::fmt::Display;
 use std::str::FromStr;
+use serde::{Deserialize, Serialize};
 use crate::areas::Area;
 use crate::games::Game;
 use crate::items::name_generator::{generate_shield_name, generate_weapon_name};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Item {
     pub id: Option<i32>,
     pub name: String,

@@ -1,73 +1,73 @@
 use rand::Rng;
 use std::fmt::Display;
 use std::str::FromStr;
+use serde::{Deserialize, Serialize};
 use super::events::AreaEvent;
 use crate::tributes::Tribute;
 use crate::tributes::statuses::TributeStatus;
 use crate::items::Item;
 use crate::messages::GameMessage;
 
-#[derive(Clone, Default, Debug, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub struct AreaDetails {
+    pub open: bool,
+    pub items: Vec<Item>,
+}
+
+impl Default for AreaDetails {
+    fn default() -> Self {
+        Self {
+            open: true,
+            items: vec![],
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Area {
     #[default]
-    Cornucopia,
-    Northeast,
-    Northwest,
-    Southeast,
-    Southwest,
+    Cornucopia(AreaDetails),
+    Northeast(AreaDetails),
+    Northwest(AreaDetails),
+    Southeast(AreaDetails),
+    Southwest(AreaDetails),
 }
 
 impl Display for Area {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Area::Cornucopia => write!(f, "The Cornucopia"),
-            Area::Northeast => write!(f, "Northeast"),
-            Area::Northwest => write!(f, "Northwest"),
-            Area::Southeast => write!(f, "Southeast"),
-            Area::Southwest => write!(f, "Southwest"),
+            Area::Cornucopia(_) => write!(f, "the cornucopia"),
+            Area::Northeast(_) => write!(f, "northeast"),
+            Area::Northwest(_) => write!(f, "northwest"),
+            Area::Southeast(_) => write!(f, "southeast"),
+            Area::Southwest(_) => write!(f, "southwest"),
+        }
+    }
+}
+
+impl FromStr for Area {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "the cornucopia" => Ok(Area::Cornucopia { 0: Default::default() }),
+            "northeast" => Ok(Area::Northeast { 0: Default::default() }),
+            "northwest" => Ok(Area::Northwest { 0: Default::default() }),
+            "southeast" => Ok(Area::Southeast { 0: Default::default() }),
+            "southwest" => Ok(Area::Southwest { 0: Default::default() }),
+            _ => Err("invalid area".into()),
         }
     }
 }
 
 impl Area {
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "the cornucopia" => Some(Area::Cornucopia),
-            "thecornucopia" => Some(Area::Cornucopia),
-            "cornucopia" => Some(Area::Cornucopia),
-            "north east" => Some(Area::Northeast),
-            "northeast" => Some(Area::Northeast),
-            "ne" => Some(Area::Northeast),
-            "north west" => Some(Area::Northwest),
-            "northwest" => Some(Area::Northwest),
-            "nw" => Some(Area::Northwest),
-            "south east" => Some(Area::Southeast),
-            "southeast" => Some(Area::Southeast),
-            "se" => Some(Area::Southeast),
-            "south west" => Some(Area::Southwest),
-            "southwest" => Some(Area::Southwest),
-            "sw" => Some(Area::Southwest),
-            _ => None,
-        }
-    }
-
-    pub fn as_str(&self) -> &str {
+    pub fn neighbors(&self) -> Vec<&str> {
         match self {
-            Area::Cornucopia => "The Cornucopia",
-            Area::Northeast => "Northeast",
-            Area::Northwest => "Northwest",
-            Area::Southeast => "Southeast",
-            Area::Southwest => "Southwest",
-        }
-    }
-
-    pub fn neighbors(&self) -> Vec<Area> {
-        match self {
-            Area::Cornucopia => vec![Area::Northeast, Area::Northwest, Area::Southeast, Area::Southwest],
-            Area::Northeast => vec![Area::Cornucopia, Area::Northwest, Area::Southeast],
-            Area::Northwest => vec![Area::Cornucopia, Area::Northeast, Area::Southwest],
-            Area::Southeast => vec![Area::Cornucopia, Area::Southwest, Area::Northeast],
-            Area::Southwest => vec![Area::Cornucopia, Area::Southeast, Area::Northwest]
+            Area::Cornucopia(_) => vec!["northeast", "northwest", "southeast", "southwest"],
+            Area::Northeast(_) => vec!["the cornucopia", "northwest", "southeast"],
+            Area::Northwest(_) => vec!["the cornucopia", "northeast", "southwest"],
+            Area::Southeast(_) => vec!["the cornucopia", "southwest", "northeast"],
+            Area::Southwest(_) => vec!["the cornucopia", "southeast", "northwest"]
         }
     }
 
@@ -78,13 +78,13 @@ impl Area {
             2 => Area::Northwest,
             3 => Area::Southeast,
             4 => Area::Southwest,
-            _ => Area::Cornucopia,
+            _ => Cornucopia,
         }
     }
 
     pub fn id(&self) -> i32 {
         match self {
-            Area::Cornucopia => 1,
+            Cornucopia => 1,
             Area::Northeast => 2,
             Area::Northwest => 3,
             Area::Southeast => 4,
@@ -94,7 +94,7 @@ impl Area {
 
     pub fn get_by_id(area_id: i32) -> Option<Area> {
         match area_id {
-            1 => Some(Area::Cornucopia),
+            1 => Some(Cornucopia),
             2 => Some(Area::Northeast),
             3 => Some(Area::Northwest),
             4 => Some(Area::Southeast),
@@ -113,7 +113,7 @@ impl Area {
                 break random_area;
             }
             if count == 10 {
-                break Area::Cornucopia;
+                break Cornucopia;
             }
             count += 1;
         };
@@ -250,13 +250,13 @@ impl Area {
 
 impl From<AreaModel> for Area {
     fn from(area: AreaModel) -> Self {
-        Self::from_str(area.name.as_str()).unwrap_or(Area::Cornucopia)
+        Self::from_str(area.name.as_str()).unwrap_or(Cornucopia)
     }
 }
 
 impl From<String> for Area {
     fn from(s: String) -> Self {
-        Self::from_str(s.as_str()).unwrap_or(Area::Cornucopia)
+        Self::from_str(s.as_str()).unwrap_or(Cornucopia)
     }
 }
 
@@ -266,8 +266,8 @@ mod tests {
 
     #[test]
     fn area_from_str() {
-        assert_eq!(Area::from_str("The Cornucopia"), Some(Area::Cornucopia));
-        assert_eq!(Area::from_str("Cornucopia"), Some(Area::Cornucopia));
+        assert_eq!(Area::from_str("The Cornucopia"), Some(Cornucopia));
+        assert_eq!(Area::from_str("Cornucopia"), Some(Cornucopia));
         assert_eq!(Area::from_str("North East"), Some(Area::Northeast));
         assert_eq!(Area::from_str("Northeast"), Some(Area::Northeast));
         assert_eq!(Area::from_str("NE"), Some(Area::Northeast));
@@ -284,7 +284,7 @@ mod tests {
 
     #[test]
     fn area_as_str() {
-        assert_eq!(Area::Cornucopia.as_str(), "The Cornucopia");
+        assert_eq!(Cornucopia.as_str(), "The Cornucopia");
         assert_eq!(Area::Northeast.as_str(), "Northeast");
         assert_eq!(Area::Northwest.as_str(), "Northwest");
         assert_eq!(Area::Southeast.as_str(), "Southeast");
@@ -295,7 +295,7 @@ mod tests {
     fn random_area() {
         let area = Area::random();
         assert!(
-            area == Area::Cornucopia ||
+            area == Cornucopia ||
                 area == Area::Northeast ||
                 area == Area::Northwest ||
                 area == Area::Southeast ||
@@ -305,10 +305,10 @@ mod tests {
 
     #[test]
     fn area_neighbors() {
-        assert_eq!(Area::Cornucopia.neighbors(), vec![Area::Northeast, Area::Northwest, Area::Southeast, Area::Southwest]);
-        assert_eq!(Area::Northeast.neighbors(), vec![Area::Cornucopia, Area::Northwest, Area::Southeast]);
-        assert_eq!(Area::Northwest.neighbors(), vec![Area::Cornucopia, Area::Northeast, Area::Southwest]);
-        assert_eq!(Area::Southeast.neighbors(), vec![Area::Cornucopia, Area::Southwest, Area::Northeast]);
-        assert_eq!(Area::Southwest.neighbors(), vec![Area::Cornucopia, Area::Southeast, Area::Northwest]);
+        assert_eq!(Cornucopia.neighbors(), vec![Area::Northeast, Area::Northwest, Area::Southeast, Area::Southwest]);
+        assert_eq!(Area::Northeast.neighbors(), vec![Cornucopia, Area::Northwest, Area::Southeast]);
+        assert_eq!(Area::Northwest.neighbors(), vec![Cornucopia, Area::Northeast, Area::Southwest]);
+        assert_eq!(Area::Southeast.neighbors(), vec![Cornucopia, Area::Southwest, Area::Northeast]);
+        assert_eq!(Area::Southwest.neighbors(), vec![Cornucopia, Area::Southeast, Area::Northwest]);
     }
 }

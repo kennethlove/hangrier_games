@@ -61,6 +61,16 @@ impl Game {
         game
     }
 
+    pub fn where_am_i(&self, tribute: &Tribute) -> Option<Area> {
+        for area in self.areas.iter() {
+            if area.tributes.contains(tribute) {
+                return Some(area.clone())
+            }
+        }
+        None
+
+    }
+
     pub fn end(&mut self) { self.status = GameStatus::Finished }
 
     // Runs at the start of the game
@@ -72,9 +82,11 @@ impl Game {
         // add tributes to the cornucopia
     }
 
-    pub fn add_tribute(&self, tribute: Tribute) {
-        let mut cornucopia = self.areas.iter().filter(|a| a.name == "The Cornucopia").collect::<Vec<&Area>>().first().unwrap();
-        cornucopia.add_tribute(tribute);
+    pub fn add_tribute(&self, mut tribute: Tribute) {
+        let cornucopias = self.areas.iter().filter(|a| a.name == "The Cornucopia").collect::<Vec<&Area>>();
+        let mut cornucopia = cornucopias.first().cloned().unwrap().clone();
+        cornucopia.add_tribute(tribute.clone());
+        tribute.game = Some(self.clone());
     }
 
     pub fn tributes(&self) -> Vec<Tribute> {
@@ -205,6 +217,12 @@ impl Game {
         for mut tribute in self.recently_dead_tributes() {
             tribute.dies();
         }
+    }
+
+    pub fn tribute_moves(&self, tribute: &Tribute, mut area: Area) {
+        let mut current_area = self.where_am_i(tribute).unwrap().clone();
+        current_area.remove_tribute(tribute);
+        area.add_tribute(tribute.clone());
     }
 }
 

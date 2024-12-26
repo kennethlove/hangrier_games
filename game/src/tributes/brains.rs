@@ -1,11 +1,11 @@
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-use crate::tributes::actions::Action;
+use crate::tributes::actions::{Action, TributeAction};
 use crate::tributes::Tribute;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Brain {
-    pub previous_actions: Vec<Action>,
+    pub previous_actions: Vec<TributeAction>,
     pub preferred_action: Option<Action>,
     pub preferred_action_percentage: f64,
 }
@@ -36,15 +36,9 @@ impl Brain {
     pub fn act(&mut self, tribute: &Tribute, nearby_tributes: usize) -> Action {
         if tribute.attributes.health == 0 { return Action::None; }
 
-        // // If the tribute is in a closed area, move them.
-        // if closed_areas.contains(tribute.area.as_ref().unwrap()) {
-        //     self.previous_actions.push(Action::Move(None));
-        //     return Action::Move(None);
-        // }
-        //
         let action = self.decide_on_action(tribute, nearby_tributes);
 
-        self.previous_actions.push(action.clone());
+        self.previous_actions.push(TributeAction::new(action.clone(), None));
 
         action
     }
@@ -52,7 +46,7 @@ impl Brain {
     /// Get the last action taken by the tribute
     pub fn last_action(&self) -> Action {
         if let Some(previous_action) = self.previous_actions.last() {
-            previous_action.clone()
+            previous_action.action.clone()
         } else {
             Action::None
         }
@@ -67,7 +61,7 @@ impl Brain {
         // If there is a preferred action, we should take it, assuming a positive roll
         if let Some(preferred_action) = self.preferred_action.clone() {
             if thread_rng().gen_bool(self.preferred_action_percentage) {
-                self.previous_actions.push(preferred_action.clone());
+                self.previous_actions.push(TributeAction::new(self.preferred_action.clone().unwrap(), None));
                 return preferred_action
             }
         }

@@ -6,8 +6,8 @@ use crate::tributes::Tribute;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct TributeAction {
-    action: Action,
-    target: Option<Tribute>,
+    pub action: Action,
+    pub target: Option<Tribute>,
 }
 
 impl TributeAction {

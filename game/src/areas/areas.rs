@@ -91,6 +91,14 @@ impl Area {
             }
         }
     }
+
+    pub fn living_tributes(&self) -> Vec<Tribute> {
+        self.tributes.iter().filter(|t| t.is_alive()).cloned().collect()
+    }
+
+    pub fn available_items(&self) -> Vec<Item> {
+        self.items.iter().filter(|i| i.quantity > 0).cloned().collect()
+    }
 }
 
 

@@ -1,8 +1,8 @@
+use crate::threats::animals::Animal;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
-use serde::{Deserialize, Serialize};
-use crate::threats::animals::Animal;
 
 #[derive(Clone, Debug, PartialOrd, PartialEq, Serialize, Deserialize)]
 pub enum TributeEvent {
@@ -25,11 +25,16 @@ impl FromStr for TributeEvent {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.contains("animal attack") {
-            let animal_name = s.split_whitespace().skip(2).map(|s| s.to_string()).collect::<Vec<String>>().join(" ");
+            let animal_name = s
+                .split_whitespace()
+                .skip(2)
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+                .join(" ");
 
             let animal = Animal::from_str(animal_name.as_str());
             if animal.is_ok() {
-                return Ok(TributeEvent::AnimalAttack(animal?))
+                return Ok(TributeEvent::AnimalAttack(animal?));
             };
         }
         match s {
@@ -44,7 +49,7 @@ impl FromStr for TributeEvent {
             "infection" => Ok(TributeEvent::Infection),
             "drowning" => Ok(TributeEvent::Drowning),
             "burn" => Ok(TributeEvent::Burn),
-            _ => Err(())
+            _ => Err(()),
         }
     }
 }
@@ -74,9 +79,9 @@ impl TributeEvent {
             TributeEvent::AnimalAttack(animal) => {
                 let s = format!("animal attack {}", animal.as_str());
                 Box::leak(s.into_boxed_str())
-            },
+            }
             TributeEvent::Dysentery => "dysentery",
-            TributeEvent::LightningStrike =>"lightning strike",
+            TributeEvent::LightningStrike => "lightning strike",
             TributeEvent::Hypothermia => "hypothermia",
             TributeEvent::HeatStroke => "heat stroke",
             TributeEvent::Dehydration => "dehydration",
@@ -123,7 +128,10 @@ mod tests {
 
     #[test]
     fn tribute_event_from_str() {
-        assert_eq!(TributeEvent::from_str("animal attack wolf").unwrap(), TributeEvent::AnimalAttack(Animal::Wolf));
+        assert_eq!(
+            TributeEvent::from_str("animal attack wolf").unwrap(),
+            TributeEvent::AnimalAttack(Animal::Wolf)
+        );
     }
 
     #[test]

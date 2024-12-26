@@ -1,8 +1,8 @@
-use std::str::FromStr;
-use serde::{Deserialize, Serialize};
 use crate::areas::Area;
 use crate::items::Item;
 use crate::tributes::Tribute;
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct TributeAction {
@@ -15,7 +15,6 @@ impl TributeAction {
         TributeAction { action, target }
     }
 }
-
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub enum Action {
@@ -92,6 +91,9 @@ mod tests {
 
     #[test]
     fn tribute_action_new() {
-        assert_eq!(TributeAction::new(Action::None, None), TributeAction { action: Action::None, target: None });
+        assert_eq!(TributeAction::new(Action::None, None), TributeAction {
+            action: Action::None,
+            target: None
+        });
     }
 }

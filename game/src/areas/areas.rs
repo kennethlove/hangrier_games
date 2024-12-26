@@ -1,9 +1,9 @@
-use std::fmt::Display;
-use serde::{Deserialize, Serialize};
 use crate::areas::events::AreaEvent;
-use crate::tributes::Tribute;
 use crate::items::Item;
+use crate::tributes::Tribute;
 use crate::tributes::statuses::TributeStatus;
+use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Area {
@@ -80,33 +80,38 @@ impl Area {
         for event in self.events.iter() {
             for tribute in self.tributes.iter_mut() {
                 match event {
-                    AreaEvent::Wildfire => { tribute.status = TributeStatus::Burned }
-                    AreaEvent::Flood => { tribute.status = TributeStatus::Drowned }
-                    AreaEvent::Earthquake => { tribute.status = TributeStatus::Buried }
-                    AreaEvent::Avalanche => { tribute.status = TributeStatus::Buried }
-                    AreaEvent::Blizzard => { tribute.status = TributeStatus::Frozen }
-                    AreaEvent::Landslide => { tribute.status = TributeStatus::Buried }
-                    AreaEvent::Heatwave => { tribute.status = TributeStatus::Overheated }
+                    AreaEvent::Wildfire => tribute.status = TributeStatus::Burned,
+                    AreaEvent::Flood => tribute.status = TributeStatus::Drowned,
+                    AreaEvent::Earthquake => tribute.status = TributeStatus::Buried,
+                    AreaEvent::Avalanche => tribute.status = TributeStatus::Buried,
+                    AreaEvent::Blizzard => tribute.status = TributeStatus::Frozen,
+                    AreaEvent::Landslide => tribute.status = TributeStatus::Buried,
+                    AreaEvent::Heatwave => tribute.status = TributeStatus::Overheated,
                 }
             }
         }
     }
 
     pub fn living_tributes(&self) -> Vec<Tribute> {
-        self.tributes.iter().filter(|t| t.is_alive()).cloned().collect()
+        self.tributes
+            .iter()
+            .filter(|t| t.is_alive())
+            .cloned()
+            .collect()
     }
 
     pub fn available_items(&self) -> Vec<Item> {
-        self.items.iter().filter(|i| i.quantity > 0).cloned().collect()
+        self.items
+            .iter()
+            .filter(|i| i.quantity > 0)
+            .cloned()
+            .collect()
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::items::Item;
-    use crate::tributes::Tribute;
-    use super::Area;
+    use super::*;
 
     #[test]
     fn default_area() {

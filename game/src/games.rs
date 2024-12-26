@@ -1,16 +1,16 @@
-use rand::prelude::SliceRandom;
-use rand::Rng;
-use std::fmt::Display;
-use std::str::FromStr;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use crate::areas::Area;
 use crate::areas::events::AreaEvent;
-use crate::tributes::events::TributeEvent;
-use crate::tributes::actions::Action;
-use crate::tributes::Tribute;
-use crate::tributes::statuses::TributeStatus;
 use crate::messages::GameMessage;
+use crate::tributes::Tribute;
+use crate::tributes::actions::Action;
+use crate::tributes::events::TributeEvent;
+use crate::tributes::statuses::TributeStatus;
+use rand::Rng;
+use rand::prelude::SliceRandom;
+use serde::{Deserialize, Serialize};
+use std::fmt::Display;
+use std::str::FromStr;
+use uuid::Uuid;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Game {
@@ -50,7 +50,6 @@ impl Default for Game {
             day: None,
             areas,
         }
-
     }
 }
 
@@ -64,14 +63,15 @@ impl Game {
     pub fn where_am_i(&self, tribute: &Tribute) -> Option<Area> {
         for area in self.areas.iter() {
             if area.tributes.contains(tribute) {
-                return Some(area.clone())
+                return Some(area.clone());
             }
         }
         None
-
     }
 
-    pub fn end(&mut self) { self.status = GameStatus::Finished }
+    pub fn end(&mut self) {
+        self.status = GameStatus::Finished
+    }
 
     // Runs at the start of the game
     pub fn start(&mut self) {
@@ -83,7 +83,11 @@ impl Game {
     }
 
     pub fn add_tribute(&self, mut tribute: Tribute) {
-        let cornucopias = self.areas.iter().filter(|a| a.name == "The Cornucopia").collect::<Vec<&Area>>();
+        let cornucopias = self
+            .areas
+            .iter()
+            .filter(|a| a.name == "The Cornucopia")
+            .collect::<Vec<&Area>>();
         let mut cornucopia = cornucopias.first().cloned().unwrap().clone();
         cornucopia.add_tribute(tribute.clone());
         tribute.game = Some(self.clone());
@@ -98,15 +102,27 @@ impl Game {
     }
 
     pub fn living_tributes(&self) -> Vec<Tribute> {
-        self.tributes().iter().filter(|t| t.is_alive()).cloned().collect()
+        self.tributes()
+            .iter()
+            .filter(|t| t.is_alive())
+            .cloned()
+            .collect()
     }
 
     pub fn dead_tributes(&self) -> Vec<Tribute> {
-        self.tributes().iter().filter(|t| !t.is_alive()).cloned().collect()
+        self.tributes()
+            .iter()
+            .filter(|t| !t.is_alive())
+            .cloned()
+            .collect()
     }
 
     pub fn recently_dead_tributes(&self) -> Vec<Tribute> {
-        self.tributes().iter().filter(|t| t.status == TributeStatus::RecentlyDead).cloned().collect()
+        self.tributes()
+            .iter()
+            .filter(|t| t.status == TributeStatus::RecentlyDead)
+            .cloned()
+            .collect()
     }
 
     pub fn winner(&self) -> Option<Tribute> {
@@ -123,11 +139,11 @@ impl Game {
         if let Some(winner) = self.winner() {
             println!("{}", GameMessage::TributeWins(winner));
             self.end();
-            return
+            return;
         } else if living_tributes.len() == 0 {
             println!("{}", GameMessage::NoOneWins);
             self.end();
-            return
+            return;
         }
 
         // Make any announcements for the day
@@ -143,7 +159,10 @@ impl Game {
             }
         }
 
-        println!("{}", GameMessage::TributesLeft(living_tributes.len() as u32));
+        println!(
+            "{}",
+            GameMessage::TributesLeft(living_tributes.len() as u32)
+        );
 
         // Run the day
         self.do_day_night_cycle(true);
@@ -168,7 +187,11 @@ impl Game {
         // Trigger any events for this cycle if we're past the first three days
         if self.day > Some(3) || !day {
             for _ in &self.areas {
-                if rng.gen_bool(if day { day_event_frequency } else { night_event_frequency }) {
+                if rng.gen_bool(if day {
+                    day_event_frequency
+                } else {
+                    night_event_frequency
+                }) {
                     AreaEvent::random();
                 }
             }
@@ -199,16 +222,23 @@ impl Game {
             }
 
             match (self.day, day) {
-                (Some(1), true) => { tribute.do_day_night(Some(Action::Move(None)), Some(0.5), day); },
+                (Some(1), true) => {
+                    tribute.do_day_night(Some(Action::Move(None)), Some(0.5), day);
+                }
                 (Some(3), true) => {
-                    let cornucopia: Option<Area> = self.areas.iter().filter(|a| a.name == "cornucopia").cloned().collect::<Vec<Area>>().first().cloned();
-                    tribute.do_day_night(
-                        Some(Action::Move(cornucopia)),
-                        Some(0.75),
-                        day
-                    );
-                },
-                (_, _) => { tribute.do_day_night(None, None, day); }
+                    let cornucopia: Option<Area> = self
+                        .areas
+                        .iter()
+                        .filter(|a| a.name == "cornucopia")
+                        .cloned()
+                        .collect::<Vec<Area>>()
+                        .first()
+                        .cloned();
+                    tribute.do_day_night(Some(Action::Move(cornucopia)), Some(0.75), day);
+                }
+                (_, _) => {
+                    tribute.do_day_night(None, None, day);
+                }
             }
         }
     }

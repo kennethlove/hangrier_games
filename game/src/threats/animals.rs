@@ -1,10 +1,12 @@
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
-use serde::{Deserialize, Serialize};
 use strum::EnumIter;
 
-#[derive(Clone, Debug, Default, Deserialize, EnumIter, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[derive(
+    Clone, Debug, Default, Deserialize, EnumIter, Eq, Ord, PartialEq, PartialOrd, Serialize,
+)]
 pub enum Animal {
     #[default]
     Squirrel,
@@ -51,7 +53,7 @@ impl Animal {
             _ => {
                 let pluralized = format!("{}s", self.as_str());
                 pluralized
-            },
+            }
         }
     }
 

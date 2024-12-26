@@ -1,10 +1,10 @@
+use crate::items::name_generator::{generate_shield_name, generate_weapon_name};
 use rand::Rng;
-use std::fmt::Display;
-use std::str::FromStr;
 use rand::prelude::IteratorRandom;
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
+use std::str::FromStr;
 use strum::{EnumIter, IntoEnumIterator};
-use crate::items::name_generator::{generate_shield_name, generate_weapon_name};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Item {
@@ -34,7 +34,13 @@ impl Default for Item {
 }
 
 impl Item {
-    pub fn new(name: &str, item_type: ItemType, quantity: u32, attribute: Attribute, effect: i32) -> Item {
+    pub fn new(
+        name: &str,
+        item_type: ItemType,
+        quantity: u32,
+        attribute: Attribute,
+        effect: i32,
+    ) -> Item {
         Item {
             name: name.to_string(),
             item_type,
@@ -77,7 +83,13 @@ impl Item {
         let attribute = Attribute::random();
         let effect = rng.gen_range(1..=10);
 
-        Item::new(name, ItemType::Consumable, quantity, attribute.unwrap(), effect)
+        Item::new(
+            name,
+            ItemType::Consumable,
+            quantity,
+            attribute.unwrap(),
+            effect,
+        )
     }
 
     pub fn new_generic_consumable() -> Item {
@@ -140,9 +152,9 @@ impl Item {
     }
 
     pub fn is_consumable(&self) -> bool {
-        self.item_type == ItemType::Consumable &&
-            self.attribute != Attribute::Strength &&
-            self.attribute != Attribute::Defense
+        self.item_type == ItemType::Consumable
+            && self.attribute != Attribute::Strength
+            && self.attribute != Attribute::Defense
     }
 }
 
@@ -200,13 +212,13 @@ impl FromStr for ItemType {
 
 #[derive(Debug, Clone, Eq, EnumIter, PartialEq, Serialize, Deserialize)]
 pub enum Attribute {
-    Health, // Heals health
-    Sanity, // Heals sanity
+    Health,   // Heals health
+    Sanity,   // Heals sanity
     Movement, // Increases movement
-    Bravery, // Increases bravery
-    Speed, // Increases speed
+    Bravery,  // Increases bravery
+    Speed,    // Increases speed
     Strength, // Increases damage done, i.e. weapon
-    Defense, // Reduces damage taken
+    Defense,  // Reduces damage taken
 }
 
 impl Attribute {

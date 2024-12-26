@@ -3,46 +3,21 @@ use rand::prelude::*;
 // Adjectives to come before "shield"
 // _____ shield
 const SHIELD_ADJECTIVES: &[&str] = &[
-    "iron",
-    "wooden",
-    "brass",
-    "bronze",
-    "glass",
-    "steel",
-    "stone",
+    "iron", "wooden", "brass", "bronze", "glass", "steel", "stone",
 ];
 
 // Weapon nouns
 // <descriptor> _____
 const WEAPON_NOUNS: &[&str] = &[
-    "sword",
-    "spear",
-    "dagger",
-    "knife",
-    "net",
-    "trident",
-    "bow",
-    "mace",
+    "sword", "spear", "dagger", "knife", "net", "trident", "bow", "mace",
 ];
 
 // Adjectives to come before a weapon noun
 // _____ <weapon noun>
 const WEAPON_ADJECTIVES: &[&str] = &[
-    "sharp",
-    "heavy",
-    "long",
-    "short",
-    "glass",
-    "iron",
-    "wooden",
-    "brass",
-    "bronze",
-    "glass",
-    "steel",
-    "stone",
+    "sharp", "heavy", "long", "short", "glass", "iron", "wooden", "brass", "bronze", "glass",
+    "steel", "stone",
 ];
-
-
 
 pub fn generate_shield_name() -> String {
     let mut rng = thread_rng();

@@ -1,7 +1,7 @@
-use rand::{thread_rng, Rng};
-use serde::{Deserialize, Serialize};
-use crate::tributes::actions::{Action, TributeAction};
 use crate::tributes::Tribute;
+use crate::tributes::actions::{Action, TributeAction};
+use rand::{Rng, thread_rng};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Brain {
@@ -34,11 +34,14 @@ impl Brain {
     /// Decide on an action for the tribute to take
     /// First weighs any preferred actions, then decides based on current state
     pub fn act(&mut self, tribute: &Tribute, nearby_tributes: usize) -> Action {
-        if tribute.attributes.health == 0 { return Action::None; }
+        if tribute.attributes.health == 0 {
+            return Action::None;
+        }
 
         let action = self.decide_on_action(tribute, nearby_tributes);
 
-        self.previous_actions.push(TributeAction::new(action.clone(), None));
+        self.previous_actions
+            .push(TributeAction::new(action.clone(), None));
 
         action
     }
@@ -61,8 +64,11 @@ impl Brain {
         // If there is a preferred action, we should take it, assuming a positive roll
         if let Some(preferred_action) = self.preferred_action.clone() {
             if thread_rng().gen_bool(self.preferred_action_percentage) {
-                self.previous_actions.push(TributeAction::new(self.preferred_action.clone().unwrap(), None));
-                return preferred_action
+                self.previous_actions.push(TributeAction::new(
+                    self.preferred_action.clone().unwrap(),
+                    None,
+                ));
+                return preferred_action;
             }
         }
 
@@ -85,7 +91,7 @@ impl Brain {
                         } else {
                             Action::Move(None)
                         }
-                    },
+                    }
                     // health is good, move
                     _ => {
                         // If the tribute has movement, move
@@ -106,7 +112,7 @@ impl Brain {
                         } else {
                             Action::Attack
                         }
-                    },
+                    }
                     // health isn't great, run away
                     6..=10 => {
                         if tribute.attributes.sanity > 20 {
@@ -114,11 +120,11 @@ impl Brain {
                         } else {
                             Action::Attack
                         }
-                    },
+                    }
                     // health is good, attack
                     _ => Action::Attack,
                 }
-            },
+            }
             _ => {
                 // More than 5 enemies? Intelligence decides next move
                 let sense = 100 - tribute.attributes.intelligence - tribute.attributes.sanity;
@@ -144,7 +150,7 @@ mod tests {
         // If there are no enemies nearby, the tribute should move
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         tribute.id = Some(1);
-        let action = tribute.brain.act(&tribute.clone(),0);
+        let action = tribute.brain.act(&tribute.clone(), 0);
         assert_eq!(action, Action::Move(None));
     }
 
@@ -166,7 +172,7 @@ mod tests {
         tribute.attributes.speed = 50;
         tribute.moves();
         tribute.moves();
-        let action = tribute.brain.act(&tribute.clone(),2);
+        let action = tribute.brain.act(&tribute.clone(), 2);
         assert_eq!(action, Action::Rest);
     }
 

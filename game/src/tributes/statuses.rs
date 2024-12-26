@@ -1,7 +1,7 @@
+use crate::threats::animals::Animal;
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
-use serde::{Deserialize, Serialize};
-use crate::threats::animals::Animal;
 use strum::EnumIter;
 
 #[derive(Clone, Debug, Default, Deserialize, EnumIter, Eq, PartialEq, Serialize)]
@@ -31,10 +31,15 @@ impl FromStr for TributeStatus {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.to_lowercase().as_str().contains("mauled") {
-            let animal_name = s.split_whitespace().skip(1).map(|s| s.to_string()).collect::<Vec<String>>().join(" ");
+            let animal_name = s
+                .split_whitespace()
+                .skip(1)
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+                .join(" ");
             let animal = Animal::from_str(animal_name.as_str());
             if animal.is_ok() {
-                return Ok(TributeStatus::Mauled(animal?))
+                return Ok(TributeStatus::Mauled(animal?));
             };
         }
         match s.to_lowercase().as_str() {

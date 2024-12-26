@@ -1,11 +1,10 @@
 use super::actions::{AttackOutcome, AttackResult, Action, TributeAction};
-use super::brains::TributeBrain;
+use super::brains::Brain;
 use super::statuses::TributeStatus;
 use crate::areas::Area;
 use crate::tributes::events::TributeEvent;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
-use crate::games::Game;
 use crate::items::{Attribute, Item};
 use crate::messages::GameMessage;
 
@@ -13,14 +12,10 @@ use crate::messages::GameMessage;
 pub struct Tribute {
     /// What is their identifier?
     pub id: Option<i32>,
-    /// What game do they belong to?
-    pub game: Option<Game>,
-    /// Where are they in the game?
-    pub area: Option<Area>,
     /// What is their current status?
     pub status: TributeStatus,
     /// This is their thinker
-    pub brain: TributeBrain,
+    pub brain: Brain,
     /// How they present themselves to the real world
     pub avatar: Option<String>,
     /// Who created them in the real world
@@ -33,8 +28,6 @@ pub struct Tribute {
     pub statistics: Statistics,
     /// Attributes like health
     pub attributes: Attributes,
-    /// Actions the tribute has taken
-    pub previous_actions: Vec<TributeAction>,
     /// Items the tribute owns
     pub items: Vec<Item>,
 }
@@ -42,35 +35,23 @@ pub struct Tribute {
 impl Tribute {
     /// Creates a new Tribute with full health, sanity, and movement.
     pub fn new(name: String, district: Option<i32>, avatar: Option<String>) -> Self {
-        let brain = TributeBrain::new();
+        let brain = Brain::default();
         let district = district.unwrap_or(0);
         let attributes = Attributes::new();
         let statistics = Statistics::default();
 
         Self {
             id: None,
-            game: None,
             name: name.clone(),
             district,
-            area: Some(Area::default()),
             brain,
             status: TributeStatus::Healthy,
             avatar,
             human_player_name: None,
             attributes,
             statistics,
-            previous_actions: vec![],
             items: vec![],
         }
-    }
-
-    pub fn delete(id: i32) {
-        models::tribute::Tribute::delete(id);
-    }
-
-    pub fn update(&self, update: UpdateTribute) {
-        let tribute_model = models::Tribute::from(self.clone());
-        tribute_model.update(update);
     }
 
     pub fn avatar(&self) -> String {
@@ -117,7 +98,7 @@ impl Tribute {
     /// Marks the tribute as recently dead and reveals them.
     pub fn dies(&mut self) {
         self.status = TributeStatus::RecentlyDead;
-        self.attributes.is_hidden = Some(false);
+        self.attributes.is_hidden = false;
     }
 
     pub fn is_alive(&self) -> bool {
@@ -491,92 +472,28 @@ impl Tribute {
         match status {
             TributeStatus::Wounded => {
                 self.takes_physical_damage(1);
-                create_full_log(
-                    self.game_id.unwrap(),
-                    GameMessage::TributeBleeds(self.clone()).to_string(),
-                    Some(self.area.clone().unwrap().id()),
-                    Some(self.id.unwrap()),
-                    None,
-                    None
-                );
             },
             TributeStatus::Sick => {
-                self.attributes.strength = Some(std::cmp::max(1, self.attributes.strength.unwrap() - 1));
-                self.attributes.speed = Some(std::cmp::max(1, self.attributes.speed.unwrap() - 1));
-                create_full_log(
-                    self.game_id.unwrap(),
-                    GameMessage::TributeSick(self.clone()).to_string(),
-                    Some(self.area.clone().unwrap().id()),
-                    Some(self.id.unwrap()),
-                    None,
-                    None
-                );
+                self.attributes.strength = std::cmp::max(1, self.attributes.strength - 1);
+                self.attributes.speed = std::cmp::max(1, self.attributes.speed - 1);
             },
             TributeStatus::Electrocuted => {
                 self.takes_physical_damage(20);
-                create_full_log(
-                    self.game_id.unwrap(),
-                    GameMessage::TributeElectrocuted(self.clone()).to_string(),
-                    Some(self.area.clone().unwrap().id()),
-                    Some(self.id.unwrap()),
-                    None,
-                    None
-                );
             },
             TributeStatus::Frozen => {
-                self.attributes.speed = Some(std::cmp::max(1, self.attributes.speed.unwrap() - 1));
-                create_full_log(
-                    self.game_id.unwrap(),
-                    GameMessage::TributeFrozen(self.clone()).to_string(),
-                    Some(self.area.clone().unwrap().id()),
-                    Some(self.id.unwrap()),
-                    None,
-                    None
-                );
+                self.attributes.speed = std::cmp::max(1, self.attributes.speed - 1);
             },
             TributeStatus::Overheated => {
-                self.attributes.speed = Some(std::cmp::max(1, self.attributes.speed.unwrap() - 1));
-                create_full_log(
-                    self.game_id.unwrap(),
-                    GameMessage::TributeOverheated(self.clone()).to_string(),
-                    Some(self.area.clone().unwrap().id()),
-                    Some(self.id.unwrap()),
-                    None,
-                    None
-                );
+                self.attributes.speed = std::cmp::max(1, self.attributes.speed - 1);
             },
             TributeStatus::Dehydrated => {
-                self.attributes.strength = Some(std::cmp::max(1, self.attributes.strength.unwrap() - 1));
-                create_full_log(
-                    self.game_id.unwrap(),
-                    GameMessage::TributeDehydrated(self.clone()).to_string(),
-                    Some(self.area.clone().unwrap().id()),
-                    Some(self.id.unwrap()),
-                    None,
-                    None
-                );
+                self.attributes.strength = std::cmp::max(1, self.attributes.strength - 1);
             },
             TributeStatus::Starving => {
-                self.attributes.strength = Some(std::cmp::max(1, self.attributes.strength.unwrap() - 1));
-                create_full_log(
-                    self.game_id.unwrap(),
-                    GameMessage::TributeStarving(self.clone()).to_string(),
-                    Some(self.area.clone().unwrap().id()),
-                    Some(self.id.unwrap()),
-                    None,
-                    None
-                );
+                self.attributes.strength = std::cmp::max(1, self.attributes.strength - 1);
             },
             TributeStatus::Poisoned => {
                 self.takes_mental_damage(5);
-                create_full_log(
-                    self.game_id.unwrap(),
-                    GameMessage::TributePoisoned(self.clone()).to_string(),
-                    Some(self.area.clone().unwrap().id()),
-                    Some(self.id.unwrap()),
-                    None,
-                    None
-                );
             },
             TributeStatus::Broken => {
                 // coin flip for which bone breaks
@@ -585,87 +502,31 @@ impl Tribute {
                 // TODO: Add in other bones? Ribs and skull make sense.
 
                 if leg_bone {
-                    self.attributes.speed = Some(std::cmp::max(1, self.attributes.speed.unwrap() - 5));
-                    create_full_log(
-                        self.game_id.unwrap(),
-                        GameMessage::TributeBrokenLeg(self.clone()).to_string(),
-                        Some(self.area.clone().unwrap().id()),
-                        Some(self.id.unwrap()),
-                        None,
-                        None
-                    );
+                    self.attributes.speed = std::cmp::max(1, self.attributes.speed - 5);
                 } else {
-                    self.attributes.strength = Some(std::cmp::max(1, self.attributes.strength.unwrap() - 5));
-                    create_full_log(
-                        self.game_id.unwrap(),
-                        GameMessage::TributeBrokenArm(self.clone()).to_string(),
-                        Some(self.area.clone().unwrap().id()),
-                        Some(self.id.unwrap()),
-                        None,
-                        None
-                    );
+                    self.attributes.strength = std::cmp::max(1, self.attributes.strength - 5);
                 }
             },
             TributeStatus::Infected => {
                 self.takes_physical_damage(2);
                 self.takes_mental_damage(2);
-                create_full_log(
-                    self.game_id.unwrap(),
-                    GameMessage::TributeInfected(self.clone()).to_string(),
-                    Some(self.area.clone().unwrap().id()),
-                    Some(self.id.unwrap()),
-                    None,
-                    None
-                );
             },
             TributeStatus::Drowned => {
                 self.takes_physical_damage(2);
                 self.takes_mental_damage(2);
-                create_full_log(
-                    self.game_id.unwrap(),
-                    GameMessage::TributeDrowned(self.clone()).to_string(),
-                    Some(self.area.clone().unwrap().id()),
-                    Some(self.id.unwrap()),
-                    None,
-                    None
-                );
             },
             TributeStatus::Mauled(animal) => {
                 let number_of_animals = thread_rng().gen_range(2..=5);
                 let damage = animal.damage() * number_of_animals;
                 self.takes_physical_damage(damage);
-                create_full_log(
-                    self.game_id.unwrap(),
-                    GameMessage::TributeMauled(self.clone(), number_of_animals, animal.clone(), damage).to_string(),
-                    Some(self.area.clone().unwrap().id()),
-                    Some(self.id.unwrap()),
-                    None,
-                    None
-                );
             },
             TributeStatus::Burned => {
                 self.takes_physical_damage(5);
-                create_full_log(
-                    self.game_id.unwrap(),
-                    GameMessage::TributeBurned(self.clone()).to_string(),
-                    Some(self.area.clone().unwrap().id()),
-                    Some(self.id.unwrap()),
-                    None,
-                    None
-                );
             }
             _ => {}
         }
 
         if self.attributes.health <= 0 {
-            create_full_log(
-                self.game_id.unwrap(),
-                GameMessage::TributeDiesFromStatus(self.clone(), self.status.clone()).to_string(),
-                Some(self.area.clone().unwrap().id()),
-                Some(self.id.unwrap()),
-                None,
-                None
-            );
             self.statistics.killed_by = Some(self.status.to_string());
             self.status = TributeStatus::RecentlyDead;
         }
@@ -1027,21 +888,20 @@ impl Tribute {
         true
     }
 
-    pub fn items(&self) -> Vec<Item> {
-        let items = models::item::Item::get_by_tribute(self.game_id.unwrap(), self.id.unwrap());
-        items.iter().filter(|i| i.quantity > 0).cloned().map(Item::from).collect()
+    pub fn available_items(&self) -> Vec<Item> {
+        self.items.iter().filter(|i| i.quantity > 0).collect()
     }
 
     pub fn weapons(&self) -> Vec<Item> {
-        self.items().iter().cloned().filter(|i| i.is_weapon()).collect()
+        self.available_items().iter().filter(|i| i.is_weapon()).collect()
     }
 
     pub fn defensive_items(&self) -> Vec<Item> {
-        self.items().iter().cloned().filter(|i| i.is_defensive()).collect()
+        self.available_items().iter().filter(|i| i.is_defensive()).collect()
     }
 
     pub fn consumable_items(&self) -> Vec<Item> {
-        self.items().iter().cloned().filter(|i| i.is_consumable()).collect()
+        self.available_items().iter().filter(|i| i.is_consumable()).collect()
     }
 }
 
@@ -1220,8 +1080,6 @@ pub struct Statistics {
     pub defeats: u32,
     /// How many fights ended in a draw?
     pub draws: u32,
-    /// How many games have they survived?
-    pub games: u32,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

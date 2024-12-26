@@ -1,71 +1,50 @@
 use rand::Rng;
 use std::fmt::Display;
 use std::str::FromStr;
+use rand::prelude::IteratorRandom;
 use serde::{Deserialize, Serialize};
-use crate::areas::Area;
-use crate::games::Game;
+use strum::{EnumIter, IntoEnumIterator};
 use crate::items::name_generator::{generate_shield_name, generate_weapon_name};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Item {
-    pub id: Option<i32>,
     pub name: String,
     pub item_type: ItemType,
-    pub game_id: Option<i32>,
-    pub area_id: Option<i32>,
-    pub tribute_id: Option<i32>,
-    pub quantity: i32,
+    pub quantity: u32,
     pub attribute: Attribute,
     pub effect: i32,
 }
 
+impl Display for Item {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
+impl Default for Item {
+    fn default() -> Self {
+        Self {
+            name: String::from("Useless health potion"),
+            item_type: ItemType::Consumable,
+            quantity: 1,
+            attribute: Attribute::Health,
+            effect: 0,
+        }
+    }
+}
+
 impl Item {
-    pub fn area(&self) -> Area {
-        Area::from(get_area_by_id(self.area_id).unwrap())
-    }
-
-    pub fn game(&self) -> Game {
-        Game::from(get_game_by_id(self.game_id.unwrap()).unwrap())
-    }
-
-    pub fn get_item_by_name(name: &str) -> Option<Item> {
-        Some(Item::from(ItemModel::get_by_name(name.to_string())))
-    }
-
-    pub fn create(
-        name: String,
-        item_type: String,
-        quantity: i32,
-        attribute: String,
-        effect: i32,
-        game_id: Option<i32>,
-        area_id: Option<i32>,
-        tribute_id: Option<i32>
-    ) -> Item {
-        let new_item = NewItem {
-            name,
+    pub fn new(name: &str, item_type: ItemType, quantity: u32, attribute: Attribute, effect: i32) -> Item {
+        Item {
+            name: name.to_string(),
             item_type,
-            game_id,
-            area_id,
-            tribute_id,
             quantity,
             attribute,
             effect,
-        };
-        let item = create_item(new_item);
-        Item::from(item)
+        }
     }
 
-    pub fn save(&self) {
-        let instance = UpdateItem::from(self.clone());
-        update_item(instance);
-    }
-
-    pub fn delete(&self) {
-        ItemModel::delete(self.id.unwrap());
-    }
-
-    pub fn new_random(name: String, game_id: Option<i32>, area_id: Option<i32>, tribute_id: Option<i32>) -> Item {
+    pub fn new_random(name: &str) -> Item {
         let mut rng = rand::thread_rng();
 
         let item_type = ItemType::random();
@@ -73,38 +52,36 @@ impl Item {
         let attribute = Attribute::random();
         let effect = rng.gen_range(1..=10);
 
-        Item::create(name, item_type.to_string(), quantity, attribute.to_string(), effect, game_id, area_id, tribute_id)
+        Item::new(name, item_type, quantity, attribute.unwrap(), effect)
     }
 
-    pub fn new_weapon(name: String, game_id: Option<i32>, area_id: Option<i32>, tribute_id: Option<i32>) -> Item {
+    pub fn new_weapon(name: &str) -> Item {
         let mut rng = rand::thread_rng();
 
-        let item_type = ItemType::Weapon;
         let quantity = rng.gen_range(1..=2);
         let attribute = Attribute::Strength;
         let effect = rng.gen_range(1..=5);
 
-        Item::create(name, item_type.to_string(), quantity, attribute.to_string(), effect, game_id, area_id, tribute_id)
+        Item::new(name, ItemType::Weapon, quantity, attribute, effect)
     }
 
-    pub fn new_random_weapon(game_id: Option<i32>, area_id: Option<i32>, tribute_id: Option<i32>) -> Item {
+    pub fn new_random_weapon() -> Item {
         let name = generate_weapon_name();
-        Item::new_weapon(name, game_id, area_id, tribute_id)
+        Item::new_weapon(name.as_str())
     }
 
-    pub fn new_consumable(name: String, game_id: Option<i32>, area_id: Option<i32>, tribute_id: Option<i32>) -> Item {
+    pub fn new_consumable(name: &str) -> Item {
         let mut rng = rand::thread_rng();
 
-        let item_type = ItemType::Consumable;
         let quantity = 1;
         let attribute = Attribute::random();
         let effect = rng.gen_range(1..=10);
 
-        Item::create(name, item_type.to_string(), quantity, attribute.to_string(), effect, game_id, area_id, tribute_id)
+        Item::new(name, ItemType::Consumable, quantity, attribute.unwrap(), effect)
     }
 
-    pub fn new_generic_consumable(game_id: Option<i32>, area_id: Option<i32>, tribute_id: Option<i32>) -> Item {
-        let mut item = Item::new_consumable("NONE".to_string(), game_id, area_id, tribute_id);
+    pub fn new_generic_consumable() -> Item {
+        let mut item = Item::new_consumable("NONE");
         match item.attribute {
             Attribute::Health => {
                 // restores health
@@ -135,11 +112,10 @@ impl Item {
                 item.name = "bear spray".to_string();
             }
         }
-        item.save();
         item
     }
 
-    pub fn new_shield(name: String, game_id: Option<i32>, area_id: Option<i32>, tribute_id: Option<i32>) -> Item {
+    pub fn new_shield(name: &str) -> Item {
         let mut rng = rand::thread_rng();
 
         let item_type = ItemType::Weapon;
@@ -147,12 +123,12 @@ impl Item {
         let attribute = Attribute::Defense;
         let effect = rng.gen_range(1..=7);
 
-        Item::create(name, item_type.to_string(), quantity, attribute.to_string(), effect, game_id, area_id, tribute_id)
+        Item::new(name, item_type, quantity, attribute, effect)
     }
 
-    pub fn new_random_shield(game_id: Option<i32>, area_id: Option<i32>, tribute_id: Option<i32>) -> Item {
+    pub fn new_random_shield() -> Item {
         let name = generate_shield_name();
-        Item::new_shield(name, game_id, area_id, tribute_id)
+        Item::new_shield(name.as_str())
     }
 
     pub fn is_weapon(&self) -> bool {
@@ -170,38 +146,7 @@ impl Item {
     }
 }
 
-impl From<ItemModel> for Item {
-    fn from(item: ItemModel) -> Self {
-        Item {
-            id: Some(item.id),
-            name: item.name,
-            item_type: ItemType::from_str(item.item_type.as_str()).unwrap(),
-            game_id: item.game_id,
-            area_id: item.area_id,
-            tribute_id: item.tribute_id,
-            quantity: item.quantity,
-            attribute: Attribute::from_str(item.attribute.as_str()).unwrap(),
-            effect: item.effect,
-        }
-    }
-}
-
-impl Display for Item {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name)
-    }
-}
-
-impl FromStr for Item {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let item = ItemModel::get_by_name(s.to_string());
-        Ok(Item::from(item))
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ItemType {
     Consumable,
     Weapon,
@@ -235,8 +180,8 @@ impl ItemType {
 impl Display for ItemType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ItemType::Consumable => write!(f, "Consumable"),
-            ItemType::Weapon => write!(f, "Weapon"),
+            ItemType::Consumable => write!(f, "consumable"),
+            ItemType::Weapon => write!(f, "weapon"),
         }
     }
 }
@@ -253,7 +198,7 @@ impl FromStr for ItemType {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, EnumIter, PartialEq, Serialize, Deserialize)]
 pub enum Attribute {
     Health, // Heals health
     Sanity, // Heals sanity
@@ -265,18 +210,9 @@ pub enum Attribute {
 }
 
 impl Attribute {
-    pub fn random() -> Attribute {
+    pub fn random() -> Option<Attribute> {
         let mut rng = rand::thread_rng();
-        match rng.gen_range(0..7) {
-            0 => Attribute::Health,
-            1 => Attribute::Sanity,
-            2 => Attribute::Movement,
-            3 => Attribute::Bravery,
-            4 => Attribute::Speed,
-            5 => Attribute::Strength,
-            6 => Attribute::Defense,
-            _ => panic!("Invalid attribute"),
-        }
+        Attribute::iter().choose(&mut rng)
     }
 }
 

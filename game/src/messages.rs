@@ -9,12 +9,12 @@ use crate::tributes::statuses::TributeStatus;
 
 // Collection on strings to be used as output for the game
 pub enum GameMessage {
-    GameDayStart(i32),
+    GameDayStart(u32),
     FirstDayStart,
     FeastDayStart,
-    TributesLeft(i32),
-    GameNightStart(i32),
-    DailyDeathAnnouncement(i32),
+    TributesLeft(u32),
+    GameNightStart(u32),
+    DailyDeathAnnouncement(u32),
     DeathAnnouncement(Tribute),
     NoOneWins,
     TributeWins(Tribute),
@@ -41,9 +41,9 @@ pub enum GameMessage {
     TributeBrokenLeg(Tribute),
     TributeInfected(Tribute),
     TributeDrowned(Tribute),
-    TributeMauled(Tribute, i32, Animal, i32),
+    TributeMauled(Tribute, u32, Animal, u32),
     TributeBurned(Tribute),
-    TributeHorrified(Tribute, i32),
+    TributeHorrified(Tribute, u32),
     TributeSuffer(Tribute),
     TributeSelfHarm(Tribute),
     TributeSuicide(Tribute),

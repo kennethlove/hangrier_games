@@ -1,8 +1,9 @@
 use rand::Rng;
 use std::fmt::Display;
 use std::str::FromStr;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum AreaEvent {
     Wildfire,
     Flood,
@@ -45,18 +46,6 @@ impl Display for AreaEvent {
 }
 
 impl AreaEvent {
-    pub fn as_str(&self) -> &str {
-        match self {
-            AreaEvent::Wildfire => "wildfire",
-            AreaEvent::Flood => "flood",
-            AreaEvent::Earthquake => "earthquake",
-            AreaEvent::Avalanche => "avalanche",
-            AreaEvent::Blizzard => "blizzard",
-            AreaEvent::Landslide => "landslide",
-            AreaEvent::Heatwave => "heatwave",
-        }
-    }
-
     pub fn random() -> AreaEvent {
         let mut rng = rand::thread_rng();
         let events = vec![

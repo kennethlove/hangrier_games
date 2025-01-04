@@ -9,3 +9,5 @@ serde = { version = "1.0.216", features = ["derive"] }
 strum = { version = "0.26.3", features = ["derive"] }
 witty-phrase-generator = "0.3.0"
 uuid = { version = "1.11.0", features = ["v4", "serde"] }
+rstest = "0.23.0"
+tracing = "0.1.41"

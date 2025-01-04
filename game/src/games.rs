@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
 use uuid::Uuid;
+use crate::items::Item;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Game {
@@ -75,11 +76,11 @@ impl Game {
 
     // Runs at the start of the game
     pub fn start(&mut self) {
+        // TODO: add items to the cornucopia
+
+        // TODO: add tributes
+
         self.status = GameStatus::InProgress;
-
-        // add items to the cornucopia
-
-        // add tributes to the cornucopia
     }
 
     pub fn add_tribute(&self, mut tribute: Tribute) {
@@ -94,9 +95,10 @@ impl Game {
     }
 
     pub fn tributes(&self) -> Vec<Tribute> {
-        let mut tributes = vec![];
+        let mut tributes: Vec<Tribute> = vec![];
         for area in &self.areas {
-            tributes.extend_from_slice(&area.tributes);
+            let tribs = area.tributes.clone();
+            tributes.extend_from_slice(tribs.as_slice());
         }
         tributes
     }
@@ -179,7 +181,7 @@ impl Game {
         self.clean_up_recent_deaths();
     }
 
-    pub fn do_day_night_cycle(&self, day: bool) {
+    pub fn do_day_night_cycle(&mut self, day: bool) {
         let mut rng = rand::thread_rng();
         let day_event_frequency = 1.0 / 4.0;
         let night_event_frequency = 1.0 / 8.0;
@@ -198,7 +200,13 @@ impl Game {
         }
 
         if self.day == Some(3) && day {
-            // add goodies to the cornucopia
+            // TODO: add goodies to the cornucopia
+            let area = self.areas.iter_mut().find(|a| a.name == "The Cornucopia").unwrap();
+            for _ in 0..=5 {
+                area.add_item(Item::new_random_weapon());
+                area.add_item(Item::new_random_consumable());
+                area.add_item(Item::new_random_shield());
+            }
         }
 
         if self.living_tributes().len() > 1 && self.living_tributes().len() < 6 {
@@ -249,7 +257,7 @@ impl Game {
         }
     }
 
-    pub fn tribute_moves(&self, tribute: &Tribute, mut area: Area) {
+    pub fn move_tribute(&self, tribute: &Tribute, mut area: Area) {
         let mut current_area = self.where_am_i(tribute).unwrap().clone();
         current_area.remove_tribute(tribute);
         area.add_tribute(tribute.clone());

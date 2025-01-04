@@ -1,8 +1,8 @@
-use rand::Rng;
+use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
-use strum::EnumIter;
+use strum::{EnumIter, IntoEnumIterator};
 
 #[derive(
     Clone, Debug, Default, Deserialize, EnumIter, Eq, Ord, PartialEq, PartialOrd, Serialize,
@@ -59,25 +59,8 @@ impl Animal {
 
     pub fn random() -> Animal {
         let mut rng = rand::thread_rng();
-        let animals = [
-            Animal::Squirrel,
-            Animal::Bear,
-            Animal::Wolf,
-            Animal::Cougar,
-            Animal::Boar,
-            Animal::Snake,
-            Animal::Monkey,
-            Animal::Baboon,
-            Animal::Hyena,
-            Animal::Lion,
-            Animal::Tiger,
-            Animal::Elephant,
-            Animal::Rhino,
-            Animal::Hippo,
-            Animal::TrackerJacker,
-        ];
-        let index = rng.gen_range(0..animals.len());
-        animals[index].clone()
+        let animal = Animal::iter().choose(&mut rng).unwrap();
+        animal
     }
 
     pub fn damage(&self) -> i32 {
@@ -153,9 +136,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn animal_to_str() {
+    fn animal_to_string() {
         let animal = Animal::Squirrel;
-        assert_eq!(animal.to_string(), "squirrel");
+        assert_eq!(animal.to_string(), "squirrel".to_string());
     }
 
     #[test]
@@ -178,9 +161,11 @@ mod tests {
 
     #[test]
     fn animal_plurals() {
-        let animal = Animal::TrackerJacker;
+        let tracker_jacker = Animal::TrackerJacker;
         let wolf = Animal::Wolf;
-        assert_eq!(animal.plural(), "tracker jackers");
+        let cougar = Animal::Cougar;
+        assert_eq!(tracker_jacker.plural(), "tracker jackers");
         assert_eq!(wolf.plural(), "wolves");
+        assert_eq!(cougar.plural(), "cougars");
     }
 }

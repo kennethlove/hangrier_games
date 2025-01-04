@@ -9,11 +9,12 @@ use crate::tributes::events::TributeEvent;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
+use uuid::Uuid;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Tribute {
     /// What is their identifier?
-    pub id: Option<i32>,
+    pub id: Uuid,
     /// What game do they belong to?
     pub game: Option<Game>,
     /// What is their current status?
@@ -27,7 +28,7 @@ pub struct Tribute {
     /// What they like to go by
     pub name: String,
     /// Where they're from
-    pub district: i32,
+    pub district: u32,
     /// Stats like fights won
     pub statistics: Statistics,
     /// Attributes like health
@@ -36,27 +37,21 @@ pub struct Tribute {
     pub items: Vec<Item>,
 }
 
-impl PartialEq<&Area> for Area {
-    fn eq(&self, other: &&Area) -> bool {
-        *self == **other
-    }
-}
-
 impl Tribute {
     /// Creates a new Tribute with full health, sanity, and movement.
-    pub fn new(name: String, district: Option<i32>, avatar: Option<String>) -> Self {
+    pub fn new(name: String, district: Option<u32>, avatar: Option<String>) -> Self {
         let brain = Brain::default();
-        let district = district.unwrap_or(0);
+        let district  = district.unwrap_or(0);
         let attributes = Attributes::new();
         let statistics = Statistics::default();
 
         Self {
-            id: None,
+            id: Uuid::new_v4(),
             game: None,
             name: name.clone(),
             district,
             brain,
-            status: TributeStatus::Healthy,
+            status: TributeStatus::default(),
             avatar,
             human_player_name: None,
             attributes,
@@ -418,15 +413,21 @@ impl Tribute {
                 self.takes_mental_damage(5);
             }
             TributeStatus::Broken => {
-                // coin flip for which bone breaks
-                let leg_bone = thread_rng().gen_bool(0.5);
-
-                // TODO: Add in other bones? Ribs and skull make sense.
-
-                if leg_bone {
-                    self.attributes.speed = std::cmp::max(1, self.attributes.speed - 5);
-                } else {
-                    self.attributes.strength = std::cmp::max(1, self.attributes.strength - 5);
+                // die roll for which bone breaks
+                let bone = thread_rng().gen_range(0..4);
+                match bone {
+                    0 => { // Leg
+                        self.attributes.speed = std::cmp::max(1, self.attributes.speed - 5);
+                    },
+                    1 => { // Arm
+                        self.attributes.strength = std::cmp::max(1, self.attributes.strength - 5);
+                    },
+                    2 => { // Skull
+                        self.attributes.intelligence = std::cmp::max(1, self.attributes.intelligence - 5);
+                    },
+                    _ => { // Rib
+                        self.attributes.dexterity = std::cmp::max(1, self.attributes.dexterity - 5);
+                    },
                 }
             }
             TributeStatus::Infected => {
@@ -508,11 +509,10 @@ impl Tribute {
         suggested_action: Option<Action>,
         probability: Option<f64>,
         day: bool,
-    ) -> Tribute {
+    ) {
         // Tribute is already dead, do nothing.
         if !self.is_alive() {
             println!("{}", GameMessage::TributeAlreadyDead(self.clone()));
-            return self.clone();
         }
 
         // Update the tribute based on the period's events.
@@ -534,14 +534,13 @@ impl Tribute {
         };
 
         if thread_rng().gen_bool(chance) {
-            let item = Item::new_generic_consumable();
+            let item = Item::new_random_consumable();
             println!("{}", GameMessage::SponsorGift(self.clone(), item.clone()));
         }
 
         // Tribute died to the period's events.
         if self.status == TributeStatus::RecentlyDead || self.attributes.health <= 0 {
             println!("{}", GameMessage::TributeDead(self.clone()));
-            return self.clone();
         }
 
         let game = self.game.clone().unwrap();
@@ -568,7 +567,7 @@ impl Tribute {
         match &action {
             Action::Move(area) => match self.travels(closed_areas.clone(), area.clone()) {
                 TravelResult::Success(area) => {
-                    self.clone().game.unwrap().tribute_moves(&self, area);
+                    self.clone().game.unwrap().move_tribute(&self, area);
                 }
                 TravelResult::Failure => {
                     self.short_rests();
@@ -602,7 +601,7 @@ impl Tribute {
                                     attacker.statistics.killed_by =
                                         target.statistics.killed_by.clone();
                                     attacker.status = target.status.clone();
-                                    return target;
+                                    // return target;
                                 }
                             }
                             _ => (),
@@ -678,7 +677,6 @@ impl Tribute {
                 }
             }
         }
-        self.clone()
     }
 
     /// Save the tribute's latest action
@@ -824,6 +822,14 @@ impl Tribute {
                 }
             }
         }
+    }
+
+    pub fn status(&self) -> TributeStatus {
+        self.status.clone()
+    }
+
+    pub fn set_status(&mut self, status: TributeStatus) {
+        self.status = status;
     }
 }
 
@@ -980,8 +986,8 @@ impl Attributes {
         let mut rng = thread_rng();
 
         Self {
-            health: 100,
-            sanity: 100,
+            health: rng.gen_range(50..=100),
+            sanity: rng.gen_range(50..=100),
             movement: 100,
             strength: rng.gen_range(1..=50),
             defense: rng.gen_range(1..=50),
@@ -1004,8 +1010,8 @@ mod tests {
     #[test]
     fn new() {
         let tribute = Tribute::new("Katniss".to_string(), None, None);
-        assert_eq!(tribute.attributes.health, 100);
-        assert_eq!(tribute.attributes.sanity, 100);
+        assert!((50u32..=100).contains(&tribute.attributes.health));
+        assert!((50u32..=100).contains(&tribute.attributes.sanity));
         assert_eq!(tribute.attributes.movement, 100);
         assert_eq!(tribute.status, TributeStatus::Healthy);
     }
@@ -1013,15 +1019,17 @@ mod tests {
     #[test]
     fn takes_physical_damage() {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        let hp = tribute.attributes.health.clone();
         tribute.takes_physical_damage(10);
-        assert_eq!(tribute.attributes.health, 90);
+        assert_eq!(tribute.attributes.health, hp - 10);
     }
 
     #[test]
     fn takes_mental_damage() {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        let mp = tribute.attributes.sanity.clone();
         tribute.takes_mental_damage(10);
-        assert_eq!(tribute.attributes.sanity, 90);
+        assert_eq!(tribute.attributes.sanity, mp - 10);
     }
 
     #[test]

@@ -2,6 +2,7 @@ use crate::areas::Area;
 use crate::items::Item;
 use crate::tributes::Tribute;
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 use std::str::FromStr;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -28,16 +29,16 @@ pub enum Action {
     TakeItem,
 }
 
-impl Action {
-    pub fn as_str(&self) -> &str {
+impl Display for Action {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Action::None => "none",
-            Action::Move(_) => "move",
-            Action::Rest => "rest",
-            Action::UseItem(_) => "use item",
-            Action::Attack => "attack",
-            Action::Hide => "hide",
-            Action::TakeItem => "take item",
+            Action::None => write!(f, "none"),
+            Action::Move(_) => write!(f, "move"),
+            Action::Rest => write!(f, "rest"),
+            Action::UseItem(_) => write!(f, "use item"),
+            Action::Attack => write!(f, "attack"),
+            Action::Hide => write!(f, "hide"),
+            Action::TakeItem => write!(f, "take item"),
         }
     }
 }
@@ -78,15 +79,37 @@ pub enum AttackOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
-    #[test]
-    fn action_to_str() {
-        assert_eq!(Action::None.as_str(), "none");
+    #[rstest]
+    #[case(Action::None, "none")]
+    #[case(Action::Move(None), "move")]
+    #[case(Action::Move(Some(Area::new("New York City"))), "move")]
+    #[case(Action::Rest, "rest")]
+    #[case(Action::UseItem(None), "use item")]
+    #[case(Action::UseItem(Some(Item::new_weapon("lasso"))), "use item")]
+    #[case(Action::Attack, "attack")]
+    #[case(Action::Hide, "hide")]
+    #[case(Action::TakeItem, "take item")]
+    fn action_to_string(#[case] action: Action, #[case] expected: &str) {
+        assert_eq!(action.to_string(), expected.to_string());
+    }
+
+    #[rstest]
+    #[case("none", Action::None)]
+    #[case("move", Action::Move(None))]
+    #[case("rest", Action::Rest)]
+    #[case("use item", Action::UseItem(None))]
+    #[case("attack", Action::Attack)]
+    #[case("hide", Action::Hide)]
+    #[case("take item", Action::TakeItem)]
+    fn action_from_str(#[case] input: &str, #[case] action: Action) {
+        assert_eq!(Action::from_str(input).unwrap(), action);
     }
 
     #[test]
-    fn action_from_str() {
-        assert_eq!(Action::from_str("none").unwrap(), Action::None);
+    fn action_from_str_invalid() {
+        assert_eq!(Action::from_str("do a barrel roll"), Err(()));
     }
 
     #[test]

@@ -34,6 +34,12 @@ impl Display for Area {
     }
 }
 
+impl PartialEq<&Area> for Area {
+    fn eq(&self, other: &&Area) -> bool {
+        *self == **other
+    }
+}
+
 impl Area {
     pub fn new(name: &str) -> Self {
         let mut area = Area::default();
@@ -80,13 +86,13 @@ impl Area {
         for event in self.events.iter() {
             for tribute in self.tributes.iter_mut() {
                 match event {
-                    AreaEvent::Wildfire => tribute.status = TributeStatus::Burned,
-                    AreaEvent::Flood => tribute.status = TributeStatus::Drowned,
-                    AreaEvent::Earthquake => tribute.status = TributeStatus::Buried,
-                    AreaEvent::Avalanche => tribute.status = TributeStatus::Buried,
-                    AreaEvent::Blizzard => tribute.status = TributeStatus::Frozen,
-                    AreaEvent::Landslide => tribute.status = TributeStatus::Buried,
-                    AreaEvent::Heatwave => tribute.status = TributeStatus::Overheated,
+                    AreaEvent::Wildfire => tribute.set_status(TributeStatus::Burned),
+                    AreaEvent::Flood => tribute.set_status(TributeStatus::Drowned),
+                    AreaEvent::Earthquake => tribute.set_status(TributeStatus::Buried),
+                    AreaEvent::Avalanche => tribute.set_status(TributeStatus::Buried),
+                    AreaEvent::Blizzard => tribute.set_status(TributeStatus::Frozen),
+                    AreaEvent::Landslide => tribute.set_status(TributeStatus::Buried),
+                    AreaEvent::Heatwave => tribute.set_status(TributeStatus::Overheated),
                 }
             }
         }
@@ -112,6 +118,7 @@ impl Area {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
     #[test]
     fn default_area() {
@@ -126,7 +133,7 @@ mod tests {
     fn new_area() {
         let area = Area::new("The Cornucopia");
         assert_eq!(area.name, "The Cornucopia");
-        assert_eq!(area.to_string(), "The Cornucopia");
+        assert_eq!(area.to_string(), "The Cornucopia".to_string());
     }
 
     #[test]
@@ -153,6 +160,7 @@ mod tests {
         let item = Item::new_random_weapon();
         area.add_item(item.clone());
         assert!(area.items.contains(&item));
+        assert!(area.available_items().contains(&item));
     }
 
     #[test]
@@ -163,6 +171,17 @@ mod tests {
         assert!(area.items.contains(&item));
         area.remove_item(&item);
         assert!(!area.items.contains(&item));
+    }
+
+    #[test]
+    fn available_items() {
+        let mut area = Area::new("The Cornucopia");
+        assert!(area.available_items().is_empty());
+
+        let item = Item::new_random_weapon();
+        area.add_item(item.clone());
+
+        assert!(!area.available_items().is_empty());
     }
 
     #[test]
@@ -181,5 +200,64 @@ mod tests {
         assert!(area.tributes.contains(&tribute));
         area.remove_tribute(&tribute);
         assert!(!area.tributes.contains(&tribute));
+    }
+
+    #[test]
+    fn living_tributes() {
+        let mut area = Area::new("The Cornucopia");
+        let tribute = Tribute::new("Katniss".to_string(), Some(12), None);
+        area.add_tribute(tribute.clone());
+        assert_eq!(area.living_tributes().len(), 1);
+        assert_eq!(area.living_tributes()[0], tribute);
+    }
+
+    #[test]
+    fn dead_tributes() {
+        let mut area = Area::new("The Cornucopia");
+        let mut tribute = Tribute::new("Katniss".to_string(), Some(12), None);
+        tribute.status = TributeStatus::Dead;
+        area.add_tribute(tribute.clone());
+        assert_eq!(area.living_tributes().len(), 0);
+    }
+
+    #[test]
+    fn add_event() {
+        let mut area = Area::new("The Cornucopia");
+        let event = AreaEvent::Wildfire;
+        area.add_event(event.clone());
+        assert!(area.events.contains(&event));
+    }
+
+    #[test]
+    fn process_events_closes_area() {
+        let mut area = Area::new("The Cornucopia");
+        let event = AreaEvent::Wildfire;
+        area.add_event(event.clone());
+        area.process_events();
+        assert_eq!(area.open, false);
+    }
+
+    #[rstest]
+    #[case(AreaEvent::Wildfire, TributeStatus::Burned)]
+    #[case(AreaEvent::Flood, TributeStatus::Drowned)]
+    #[case(AreaEvent::Earthquake, TributeStatus::Buried)]
+    #[case(AreaEvent::Avalanche, TributeStatus::Buried)]
+    #[case(AreaEvent::Blizzard, TributeStatus::Frozen)]
+    #[case(AreaEvent::Landslide, TributeStatus::Buried)]
+    #[case(AreaEvent::Heatwave, TributeStatus::Overheated)]
+    fn process_events_affects_tributes(#[case] event: AreaEvent, #[case] status: TributeStatus) {
+        let mut area = Area::new("The Cornucopia");
+        let tribute = Tribute::new("Katniss".to_string(), Some(12), None);
+        area.add_tribute(tribute);
+        area.add_event(event);
+        area.process_events();
+        assert_eq!(area.open, false);
+        assert_eq!(area.tributes.first().unwrap().status(), status);
+    }
+
+    #[test]
+    fn partial_eq_with_reference() {
+        let area = Area::new("The Cornucopia");
+        assert_eq!(area, &area);
     }
 }

@@ -1,6 +1,6 @@
 use crate::items::name_generator::{generate_shield_name, generate_weapon_name};
-use rand::Rng;
 use rand::prelude::IteratorRandom;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
@@ -92,7 +92,7 @@ impl Item {
         )
     }
 
-    pub fn new_generic_consumable() -> Item {
+    pub fn new_random_consumable() -> Item {
         let mut item = Item::new_consumable("NONE");
         match item.attribute {
             Attribute::Health => {
@@ -153,8 +153,6 @@ impl Item {
 
     pub fn is_consumable(&self) -> bool {
         self.item_type == ItemType::Consumable
-            && self.attribute != Attribute::Strength
-            && self.attribute != Attribute::Defense
     }
 }
 
@@ -170,21 +168,6 @@ impl ItemType {
         match rng.gen_bool(0.5) {
             true => ItemType::Consumable,
             false => ItemType::Weapon,
-        }
-    }
-
-    pub fn from_int(i: i32) -> ItemType {
-        match i {
-            0 => ItemType::Consumable,
-            1 => ItemType::Weapon,
-            _ => panic!("Invalid item type"),
-        }
-    }
-
-    pub fn to_int(&self) -> i32 {
-        match self {
-            ItemType::Consumable => 0,
-            ItemType::Weapon => 1,
         }
     }
 }
@@ -231,13 +214,13 @@ impl Attribute {
 impl Display for Attribute {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Attribute::Health => write!(f, "Health"),
-            Attribute::Sanity => write!(f, "Sanity"),
-            Attribute::Movement => write!(f, "Movement"),
-            Attribute::Bravery => write!(f, "Bravery"),
-            Attribute::Speed => write!(f, "Speed"),
-            Attribute::Strength => write!(f, "Strength"),
-            Attribute::Defense => write!(f, "Defense"),
+            Attribute::Health => write!(f, "health"),
+            Attribute::Sanity => write!(f, "sanity"),
+            Attribute::Movement => write!(f, "movement"),
+            Attribute::Bravery => write!(f, "bravery"),
+            Attribute::Speed => write!(f, "speed"),
+            Attribute::Strength => write!(f, "strength"),
+            Attribute::Defense => write!(f, "defense"),
         }
     }
 }
@@ -256,5 +239,149 @@ impl FromStr for Attribute {
             "defense" => Ok(Attribute::Defense),
             _ => Err("Invalid attribute"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    #[test]
+    fn default_item() {
+        let item = Item::default();
+        assert_eq!(item.name, "Useless health potion".to_string());
+    }
+
+    #[test]
+    fn item_to_string() {
+        let item = Item::default();
+        assert_eq!(item.to_string(), "Useless health potion".to_string());
+    }
+
+    #[test]
+    fn new_item() {
+        let item = Item::new(
+            "Test item",
+            ItemType::Weapon,
+            1,
+            Attribute::Defense,
+            10,
+        );
+        assert_eq!(item.name, "Test item");
+        assert_eq!(item.item_type, ItemType::Weapon);
+        assert_eq!(item.quantity, 1);
+        assert_eq!(item.attribute, Attribute::Defense);
+        assert_eq!(item.effect, 10);
+    }
+
+    #[test]
+    fn new_random_item() {
+        let item = Item::new_random("Test item");
+        assert_eq!(item.name, "Test item");
+        assert!((1..=3).contains(&item.quantity));
+    }
+
+    #[test]
+    fn new_weapon() {
+        let weapon = Item::new_weapon("Test weapon");
+        assert_eq!(weapon.item_type, ItemType::Weapon);
+        assert_eq!(weapon.attribute, Attribute::Strength);
+        assert!(weapon.is_weapon());
+    }
+
+    #[test]
+    fn new_random_weapon() {
+        let weapon = Item::new_random_weapon();
+        assert_eq!(weapon.item_type, ItemType::Weapon);
+        assert!(!weapon.name.is_empty());
+        assert!(weapon.is_weapon());
+    }
+
+    #[test]
+    fn new_consumable() {
+        let consumable = Item::new_consumable("Test item");
+        assert_eq!(consumable.item_type, ItemType::Consumable);
+        assert!(consumable.is_consumable());
+    }
+
+    #[test]
+    fn new_random_consumable() {
+        let consumable = Item::new_random_consumable();
+        assert_eq!(consumable.item_type, ItemType::Consumable);
+        assert!(!consumable.name.is_empty());
+        assert!(consumable.is_consumable());
+    }
+
+    #[test]
+    fn new_shield() {
+        let shield = Item::new_shield("Test shield");
+        assert_eq!(shield.item_type, ItemType::Weapon);
+        assert_eq!(shield.attribute, Attribute::Defense);
+        assert!(shield.is_defensive());
+    }
+
+    #[test]
+    fn new_random_shield() {
+        let shield = Item::new_random_shield();
+        assert_eq!(shield.item_type, ItemType::Weapon);
+        assert!(!shield.name.is_empty());
+        assert!(shield.is_defensive());
+    }
+
+    #[rstest]
+    #[case(ItemType::Consumable, "consumable")]
+    #[case(ItemType::Weapon, "weapon")]
+    fn item_type_to_string(#[case] item_type: ItemType, #[case] expected: &str) {
+        assert_eq!(item_type.to_string(), expected);
+    }
+
+    #[rstest]
+    #[case("consumable", ItemType::Consumable)]
+    #[case("weapon", ItemType::Weapon)]
+    fn item_type_from_str(#[case] input: &str, #[case] item_type: ItemType) {
+        assert_eq!(ItemType::from_str(input).unwrap(), item_type);
+    }
+
+    #[test]
+    fn random_item_type() {
+        let item_type = ItemType::random();
+        assert!([ItemType::Weapon, ItemType::Consumable].contains(&item_type));
+    }
+
+    #[test]
+    fn random_attribute() {
+        let attribute = Attribute::random();
+        assert!(attribute.is_some());
+        assert!(Attribute::iter().find(|a| *a == attribute.clone().unwrap()).is_some());
+    }
+
+    #[rstest]
+    #[case(Attribute::Health, "health")]
+    #[case(Attribute::Sanity, "sanity")]
+    #[case(Attribute::Movement, "movement")]
+    #[case(Attribute::Bravery, "bravery")]
+    #[case(Attribute::Speed, "speed")]
+    #[case(Attribute::Strength, "strength")]
+    #[case(Attribute::Defense, "defense")]
+    fn attribute_to_string(#[case] attribute: Attribute, #[case] expected: String) {
+        assert_eq!(attribute.to_string(), expected);
+    }
+
+    #[rstest]
+    #[case("health", Attribute::Health)]
+    #[case("sanity", Attribute::Sanity)]
+    #[case("movement", Attribute::Movement)]
+    #[case("bravery", Attribute::Bravery)]
+    #[case("speed", Attribute::Speed)]
+    #[case("strength", Attribute::Strength)]
+    #[case("defense", Attribute::Defense)]
+    fn attribute_from_str(#[case] input: &str, #[case] attribute: Attribute) {
+        assert_eq!(Attribute::from_str(input).unwrap(), attribute);
+    }
+
+    #[test]
+    fn attribute_from_str_invalid() {
+        assert!(Attribute::from_str("mana").is_err());
     }
 }

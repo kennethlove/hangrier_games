@@ -1,9 +1,10 @@
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
+use rand::prelude::*;
+use strum::{EnumIter, IntoEnumIterator};
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, EnumIter)]
 pub enum AreaEvent {
     Wildfire,
     Flood,
@@ -26,7 +27,7 @@ impl FromStr for AreaEvent {
             "blizzard" => Ok(AreaEvent::Blizzard),
             "landslide" => Ok(AreaEvent::Landslide),
             "heatwave" => Ok(AreaEvent::Heatwave),
-            _ => Err(()),
+            _ => Err(())
         }
     }
 }
@@ -47,17 +48,50 @@ impl Display for AreaEvent {
 
 impl AreaEvent {
     pub fn random() -> AreaEvent {
-        let mut rng = rand::thread_rng();
-        let events = vec![
-            AreaEvent::Wildfire,
-            AreaEvent::Flood,
-            AreaEvent::Earthquake,
-            AreaEvent::Avalanche,
-            AreaEvent::Blizzard,
-            AreaEvent::Landslide,
-            AreaEvent::Heatwave,
-        ];
-        let index = rng.gen_range(0..events.len());
-        events[index].clone()
+        let mut rng = thread_rng();
+        Self::iter().choose(&mut rng).unwrap().clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    #[test]
+    fn random_area_event() {
+        let random_event = AreaEvent::random();
+        assert!(AreaEvent::iter().position(|a| a == random_event).is_some());
+    }
+
+    #[rstest]
+    #[case(AreaEvent::Wildfire, "wildfire")]
+    #[case(AreaEvent::Flood, "flood")]
+    #[case(AreaEvent::Earthquake, "earthquake")]
+    #[case(AreaEvent::Avalanche, "avalanche")]
+    #[case(AreaEvent::Blizzard, "blizzard")]
+    #[case(AreaEvent::Landslide, "landslide")]
+    #[case(AreaEvent::Heatwave, "heatwave")]
+    fn area_event_to_string(#[case] event: AreaEvent, #[case] expected: &str) {
+        assert_eq!(event.to_string(), expected.to_string());
+    }
+
+    #[rstest]
+    #[case("wildfire", AreaEvent::Wildfire)]
+    #[case("flood", AreaEvent::Flood)]
+    #[case("earthquake", AreaEvent::Earthquake)]
+    #[case("avalanche", AreaEvent::Avalanche)]
+    #[case("blizzard", AreaEvent::Blizzard)]
+    #[case("landslide", AreaEvent::Landslide)]
+    #[case("heatwave", AreaEvent::Heatwave)]
+    fn area_event_from_str(#[case] input: &str, #[case] event: AreaEvent) {
+        let area_event = AreaEvent::from_str(input).unwrap();
+        assert_eq!(area_event, event);
+    }
+
+    #[test]
+    fn area_event_from_str_invalid() {
+        let area_event = AreaEvent::from_str("alien invasion");
+        assert!(area_event.is_err());
     }
 }

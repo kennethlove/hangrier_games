@@ -1,17 +1,17 @@
-use crate::areas::Area;
 use crate::areas::events::AreaEvent;
+use crate::areas::Area;
+use crate::items::Item;
 use crate::messages::GameMessage;
-use crate::tributes::Tribute;
 use crate::tributes::actions::Action;
 use crate::tributes::events::TributeEvent;
 use crate::tributes::statuses::TributeStatus;
-use rand::Rng;
+use crate::tributes::Tribute;
 use rand::prelude::SliceRandom;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
 use uuid::Uuid;
-use crate::items::Item;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Game {
@@ -83,15 +83,20 @@ impl Game {
         self.status = GameStatus::InProgress;
     }
 
-    pub fn add_tribute(&self, mut tribute: Tribute) {
-        let cornucopias = self
+    pub fn add_tribute(&mut self, mut tribute: Tribute) {
+        let mut cornucopias = self
             .areas
-            .iter()
+            .iter_mut()
             .filter(|a| a.name == "The Cornucopia")
-            .collect::<Vec<&Area>>();
-        let mut cornucopia = cornucopias.first().cloned().unwrap().clone();
+            .collect::<Vec<&mut Area>>();
+        let mut cornucopia: &mut Area = cornucopias.pop().unwrap();
         cornucopia.add_tribute(tribute.clone());
         tribute.game = Some(self.clone());
+    }
+
+    pub fn add_random_tribute(&mut self) {
+        let mut tribute = Tribute::random();
+        self.add_tribute(tribute.clone());
     }
 
     pub fn tributes(&self) -> Vec<Tribute> {

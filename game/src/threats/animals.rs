@@ -27,43 +27,22 @@ pub enum Animal {
 }
 
 impl Animal {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Animal::Squirrel => "squirrel",
-            Animal::Bear => "bear",
-            Animal::Wolf => "wolf",
-            Animal::Cougar => "cougar",
-            Animal::Boar => "boar",
-            Animal::Snake => "snake",
-            Animal::Monkey => "monkey",
-            Animal::Baboon => "baboon",
-            Animal::Hyena => "hyena",
-            Animal::Lion => "lion",
-            Animal::Tiger => "tiger",
-            Animal::Elephant => "elephant",
-            Animal::Rhino => "rhino",
-            Animal::Hippo => "hippo",
-            Animal::TrackerJacker => "tracker jacker",
-        }
-    }
-
     pub fn plural(&self) -> String {
         match self {
             Animal::Wolf => "wolves".to_string(),
             _ => {
-                let pluralized = format!("{}s", self.as_str());
-                pluralized
+                format!("{}s", self)
             }
         }
     }
 
     pub fn random() -> Animal {
-        let mut rng = rand::thread_rng();
+        let mut rng = thread_rng();
         let animal = Animal::iter().choose(&mut rng).unwrap();
         animal
     }
 
-    pub fn damage(&self) -> i32 {
+    pub fn damage(&self) -> u32 {
         match self {
             Animal::Squirrel => 1,
             Animal::Bear => 10,
@@ -134,29 +113,72 @@ impl Display for Animal {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
-    #[test]
-    fn animal_to_string() {
-        let animal = Animal::Squirrel;
-        assert_eq!(animal.to_string(), "squirrel".to_string());
+    #[rstest]
+    #[case(Animal::Squirrel, "squirrel")]
+    #[case(Animal::Bear, "bear")]
+    #[case(Animal::Wolf, "wolf")]
+    #[case(Animal::Cougar, "cougar")]
+    #[case(Animal::Boar, "boar")]
+    #[case(Animal::Snake, "snake")]
+    #[case(Animal::Monkey, "monkey")]
+    #[case(Animal::Baboon, "baboon")]
+    #[case(Animal::Hyena, "hyena")]
+    #[case(Animal::Lion, "lion")]
+    #[case(Animal::Tiger, "tiger")]
+    #[case(Animal::Elephant, "elephant")]
+    #[case(Animal::Rhino, "rhino")]
+    #[case(Animal::Hippo, "hippo")]
+    #[case(Animal::TrackerJacker, "tracker jacker")]
+    fn animal_to_string(#[case] animal: Animal, #[case] expected: &str) {
+        assert_eq!(animal.to_string(), expected);
     }
 
-    #[test]
-    fn animal_from_str() {
-        let animal = Animal::Squirrel;
-        assert_eq!(animal, Animal::from_str("squirrel").unwrap());
+    #[rstest]
+    #[case("squirrel", Animal::Squirrel)]
+    #[case("bear", Animal::Bear)]
+    #[case("wolf", Animal::Wolf)]
+    #[case("cougar", Animal::Cougar)]
+    #[case("boar", Animal::Boar)]
+    #[case("snake", Animal::Snake)]
+    #[case("monkey", Animal::Monkey)]
+    #[case("baboon", Animal::Baboon)]
+    #[case("hyena", Animal::Hyena)]
+    #[case("lion", Animal::Lion)]
+    #[case("tiger", Animal::Tiger)]
+    #[case("elephant", Animal::Elephant)]
+    #[case("rhino", Animal::Rhino)]
+    #[case("hippo", Animal::Hippo)]
+    #[case("tracker jacker", Animal::TrackerJacker)]
+    fn animal_from_str(#[case] input: &str, #[case] animal: Animal) {
+        assert_eq!(animal, Animal::from_str(input).unwrap());
     }
 
-    #[test]
-    fn animal_damage() {
-        let animal = Animal::Squirrel;
-        assert_eq!(animal.damage(), 1);
+    #[rstest]
+    #[case(Animal::Squirrel, 1)]
+    #[case(Animal::Bear, 10)]
+    #[case(Animal::Wolf, 5)]
+    #[case(Animal::Cougar, 5)]
+    #[case(Animal::Boar, 3)]
+    #[case(Animal::Snake, 2)]
+    #[case(Animal::Monkey, 3)]
+    #[case(Animal::Baboon, 5)]
+    #[case(Animal::Hyena, 5)]
+    #[case(Animal::Lion, 10)]
+    #[case(Animal::Tiger, 10)]
+    #[case(Animal::Elephant, 10)]
+    #[case(Animal::Rhino, 10)]
+    #[case(Animal::Hippo, 20)]
+    #[case(Animal::TrackerJacker, 5)]
+    fn animal_damage(#[case] animal: Animal, #[case] damage: u32) {
+        assert_eq!(animal.damage(), damage);
     }
 
     #[test]
     fn random_animal() {
         let animal = Animal::random();
-        assert_eq!(animal, Animal::from_str(animal.as_str()).unwrap());
+        assert_eq!(animal, Animal::from_str(&animal.to_string()).unwrap());
     }
 
     #[test]

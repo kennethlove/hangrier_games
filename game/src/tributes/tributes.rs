@@ -6,6 +6,9 @@ use crate::games::Game;
 use crate::items::{Attribute, Item};
 use crate::messages::GameMessage;
 use crate::tributes::events::TributeEvent;
+use fake::faker::name::raw::*;
+use fake::locales::*;
+use fake::Fake;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
@@ -58,6 +61,13 @@ impl Tribute {
             statistics,
             items: vec![],
         }
+    }
+
+    pub fn random() -> Self {
+        let name = Name(EN).fake();
+        let mut rng = thread_rng();
+        let district = rng.gen_range(1..=12);
+        Tribute::new(name, Some(district), None)
     }
 
     pub fn avatar(&self) -> String {

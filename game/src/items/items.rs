@@ -1,6 +1,5 @@
 use crate::items::name_generator::{generate_shield_name, generate_weapon_name};
-use rand::prelude::IteratorRandom;
-use rand::Rng;
+use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
@@ -182,13 +181,13 @@ impl Display for ItemType {
 }
 
 impl FromStr for ItemType {
-    type Err = &'static str;
+    type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "consumable" => Ok(ItemType::Consumable),
             "weapon" => Ok(ItemType::Weapon),
-            _ => Err("Invalid item type"),
+            _ => Err(()),
         }
     }
 }
@@ -245,7 +244,7 @@ impl FromStr for Attribute {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rstest::rstest;
+    use rstest::*;
 
     #[test]
     fn default_item() {
@@ -341,6 +340,11 @@ mod tests {
     #[case("weapon", ItemType::Weapon)]
     fn item_type_from_str(#[case] input: &str, #[case] item_type: ItemType) {
         assert_eq!(ItemType::from_str(input).unwrap(), item_type);
+    }
+
+    #[test]
+    fn item_type_from_str_invalid() {
+        assert!(ItemType::from_str("nuclear").is_err());
     }
 
     #[test]

@@ -1,5 +1,5 @@
 mod areas;
-mod games;
+pub mod games;
 mod items;
 mod messages;
 mod threats;

@@ -1,15 +1,19 @@
 use crate::areas::events::AreaEvent;
 use crate::items::Item;
-use crate::tributes::Tribute;
 use crate::tributes::statuses::TributeStatus;
+use crate::tributes::Tribute;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::Display;
+use std::str::FromStr;
 
+#[serde_as]
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Area {
     pub name: String,
     pub open: bool,
     pub items: Vec<Item>,
+    #[serde_as(as = "Vec<DisplayFromStr>")]
     pub neighbors: Vec<Area>,
     pub tributes: Vec<Tribute>,
     pub events: Vec<AreaEvent>,
@@ -37,6 +41,14 @@ impl Display for Area {
 impl PartialEq<&Area> for Area {
     fn eq(&self, other: &&Area) -> bool {
         *self == **other
+    }
+}
+
+impl FromStr for Area {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Area::new(s))
     }
 }
 

@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use crate::areas::events::AreaEvent;
 use crate::areas::Area;
 use crate::items::Item;
@@ -11,10 +12,10 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
-use std::sync::OnceLock;
 use uuid::Uuid;
 
-thread_local!(pub static GAME: Game = Game::default());
+// thread_local!(pub static GAME: Game = Game::default());
+thread_local!(pub static GAME: RefCell<Game> = RefCell::new(Game::default()));
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Game {

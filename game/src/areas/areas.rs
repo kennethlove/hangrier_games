@@ -50,7 +50,7 @@ impl FromStr for Area {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         GAME.with(|game| {
-            return Ok::<Area, Self::Err>(game.areas.iter()
+            return Ok::<Area, Self::Err>(game.borrow().areas.iter()
                 .find(|area| area.name == s)
                 .unwrap().clone())
         }).expect("No global game?");
@@ -112,7 +112,7 @@ impl Area {
 
     pub fn tributes(&self) -> Vec<Tribute> {
         GAME.with(|game| {
-            game.tributes.iter()
+            game.borrow().tributes.iter()
                 .filter(|t| t.area == self)
                 .cloned()
                 .collect()
@@ -121,7 +121,7 @@ impl Area {
 
     pub fn living_tributes(&self) -> Vec<Tribute> {
         GAME.with(|game| {
-            game.tributes().filter(|t| t.is_alive()).cloned().collect()
+            game.borrow().tributes.iter().filter(|t| t.is_alive()).cloned().collect()
         })
     }
 

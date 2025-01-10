@@ -48,11 +48,14 @@ impl Tribute {
         let attributes = Attributes::new();
         let statistics = Statistics::default();
 
-        let area = GAME.get().unwrap().get_area("the cornucopia").unwrap();
 
         Self {
             id: Uuid::new_v4(),
-            area: area.clone(),
+            area: {
+                GAME.with_borrow(|game| {
+                    game.get_area("the cornucopia").unwrap()
+                }).clone()
+            },
             name: name.clone(),
             district,
             brain,
@@ -284,8 +287,7 @@ impl Tribute {
 
     pub fn travels(&self, closed_areas: Vec<Area>, suggested_area: Option<Area>) -> TravelResult {
         let mut rng = thread_rng();
-        let game = GAME.get().unwrap();
-        let area = game.where_am_i(self);
+        let area = GAME.borrow_mut().where_am_i(self);
         let mut new_area: Option<Area> = None;
 
         if let Some(suggestion) = suggested_area {

@@ -93,36 +93,7 @@ impl Item {
 
     pub fn new_random_consumable() -> Item {
         let mut item = Item::new_consumable("NONE");
-        match item.attribute {
-            Attribute::Health => {
-                // restores health
-                item.name = "health kit".to_string();
-            }
-            Attribute::Sanity => {
-                // restores sanity
-                item.name = "memento".to_string();
-            }
-            Attribute::Movement => {
-                // move further
-                item.name = "trail mix".to_string();
-            }
-            Attribute::Bravery => {
-                // sure, you can win that fight
-                item.name = "yayo".to_string();
-            }
-            Attribute::Speed => {
-                // move faster
-                item.name = "go-juice".to_string();
-            }
-            Attribute::Strength => {
-                // hit harder
-                item.name = "adrenaline".to_string();
-            }
-            Attribute::Defense => {
-                // take hits better
-                item.name = "bear spray".to_string();
-            }
-        }
+        item.name = item.attribute.consumable_name();
         item
     }
 
@@ -207,6 +178,31 @@ impl Attribute {
     pub fn random() -> Option<Attribute> {
         let mut rng = rand::thread_rng();
         Attribute::iter().choose(&mut rng)
+    }
+}
+
+pub trait ConsumableAttribute {
+    fn consumable_name(&self) -> String;
+}
+
+impl ConsumableAttribute for Attribute {
+    fn consumable_name(&self) -> String {
+        match &self {
+            // restores health
+            Attribute::Health => { "health kit".to_string() }
+            // restores sanity
+            Attribute::Sanity => { "memento".to_string() }
+            // move further
+            Attribute::Movement => { "trail mix".to_string() }
+            // sure, you can win that fight
+            Attribute::Bravery => { "yayo".to_string() }
+            // move faster
+            Attribute::Speed => { "go-juice".to_string() }
+            // hit harder
+            Attribute::Strength => { "adrenaline".to_string() }
+            // take hits better
+            Attribute::Defense => { "bear spray".to_string() }
+        }
     }
 }
 
@@ -387,5 +383,17 @@ mod tests {
     #[test]
     fn attribute_from_str_invalid() {
         assert!(Attribute::from_str("mana").is_err());
+    }
+
+    #[rstest]
+    #[case(Attribute::Health, "health kit")]
+    #[case(Attribute::Sanity, "memento")]
+    #[case(Attribute::Movement, "trail mix")]
+    #[case(Attribute::Bravery, "yayo")]
+    #[case(Attribute::Speed, "go-juice")]
+    #[case(Attribute::Strength, "adrenaline")]
+    #[case(Attribute::Defense, "bear spray")]
+    fn attribute_to_consumable_name(#[case] attribute: Attribute, #[case] expected: String) {
+        assert_eq!(attribute.consumable_name(), expected);
     }
 }

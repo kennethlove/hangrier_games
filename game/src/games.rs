@@ -11,7 +11,10 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
+use std::sync::OnceLock;
 use uuid::Uuid;
+
+thread_local!(pub static GAME: Game = Game::default());
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Game {
@@ -20,6 +23,7 @@ pub struct Game {
     pub status: GameStatus,
     pub day: Option<u32>,
     pub areas: Vec<Area>,
+    pub tributes: Vec<Tribute>,
 }
 
 impl Default for Game {
@@ -42,7 +46,7 @@ impl Default for Game {
         sw.add_neighbors(vec![&nw, &se, &cornucopia]);
         se.add_neighbors(vec![&ne, &sw, &cornucopia]);
 
-        let areas = vec![cornucopia, nw, ne, sw, se];
+        let areas: Vec<Area> = vec![cornucopia, nw, ne, sw, se];
 
         Game {
             id: Uuid::new_v4(),
@@ -50,6 +54,7 @@ impl Default for Game {
             status: Default::default(),
             day: None,
             areas,
+            tributes: Vec::new(),
         }
     }
 }
@@ -62,12 +67,9 @@ impl Game {
     }
 
     pub fn where_am_i(&self, tribute: &Tribute) -> Option<Area> {
-        for area in self.areas.iter() {
-            if area.tributes.contains(tribute) {
-                return Some(area.clone());
-            }
-        }
-        None
+        if let Some(tribute) = self.tributes.iter().find(|t| *t == tribute) {
+            Some(tribute.area.clone())
+        } else { None }
     }
 
     pub fn end(&mut self) {
@@ -83,33 +85,28 @@ impl Game {
         self.status = GameStatus::InProgress;
     }
 
-    pub fn add_tribute(&mut self, mut tribute: Tribute) {
-        let mut cornucopias = self
-            .areas
-            .iter_mut()
-            .filter(|a| a.name == "The Cornucopia")
-            .collect::<Vec<&mut Area>>();
-        let mut cornucopia: &mut Area = cornucopias.pop().unwrap();
-        cornucopia.add_tribute(tribute.clone());
-        tribute.game = Some(self.clone());
+    pub fn add_tribute(&mut self, tribute: Tribute) {
+        self.tributes.push(tribute);
+    }
+
+    pub fn remove_tribute(&mut self, tribute: &Tribute) {
+        self.tributes.retain(|item| item != tribute);
     }
 
     pub fn add_random_tribute(&mut self) {
-        let mut tribute = Tribute::random();
+        let tribute = Tribute::random();
         self.add_tribute(tribute.clone());
     }
 
-    pub fn tributes(&self) -> Vec<Tribute> {
-        let mut tributes: Vec<Tribute> = vec![];
-        for area in &self.areas {
-            let tribs = area.tributes.clone();
-            tributes.extend_from_slice(tribs.as_slice());
-        }
-        tributes
+    pub fn shuffle_tributes(&mut self) {
+        let mut rng = rand::thread_rng();
+        let mut tributes = self.tributes.clone();
+        tributes.shuffle(&mut rng);
+        self.tributes = tributes;
     }
 
     pub fn living_tributes(&self) -> Vec<Tribute> {
-        self.tributes()
+        self.tributes
             .iter()
             .filter(|t| t.is_alive())
             .cloned()
@@ -117,7 +114,7 @@ impl Game {
     }
 
     pub fn dead_tributes(&self) -> Vec<Tribute> {
-        self.tributes()
+        self.tributes
             .iter()
             .filter(|t| !t.is_alive())
             .cloned()
@@ -125,7 +122,7 @@ impl Game {
     }
 
     pub fn recently_dead_tributes(&self) -> Vec<Tribute> {
-        self.tributes()
+        self.tributes
             .iter()
             .filter(|t| t.status == TributeStatus::RecentlyDead)
             .cloned()
@@ -137,6 +134,18 @@ impl Game {
             1 => Some(self.living_tributes()[0].clone()),
             _ => None,
         }
+    }
+
+    pub fn get_area(&self, name: &str) -> Option<&Area> {
+        self.areas.iter().find(|a| a.name == name)
+    }
+
+    pub fn get_area_mut(&mut self, name: &str) -> Option<&mut Area> {
+        self.areas.iter_mut().find(|a| a.name == name)
+    }
+
+    pub fn random_area(&self) -> Option<Area> {
+        self.areas.choose(&mut rand::thread_rng()).cloned()
     }
 
     pub fn run_day_night_cycle(&mut self) {
@@ -262,10 +271,8 @@ impl Game {
         }
     }
 
-    pub fn move_tribute(&self, tribute: &Tribute, mut area: Area) {
-        let mut current_area = self.where_am_i(tribute).unwrap().clone();
-        current_area.remove_tribute(tribute);
-        area.add_tribute(tribute.clone());
+    pub fn move_tribute(&self, tribute: &mut Tribute, area: Area) {
+        tribute.area = area;
     }
 }
 

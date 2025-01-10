@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::Display;
 use std::str::FromStr;
+use std::borrow::BorrowMut;
 
 #[serde_as]
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -15,7 +16,6 @@ pub struct Area {
     pub items: Vec<Item>,
     #[serde_as(as = "Vec<DisplayFromStr>")]
     pub neighbors: Vec<Area>,
-    pub tributes: Vec<Tribute>,
     pub events: Vec<AreaEvent>,
 }
 
@@ -26,7 +26,6 @@ impl Default for Area {
             open: true,
             items: vec![],
             neighbors: vec![],
-            tributes: vec![],
             events: vec![],
         }
     }
@@ -44,10 +43,17 @@ impl PartialEq<&Area> for Area {
     }
 }
 
+use crate::games::GAME;
+
 impl FromStr for Area {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        GAME.with(|game| {
+            return Ok::<Area, Self::Err>(game.areas.iter()
+                .find(|area| area.name == s)
+                .unwrap().clone())
+        }).expect("No global game?");
         Ok(Area::new(s))
     }
 }
@@ -77,26 +83,18 @@ impl Area {
         self.items.retain(|item| item != removed_item);
     }
 
-    pub fn add_tribute(&mut self, tribute: Tribute) {
-        self.tributes.push(tribute);
-    }
-
-    pub fn remove_tribute(&mut self, tribute: &Tribute) {
-        self.tributes.retain(|item| item != tribute);
-    }
-
     pub fn add_event(&mut self, event: AreaEvent) {
         self.events.push(event);
     }
 
-    pub fn process_events(&mut self) {
+    pub fn process_events(&mut self, mut tributes: Vec<Tribute>) -> Vec<Tribute> {
         // If there are events, close the area
         if !self.events.is_empty() {
             self.open = false;
         }
 
         for event in self.events.iter() {
-            for tribute in self.tributes.iter_mut() {
+            for tribute in tributes.iter_mut() {
                 match event {
                     AreaEvent::Wildfire => tribute.set_status(TributeStatus::Burned),
                     AreaEvent::Flood => tribute.set_status(TributeStatus::Drowned),
@@ -108,14 +106,23 @@ impl Area {
                 }
             }
         }
+
+        tributes
+    }
+
+    pub fn tributes(&self) -> Vec<Tribute> {
+        GAME.with(|game| {
+            game.tributes.iter()
+                .filter(|t| t.area == self)
+                .cloned()
+                .collect()
+        })
     }
 
     pub fn living_tributes(&self) -> Vec<Tribute> {
-        self.tributes
-            .iter()
-            .filter(|t| t.is_alive())
-            .cloned()
-            .collect()
+        GAME.with(|game| {
+            game.tributes().filter(|t| t.is_alive()).cloned().collect()
+        })
     }
 
     pub fn available_items(&self) -> Vec<Item> {
@@ -129,8 +136,12 @@ impl Area {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::OnceLock;
     use super::*;
     use rstest::rstest;
+    use crate::games::Game;
+
+    thread_local!(pub static GAME: Game = Game::default());
 
     #[test]
     fn default_area() {
@@ -138,7 +149,6 @@ mod tests {
         assert_eq!(area.name, "");
         assert_eq!(area.items.len(), 0);
         assert_eq!(area.neighbors.len(), 0);
-        assert_eq!(area.tributes.len(), 0);
     }
 
     #[test]
@@ -200,18 +210,22 @@ mod tests {
     fn add_tribute() {
         let mut area = Area::new("The Cornucopia");
         let tribute = Tribute::new("Katniss".to_string(), Some(12), None);
-        area.add_tribute(tribute.clone());
-        assert!(area.tributes.contains(&tribute));
+        GAME.with(|mut game| {
+            game.borrow_mut().add_tribute(tribute.clone());
+        });
+        assert!(area.tributes().contains(&tribute));
     }
 
     #[test]
     fn remove_tribute() {
         let mut area = Area::new("The Cornucopia");
         let tribute = Tribute::new("Katniss".to_string(), Some(12), None);
-        area.add_tribute(tribute.clone());
-        assert!(area.tributes.contains(&tribute));
-        area.remove_tribute(&tribute);
-        assert!(!area.tributes.contains(&tribute));
+        GAME.with(|mut game| {
+            game.borrow_mut().add_tribute(tribute.clone());
+            assert!(area.tributes().contains(&tribute));
+            game.borrow_mut().remove_tribute(&tribute);
+            assert!(!area.tributes().contains(&tribute));
+        });
     }
 
     #[test]
@@ -228,7 +242,7 @@ mod tests {
         let mut area = Area::new("The Cornucopia");
         let mut tribute = Tribute::new("Katniss".to_string(), Some(12), None);
         tribute.status = TributeStatus::Dead;
-        area.add_tribute(tribute.clone());
+        GAME.get_mut().unwrap().tributes.push(tribute.clone());
         assert_eq!(area.living_tributes().len(), 0);
     }
 
@@ -260,11 +274,10 @@ mod tests {
     fn process_events_affects_tributes(#[case] event: AreaEvent, #[case] status: TributeStatus) {
         let mut area = Area::new("The Cornucopia");
         let tribute = Tribute::new("Katniss".to_string(), Some(12), None);
-        area.add_tribute(tribute);
         area.add_event(event);
         area.process_events();
         assert_eq!(area.open, false);
-        assert_eq!(area.tributes.first().unwrap().status(), status);
+        todo!()
     }
 
     #[test]

@@ -23,9 +23,7 @@ fn main() {
             let mut game = Game::default();
             game.add_random_tribute();
             game.add_random_tribute();
-            game.add_random_tribute();
-            game.add_random_tribute();
-            game.add_random_tribute();
+            game.shuffle_tributes();
 
             println!("{}", json!(game));
         }

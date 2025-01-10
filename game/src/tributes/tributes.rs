@@ -2,7 +2,7 @@ use super::actions::{Action, AttackOutcome, AttackResult, TributeAction};
 use super::brains::Brain;
 use super::statuses::TributeStatus;
 use crate::areas::Area;
-use crate::games::Game;
+use crate::games::GAME;
 use crate::items::{Attribute, Item};
 use crate::messages::GameMessage;
 use crate::tributes::events::TributeEvent;
@@ -18,8 +18,8 @@ use uuid::Uuid;
 pub struct Tribute {
     /// What is their identifier?
     pub id: Uuid,
-    /// What game do they belong to?
-    pub game: Option<Game>,
+    /// Where are they?
+    pub area: Area,
     /// What is their current status?
     pub status: TributeStatus,
     /// This is their thinker
@@ -48,9 +48,11 @@ impl Tribute {
         let attributes = Attributes::new();
         let statistics = Statistics::default();
 
+        let area = GAME.get().unwrap().get_area("the cornucopia").unwrap();
+
         Self {
             id: Uuid::new_v4(),
-            game: None,
+            area: area.clone(),
             name: name.clone(),
             district,
             brain,
@@ -282,7 +284,7 @@ impl Tribute {
 
     pub fn travels(&self, closed_areas: Vec<Area>, suggested_area: Option<Area>) -> TravelResult {
         let mut rng = thread_rng();
-        let game = self.game.clone().unwrap();
+        let game = GAME.get().unwrap();
         let area = game.where_am_i(self);
         let mut new_area: Option<Area> = None;
 
@@ -553,17 +555,18 @@ impl Tribute {
             println!("{}", GameMessage::TributeDead(self.clone()));
         }
 
-        let game = self.game.clone().unwrap();
+        let game = GAME.get().unwrap();
         let area = game.where_am_i(self);
-        let closed_areas = self
-            .game
-            .clone()
-            .unwrap()
-            .areas
-            .iter()
-            .filter(|a| !a.open)
-            .cloned()
-            .collect::<Vec<Area>>();
+        let closed_areas = vec![];
+        // let closed_areas = self
+        //     .game
+        //     .clone()
+        //     .unwrap()
+        //     .areas
+        //     .iter()
+        //     .filter(|a| !a.open)
+        //     .cloned()
+        //     .collect::<Vec<Area>>();
 
         if suggested_action.is_some() {
             self.brain
@@ -577,7 +580,7 @@ impl Tribute {
         match &action {
             Action::Move(area) => match self.travels(closed_areas.clone(), area.clone()) {
                 TravelResult::Success(area) => {
-                    self.clone().game.unwrap().move_tribute(&self, area);
+                    // self.clone().game.unwrap().move_tribute(&self, area);
                 }
                 TravelResult::Failure => {
                     self.short_rests();
@@ -699,7 +702,7 @@ impl Tribute {
     /// Take item from area
     fn take_nearby_item(&mut self) -> Item {
         let mut rng = thread_rng();
-        let game = self.game.clone().unwrap();
+        let game = GAME.get().unwrap();
         let mut area = game.where_am_i(&self).unwrap();
         let items = area.available_items();
         let item = items.choose(&mut rng).unwrap();
@@ -793,7 +796,7 @@ impl Tribute {
     }
 
     pub fn pick_target(&self) -> Option<Tribute> {
-        let game = self.game.clone().unwrap();
+        let game = GAME.get().unwrap();
         let area = game.where_am_i(&self).unwrap();
         let tributes: Vec<Tribute> = area
             .living_tributes()

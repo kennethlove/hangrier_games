@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::Display;
 use std::str::FromStr;
+use strum::EnumIter;
 
 #[serde_as]
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -17,6 +18,42 @@ pub struct Area {
     #[serde_as(as = "Vec<DisplayFromStr>")]
     pub neighbors: Vec<Area>,
     // pub events: Vec<AreaEvent>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AreaDetails {
+    pub open: bool,
+    pub neighbors: Vec<Areas>,
+}
+
+impl Default for AreaDetails {
+    fn default() -> Self {
+        Self {
+            open: true,
+            neighbors: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, EnumIter)]
+pub enum Areas {
+    TheCornucopia(AreaDetails),
+    Northwest(AreaDetails),
+    Northeast(AreaDetails),
+    Southeast(AreaDetails),
+    Southwest(AreaDetails),
+}
+
+impl Areas {
+    pub fn name(&self) -> String {
+        match self {
+            Areas::Northwest(_) => "Northwest".to_string(),
+            Areas::Northeast(_) => "Northeast".to_string(),
+            Areas::Southeast(_) => "Southeast".to_string(),
+            Areas::Southwest(_) => "Southwest".to_string(),
+            _ => "The Cornucopia".to_string()
+        }
+    }
 }
 
 impl Default for Area {

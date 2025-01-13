@@ -4,15 +4,11 @@ use serde::{Deserialize, Serialize};
 use std::iter::zip;
 use surrealdb::engine::local::Mem;
 use surrealdb::{Error, RecordId, Surreal};
+use game::areas::areas::Areas;
 
 #[derive(Debug, Deserialize)]
 struct Record {
     id: RecordId,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Neighbors {
-    neighbors: Vec<Area>,
 }
 
 #[tokio::main]
@@ -38,7 +34,6 @@ async fn main() -> surrealdb::Result<()> {
         .query("SELECT * FROM game WHERE id = $id")
         .bind(("id", create_game.unwrap().id))
         .await?;
-    // dbg!(&created_game);
     let game: Result<Option<Game>, surrealdb::Error> = created_game.take(0_usize);
     let game = {
         if let Ok(Some(game)) = game {
@@ -47,25 +42,75 @@ async fn main() -> surrealdb::Result<()> {
             return Err(Error::from(surrealdb::error::Db::IdNotFound { value: "Invalid id".to_string() }))
         }
     };
-    // dbg!(&game);
 
-    let area_names = ["the cornucopia", "northwest", "northeast", "southwest", "southeast"];
-    for area_name in &area_names {
-        let _: Option<Record> = area_db.create("area").content(Area::new(area_name)).await?;
+    // Create areas
+    let the_cornucopia: Option<Record> = area_db.create("area").content(Area::new("The Cornucopia")).await?;
+    let northwest: Option<Record> = area_db.create("area").content(Area::new("Northwest")).await?;
+    let northeast: Option<Record> = area_db.create("area").content(Area::new("Northeast")).await?;
+    let southwest: Option<Record> = area_db.create("area").content(Area::new("Southwest")).await?;
+    let southeast: Option<Record> = area_db.create("area").content(Area::new("Southeast")).await?;
+
+    let northwest = northwest.unwrap().id;
+    let northeast = northeast.unwrap().id;
+    let southwest = southwest.unwrap().id;
+    let southeast = southeast.unwrap().id;
+    let the_cornucopia = the_cornucopia.unwrap().id;
+
+    // Set Cornucopia neighbors
+    let corn_neighbors: Vec<RecordId> = vec![northwest.clone(), northeast.clone(), southeast.clone(), southwest.clone()];
+    for neighbor in corn_neighbors.iter() {
+        let _ = area_db
+            .query("RELATE $area1->neighbors->$area2")
+            .bind(("area1", the_cornucopia.clone()))
+            .bind(("area2", neighbor.clone()))
+            .await?;
     }
 
-    let area_records: Vec<Record> = area_db.select("area").await?;
-    let areas: Vec<Area> = area_db.select("area").await?;
-
-    for (area, record) in zip(areas, area_records) {
-        match area.name.as_str() {
-            "northwest" => {},
-            "northeast" => {},
-            "southwest" => {},
-            "southeast" => {},
-            _ => {}
-        }
+    // Set NW neighbors
+    let nw_neighbors: Vec<RecordId> = vec![the_cornucopia.clone(), northeast.clone(), southwest.clone()];
+    for neighbor in nw_neighbors.iter() {
+        let _ = area_db
+            .query("RELATE $area1->neighbors->$area2")
+            .bind(("area1", northwest.clone()))
+            .bind(("area2", neighbor.clone()))
+            .await?;
     }
+
+    // Set NE neighbors
+    let ne_neighbors: Vec<RecordId> = vec![the_cornucopia.clone(), northwest.clone(), southeast.clone()];
+    for neighbor in ne_neighbors.iter() {
+        let _ = area_db
+            .query("RELATE $area1->neighbors->$area2")
+            .bind(("area1", northeast.clone()))
+            .bind(("area2", neighbor.clone()))
+            .await?;
+    }
+
+    // Set SE neighbors
+    let se_neighbors: Vec<RecordId> = vec![the_cornucopia.clone(), northeast.clone(), southwest.clone()];
+    for neighbor in se_neighbors.iter() {
+        let _ = area_db
+            .query("RELATE $area1->neighbors->$area2")
+            .bind(("area1", southeast.clone()))
+            .bind(("area2", neighbor.clone()))
+            .await?;
+    }
+
+    // Set SW neighbors
+    let sw_neighbors: Vec<RecordId> = vec![the_cornucopia.clone(), northwest.clone(), southeast.clone()];
+    for neighbor in sw_neighbors.iter() {
+        let _ = area_db
+            .query("RELATE $area1->neighbors->$area2")
+            .bind(("area1", southwest.clone()))
+            .bind(("area2", neighbor.clone()))
+            .await?;
+    }
+
+    let result = area_db
+        .query("SELECT ->neighbors->area.name FROM $area")
+        .bind(("area", the_cornucopia.clone()))
+        .await?;
+    dbg!(result);
 
     Ok(())
 }

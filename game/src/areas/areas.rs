@@ -1,4 +1,5 @@
 use crate::areas::events::AreaEvent;
+use crate::database::get_db;
 use crate::items::Item;
 use crate::tributes::statuses::TributeStatus;
 use crate::tributes::Tribute;
@@ -6,17 +7,16 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::Display;
 use std::str::FromStr;
-use std::borrow::BorrowMut;
 
 #[serde_as]
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Area {
     pub name: String,
     pub open: bool,
-    pub items: Vec<Item>,
+    // pub items: Vec<Item>,
     #[serde_as(as = "Vec<DisplayFromStr>")]
     pub neighbors: Vec<Area>,
-    pub events: Vec<AreaEvent>,
+    // pub events: Vec<AreaEvent>,
 }
 
 impl Default for Area {
@@ -24,9 +24,9 @@ impl Default for Area {
         Self {
             name: String::from(""),
             open: true,
-            items: vec![],
+            // items: vec![],
             neighbors: vec![],
-            events: vec![],
+            // events: vec![],
         }
     }
 }
@@ -43,17 +43,15 @@ impl PartialEq<&Area> for Area {
     }
 }
 
-use crate::games::GAME;
-
 impl FromStr for Area {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        GAME.with(|game| {
-            return Ok::<Area, Self::Err>(game.borrow().areas.iter()
-                .find(|area| area.name == s)
-                .unwrap().clone())
-        }).expect("No global game?");
+        // GAME.with(|game| {
+        //     return Ok::<Area, Self::Err>(game.borrow().areas.iter()
+        //         .find(|area| area.id == s)
+        //         .unwrap().clone())
+        // }).expect("No global game?");
         Ok(Area::new(s))
     }
 }
@@ -76,70 +74,111 @@ impl Area {
     }
 
     pub fn add_item(&mut self, item: Item) {
-        self.items.push(item);
+        todo!();
+        // self.items.push(item);
     }
 
     pub fn remove_item(&mut self, removed_item: &Item) {
-        self.items.retain(|item| item != removed_item);
+        todo!();
+        // self.items.retain(|item| item != removed_item);
     }
 
     pub fn add_event(&mut self, event: AreaEvent) {
-        self.events.push(event);
+        todo!();
+        // self.events.push(event);
     }
 
     pub fn process_events(&mut self, mut tributes: Vec<Tribute>) -> Vec<Tribute> {
         // If there are events, close the area
-        if !self.events.is_empty() {
-            self.open = false;
-        }
+        // if !self.events.is_empty() {
+        //     self.open = false;
+        // }
 
-        for event in self.events.iter() {
-            for tribute in tributes.iter_mut() {
-                match event {
-                    AreaEvent::Wildfire => tribute.set_status(TributeStatus::Burned),
-                    AreaEvent::Flood => tribute.set_status(TributeStatus::Drowned),
-                    AreaEvent::Earthquake => tribute.set_status(TributeStatus::Buried),
-                    AreaEvent::Avalanche => tribute.set_status(TributeStatus::Buried),
-                    AreaEvent::Blizzard => tribute.set_status(TributeStatus::Frozen),
-                    AreaEvent::Landslide => tribute.set_status(TributeStatus::Buried),
-                    AreaEvent::Heatwave => tribute.set_status(TributeStatus::Overheated),
-                }
-            }
-        }
+        // for event in self.events.iter() {
+        //     for tribute in tributes.iter_mut() {
+        //         match event {
+        //             AreaEvent::Wildfire => tribute.set_status(TributeStatus::Burned),
+        //             AreaEvent::Flood => tribute.set_status(TributeStatus::Drowned),
+        //             AreaEvent::Earthquake => tribute.set_status(TributeStatus::Buried),
+        //             AreaEvent::Avalanche => tribute.set_status(TributeStatus::Buried),
+        //             AreaEvent::Blizzard => tribute.set_status(TributeStatus::Frozen),
+        //             AreaEvent::Landslide => tribute.set_status(TributeStatus::Buried),
+        //             AreaEvent::Heatwave => tribute.set_status(TributeStatus::Overheated),
+        //         }
+        //     }
+        // }
 
         tributes
     }
 
     pub fn tributes(&self) -> Vec<Tribute> {
-        GAME.with(|game| {
-            game.borrow().tributes.iter()
-                .filter(|t| t.area == self)
-                .cloned()
-                .collect()
-        })
+        todo!();
+        // GAME.with(|game| {
+        //     game.borrow().tributes.iter()
+        //         .filter(|t| t.area == self)
+        //         .cloned()
+        //         .collect()
+        // })
     }
 
     pub fn living_tributes(&self) -> Vec<Tribute> {
-        GAME.with(|game| {
-            game.borrow().tributes.iter().filter(|t| t.is_alive()).cloned().collect()
-        })
+        todo!();
+        // GAME.with(|game| {
+        //     game.borrow().tributes.iter().filter(|t| t.is_alive()).cloned().collect()
+        // })
     }
 
     pub fn available_items(&self) -> Vec<Item> {
-        self.items
-            .iter()
-            .filter(|i| i.quantity > 0)
-            .cloned()
-            .collect()
+        todo!();
+        // self.items
+        //     .iter()
+        //     .filter(|i| i.quantity > 0)
+        //     .cloned()
+        //     .collect()
+    }
+
+    pub async fn save(&self) -> Result<Box<Area>, surrealdb::Error> {
+        let db = get_db();
+        let db = db.lock().unwrap();
+        let db = db.as_ref().unwrap();
+
+        let area = db.client()
+            .create("area")
+            .content(self.clone())
+            .await;
+        match area {
+            Ok(area) => {
+                match area {
+                    Some(area) => Ok(area),
+                    None => Err(surrealdb::Error::Db(surrealdb::error::Db::InsertStatement { value: "oh boy".to_string() })),
+                }
+            },
+            Err(e) => Err(e)
+        }
+    }
+
+    pub async fn fetch(name: &str) -> Option<Area> {
+        let db = get_db();
+        let db = db.lock().unwrap();
+        let db = db.as_ref().unwrap();
+        let area = db.client()
+            .select(("area", name))
+            .await;
+        if let Ok(area) = area {
+            if let Some(area) = area {
+                return Some(area);
+            }
+        }
+        None
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::OnceLock;
     use super::*;
-    use rstest::rstest;
     use crate::games::Game;
+    use rstest::rstest;
+    use tokio::runtime::Runtime;
 
     thread_local!(pub static GAME: Game = Game::default());
 
@@ -207,42 +246,24 @@ mod tests {
     }
 
     #[test]
-    fn add_tribute() {
-        let mut area = Area::new("The Cornucopia");
-        let tribute = Tribute::new("Katniss".to_string(), Some(12), None);
-        GAME.with(|mut game| {
-            game.borrow_mut().add_tribute(tribute.clone());
-        });
-        assert!(area.tributes().contains(&tribute));
-    }
-
-    #[test]
-    fn remove_tribute() {
-        let mut area = Area::new("The Cornucopia");
-        let tribute = Tribute::new("Katniss".to_string(), Some(12), None);
-        GAME.with(|mut game| {
-            game.borrow_mut().add_tribute(tribute.clone());
-            assert!(area.tributes().contains(&tribute));
-            game.borrow_mut().remove_tribute(&tribute);
-            assert!(!area.tributes().contains(&tribute));
-        });
-    }
-
-    #[test]
     fn living_tributes() {
-        let mut area = Area::new("The Cornucopia");
-        let tribute = Tribute::new("Katniss".to_string(), Some(12), None);
-        area.add_tribute(tribute.clone());
+        let mut game = Game::default();
+        let area = Area::new("The Cornucopia");
+        let mut tribute = Tribute::new("Katniss".to_string(), Some(12), None);
+        tribute.area = area.clone();
+        game.add_tribute(tribute.clone());
         assert_eq!(area.living_tributes().len(), 1);
         assert_eq!(area.living_tributes()[0], tribute);
     }
 
     #[test]
     fn dead_tributes() {
-        let mut area = Area::new("The Cornucopia");
+        let mut game = Game::default();
+        let area = Area::new("The Cornucopia");
         let mut tribute = Tribute::new("Katniss".to_string(), Some(12), None);
         tribute.status = TributeStatus::Dead;
-        GAME.get_mut().unwrap().tributes.push(tribute.clone());
+        tribute.area = area.clone();
+        game.add_tribute(tribute.clone());
         assert_eq!(area.living_tributes().len(), 0);
     }
 
@@ -259,7 +280,7 @@ mod tests {
         let mut area = Area::new("The Cornucopia");
         let event = AreaEvent::Wildfire;
         area.add_event(event.clone());
-        area.process_events();
+        area.process_events(area.tributes());
         assert_eq!(area.open, false);
     }
 
@@ -275,7 +296,7 @@ mod tests {
         let mut area = Area::new("The Cornucopia");
         let tribute = Tribute::new("Katniss".to_string(), Some(12), None);
         area.add_event(event);
-        area.process_events();
+        area.process_events(area.tributes());
         assert_eq!(area.open, false);
         todo!()
     }
@@ -284,5 +305,19 @@ mod tests {
     fn partial_eq_with_reference() {
         let area = Area::new("The Cornucopia");
         assert_eq!(area, &area);
+    }
+
+    use crate::initialize_library;
+    #[test]
+    fn save_area() {
+        initialize_library();
+
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let area = Area::new("The Cornucopia");
+            let thing = area.save().await;
+            println!("Saved area with ID: '{:?}'", thing);
+            assert!(thing.is_ok());
+        });
     }
 }

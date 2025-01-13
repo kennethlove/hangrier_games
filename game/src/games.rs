@@ -1,7 +1,5 @@
-use std::cell::RefCell;
 use crate::areas::events::AreaEvent;
 use crate::areas::Area;
-use crate::items::Item;
 use crate::messages::GameMessage;
 use crate::tributes::actions::Action;
 use crate::tributes::events::TributeEvent;
@@ -10,21 +8,19 @@ use crate::tributes::Tribute;
 use rand::prelude::SliceRandom;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
 use std::fmt::Display;
 use std::str::FromStr;
-use uuid::Uuid;
 
-// thread_local!(pub static GAME: Game = Game::default());
 thread_local!(pub static GAME: RefCell<Game> = RefCell::new(Game::default()));
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Game {
-    pub id: Uuid,
     pub name: String,
     pub status: GameStatus,
     pub day: Option<u32>,
-    pub areas: Vec<Area>,
-    pub tributes: Vec<Tribute>,
+    // pub areas: Vec<Area>,
+    // pub tributes: Vec<Tribute>,
 }
 
 impl Default for Game {
@@ -50,17 +46,20 @@ impl Default for Game {
         let areas: Vec<Area> = vec![cornucopia, nw, ne, sw, se];
 
         Game {
-            id: Uuid::new_v4(),
             name,
             status: Default::default(),
             day: None,
-            areas,
-            tributes: Vec::new(),
+            // areas,
+            // tributes: Vec::new(),
         }
     }
 }
 
 impl Game {
+    // pub fn name(&self) -> String {
+    //     self.id.clone()
+    // }
+
     pub fn new(name: &str) -> Self {
         let mut game = Game::default();
         game.name = name.to_string();
@@ -68,9 +67,10 @@ impl Game {
     }
 
     pub fn where_am_i(&self, tribute: &Tribute) -> Option<Area> {
-        if let Some(tribute) = self.tributes.iter().find(|t| *t == tribute) {
-            Some(tribute.area.clone())
-        } else { None }
+        todo!();
+        // if let Some(tribute) = self.tributes.iter().find(|t| *t == tribute) {
+        //     Some(tribute.area.clone())
+        // } else { None }
     }
 
     pub fn end(&mut self) {
@@ -87,47 +87,54 @@ impl Game {
     }
 
     pub fn add_tribute(&mut self, tribute: Tribute) {
-        self.tributes.push(tribute);
+        todo!();
+        // self.tributes.push(tribute);
     }
 
     pub fn remove_tribute(&mut self, tribute: &Tribute) {
-        self.tributes.retain(|item| item != tribute);
+        todo!();
+        // self.tributes.retain(|item| item != tribute);
     }
 
     pub fn add_random_tribute(&mut self) {
+        todo!();
         let tribute = Tribute::random();
         self.add_tribute(tribute.clone());
     }
 
     pub fn shuffle_tributes(&mut self) {
-        let mut rng = rand::thread_rng();
-        let mut tributes = self.tributes.clone();
-        tributes.shuffle(&mut rng);
-        self.tributes = tributes;
+        todo!();
+        // let mut rng = rand::thread_rng();
+        // let mut tributes = self.tributes.clone();
+        // tributes.shuffle(&mut rng);
+        // self.tributes = tributes;
     }
 
     pub fn living_tributes(&self) -> Vec<Tribute> {
-        self.tributes
-            .iter()
-            .filter(|t| t.is_alive())
-            .cloned()
-            .collect()
+        todo!();
+        // self.tributes
+        //     .iter()
+        //     .filter(|t| t.is_alive())
+        //     .cloned()
+        //     .collect()
     }
 
     pub fn dead_tributes(&self) -> Vec<Tribute> {
-        self.tributes
-            .iter()
-            .filter(|t| !t.is_alive())
-            .cloned()
-            .collect()
+        todo!();
+        // self.tributes
+        //     .iter()
+        //     .filter(|t| !t.is_alive())
+        //     .cloned()
+        //     .collect()
     }
 
     pub fn recently_dead_tributes(&self) -> Vec<Tribute> {
-        self.tributes
-            .iter()
-            .filter(|t| t.status == TributeStatus::RecentlyDead)
-            .cloned()
-            .collect()
+        todo!();
+        // self.tributes
+        //     .iter()
+        //     .filter(|t| t.status == TributeStatus::RecentlyDead)
+        //     .cloned()
+        //     .collect()
     }
 
     pub fn winner(&self) -> Option<Tribute> {
@@ -138,15 +145,30 @@ impl Game {
     }
 
     pub fn get_area(&self, name: &str) -> Option<&Area> {
-        self.areas.iter().find(|a| a.name == name)
+        todo!();
+        // self.areas.iter().find(|a| a.name() == name)
+    }
+
+    pub fn get_or_create_area(&mut self, _name: &str) -> &Area {
+        todo!();
+        // match self.get_area(name) {
+        //     Some(area) => area,
+        //     None => {
+        //         let area = Area::new(name);
+        //         self.areas.push(area);
+        //         self.areas.last().unwrap()
+        //     }
+        // }
     }
 
     pub fn get_area_mut(&mut self, name: &str) -> Option<&mut Area> {
-        self.areas.iter_mut().find(|a| a.name == name)
+        todo!();
+        // self.areas.iter_mut().find(|a| a.name() == name)
     }
 
     pub fn random_area(&self) -> Option<Area> {
-        self.areas.choose(&mut rand::thread_rng()).cloned()
+        todo!();
+        // self.areas.choose(&mut rand::thread_rng()).cloned()
     }
 
     pub fn run_day_night_cycle(&mut self) {
@@ -203,25 +225,26 @@ impl Game {
 
         // Trigger any events for this cycle if we're past the first three days
         if self.day > Some(3) || !day {
-            for _ in &self.areas {
-                if rng.gen_bool(if day {
-                    day_event_frequency
-                } else {
-                    night_event_frequency
-                }) {
-                    AreaEvent::random();
-                }
-            }
+            // for _ in &self.areas {
+            //     if rng.gen_bool(if day {
+            //         day_event_frequency
+            //     } else {
+            //         night_event_frequency
+            //     }) {
+            //         AreaEvent::random();
+            //     }
+            // }
         }
 
         if self.day == Some(3) && day {
             // TODO: add goodies to the cornucopia
-            let area = self.areas.iter_mut().find(|a| a.name == "The Cornucopia").unwrap();
-            for _ in 0..=5 {
-                area.add_item(Item::new_random_weapon());
-                area.add_item(Item::new_random_consumable());
-                area.add_item(Item::new_random_shield());
-            }
+            todo!();
+            // let area = self.areas.iter_mut().find(|a| a.name() == "The Cornucopia").unwrap();
+            // for _ in 0..=5 {
+            //     area.add_item(Item::new_random_weapon());
+            //     area.add_item(Item::new_random_consumable());
+            //     area.add_item(Item::new_random_shield());
+            // }
         }
 
         if self.living_tributes().len() > 1 && self.living_tributes().len() < 6 {
@@ -249,15 +272,15 @@ impl Game {
                     tribute.do_day_night(Some(Action::Move(None)), Some(0.5), day);
                 }
                 (Some(3), true) => {
-                    let cornucopia: Option<Area> = self
-                        .areas
-                        .iter()
-                        .filter(|a| a.name == "cornucopia")
-                        .cloned()
-                        .collect::<Vec<Area>>()
-                        .first()
-                        .cloned();
-                    tribute.do_day_night(Some(Action::Move(cornucopia)), Some(0.75), day);
+                    // let cornucopia: Option<Area> = self
+                    //     .areas
+                    //     .iter()
+                    //     .filter(|a| a.name() == "cornucopia")
+                    //     .cloned()
+                    //     .collect::<Vec<Area>>()
+                    //     .first()
+                    //     .cloned();
+                    // tribute.do_day_night(Some(Action::Move(cornucopia)), Some(0.75), day);
                 }
                 (_, _) => {
                     tribute.do_day_night(None, None, day);

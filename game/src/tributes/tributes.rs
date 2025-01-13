@@ -47,15 +47,12 @@ impl Tribute {
         let district  = district.unwrap_or(0);
         let attributes = Attributes::new();
         let statistics = Statistics::default();
-
+        let mut game = GAME.with_borrow_mut(|game| game.clone());
+        let area = game.get_or_create_area("the cornucopia");
 
         Self {
             id: Uuid::new_v4(),
-            area: {
-                GAME.with_borrow(|game| {
-                    game.get_area("the cornucopia").unwrap()
-                }).clone()
-            },
+            area: area.clone(),
             name: name.clone(),
             district,
             brain,
@@ -287,7 +284,9 @@ impl Tribute {
 
     pub fn travels(&self, closed_areas: Vec<Area>, suggested_area: Option<Area>) -> TravelResult {
         let mut rng = thread_rng();
-        let area = GAME.borrow_mut().where_am_i(self);
+        let area = GAME.with_borrow(|game| {
+            game.where_am_i(&self)
+        });
         let mut new_area: Option<Area> = None;
 
         if let Some(suggestion) = suggested_area {
@@ -557,8 +556,7 @@ impl Tribute {
             println!("{}", GameMessage::TributeDead(self.clone()));
         }
 
-        let game = GAME.get().unwrap();
-        let area = game.where_am_i(self);
+        let area = GAME.with_borrow(|game| { game.where_am_i(&self) });
         let closed_areas = vec![];
         // let closed_areas = self
         //     .game
@@ -581,7 +579,7 @@ impl Tribute {
 
         match &action {
             Action::Move(area) => match self.travels(closed_areas.clone(), area.clone()) {
-                TravelResult::Success(area) => {
+                TravelResult::Success(_area) => {
                     // self.clone().game.unwrap().move_tribute(&self, area);
                 }
                 TravelResult::Failure => {
@@ -632,12 +630,13 @@ impl Tribute {
                 }
             }
             Action::TakeItem => {
-                let item = self.take_nearby_item();
-                self.take_action(&action, None);
-                println!(
-                    "{}",
-                    GameMessage::TributeTakeItem(self.clone(), item.clone())
-                );
+                if let Some(item) = self.take_nearby_item() {
+                    self.take_action(&action, None);
+                    println!(
+                        "{}",
+                        GameMessage::TributeTakeItem(self.clone(), item.clone())
+                    );
+                }
             }
             Action::UseItem(None) => {
                 // Get consumable items
@@ -702,22 +701,26 @@ impl Tribute {
     }
 
     /// Take item from area
-    fn take_nearby_item(&mut self) -> Item {
+    fn take_nearby_item(&mut self) -> Option<Item> {
         let mut rng = thread_rng();
-        let game = GAME.get().unwrap();
-        let mut area = game.where_am_i(&self).unwrap();
-        let items = area.available_items();
-        let item = items.choose(&mut rng).unwrap();
+        let area = GAME.with_borrow(|game| { game.where_am_i(&self) });
+        if area.is_none() {
+            None
+        } else {
+            let mut area = area.unwrap();
+            let items = area.available_items();
+            let item = items.choose(&mut rng).unwrap();
 
-        self.take_item(item.clone());
-        area.remove_item(item);
+            self.take_item(&item);
+            area.remove_item(&item);
 
-        item.clone()
+            Some(item.clone())
+        }
     }
 
     /// Take a prescribed item
-    fn take_item(&mut self, item: Item) {
-        self.items.push(item);
+    fn take_item(&mut self, item: &Item) {
+        self.items.push(item.clone());
     }
 
     fn use_consumable(&mut self, chosen_item: Item) -> bool {
@@ -798,14 +801,17 @@ impl Tribute {
     }
 
     pub fn pick_target(&self) -> Option<Tribute> {
-        let game = GAME.get().unwrap();
-        let area = game.where_am_i(&self).unwrap();
-        let tributes: Vec<Tribute> = area
-            .living_tributes()
-            .iter()
-            .filter(|t| t.id != self.id)
-            .cloned()
-            .collect();
+        let game = GAME.with_borrow(|game| { game.clone() });
+        let area = game.where_am_i(&self);
+        let mut tributes: Vec<Tribute> = Vec::new();
+        if let Some(area) = area {
+            tributes = area
+                .living_tributes()
+                .iter()
+                .filter(|t| t.id != self.id)
+                .cloned()
+                .collect();
+        }
 
         match tributes.len() {
             0 => {
@@ -1021,6 +1027,13 @@ impl Attributes {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::games::Game;
+    use rstest::{fixture, rstest};
+
+    #[fixture]
+    fn game() -> Game {
+        Game::default()
+    }
 
     #[test]
     fn new() {
@@ -1031,24 +1044,24 @@ mod tests {
         assert_eq!(tribute.status, TributeStatus::Healthy);
     }
 
-    #[test]
-    fn takes_physical_damage() {
+    #[rstest]
+    fn takes_physical_damage(_game: Game) {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         let hp = tribute.attributes.health.clone();
         tribute.takes_physical_damage(10);
         assert_eq!(tribute.attributes.health, hp - 10);
     }
 
-    #[test]
-    fn takes_mental_damage() {
+    #[rstest]
+    fn takes_mental_damage(_game: Game) {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         let mp = tribute.attributes.sanity.clone();
         tribute.takes_mental_damage(10);
         assert_eq!(tribute.attributes.sanity, mp - 10);
     }
 
-    #[test]
-    fn moves_and_rests() {
+    #[rstest]
+    fn moves_and_rests(_game: Game) {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         tribute.attributes.speed = 50;
         tribute.moves();
@@ -1057,8 +1070,8 @@ mod tests {
         assert_eq!(tribute.attributes.movement, 100);
     }
 
-    #[test]
-    fn is_hidden_true() {
+    #[rstest]
+    fn is_hidden_true(_game: Game) {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         tribute.attributes.intelligence = 100;
         tribute.attributes.is_hidden = true;

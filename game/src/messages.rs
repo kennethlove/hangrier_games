@@ -1,13 +1,14 @@
-use crate::areas::Area;
 use crate::areas::events::AreaEvent;
+use crate::areas::Area;
 use crate::items::Item;
 use crate::threats::animals::Animal;
-use crate::tributes::Tribute;
 use crate::tributes::events::TributeEvent;
 use crate::tributes::statuses::TributeStatus;
+use crate::tributes::Tribute;
 use std::fmt::{Display, Formatter};
 
 // Collection on strings to be used as output for the game
+#[allow(dead_code)]
 pub enum GameMessage {
     GameDayStart(u32),
     FirstDayStart,

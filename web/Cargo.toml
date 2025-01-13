@@ -4,4 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-#game = { path = "../game" }
+dioxus = { version = "0.6.1", features = ["web", "router"] }
+dioxus-logger = "0.6.1"
+game = { path = "../game" }
+surrealdb = { version = "2.1.4", features = ["kv-mem"] }
+tokio = { version = "1.42.0", features = ["macros", "rt-multi-thread"] }
+serde = { version = "1.0.216", features = ["derive"] }

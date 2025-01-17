@@ -1,116 +1,108 @@
-use game::areas::Area;
-use game::games::Game;
-use serde::{Deserialize, Serialize};
-use std::iter::zip;
-use surrealdb::engine::local::Mem;
-use surrealdb::{Error, RecordId, Surreal};
-use game::areas::areas::Areas;
+use dioxus::prelude::*;
+use dioxus_query::prelude::*;
+use game::games::{Game, GameStatus};
+use num_traits::ToPrimitive;
+use std::str::FromStr;
+use serde::Deserialize;
+use std::env;
+use surrealdb::engine::remote::ws::{Client, Ws};
+use surrealdb::opt::auth::Root;
+use surrealdb::Surreal;
 
-#[derive(Debug, Deserialize)]
-struct Record {
-    id: RecordId,
+#[derive(Clone, PartialEq, Eq, Hash)]
+enum QueryKey {
+    AllGames,
+    Game(usize),
+    Games,
 }
 
-#[tokio::main]
-async fn main() -> surrealdb::Result<()> {
-    let db = Surreal::new::<Mem>(()).await?;
-    db.use_ns("hangry-games").await?;
+#[derive(PartialEq, Debug)]
+enum QueryError {
+    GameNotFound(usize),
+    NoGames,
+    Unknown
+}
 
-    // Get the GAMES database
-    let game_db = db.clone();
-    game_db.use_db("games").await?;
+#[derive(PartialEq, Debug)]
+enum QueryValue {
+    Games(Vec<Game>),
+    GameName(String),
+}
 
-    let area_db = db.clone();
-    area_db.use_db("areas").await?;
-
-    // Create a game
-    let create_game: Option<Record> = game_db
-        .create("game")
-        .content(Game::default())
-        .await?;
-
-    // Get created game
-    let mut created_game = game_db
-        .query("SELECT * FROM game WHERE id = $id")
-        .bind(("id", create_game.unwrap().id))
-        .await?;
-    let game: Result<Option<Game>, surrealdb::Error> = created_game.take(0_usize);
-    let game = {
-        if let Ok(Some(game)) = game {
-            game
-        } else {
-            return Err(Error::from(surrealdb::error::Db::IdNotFound { value: "Invalid id".to_string() }))
+async fn fetch_games(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
+    if let Some(QueryKey::Games) = keys.first() {
+        let db: Resource<Surreal<Client>> = use_context();
+        let db = db.value().unwrap();
+        db.use_ns("hangry-games").use_db("games").await.expect("Failed to use games database");
+        dioxus_logger::tracing::info!("Fetching games");
+        match db.select("game").await {
+            Ok(games) => QueryResult::Ok(QueryValue::Games(games)),
+            Err(_) => QueryResult::Err(QueryError::NoGames),
         }
-    };
-
-    // Create areas
-    let the_cornucopia: Option<Record> = area_db.create("area").content(Area::new("The Cornucopia")).await?;
-    let northwest: Option<Record> = area_db.create("area").content(Area::new("Northwest")).await?;
-    let northeast: Option<Record> = area_db.create("area").content(Area::new("Northeast")).await?;
-    let southwest: Option<Record> = area_db.create("area").content(Area::new("Southwest")).await?;
-    let southeast: Option<Record> = area_db.create("area").content(Area::new("Southeast")).await?;
-
-    let northwest = northwest.unwrap().id;
-    let northeast = northeast.unwrap().id;
-    let southwest = southwest.unwrap().id;
-    let southeast = southeast.unwrap().id;
-    let the_cornucopia = the_cornucopia.unwrap().id;
-
-    // Set Cornucopia neighbors
-    let corn_neighbors: Vec<RecordId> = vec![northwest.clone(), northeast.clone(), southeast.clone(), southwest.clone()];
-    for neighbor in corn_neighbors.iter() {
-        let _ = area_db
-            .query("RELATE $area1->neighbors->$area2")
-            .bind(("area1", the_cornucopia.clone()))
-            .bind(("area2", neighbor.clone()))
-            .await?;
+    } else {
+        QueryResult::Err(QueryError::Unknown)
     }
+}
 
-    // Set NW neighbors
-    let nw_neighbors: Vec<RecordId> = vec![the_cornucopia.clone(), northeast.clone(), southwest.clone()];
-    for neighbor in nw_neighbors.iter() {
-        let _ = area_db
-            .query("RELATE $area1->neighbors->$area2")
-            .bind(("area1", northwest.clone()))
-            .bind(("area2", neighbor.clone()))
-            .await?;
+fn main() {
+    dotenvy::dotenv().expect("Failed to read .env file");
+    launch(App);
+}
+
+fn App() -> Element {
+    dioxus_logger::tracing::info!("Initialised");
+
+    // let db: Resource<Surreal<Client>> = use_resource(|| async move {
+    //     let surreal: Surreal<Client> = Surreal::init();
+    //     surreal.connect::<Ws>("http://surrealdb.eyeheartzombies.com").await.unwrap();
+    //     surreal.signin(Root {
+    //         username: &env::var("SURREAL_USER").unwrap(),
+    //         password: &env::var("SURREAL_PASS").unwrap(),
+    //     }).await.unwrap();
+    //     surreal
+    // });
+    // use_context_provider(|| db.clone());
+
+    rsx! {
+        h1 { "Hangry Games" }
+        GamesList {}
     }
+}
 
-    // Set NE neighbors
-    let ne_neighbors: Vec<RecordId> = vec![the_cornucopia.clone(), northwest.clone(), southeast.clone()];
-    for neighbor in ne_neighbors.iter() {
-        let _ = area_db
-            .query("RELATE $area1->neighbors->$area2")
-            .bind(("area1", northeast.clone()))
-            .bind(("area2", neighbor.clone()))
-            .await?;
+#[component]
+fn GamesList() -> Element {
+    let games_query = use_get_query([QueryKey::AllGames, QueryKey::Games], fetch_games);
+    let games = games_query.result();
+    let games = games.value();
+    dioxus_logger::tracing::info!("games {:?}", games);
+    match games {
+        QueryResult::Err(QueryError::NoGames) => {
+            rsx! { p { "No games" } }
+        }
+        QueryResult::Ok(games) => {
+            match games {
+                QueryValue::Games(games) => {
+                    if games.is_empty() {
+                        rsx! { p { "No games yet" } }
+                    } else {
+                        rsx! {
+                            for game in games {
+                                p { "{game.name}" }
+                            }
+                        }
+                    }
+                },
+                _ => {
+                    rsx! { p { "Wrong result type" } }
+                }
+            }
+
+        }
+        QueryResult::Loading(_) => {
+            rsx! { p { "Loading..." } }
+        }
+        _ => {
+            rsx! { p { "No idea how you got here." } }
+        }
     }
-
-    // Set SE neighbors
-    let se_neighbors: Vec<RecordId> = vec![the_cornucopia.clone(), northeast.clone(), southwest.clone()];
-    for neighbor in se_neighbors.iter() {
-        let _ = area_db
-            .query("RELATE $area1->neighbors->$area2")
-            .bind(("area1", southeast.clone()))
-            .bind(("area2", neighbor.clone()))
-            .await?;
-    }
-
-    // Set SW neighbors
-    let sw_neighbors: Vec<RecordId> = vec![the_cornucopia.clone(), northwest.clone(), southeast.clone()];
-    for neighbor in sw_neighbors.iter() {
-        let _ = area_db
-            .query("RELATE $area1->neighbors->$area2")
-            .bind(("area1", southwest.clone()))
-            .bind(("area2", neighbor.clone()))
-            .await?;
-    }
-
-    let result = area_db
-        .query("SELECT ->neighbors->area.name FROM $area")
-        .bind(("area", the_cornucopia.clone()))
-        .await?;
-    dbg!(result);
-
-    Ok(())
 }

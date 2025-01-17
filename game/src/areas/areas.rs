@@ -1,5 +1,4 @@
 use crate::areas::events::AreaEvent;
-use crate::database::get_db;
 use crate::items::Item;
 use crate::tributes::statuses::TributeStatus;
 use crate::tributes::Tribute;
@@ -7,7 +6,6 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::Display;
 use std::str::FromStr;
-use strum::EnumIter;
 
 #[serde_as]
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -18,42 +16,6 @@ pub struct Area {
     #[serde_as(as = "Vec<DisplayFromStr>")]
     pub neighbors: Vec<Area>,
     // pub events: Vec<AreaEvent>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AreaDetails {
-    pub open: bool,
-    pub neighbors: Vec<Areas>,
-}
-
-impl Default for AreaDetails {
-    fn default() -> Self {
-        Self {
-            open: true,
-            neighbors: Vec::new(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, EnumIter)]
-pub enum Areas {
-    TheCornucopia(AreaDetails),
-    Northwest(AreaDetails),
-    Northeast(AreaDetails),
-    Southeast(AreaDetails),
-    Southwest(AreaDetails),
-}
-
-impl Areas {
-    pub fn name(&self) -> String {
-        match self {
-            Areas::Northwest(_) => "Northwest".to_string(),
-            Areas::Northeast(_) => "Northeast".to_string(),
-            Areas::Southeast(_) => "Southeast".to_string(),
-            Areas::Southwest(_) => "Southwest".to_string(),
-            _ => "The Cornucopia".to_string()
-        }
-    }
 }
 
 impl Default for Area {
@@ -172,41 +134,6 @@ impl Area {
         //     .filter(|i| i.quantity > 0)
         //     .cloned()
         //     .collect()
-    }
-
-    pub async fn save(&self) -> Result<Box<Area>, surrealdb::Error> {
-        let db = get_db();
-        let db = db.lock().unwrap();
-        let db = db.as_ref().unwrap();
-
-        let area = db.client()
-            .create("area")
-            .content(self.clone())
-            .await;
-        match area {
-            Ok(area) => {
-                match area {
-                    Some(area) => Ok(area),
-                    None => Err(surrealdb::Error::Db(surrealdb::error::Db::InsertStatement { value: "oh boy".to_string() })),
-                }
-            },
-            Err(e) => Err(e)
-        }
-    }
-
-    pub async fn fetch(name: &str) -> Option<Area> {
-        let db = get_db();
-        let db = db.lock().unwrap();
-        let db = db.as_ref().unwrap();
-        let area = db.client()
-            .select(("area", name))
-            .await;
-        if let Ok(area) = area {
-            if let Some(area) = area {
-                return Some(area);
-            }
-        }
-        None
     }
 }
 

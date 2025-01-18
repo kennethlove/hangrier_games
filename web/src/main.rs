@@ -2,12 +2,9 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::games::{Game, GameStatus};
 use num_traits::ToPrimitive;
-use std::str::FromStr;
 use serde::Deserialize;
 use std::env;
-use surrealdb::engine::remote::ws::{Client, Ws};
-use surrealdb::opt::auth::Root;
-use surrealdb::Surreal;
+use std::str::FromStr;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum QueryKey {
@@ -30,39 +27,24 @@ enum QueryValue {
 }
 
 async fn fetch_games(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::Games) = keys.first() {
-        let db: Resource<Surreal<Client>> = use_context();
-        let db = db.value().unwrap();
-        db.use_ns("hangry-games").use_db("games").await.expect("Failed to use games database");
-        dioxus_logger::tracing::info!("Fetching games");
-        match db.select("game").await {
-            Ok(games) => QueryResult::Ok(QueryValue::Games(games)),
-            Err(_) => QueryResult::Err(QueryError::NoGames),
-        }
+    dioxus_logger::tracing::info!("Fetching games");
+    if let Some(QueryKey::AllGames) = keys.first() {
+        let body = reqwest::get("http://127.0.0.1:3000/api/games")
+            .await.unwrap()
+            .json::<Vec<Game>>()
+            .await.unwrap();
+        QueryResult::Ok(QueryValue::Games(body))
     } else {
         QueryResult::Err(QueryError::Unknown)
     }
 }
 
 fn main() {
-    dotenvy::dotenv().expect("Failed to read .env file");
     launch(App);
 }
 
 fn App() -> Element {
-    dioxus_logger::tracing::info!("Initialised");
-
-    // let db: Resource<Surreal<Client>> = use_resource(|| async move {
-    //     let surreal: Surreal<Client> = Surreal::init();
-    //     surreal.connect::<Ws>("http://surrealdb.eyeheartzombies.com").await.unwrap();
-    //     surreal.signin(Root {
-    //         username: &env::var("SURREAL_USER").unwrap(),
-    //         password: &env::var("SURREAL_PASS").unwrap(),
-    //     }).await.unwrap();
-    //     surreal
-    // });
-    // use_context_provider(|| db.clone());
-
+    use_init_query_client::<QueryValue, QueryError, QueryKey>();
     rsx! {
         h1 { "Hangry Games" }
         GamesList {}

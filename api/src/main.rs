@@ -1,21 +1,20 @@
+mod games;
+
 use axum::error_handling::HandleErrorLayer;
-use axum::routing::{get, post};
-use axum::{BoxError, Json, Router};
+use axum::http::StatusCode;
+use axum::{BoxError, Router};
+use games::GAMES_ROUTER;
 use std::env;
 use std::sync::LazyLock;
 use std::time::Duration;
-use axum::http::{Response, StatusCode};
-use axum::response::IntoResponse;
-use serde::{Deserialize, Serialize};
-use surrealdb::engine::remote::ws::{Client, Wss};
+use surrealdb::engine::remote::ws::{Client, Ws, Wss};
 use surrealdb::opt::auth::Root;
-use surrealdb::sql::{Id, Thing};
 use surrealdb::Surreal;
 use tower::ServiceBuilder;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use game::games::Game;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 pub static DATABASE: LazyLock<Surreal<Client>> = LazyLock::new(Surreal::init);
 
@@ -31,8 +30,18 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    DATABASE.connect::<Wss>("surrealdb.eyeheartzombies.com").await.unwrap();
+    let host = env::var("SURREAL_HOST").unwrap();
+
+    match env::var("ENV").unwrap().as_str() {
+        "production" => {
+            DATABASE.connect::<Wss>(host.as_str()).await.unwrap();
+        }
+        _ => {
+            DATABASE.connect::<Ws>(host.as_str()).await.unwrap();
+        }
+    }
     tracing::debug!("connected to SurrealDB");
+
     DATABASE.signin(Root {
         username: env::var("SURREAL_USER").unwrap().as_str(),
         password: env::var("SURREAL_PASS").unwrap().as_str(),
@@ -49,8 +58,9 @@ async fn main() {
             "DELETE".parse().unwrap(),
         ]);
 
-    let router = Router::new()
-        .route("/", get(games_list).post(games_create))
+    let api_routes = Router::new().nest("/games", GAMES_ROUTER.clone());
+
+    let router = Router::new().nest("/api", api_routes)
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|error: BoxError| async move {
@@ -74,31 +84,3 @@ async fn main() {
     axum::serve(listener, router).await.unwrap();
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-struct GameThing {
-    tb: String,
-    id: String
-}
-
-impl From<Thing> for GameThing {
-    fn from(thing: Thing) -> Self {
-        GameThing {
-            tb: thing.tb,
-            id: thing.id.to_string(),
-        }
-    }
-}
-
-async fn games_list() -> (StatusCode, Json<Vec<GameThing>>){
-    DATABASE.use_ns("hangry-games").use_db("games").await.expect("Failed to use games database");
-    let games: Vec<GameThing> = DATABASE.select("game").await.unwrap();
-    (StatusCode::OK, Json::<Vec<GameThing>>(games))
-}
-
-async fn games_create() -> (StatusCode, Json<Game>){
-    DATABASE.use_ns("hangry-games").use_db("games").await.expect("Failed to use game database");
-    let new_game = Game::default();
-    dbg!(&new_game);
-    let game: Option<Game> = DATABASE.create("game").content(new_game).await.expect("Failed to create game");
-    (StatusCode::CREATED, game.unwrap().into())
-}

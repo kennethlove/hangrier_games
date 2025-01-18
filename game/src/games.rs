@@ -31,19 +31,19 @@ impl Default for Game {
             name = words.join("-").to_string();
         };
 
-        let mut cornucopia = Area::new("The Cornucopia");
-        let mut nw = Area::new("Northwest");
-        let mut ne = Area::new("Northeast");
-        let mut sw = Area::new("Southwest");
-        let mut se = Area::new("Southeast");
-
-        cornucopia.add_neighbors(vec![&nw, &ne, &sw, &se]);
-        nw.add_neighbors(vec![&ne, &sw, &cornucopia]);
-        ne.add_neighbors(vec![&nw, &se, &cornucopia]);
-        sw.add_neighbors(vec![&nw, &se, &cornucopia]);
-        se.add_neighbors(vec![&ne, &sw, &cornucopia]);
-
-        let areas: Vec<Area> = vec![cornucopia, nw, ne, sw, se];
+        // let mut cornucopia = Area::new("The Cornucopia");
+        // let mut nw = Area::new("Northwest");
+        // let mut ne = Area::new("Northeast");
+        // let mut sw = Area::new("Southwest");
+        // let mut se = Area::new("Southeast");
+        //
+        // cornucopia.add_neighbors(vec![&nw, &ne, &sw, &se]);
+        // nw.add_neighbors(vec![&ne, &sw, &cornucopia]);
+        // ne.add_neighbors(vec![&nw, &se, &cornucopia]);
+        // sw.add_neighbors(vec![&nw, &se, &cornucopia]);
+        // se.add_neighbors(vec![&ne, &sw, &cornucopia]);
+        //
+        // let areas: Vec<Area> = vec![cornucopia, nw, ne, sw, se];
 
         Game {
             name,
@@ -317,9 +317,9 @@ pub enum GameStatus {
 impl Display for GameStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GameStatus::NotStarted => write!(f, "not started"),
-            GameStatus::InProgress => write!(f, "in progress"),
-            GameStatus::Finished => write!(f, "finished"),
+            GameStatus::NotStarted => write!(f, "NotStarted"),
+            GameStatus::InProgress => write!(f, "InProgress"),
+            GameStatus::Finished => write!(f, "Finished"),
         }
     }
 }
@@ -329,8 +329,8 @@ impl FromStr for GameStatus {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "not started" => Ok(GameStatus::NotStarted),
-            "in progress" => Ok(GameStatus::InProgress),
+            "notstarted" => Ok(GameStatus::NotStarted),
+            "inprogress" => Ok(GameStatus::InProgress),
             "finished" => Ok(GameStatus::Finished),
             _ => Err(()),
         }

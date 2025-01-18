@@ -5,13 +5,10 @@ edition = "2024"
 
 [dependencies]
 fake = "3.0.1"
-lazy_static = "1.5.0"
 rand = "0.8.5"
 rstest = "0.23.0"
 serde = { version = "1.0.216", features = ["derive"] }
 serde_with = { version = "3.11.0", features = ["json"] }
 strum = { version = "0.26.3", features = ["derive"] }
-tokio = { version = "1.42.0", features = ["macros"] }
-tracing = "0.1.41"
 witty-phrase-generator = "0.3.0"
 uuid = { version = "1.11.0", features = ["v4", "serde"] }

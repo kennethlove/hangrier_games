@@ -166,6 +166,7 @@ dependencies = [
  "dotenvy",
  "game",
  "serde",
+ "serde_json",
  "surrealdb",
  "thiserror 2.0.11",
  "tokio",

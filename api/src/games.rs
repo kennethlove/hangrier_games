@@ -26,9 +26,19 @@ pub async fn games_list() -> (StatusCode, Json<Vec<Game>>) {
     }
 }
 
-pub async fn games_create() -> (StatusCode, Json<Game>) {
+#[derive(serde::Deserialize, Debug)]
+pub struct CreateGame {
+    name: Option<String>,
+}
+
+pub async fn games_create(Json(payload): Json<CreateGame>) -> (StatusCode, Json<Game>) {
     DATABASE.use_ns("hangry-games").use_db("games").await.expect("Failed to use game database");
-    let new_game = Game::default();
+    let mut new_game = Game::default();
+
+    if payload.name.is_some() {
+        new_game.name = payload.name.unwrap();
+    }
+
     let game: Option<Game> = DATABASE.create(("game", &new_game.name)).content(new_game).await.expect("Failed to create game");
     (StatusCode::CREATED, game.unwrap().into())
 }

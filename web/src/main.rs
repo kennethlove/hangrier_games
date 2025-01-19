@@ -1,3 +1,4 @@
+use dioxus::html::q::dangerous_inner_html;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::games::{Game, GameStatus};
@@ -9,13 +10,13 @@ use std::str::FromStr;
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum QueryKey {
     AllGames,
-    Game(usize),
+    Game(String),
     Games,
 }
 
 #[derive(PartialEq, Debug)]
 enum QueryError {
-    GameNotFound(usize),
+    GameNotFound(String),
     NoGames,
     Unknown
 }
@@ -23,11 +24,10 @@ enum QueryError {
 #[derive(PartialEq, Debug)]
 enum QueryValue {
     Games(Vec<Game>),
-    GameName(String),
+    Game(Game),
 }
 
 async fn fetch_games(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
-    dioxus_logger::tracing::info!("Fetching games");
     if let Some(QueryKey::AllGames) = keys.first() {
         let body = reqwest::get("http://127.0.0.1:3000/api/games")
             .await.unwrap()
@@ -39,15 +39,46 @@ async fn fetch_games(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError>
     }
 }
 
+async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
+    if let Some(QueryKey::Game(name)) = keys.first() {
+        let body = reqwest::get(format!("http://127.0.0.1:3000/api/games/{}", name))
+            .await.unwrap();
+
+        match body.json::<Game>().await {
+            Ok(game) => {
+                QueryResult::Ok(QueryValue::Game(game))
+            }
+            Err(_) => {
+                QueryResult::Err(QueryError::GameNotFound(name.to_string()))
+            }
+        }
+    } else {
+        QueryResult::Err(QueryError::Unknown)
+    }
+}
+
 fn main() {
     launch(App);
 }
 
 fn App() -> Element {
     use_init_query_client::<QueryValue, QueryError, QueryKey>();
+    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+    let copyright = "&copy; 2025";
     rsx! {
         h1 { "Hangry Games" }
         GamesList {}
+        GameDetail { name: "dotingly-distasteful-sport".to_string() }
+        GameDetail { name: "unchangingly-senseless-object".to_string() }
+        button {
+            onclick: move |_| {
+                client.invalidate_query(QueryKey::Games)
+            },
+            label { "Refresh" }
+        }
+        p {
+            dangerous_inner_html: "{copyright}",
+        }
     }
 }
 
@@ -56,7 +87,6 @@ fn GamesList() -> Element {
     let games_query = use_get_query([QueryKey::AllGames, QueryKey::Games], fetch_games);
     let games = games_query.result();
     let games = games.value();
-    dioxus_logger::tracing::info!("games {:?}", games);
     match games {
         QueryResult::Err(QueryError::NoGames) => {
             rsx! { p { "No games" } }
@@ -88,3 +118,26 @@ fn GamesList() -> Element {
         }
     }
 }
+
+#[component]
+fn GameDetail(name: String) -> Element {
+    let game_query = use_get_query([QueryKey::Game(name), QueryKey::Games], fetch_game);
+    let game = game_query.result();
+    let game = game.value();
+    match game {
+        QueryResult::Ok(QueryValue::Game(game_result)) => {
+            rsx! {
+                h1 { "{game_result.name}" }
+                h2 { "{game_result.status}" }
+            }
+        }
+        QueryResult::Loading(_) => {
+            rsx! { p { "Loading..." } }
+        }
+        _ => {
+            rsx! { p { "Game not found" } }
+        }
+    }
+}
+
+

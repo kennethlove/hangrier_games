@@ -30,7 +30,8 @@ enum QueryValue {
 
 #[derive(PartialEq, Debug)]
 enum MutationValue {
-    NewGame(Game)
+    NewGame(Game),
+    GameDeleted(String),
 }
 
 #[derive(PartialEq, Debug)]
@@ -83,11 +84,29 @@ async fn create_game(name: Option<String>) -> MutationResult<MutationValue, Muta
 
     match response.json::<Game>().await {
         Ok(game) => {
+            let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+            client.invalidate_queries(&[QueryKey::Games]);
+
             MutationResult::Ok(MutationValue::NewGame(game))
         }
         Err(e) => {
             MutationResult::Err(MutationError::UnableToCreateGame)
         }
+    }
+}
+
+async fn delete_game(name: String) -> MutationResult<MutationValue, MutationError> {
+    let client = reqwest::Client::new();
+    let response = client
+        .delete(format!("http://127.0.0.1:3000/api/games/{}", name))
+        .send().await.unwrap();
+
+    if response.status().is_server_error() {
+        MutationResult::Err(MutationError::Unknown)
+    } else {
+        let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+        client.invalidate_queries(&[QueryKey::Games]);
+        MutationResult::Ok(MutationValue::GameDeleted(name))
     }
 }
 
@@ -124,12 +143,10 @@ fn CreateGameButton() -> Element {
 
     let onclick = move |_| {
         mutate.mutate(None);
-        let client = use_query_client::<QueryValue, QueryError, QueryKey>();
-        client.invalidate_queries(&[QueryKey::Games]);
     };
 
-
     rsx! {
+        p { "{*mutate.result():?}" }
         button {
             onclick,
             label { "quickstart" }
@@ -186,8 +203,10 @@ fn GamesList() -> Element {
                         rsx! { p { "No games yet" } }
                     } else {
                         rsx! {
-                            for game in games {
-                                p { "{game.name}" }
+                            ul {
+                                for game in games {
+                                    GameListMember { game: game.clone() }
+                                }
                             }
                         }
                     }
@@ -203,6 +222,26 @@ fn GamesList() -> Element {
         }
         _ => {
             rsx! { p { "No idea how you got here." } }
+        }
+    }
+}
+
+#[component]
+fn GameListMember(game: Game) -> Element {
+    let mutate = use_mutation(delete_game);
+    let name = game.name.clone();
+
+    let onclick = move |_| {
+        mutate.mutate(name.clone());
+    };
+
+    rsx! {
+        li {
+            "{game.name} ",
+            button {
+                onclick,
+                "x"
+            }
         }
     }
 }

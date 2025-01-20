@@ -10,7 +10,7 @@ use std::sync::LazyLock;
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
         .route("/", get(games_list).post(games_create))
-        .route("/{name}", get(game_detail))
+        .route("/{name}", get(game_detail).delete(game_delete))
 });
 
 pub async fn games_list() -> (StatusCode, Json<Vec<Game>>) {
@@ -55,6 +55,17 @@ pub async fn game_detail(name: Path<String>) -> (StatusCode, Json<Option<Game>>)
         }
         _ => {
             (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<Game>>(None))
+        }
+    }
+}
+
+pub async fn game_delete(name: Path<String>) -> StatusCode {
+    DATABASE.use_ns("hangry-games").use_db("games").await.expect("Failed to use game database");
+    let game: Option<Game> = DATABASE.delete(("game", &name.0)).await.expect("Failed to delete game");
+    match game {
+        Some(_) => StatusCode::OK,
+        None => {
+            StatusCode::INTERNAL_SERVER_ERROR
         }
     }
 }

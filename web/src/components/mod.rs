@@ -8,6 +8,8 @@ mod games_list;
 pub(crate) use games_list::GamesList;
 mod game_delete;
 pub(crate) use game_delete::GameDelete;
+pub(crate) use game_delete::DeleteGameModal;
+
 
 
 

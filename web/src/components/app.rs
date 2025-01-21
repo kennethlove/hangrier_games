@@ -1,16 +1,21 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_init_query_client, use_query_client};
-
+use game::games::Game;
 use crate::components::{
     CreateGameButton,
     CreateGameForm,
+    DeleteGameModal,
     GamesList,
 };
 
 pub fn App() -> Element {
     use_init_query_client::<QueryValue, QueryError, QueryKey>();
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+
+    let delete_game_signal: Signal<Option<String>> = use_signal(|| None);
+    use_context_provider(|| delete_game_signal);
+
     let copyright = "&copy; 2025";
 
     rsx! {
@@ -28,6 +33,8 @@ pub fn App() -> Element {
         p {
             dangerous_inner_html: "{copyright}",
         }
+
+        DeleteGameModal {}
     }
 }
 

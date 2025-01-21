@@ -33,7 +33,6 @@ pub fn CreateGameButton() -> Element {
     };
 
     rsx! {
-        p { "{*mutate.result():?}" }
         button {
             onclick,
             label { "quickstart" }

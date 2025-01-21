@@ -167,6 +167,7 @@ dependencies = [
  "game",
  "serde",
  "serde_json",
+ "shared",
  "surrealdb",
  "thiserror 2.0.11",
  "tokio",
@@ -6111,6 +6112,9 @@ dependencies = [
 [[package]]
 name = "shared"
 version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "shlex"
@@ -7531,6 +7535,7 @@ dependencies = [
  "num-traits",
  "reqwest",
  "serde",
+ "shared",
  "wasm-bindgen",
 ]
 

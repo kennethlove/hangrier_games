@@ -5,6 +5,7 @@ use axum::routing::get;
 use axum::Json;
 use axum::Router;
 use game::games::Game;
+use shared::CreateGame;
 use std::sync::LazyLock;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
@@ -24,11 +25,6 @@ pub async fn games_list() -> (StatusCode, Json<Vec<Game>>) {
             (StatusCode::INTERNAL_SERVER_ERROR, Json::<Vec<Game>>(Vec::new()))
         }
     }
-}
-
-#[derive(serde::Deserialize, Debug)]
-pub struct CreateGame {
-    name: Option<String>,
 }
 
 pub async fn games_create(Json(payload): Json<CreateGame>) -> (StatusCode, Json<Game>) {

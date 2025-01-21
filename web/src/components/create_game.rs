@@ -18,7 +18,7 @@ async fn create_game(name: Option<String>) -> MutationResult<MutationValue, Muta
 
             MutationResult::Ok(MutationValue::NewGame(game))
         }
-        Err(e) => {
+        Err(_) => {
             MutationResult::Err(MutationError::UnableToCreateGame)
         }
     }
@@ -49,7 +49,7 @@ pub fn CreateGameForm() -> Element {
         let name = game_name_signal.peek().clone();
         if name.is_empty() { return; }
 
-        let game_query = mutate.mutate(Some(name));
+        mutate.mutate(Some(name));
 
         let client = use_query_client::<QueryValue, QueryError, QueryKey>();
         client.invalidate_queries(&[QueryKey::Games]);

@@ -1,17 +1,11 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_init_query_client, use_query_client};
-use game::games::Game;
-use crate::components::{
-    CreateGameButton,
-    CreateGameForm,
-    DeleteGameModal,
-    GamesList,
-};
+use crate::routes::Routes;
 
+#[component]
 pub fn App() -> Element {
     use_init_query_client::<QueryValue, QueryError, QueryKey>();
-    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
     let delete_game_signal: Signal<Option<String>> = use_signal(|| None);
     use_context_provider(|| delete_game_signal);
@@ -20,21 +14,13 @@ pub fn App() -> Element {
 
     rsx! {
         h1 { "Hangry Games" }
-        CreateGameButton {}
-        CreateGameForm {}
-        GamesList {}
 
-        button {
-            onclick: move |_| {
-                client.invalidate_query(QueryKey::Games)
-            },
-            label { "Refresh" }
-        }
+        Router::<Routes> {}
+
         p {
             dangerous_inner_html: "{copyright}",
         }
 
-        DeleteGameModal {}
     }
 }
 

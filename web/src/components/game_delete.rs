@@ -1,7 +1,6 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
-use game::games::Game;
 
 async fn delete_game(name: String) -> MutationResult<MutationValue, MutationError> {
     let client = reqwest::Client::new();
@@ -22,11 +21,9 @@ async fn delete_game(name: String) -> MutationResult<MutationValue, MutationErro
 pub fn GameDelete(game_name: String) -> Element {
     let mut delete_game_signal: Signal<Option<String>> = use_context();
 
-    let mutate = use_mutation(delete_game);
     let name = game_name.clone();
 
     let onclick = move |_| {
-        // mutate.mutate(name.clone());
         delete_game_signal.set(Some(name.clone()));
     };
 

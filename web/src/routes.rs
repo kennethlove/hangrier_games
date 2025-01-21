@@ -1,28 +1,8 @@
 use dioxus::prelude::*;
 use dioxus_query::prelude::use_query_client;
 use crate::cache::{QueryError, QueryKey, QueryValue};
-use crate::components::{App, GamesList, GameDetail, CreateGameButton, CreateGameForm, DeleteGameModal};
+use crate::components::{App, Games, GamesList, GameDetail, CreateGameButton, CreateGameForm, DeleteGameModal};
 
-
-#[component]
-fn Games() -> Element {
-    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
-    rsx! {
-        div {
-            id: "games",
-            CreateGameButton {}
-            CreateGameForm {}
-            Outlet::<Routes> {}
-            button {
-                onclick: move |_| {
-                    client.invalidate_query(QueryKey::Games)
-                },
-                label { "Refresh" }
-            }
-            DeleteGameModal {}
-        }
-    }
-}
 
 #[component]
 fn Home() -> Element {

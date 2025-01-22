@@ -43,7 +43,7 @@ pub fn GamesList() -> Element {
 
             DeleteGameModal {}
         }
-    } else { rsx! {} }
+    } else { rsx! { p { "Database is down." } } }
 }
 
 #[component]

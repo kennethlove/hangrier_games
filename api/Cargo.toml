@@ -10,6 +10,7 @@ game = { path = "../game" }
 serde = { version = "1.0.217", features = ["derive"] }
 shared = { path = "../shared" }
 surrealdb = "2.1.4"
+surrealdb-migrations = "2.1.0"
 thiserror = "2.0.8"
 tokio = { version = "1.43.0", features = ["full"] }
 tower-http = { version = "0.6.2", features = ["trace", "cors"] }

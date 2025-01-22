@@ -7,16 +7,17 @@ use games::GAMES_ROUTER;
 use std::env;
 use std::sync::LazyLock;
 use std::time::Duration;
-use surrealdb::engine::remote::ws::{Client, Ws, Wss};
+use surrealdb::engine::any::Any;
 use surrealdb::opt::auth::Root;
 use surrealdb::Surreal;
+use surrealdb_migrations::MigrationRunner;
 use tower::ServiceBuilder;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-pub static DATABASE: LazyLock<Surreal<Client>> = LazyLock::new(Surreal::init);
+pub static DATABASE: LazyLock<Surreal<Any>> = LazyLock::new(Surreal::init);
 
 #[tokio::main]
 async fn main() {
@@ -30,16 +31,7 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let host = env::var("SURREAL_HOST").unwrap();
-
-    match env::var("ENV").unwrap().as_str() {
-        "production" => {
-            DATABASE.connect::<Wss>(host.as_str()).await.unwrap();
-        }
-        _ => {
-            DATABASE.connect::<Ws>(host.as_str()).await.unwrap();
-        }
-    }
+    DATABASE.connect(env::var("SURREAL_HOST").unwrap()).await.expect("Failed to connect to database");
     tracing::debug!("connected to SurrealDB");
 
     DATABASE.signin(Root {
@@ -47,6 +39,15 @@ async fn main() {
         password: env::var("SURREAL_PASS").unwrap().as_str(),
     }).await.unwrap();
     tracing::debug!("authenticated to SurrealDB");
+
+    DATABASE.use_ns("hangry-games").use_db("games").await.unwrap();
+    tracing::debug!("Using 'hangry-games' namespace and 'games' database");
+
+    MigrationRunner::new(&DATABASE)
+        .up()
+        .await
+        .expect("Failed to apply migrations");
+    tracing::debug!("Applied migrations");
 
     let cors_layer = CorsLayer::new()
         .allow_origin(AllowOrigin::any())

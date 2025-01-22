@@ -13,6 +13,7 @@ pub(crate) enum QueryError {
     GameNotFound(String),
     NoGames,
     Unknown,
+    BadJson,
 }
 
 #[derive(PartialEq, Debug)]

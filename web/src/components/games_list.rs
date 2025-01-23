@@ -12,12 +12,17 @@ async fn fetch_games(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError>
                 if let Ok(response) = request.json::<Vec<Game>>().await {
                     QueryResult::Ok(QueryValue::Games(response))
                 } else {
+                    dioxus_logger::tracing::error!("Failed to parse JSON response");
                     QueryResult::Err(QueryError::BadJson)
                 }
             },
-            _ => QueryResult::Err(QueryError::NoGames)
+            Err(e) => {
+                dioxus_logger::tracing::error!("Failed to fetch games: {:?}", e);
+                QueryResult::Err(QueryError::NoGames)
+            }
         }
     } else {
+        dioxus_logger::tracing::info!("Unknown query: {:?}", keys);
         QueryResult::Err(QueryError::Unknown)
     }
 }
@@ -26,24 +31,30 @@ async fn fetch_games(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError>
 pub fn GamesList() -> Element {
     let games_query = use_get_query([QueryKey::AllGames, QueryKey::Games], fetch_games);
 
-    if let QueryResult::Ok(QueryValue::Games(games)) = games_query.result().value() {
-        rsx! {
-            CreateGameButton {}
-            CreateGameForm {}
+    match games_query.result().value() {
+        QueryResult::Ok(QueryValue::Games(games)) => {
+            rsx! {
+                CreateGameButton {}
+                CreateGameForm {}
 
-            if games.is_empty() {
-                p { "No games yet" }
-            } else {
-                ul {
-                    for game in games {
-                        GameListMember { game: game.clone() }
+                if games.is_empty() {
+                    p { "No games yet" }
+                } else {
+                    ul {
+                        for game in games {
+                            GameListMember { game: game.clone() }
+                        }
                     }
                 }
-            }
 
-            DeleteGameModal {}
-        }
-    } else { rsx! { p { "Database is down." } } }
+                DeleteGameModal {}
+            }
+        },
+        QueryResult::Loading(_) => rsx! { p { "Loading..." } },
+        QueryResult::Err(QueryError::NoGames) => rsx! { p { "No games yet" } },
+        QueryResult::Err(QueryError::Unknown) => rsx! { p { "Something went wrong" } },
+        _ => rsx! {}
+    }
 }
 
 #[component]
@@ -55,4 +66,3 @@ pub fn GameListMember(game: Game) -> Element {
         }
     }
 }
-

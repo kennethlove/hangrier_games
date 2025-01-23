@@ -12,7 +12,7 @@ use surrealdb::opt::auth::Root;
 use surrealdb::Surreal;
 use surrealdb_migrations::MigrationRunner;
 use tower::ServiceBuilder;
-use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::cors::{AllowOrigin, CorsLayer, Any as CorsAny};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -51,7 +51,7 @@ async fn main() {
 
     let cors_layer = CorsLayer::new()
         .allow_origin(AllowOrigin::any())
-        .allow_headers(vec!["content-type".parse().unwrap()])
+        .allow_headers(CorsAny)
         .allow_methods(vec![
             "GET".parse().unwrap(),
             "POST".parse().unwrap(),

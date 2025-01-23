@@ -47,8 +47,10 @@ pub fn DeleteGameModal() -> Element {
 
     let delete = move |_| {
         if let Some(name) = game_name.clone() {
-            mutate.mutate(name.clone());
-            delete_game_signal.set(None);
+            spawn(async move {
+                mutate.mutate(name.clone());
+                delete_game_signal.set(None);
+            });
         }
     };
 

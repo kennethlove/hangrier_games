@@ -1,6 +1,6 @@
 use game::games::Game;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum QueryKey {
     AllGames,
     CreateGame(Option<String>),

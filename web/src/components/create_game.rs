@@ -77,6 +77,7 @@ pub fn CreateGameForm() -> Element {
 
                 match mutate.result().deref() {
                     MutationResult::Ok(MutationValue::NewGame(game)) => {
+                        client.invalidate_queries(&[QueryKey::Games]);
                         navigator.push(Routes::GameDetail { name: game.name.clone() });
                     },
                     MutationResult::Err(MutationError::UnableToCreateGame) => {},

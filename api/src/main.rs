@@ -50,7 +50,7 @@ async fn main() {
     tracing::debug!("Applied migrations");
 
     let cors_layer = CorsLayer::new()
-        .allow_origin(AllowOrigin::any())
+        .allow_origin(CorsAny)
         .allow_headers(CorsAny)
         .allow_methods(vec![
             "GET".parse().unwrap(),

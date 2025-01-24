@@ -20,7 +20,9 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
 pub async fn games_list() -> impl IntoResponse {
     match DATABASE.select("game").await {
         Ok(games) => {
-            (StatusCode::OK, Json::<Vec<Game>>(games)).into_response()
+            let mut headers = HeaderMap::new();
+            headers.insert("Cache-Control", "no-store".parse().unwrap());
+            (StatusCode::OK, headers, Json::<Vec<Game>>(games)).into_response()
         }
         Err(e) => {
             tracing::error!("{}", e);

@@ -1,18 +1,24 @@
+use std::net::{IpAddr, Ipv4Addr};
+use std::ops::Deref;
+use std::time::Duration;
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
+use reqwest::{Response, StatusCode};
 
 async fn delete_game(name: String) -> MutationResult<MutationValue, MutationError> {
     let client = reqwest::Client::new();
-    let response = client
-        .delete(format!("http://127.0.0.1:3000/api/games/{}", name))
-        .send().await.unwrap();
+    let url: String = format!("http://127.0.0.1:3000/api/games/{}", name);
 
-    if response.status().is_server_error() {
+    let response = client
+        .delete(url)
+        .send().await;
+
+    dioxus_logger::tracing::info!("{:?}", &response);
+
+    if !response.unwrap().status().is_success() {
         MutationResult::Err(MutationError::Unknown)
     } else {
-        let client = use_query_client::<QueryValue, QueryError, QueryKey>();
-        client.invalidate_queries(&[QueryKey::Games]);
         MutationResult::Ok(MutationValue::GameDeleted(name))
     }
 }
@@ -45,11 +51,19 @@ pub fn DeleteGameModal() -> Element {
         delete_game_signal.set(None);
     };
 
-    let delete = move |_| {
+    let delete = move |e: Event<MouseData>| {
+        e.prevent_default();
         if let Some(name) = game_name.clone() {
             spawn(async move {
-                mutate.mutate(name.clone());
-                delete_game_signal.set(None);
+                let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+
+                mutate.manual_mutate(name.clone()).await;
+                if let MutationResult::Ok(MutationValue::GameDeleted(name)) = mutate.result().deref() {
+                    let timeout = gloo_timers::callback::Timeout::new(1, move || {
+                        client.invalidate_queries(&[QueryKey::Games]);
+                        delete_game_signal.set(None);
+                    });
+                }
             });
         }
     };
@@ -61,18 +75,15 @@ pub fn DeleteGameModal() -> Element {
             div {
                 h1 { "Delete game" }
                 p { "Delete {name}"}
-                form {
-                    method: "dialog",
-                    button {
-                        r#type: "button",
-                        onclick: delete,
-                        "Continue"
-                    }
-                    button {
-                        r#type: "button",
-                        onclick: dismiss,
-                        "Close"
-                    }
+                button {
+                    r#type: "button",
+                    onclick: delete,
+                    "Continue"
+                }
+                button {
+                    r#type: "button",
+                    onclick: dismiss,
+                    "Close"
                 }
             }
         }

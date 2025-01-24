@@ -41,11 +41,12 @@ pub fn CreateGameButton() -> Element {
     let onclick = move |_| {
         spawn(async move {
             mutate.manual_mutate(None).await;
-            client.invalidate_queries(&[QueryKey::Games]);
             if mutate.result().is_ok() {
-
                 if let MutationResult::Ok(MutationValue::NewGame(game)) = mutate.result().deref() {
-                    navigator.push(Routes::GameDetail { name: game.name.clone() });
+                    let timeout = gloo_timers::callback::Timeout::new(1, move || {
+                        client.invalidate_queries(&[QueryKey::Games]);
+                    });
+                    // navigator.push(Routes::GameDetail { name: game.name.clone() });
                 }
             } else {}
         });

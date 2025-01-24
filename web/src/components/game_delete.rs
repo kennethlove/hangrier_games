@@ -51,8 +51,7 @@ pub fn DeleteGameModal() -> Element {
 
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
-    let delete = move |e: Event<MouseData>| {
-        e.prevent_default();
+    let delete = move |_| {
         if let Some(name) = game_name.clone() {
             spawn(async move {
                 mutate.manual_mutate(name.clone()).await;
@@ -72,16 +71,16 @@ pub fn DeleteGameModal() -> Element {
             open: delete_game_signal.read().clone().is_some(),
             div {
                 h1 { "Delete game" }
-                p { "Delete {name}"}
+                p { r#"Delete "{name}"?"#}
                 button {
                     r#type: "button",
                     onclick: delete,
-                    "Continue"
+                    "Yes"
                 }
                 button {
                     r#type: "button",
                     onclick: dismiss,
-                    "Close"
+                    "No"
                 }
             }
         }

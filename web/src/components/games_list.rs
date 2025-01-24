@@ -10,6 +10,7 @@ async fn fetch_games(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError>
         match reqwest::get("http://127.0.0.1:3000/api/games").await {
             Ok(request) => {
                 if let Ok(response) = request.json::<Vec<Game>>().await {
+                    dioxus_logger::tracing::info!("Got {} games", response.len());
                     QueryResult::Ok(QueryValue::Games(response))
                 } else {
                     dioxus_logger::tracing::error!("Failed to parse JSON response");
@@ -47,6 +48,8 @@ pub fn GamesList() -> Element {
                     }
                 }
 
+                RefreshButton {}
+
                 DeleteGameModal {}
             }
         },
@@ -54,6 +57,22 @@ pub fn GamesList() -> Element {
         QueryResult::Err(QueryError::NoGames) => rsx! { p { "No games yet" } },
         QueryResult::Err(QueryError::Unknown) => rsx! { p { "Something went wrong" } },
         _ => rsx! {}
+    }
+}
+
+#[component]
+fn RefreshButton() -> Element {
+    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+
+    let onclick = move |_| {
+        client.invalidate_queries(&[QueryKey::Games]);
+    };
+
+    rsx! {
+        button {
+            onclick: onclick,
+            "Refresh"
+        }
     }
 }
 

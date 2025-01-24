@@ -9,12 +9,11 @@ dioxus-logger = "0.6.1"
 dioxus-query = "0.6.0"
 dotenvy = "0.15.7"
 game = { path = "../game" }
-gloo-timers = "0.3.0"
+gloo-timers = { version = "0.3.0", features = ["futures"] }
 serde = { version = "1.0.216", features = ["derive"] }
 shared = { path = "../shared" }
 num-traits = "0.2.19"
 reqwest = { version = "0.12.9", features = ["json"] }
-windowless_sleep = "0.1.1"
 
 [dependencies.getrandom]
 version = "0.2.15"

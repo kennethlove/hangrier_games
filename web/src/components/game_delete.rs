@@ -14,12 +14,10 @@ async fn delete_game(name: String) -> MutationResult<MutationValue, MutationErro
         .delete(url)
         .send().await;
 
-    dioxus_logger::tracing::info!("{:?}", &response);
-
-    if !response.unwrap().status().is_success() {
-        MutationResult::Err(MutationError::Unknown)
-    } else {
+    if response.unwrap().status().is_success() {
         MutationResult::Ok(MutationValue::GameDeleted(name))
+    } else {
+        MutationResult::Err(MutationError::Unknown)
     }
 }
 
@@ -51,18 +49,18 @@ pub fn DeleteGameModal() -> Element {
         delete_game_signal.set(None);
     };
 
+    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+
     let delete = move |e: Event<MouseData>| {
         e.prevent_default();
         if let Some(name) = game_name.clone() {
             spawn(async move {
-                let client = use_query_client::<QueryValue, QueryError, QueryKey>();
-
                 mutate.manual_mutate(name.clone()).await;
                 if let MutationResult::Ok(MutationValue::GameDeleted(name)) = mutate.result().deref() {
                     let timeout = gloo_timers::callback::Timeout::new(1, move || {
                         client.invalidate_queries(&[QueryKey::Games]);
-                        delete_game_signal.set(None);
                     });
+                    delete_game_signal.set(None);
                 }
             });
         }

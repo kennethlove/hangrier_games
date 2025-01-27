@@ -12,7 +12,6 @@ game = { path = "../game" }
 gloo-timers = { version = "0.3.0", features = ["futures"] }
 serde = { version = "1.0.216", features = ["derive"] }
 shared = { path = "../shared" }
-num-traits = "0.2.19"
 reqwest = { version = "0.12.9", features = ["json"] }
 
 [dependencies.getrandom]

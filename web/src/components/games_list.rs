@@ -32,31 +32,32 @@ async fn fetch_games(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError>
 pub fn GamesList() -> Element {
     let games_query = use_get_query([QueryKey::AllGames, QueryKey::Games], fetch_games);
 
-    match games_query.result().value() {
-        QueryResult::Ok(QueryValue::Games(games)) => {
-            rsx! {
-                CreateGameButton {}
-                CreateGameForm {}
+    rsx! {
+        CreateGameButton {}
+        CreateGameForm {}
 
-                if games.is_empty() {
-                    p { "No games yet" }
-                } else {
-                    ul {
-                        for game in games {
-                            GameListMember { game: game.clone() }
+        match games_query.result().value() {
+            QueryResult::Ok(QueryValue::Games(games)) => {
+                rsx! {
+                    if games.is_empty() {
+                        p { "No games yet" }
+                    } else {
+                        ul {
+                            for game in games {
+                                GameListMember { game: game.clone() }
+                            }
                         }
                     }
                 }
+            },
+            QueryResult::Loading(_) => rsx! { p { "Loading..." } },
+            QueryResult::Err(QueryError::NoGames) => rsx! { p { "No games yet" } },
+            _ => rsx! { p { "Something went wrong" } },
+        }
 
-                RefreshButton {}
+        RefreshButton {}
 
-                DeleteGameModal {}
-            }
-        },
-        QueryResult::Loading(_) => rsx! { p { "Loading..." } },
-        QueryResult::Err(QueryError::NoGames) => rsx! { p { "No games yet" } },
-        QueryResult::Err(QueryError::Unknown) => rsx! { p { "Something went wrong" } },
-        _ => rsx! {}
+        DeleteGameModal {}
     }
 }
 

@@ -7,11 +7,17 @@ use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::Display;
 use std::str::FromStr;
 
+/* TODO
+ * Convert Area to enum? Might work better now that
+ * areas are auto-created at app start.
+ * Need to move items and events to GameArea, too.
+ */
+
 #[serde_as]
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Area {
     pub name: String,
-    pub open: bool,
+    // pub open: bool,
     pub items: Vec<Item>,
     #[serde_as(as = "Vec<DisplayFromStr>")]
     pub neighbors: Vec<Area>,
@@ -22,7 +28,7 @@ impl Default for Area {
     fn default() -> Self {
         Self {
             name: String::from(""),
-            open: true,
+            // open: true,
             items: vec![],
             neighbors: vec![],
             events: vec![],
@@ -81,9 +87,9 @@ impl Area {
 
     pub fn process_events(&mut self, mut tributes: Vec<Tribute>) -> Vec<Tribute> {
         // If there are events, close the area
-        if !self.events.is_empty() {
-            self.open = false;
-        }
+        // if !self.events.is_empty() {
+        //     self.open = false;
+        // }
 
         for event in self.events.iter() {
             for tribute in tributes.iter_mut() {

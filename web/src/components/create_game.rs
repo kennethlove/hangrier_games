@@ -37,7 +37,6 @@ async fn create_game(name: Option<String>) -> MutationResult<MutationValue, Muta
 pub fn CreateGameButton() -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
     let mutate = use_mutation(create_game);
-    let navigator = use_navigator();
 
     let onclick = move |_| {
         spawn(async move {
@@ -64,7 +63,6 @@ pub fn CreateGameForm() -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
     let mut game_name_signal: Signal<String> = use_signal(|| String::default());
     let mutate = use_mutation(create_game);
-    let navigator = use_navigator();
 
     let onsubmit = move |_| {
         let name = game_name_signal.peek().clone();
@@ -78,7 +76,6 @@ pub fn CreateGameForm() -> Element {
                     MutationResult::Ok(MutationValue::NewGame(game)) => {
                         client.invalidate_queries(&[QueryKey::Games]);
                         game_name_signal.set(String::default());
-                        // navigator.push(Routes::GameDetail { name: game.name.clone() });
                     },
                     MutationResult::Err(MutationError::UnableToCreateGame) => {},
                     _ => {}

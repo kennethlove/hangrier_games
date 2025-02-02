@@ -6,9 +6,12 @@ use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::Json;
 use axum::Router;
+use game::areas::Area;
 use game::games::Game;
+use serde::{Deserialize, Serialize};
 use shared::CreateGame;
 use std::sync::LazyLock;
+use surrealdb::method::Select;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
@@ -16,7 +19,13 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
         .route("/{name}", get(game_detail).delete(game_delete))
 });
 
-// pub async fn games_list() -> (StatusCode, Json<Vec<Game>>) {
+#[derive(Deserialize, Serialize)]
+struct GameArea {
+    game: Game,
+    area: Area,
+    open: bool,
+}
+
 pub async fn games_list() -> impl IntoResponse {
     match DATABASE.select("game").await {
         Ok(games) => {
@@ -36,6 +45,19 @@ pub async fn games_create(Json(payload): Json<CreateGame>) -> impl IntoResponse 
     let mut new_game = Game::default();
     if payload.name.is_some() {
         new_game.name = payload.name.unwrap();
+    }
+
+    for area in &["the_cornucopia", "northwest", "northeast", "southeast", "southwest"] {
+        let db_area: Option<Area> = DATABASE.select(("area", area.clone()))
+            .await.expect(&format!("Couldn't find area: {}", &area));
+
+        let _: Option<GameArea> = DATABASE.create("game_area").content(
+            GameArea {
+                game: new_game.clone(),
+                area: db_area.expect(format!("Missing db_area: {}", area).as_str()),
+                open: true,
+            }
+        ).await.expect(&format!("Couldn't create game area: {}", area.clone()));
     }
 
     match DATABASE.create(("game", &new_game.name)).content(new_game).await {

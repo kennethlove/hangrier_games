@@ -1,16 +1,17 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
+use crate::routes::Routes;
+use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use game::games::Game;
-use shared::CreateGame;
-use crate::routes::Routes;
-use std::ops::Deref;
 use reqwest::{Error, Response};
+use shared::CreateGame;
+use std::ops::Deref;
 
 async fn create_game(name: Option<String>) -> MutationResult<MutationValue, MutationError> {
     let client = reqwest::Client::new();
     let json_body = CreateGame { name: name.clone() };
-    let response = client.post("http://127.0.0.1:3000/api/games")
+    let response = client.post(format!("{}/api/games", API_HOST.clone()))
         .json(&json_body)
         .send().await;
 
@@ -43,10 +44,7 @@ pub fn CreateGameButton() -> Element {
             mutate.manual_mutate(None).await;
             if mutate.result().is_ok() {
                 if let MutationResult::Ok(MutationValue::NewGame(game)) = mutate.result().deref() {
-                    let timeout = gloo_timers::callback::Timeout::new(1, move || {
-                        client.invalidate_queries(&[QueryKey::Games]);
-                    });
-                    // navigator.push(Routes::GameDetail { name: game.name.clone() });
+                    client.invalidate_queries(&[QueryKey::Games]);
                 }
             } else {}
         });
@@ -79,7 +77,8 @@ pub fn CreateGameForm() -> Element {
                 match mutate.result().deref() {
                     MutationResult::Ok(MutationValue::NewGame(game)) => {
                         client.invalidate_queries(&[QueryKey::Games]);
-                        navigator.push(Routes::GameDetail { name: game.name.clone() });
+                        game_name_signal.set(String::default());
+                        // navigator.push(Routes::GameDetail { name: game.name.clone() });
                     },
                     MutationResult::Err(MutationError::UnableToCreateGame) => {},
                     _ => {}

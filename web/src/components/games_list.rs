@@ -1,13 +1,14 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::{CreateGameButton, CreateGameForm, DeleteGameModal, GameDelete};
 use crate::routes::Routes;
+use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
 use game::games::Game;
 
 async fn fetch_games(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::AllGames) = keys.first() {
-        match reqwest::get("http://127.0.0.1:3000/api/games").await {
+        match reqwest::get(format!("{}/api/games", API_HOST.clone())).await {
             Ok(request) => {
                 if let Ok(response) = request.json::<Vec<Game>>().await {
                     dioxus_logger::tracing::info!("Got {} games", response.len());

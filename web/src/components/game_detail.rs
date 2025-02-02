@@ -1,11 +1,12 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
+use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::games::Game;
 
 async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(name)) = keys.first() {
-        let response = reqwest::get(format!("http://127.0.0.1:3000/api/games/{}", name))
+        let response = reqwest::get(format!("{}/api/games/{}", API_HOST.clone(), name))
             .await.unwrap();
 
         match response.json::<Game>().await {

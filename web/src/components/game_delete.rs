@@ -1,14 +1,15 @@
-use std::net::{IpAddr, Ipv4Addr};
-use std::ops::Deref;
-use std::time::Duration;
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
+use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use reqwest::{Response, StatusCode};
+use std::net::{IpAddr, Ipv4Addr};
+use std::ops::Deref;
+use std::time::Duration;
 
 async fn delete_game(name: String) -> MutationResult<MutationValue, MutationError> {
     let client = reqwest::Client::new();
-    let url: String = format!("http://127.0.0.1:3000/api/games/{}", name);
+    let url: String = format!("{}/api/games/{}", API_HOST.clone(), name);
 
     let response = client
         .delete(url)
@@ -56,9 +57,7 @@ pub fn DeleteGameModal() -> Element {
             spawn(async move {
                 mutate.manual_mutate(name.clone()).await;
                 if let MutationResult::Ok(MutationValue::GameDeleted(name)) = mutate.result().deref() {
-                    let timeout = gloo_timers::callback::Timeout::new(1, move || {
-                        client.invalidate_queries(&[QueryKey::Games]);
-                    });
+                    client.invalidate_queries(&[QueryKey::Games]);
                     delete_game_signal.set(None);
                 }
             });

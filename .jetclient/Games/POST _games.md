@@ -12,6 +12,10 @@ id = 'eed6e8f5-4869-404b-be66-19be9347db08'
 ```toml
 name = 'Without name'
 id = '008f0158-536a-4347-a833-32fafddd89e8'
+
+[body]
+type = 'JSON'
+raw = '{'
 ```
 
 ### Example

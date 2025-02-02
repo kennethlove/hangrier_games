@@ -1,14 +1,14 @@
 use crate::DATABASE;
 use axum::extract::Path;
+use axum::http::header::{CACHE_CONTROL, EXPIRES};
 use axum::http::{HeaderMap, StatusCode};
+use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::Json;
 use axum::Router;
 use game::games::Game;
 use shared::CreateGame;
 use std::sync::LazyLock;
-use axum::http::header::{CACHE_CONTROL, EXPIRES};
-use axum::response::IntoResponse;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
@@ -21,7 +21,8 @@ pub async fn games_list() -> impl IntoResponse {
     match DATABASE.select("game").await {
         Ok(games) => {
             let mut headers = HeaderMap::new();
-            headers.insert("Cache-Control", "no-store".parse().unwrap());
+            headers.insert(CACHE_CONTROL, "no-store".parse().unwrap());
+            headers.insert(EXPIRES, "1".parse().unwrap());
             (StatusCode::OK, headers, Json::<Vec<Game>>(games)).into_response()
         }
         Err(e) => {
@@ -62,7 +63,7 @@ pub async fn game_detail(name: Path<String>) -> (StatusCode, Json<Option<Game>>)
 pub async fn game_delete(name: Path<String>) -> StatusCode {
     let game: Option<Game> = DATABASE.delete(("game", &name.0)).await.expect("Failed to delete game");
     match game {
-        Some(_) => StatusCode::OK,
+        Some(_) => StatusCode::NO_CONTENT,
         None => {
             StatusCode::INTERNAL_SERVER_ERROR
         }

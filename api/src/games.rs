@@ -11,7 +11,9 @@ use game::games::Game;
 use serde::{Deserialize, Serialize};
 use shared::CreateGame;
 use std::sync::LazyLock;
-use surrealdb::method::Select;
+use surrealdb::engine::any::Any;
+use surrealdb::method::Query;
+use surrealdb::RecordId;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
@@ -21,8 +23,10 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
 
 #[derive(Deserialize, Serialize)]
 struct GameArea {
-    game: Game,
-    area: Area,
+    #[serde(rename = "out")]
+    game: RecordId,
+    #[serde(rename = "in")]
+    area: RecordId,
     open: bool,
 }
 
@@ -47,39 +51,43 @@ pub async fn games_create(Json(payload): Json<CreateGame>) -> impl IntoResponse 
         new_game.name = payload.name.unwrap();
     }
 
-    for area in &["the_cornucopia", "northwest", "northeast", "southeast", "southwest"] {
-        let db_area: Option<Area> = DATABASE.select(("area", area.clone()))
-            .await.expect(&format!("Couldn't find area: {}", &area));
+    let game: Option<Game> = DATABASE
+        .create(("game", &new_game.name))
+        .content(new_game.clone())
+        .await.expect("failed to create game");
 
-        let _: Option<GameArea> = DATABASE.create("game_area").content(
-            GameArea {
-                game: new_game.clone(),
-                area: db_area.expect(format!("Missing db_area: {}", area).as_str()),
-                open: true,
-            }
-        ).await.expect(&format!("Couldn't create game area: {}", area.clone()));
+    for area in ["the_cornucopia", "northwest", "northeast", "southeast", "southwest"] {
+        let ga = GameArea {
+            game: RecordId::from(("game", new_game.clone().name)),
+            area: RecordId::from(("area", area)),
+            open: true,
+        };
+        let _: Vec<GameArea> = DATABASE.insert("game_area").relation(ga).await.unwrap();
     }
 
-    match DATABASE.create(("game", &new_game.name)).content(new_game).await {
-        Ok(Some(game)) => (StatusCode::OK, Json::<Game>(game)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-        Ok(None) => (StatusCode::ACCEPTED, "".to_string()).into_response(),
-    }
+    (StatusCode::OK, Json::<Game>(game.clone().unwrap())).into_response()
 }
 
 pub async fn game_detail(name: Path<String>) -> (StatusCode, Json<Option<Game>>) {
-    match DATABASE.select(("game", &name.0)).await {
-        Ok(Some(game)) => {
-            (StatusCode::OK, Json::<Option<Game>>(Some(game)))
-        }
-        Err(e) => {
-            tracing::error!("{}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<Game>>(None))
-        }
-        _ => {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<Game>>(None))
-        }
-    }
+    let query = DATABASE.query(format!("SELECT *, <-game_area<-area.* FROM game WHERE name='{}'", &name.0)).await;
+    let game = query.unwrap().check().unwrap();
+
+    dbg!(&game.check().ok());
+    todo!();
+
+    // match game.expect("No game found").take(0usize) {
+    //     // match DATABASE.select(("game", &name.0)).await {
+    //     Ok(game) => {
+    //         (StatusCode::OK, Json::<Option<Game>>(None))
+    //     }
+    //     Err(e) => {
+    //         tracing::error!("{}", e);
+    //         (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<Game>>(None))
+    //     }
+    //     _ => {
+    //         (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<Game>>(None))
+    //     }
+    // }
 }
 
 pub async fn game_delete(name: Path<String>) -> StatusCode {

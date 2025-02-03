@@ -12,7 +12,7 @@ use surrealdb::opt::auth::Root;
 use surrealdb::Surreal;
 use surrealdb_migrations::MigrationRunner;
 use tower::ServiceBuilder;
-use tower_http::cors::{AllowOrigin, Any as CorsAny, CorsLayer};
+use tower_http::cors::{Any as CorsAny, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;

@@ -27,6 +27,7 @@ pub fn GameDetail(name: String) -> Element {
     let game_query = use_get_query([QueryKey::Game(name), QueryKey::Games], fetch_game);
     match game_query.result().value() {
         QueryResult::Ok(QueryValue::Game(game_result)) => {
+            dioxus_logger::tracing::info!("{:?}", &game_result);
             rsx! {
                 h1 { "{game_result.name}" }
                 h2 { "{game_result.status}" }

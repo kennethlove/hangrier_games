@@ -346,7 +346,8 @@ impl Tribute {
                     TravelResult::Success(area) => return TravelResult::Success(area),
                     TravelResult::Failure => (),
                 }
-                let neighbors = area.clone().unwrap().neighbors;
+                // let neighbors = area.clone().unwrap().neighbors;
+                let neighbors: Vec<Area> = vec![];
                 for area in &neighbors {
                     // If the tribute has more loyalty than not
                     if self.attributes.loyalty >= 50 {

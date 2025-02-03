@@ -3,7 +3,7 @@ use crate::items::Item;
 use crate::tributes::statuses::TributeStatus;
 use crate::tributes::Tribute;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::serde_as;
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -18,10 +18,10 @@ use std::str::FromStr;
 pub struct Area {
     pub name: String,
     // pub open: bool,
-    pub items: Vec<Item>,
-    #[serde_as(as = "Vec<DisplayFromStr>")]
-    pub neighbors: Vec<Area>,
-    pub events: Vec<AreaEvent>,
+    // pub items: Vec<Item>,
+    // #[serde_as(as = "Vec<DisplayFromStr>")]
+    // pub neighbors: Vec<Area>,
+    // pub events: Vec<AreaEvent>,
 }
 
 impl Default for Area {
@@ -29,9 +29,9 @@ impl Default for Area {
         Self {
             name: String::from(""),
             // open: true,
-            items: vec![],
-            neighbors: vec![],
-            events: vec![],
+            // items: vec![],
+            // neighbors: vec![],
+            // events: vec![],
         }
     }
 }
@@ -64,7 +64,7 @@ impl Area {
     }
 
     pub fn add_neighbor(&mut self, neighbor: Area) {
-        self.neighbors.push(neighbor);
+        // self.neighbors.push(neighbor);
     }
 
     pub fn add_neighbors(&mut self, neighbors: Vec<&Area>) {
@@ -74,15 +74,15 @@ impl Area {
     }
 
     pub fn add_item(&mut self, item: Item) {
-        self.items.push(item);
+        // self.items.push(item);
     }
 
     pub fn remove_item(&mut self, removed_item: &Item) {
-        self.items.retain(|item| item != removed_item);
+        // self.items.retain(|item| item != removed_item);
     }
 
     pub fn add_event(&mut self, event: AreaEvent) {
-        self.events.push(event);
+        // self.events.push(event);
     }
 
     pub fn process_events(&mut self, mut tributes: Vec<Tribute>) -> Vec<Tribute> {
@@ -91,19 +91,19 @@ impl Area {
         //     self.open = false;
         // }
 
-        for event in self.events.iter() {
-            for tribute in tributes.iter_mut() {
-                match event {
-                    AreaEvent::Wildfire => tribute.set_status(TributeStatus::Burned),
-                    AreaEvent::Flood => tribute.set_status(TributeStatus::Drowned),
-                    AreaEvent::Earthquake => tribute.set_status(TributeStatus::Buried),
-                    AreaEvent::Avalanche => tribute.set_status(TributeStatus::Buried),
-                    AreaEvent::Blizzard => tribute.set_status(TributeStatus::Frozen),
-                    AreaEvent::Landslide => tribute.set_status(TributeStatus::Buried),
-                    AreaEvent::Heatwave => tribute.set_status(TributeStatus::Overheated),
-                }
-            }
-        }
+        // for event in self.events.iter() {
+        //     for tribute in tributes.iter_mut() {
+        //         match event {
+        //             AreaEvent::Wildfire => tribute.set_status(TributeStatus::Burned),
+        //             AreaEvent::Flood => tribute.set_status(TributeStatus::Drowned),
+        //             AreaEvent::Earthquake => tribute.set_status(TributeStatus::Buried),
+        //             AreaEvent::Avalanche => tribute.set_status(TributeStatus::Buried),
+        //             AreaEvent::Blizzard => tribute.set_status(TributeStatus::Frozen),
+        //             AreaEvent::Landslide => tribute.set_status(TributeStatus::Buried),
+        //             AreaEvent::Heatwave => tribute.set_status(TributeStatus::Overheated),
+        //         }
+        //     }
+        // }
 
         tributes
     }
@@ -126,11 +126,12 @@ impl Area {
     }
 
     pub fn available_items(&self) -> Vec<Item> {
-        self.items
-            .iter()
-            .filter(|i| i.quantity > 0)
-            .cloned()
-            .collect()
+        todo!();
+        // self.items
+        //     .iter()
+        //     .filter(|i| i.quantity > 0)
+        //     .cloned()
+        //     .collect()
     }
 }
 

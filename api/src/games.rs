@@ -14,6 +14,7 @@ use std::sync::LazyLock;
 use surrealdb::engine::any::Any;
 use surrealdb::method::Query;
 use surrealdb::RecordId;
+use surrealdb::sql::Value;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
@@ -27,6 +28,7 @@ struct GameArea {
     game: RecordId,
     #[serde(rename = "in")]
     area: RecordId,
+    #[serde(default)]
     open: bool,
 }
 
@@ -69,22 +71,26 @@ pub async fn games_create(Json(payload): Json<CreateGame>) -> impl IntoResponse 
 }
 
 pub async fn game_detail(name: Path<String>) -> (StatusCode, Json<Option<Game>>) {
-    let query = DATABASE.query(format!("SELECT *, <-game_area<-area.* FROM game WHERE name='{}'", &name.0)).await;
-    let game = query.unwrap().check().unwrap();
+    let mut result = DATABASE
+        .query(format!("SELECT * FROM game WHERE name='{}'", &name.0))
+        .query(format!("SELECT *, in.* from game_area WHERE out.name == '{}'", &name.0))
+        .await.unwrap();
+    let mut game: Option<Game> = result.take(0).expect("no game found");
+    let areas: Vec<Area> = result.take(0).expect("Expected areas");
 
-    dbg!(&game.check().ok());
-    todo!();
-
-    // match game.expect("No game found").take(0usize) {
-    //     // match DATABASE.select(("game", &name.0)).await {
-    //     Ok(game) => {
-    //         (StatusCode::OK, Json::<Option<Game>>(None))
+    if let Some(mut game) = game {
+        dbg!(&areas);
+        game.areas = areas;
+        (StatusCode::OK, Json(Some(game)))
+    } else {
+        (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<Game>>(None))
+    }
+    // match result.take::<Vec<Area>>(0) {
+    //     Ok(_) => {
+    //         (StatusCode::OK, Json(Some(game.unwrap())))
     //     }
     //     Err(e) => {
     //         tracing::error!("{}", e);
-    //         (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<Game>>(None))
-    //     }
-    //     _ => {
     //         (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<Game>>(None))
     //     }
     // }

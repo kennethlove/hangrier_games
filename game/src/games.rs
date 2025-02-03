@@ -19,7 +19,8 @@ pub struct Game {
     pub name: String,
     pub status: GameStatus,
     pub day: Option<u32>,
-    // pub areas: Vec<Area>,
+    #[serde(skip)]
+    pub areas: Vec<Area>,
     // pub tributes: Vec<Tribute>,
 }
 
@@ -49,7 +50,7 @@ impl Default for Game {
             name,
             status: Default::default(),
             day: None,
-            // areas,
+            areas,
             // tributes: Vec::new(),
         }
     }

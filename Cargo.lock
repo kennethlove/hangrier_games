@@ -168,6 +168,8 @@ dependencies = [
  "serde",
  "serde_json",
  "shared",
+ "strum",
+ "strum_macros",
  "surrealdb",
  "surrealdb-migrations",
  "thiserror 2.0.11",
@@ -2032,6 +2034,7 @@ dependencies = [
  "serde",
  "serde_with",
  "strum",
+ "strum_macros",
  "uuid",
  "witty-phrase-generator",
 ]

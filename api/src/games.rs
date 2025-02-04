@@ -11,10 +11,12 @@ use game::games::Game;
 use serde::{Deserialize, Serialize};
 use shared::CreateGame;
 use std::sync::LazyLock;
+use strum::IntoEnumIterator;
 use surrealdb::engine::any::Any;
 use surrealdb::method::Query;
 use surrealdb::RecordId;
 use surrealdb::sql::Value;
+use game::areas::areas::GameArea;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
@@ -22,16 +24,16 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
         .route("/{name}", get(game_detail).delete(game_delete))
 });
 
-#[derive(Deserialize, Serialize)]
-struct GameArea {
-    #[serde(rename = "out")]
-    game: RecordId,
-    #[serde(rename = "in")]
-    area: RecordId,
-    #[serde(default)]
-    open: bool,
-}
-
+// #[derive(Deserialize, Serialize)]
+// struct GameArea {
+//     #[serde(rename = "out")]
+//     game: RecordId,
+//     #[serde(rename = "in")]
+//     area: RecordId,
+//     #[serde(default)]
+//     open: bool,
+// }
+//
 pub async fn games_list() -> impl IntoResponse {
     match DATABASE.select("game").await {
         Ok(games) => {
@@ -58,10 +60,11 @@ pub async fn games_create(Json(payload): Json<CreateGame>) -> impl IntoResponse 
         .content(new_game.clone())
         .await.expect("failed to create game");
 
-    for area in ["the_cornucopia", "northwest", "northeast", "southeast", "southwest"] {
+    for area in Area::iter() {
         let ga = GameArea {
-            game: RecordId::from(("game", new_game.clone().name)),
-            area: RecordId::from(("area", area)),
+            // game: RecordId::from(("game", new_game.clone().name)),
+            game: game.clone().unwrap(),
+            area,
             open: true,
         };
         let _: Vec<GameArea> = DATABASE.insert("game_area").relation(ga).await.unwrap();
@@ -73,10 +76,10 @@ pub async fn games_create(Json(payload): Json<CreateGame>) -> impl IntoResponse 
 pub async fn game_detail(name: Path<String>) -> (StatusCode, Json<Option<Game>>) {
     let mut result = DATABASE
         .query(format!("SELECT * FROM game WHERE name='{}'", &name.0))
-        .query(format!("SELECT *, in.* from game_area WHERE out.name == '{}'", &name.0))
+        .query(format!("SELECT * from game_area WHERE out.name == '{}'", &name.0))
         .await.unwrap();
     let mut game: Option<Game> = result.take(0).expect("no game found");
-    let areas: Vec<Area> = result.take(0).expect("Expected areas");
+    let areas: Vec<GameArea> = result.take(1).expect("Expected areas");
 
     if let Some(mut game) = game {
         dbg!(&areas);

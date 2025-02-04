@@ -35,9 +35,10 @@ pub fn GameDetail(name: String) -> Element {
                 h3 { "Areas" }
                 ul {
                     for area in game_result.clone().areas {
-                        li { "{area.name}" }
+                        li { "{area.area}" }
                     }
                 }
+
             }
         }
         QueryResult::Loading(_) => {

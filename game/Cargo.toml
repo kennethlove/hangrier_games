@@ -12,3 +12,4 @@ serde_with = { version = "3.11.0", features = ["json"] }
 strum = { version = "0.26.3", features = ["derive"] }
 witty-phrase-generator = "0.3.0"
 uuid = { version = "1.11.0", features = ["v4", "serde"] }
+strum_macros = "0.26.4"

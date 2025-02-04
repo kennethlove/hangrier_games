@@ -76,7 +76,7 @@ pub async fn games_create(Json(payload): Json<CreateGame>) -> impl IntoResponse 
 pub async fn game_detail(name: Path<String>) -> (StatusCode, Json<Option<Game>>) {
     let mut result = DATABASE
         .query(format!("SELECT * FROM game WHERE name='{}'", &name.0))
-        .query(format!("SELECT * from game_area WHERE out.name == '{}'", &name.0))
+        .query(format!("SELECT * from game_area WHERE out.name = '{}'", &name.0))
         .await.unwrap();
     let mut game: Option<Game> = result.take(0).expect("no game found");
     let areas: Vec<GameArea> = result.take(1).expect("Expected areas");

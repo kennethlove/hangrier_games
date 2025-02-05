@@ -11,20 +11,16 @@ async fn fetch_games(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError>
         match reqwest::get(format!("{}/api/games", API_HOST.clone())).await {
             Ok(request) => {
                 if let Ok(response) = request.json::<Vec<Game>>().await {
-                    dioxus_logger::tracing::info!("Got {} games", response.len());
                     QueryResult::Ok(QueryValue::Games(response))
                 } else {
-                    dioxus_logger::tracing::error!("Failed to parse JSON response");
                     QueryResult::Err(QueryError::BadJson)
                 }
             },
             Err(e) => {
-                dioxus_logger::tracing::error!("Failed to fetch games: {:?}", e);
                 QueryResult::Err(QueryError::NoGames)
             }
         }
     } else {
-        dioxus_logger::tracing::info!("Unknown query: {:?}", keys);
         QueryResult::Err(QueryError::Unknown)
     }
 }

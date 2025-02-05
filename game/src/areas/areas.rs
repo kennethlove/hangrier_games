@@ -1,16 +1,14 @@
-use crate::areas::events::AreaEvent;
 use crate::items::Item;
-use crate::tributes::statuses::TributeStatus;
-use crate::tributes::Tribute;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
 use std::str::FromStr;
 use serde::de::{EnumAccess, Error, Visitor};
 use strum_macros::EnumIter;
 use strum::IntoEnumIterator;
 use crate::games::Game;
 
-#[derive(Clone, Debug, Eq, PartialEq, EnumIter, Serialize, Deserialize)]
+
+#[derive(Clone, Debug, Eq, PartialEq, EnumIter, Serialize, Deserialize, Hash)]
 pub enum Area {
     TheCornucopia,
     Northwest,
@@ -128,6 +126,20 @@ impl Area {
 //         //     .cloned()
 //         //     .collect()
 //     }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub struct AreaDetails {
+    pub open: bool,
+    pub items: Vec<Item>,
+}
+
+impl AreaDetails {
+    pub fn new(open: bool, items: Vec<Item>) -> Self {
+        let mut items = items;
+        items.push(Item::new_random("test item"));
+        AreaDetails { open, items }
+    }
 }
 
 #[cfg(test)]

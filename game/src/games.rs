@@ -1,5 +1,5 @@
 use crate::areas::events::AreaEvent;
-use crate::areas::Area;
+use crate::areas::{Area, AreaDetails};
 use crate::messages::GameMessage;
 use crate::tributes::actions::Action;
 use crate::tributes::events::TributeEvent;
@@ -9,17 +9,20 @@ use rand::prelude::SliceRandom;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
 
 thread_local!(pub static GAME: RefCell<Game> = RefCell::new(Game::default()));
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Game {
     pub name: String,
     pub status: GameStatus,
     pub day: Option<u32>,
+    pub areas: BTreeMap<String, AreaDetails>,
+    // pub tributes: BTreeMap<String, Tribute>,
 }
 
 impl Default for Game {
@@ -30,21 +33,25 @@ impl Default for Game {
             name = words.join("-").to_string();
         };
 
-       let mut game = Game {
+        let mut game = Game {
             name,
             status: Default::default(),
             day: None,
+            areas: BTreeMap::new(),
         };
+
+        for area in Area::iter() {
+            game.areas.insert(
+                area.to_string(),
+                AreaDetails::new(true, vec![])
+            );
+        }
 
         game
     }
 }
 
 impl Game {
-    // pub fn name(&self) -> String {
-    //     self.id.clone()
-    // }
-
     pub fn new(name: &str) -> Self {
         let mut game = Game::default();
         game.name = name.to_string();

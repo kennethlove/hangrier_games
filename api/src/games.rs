@@ -6,7 +6,7 @@ use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::Json;
 use axum::Router;
-use game::areas::Area;
+use game::areas::{Area, AreaDetails};
 use game::games::Game;
 use serde::{Deserialize, Serialize};
 use shared::CreateGame;
@@ -16,15 +16,6 @@ use surrealdb::engine::any::Any;
 use surrealdb::method::Query;
 use surrealdb::RecordId;
 use surrealdb::sql::Value;
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct GameArea {
-    // #[serde(rename="in")]
-    pub game: RecordId,
-    // #[serde(rename="in")]
-    pub area: Area,
-    pub open: bool,
-}
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
@@ -47,60 +38,25 @@ pub async fn games_list() -> impl IntoResponse {
     }
 }
 
-pub async fn games_create(Json(payload): Json<CreateGame>) -> impl IntoResponse {
-    let mut new_game = Game::default();
-    if payload.name.is_some() {
-        new_game.name = payload.name.unwrap();
-    }
-
+pub async fn games_create(Json(payload): Json<Game>) -> impl IntoResponse {
     let game: Option<Game> = DATABASE
-        .create(("game", &new_game.name))
-        .content(new_game.clone())
+        .create(("game", &payload.name))
+        .content(payload)
         .await.expect("failed to create game");
 
-    for area in Area::iter() {
-        let ga = GameArea {
-            game: RecordId::from(("game", new_game.clone().name)),
-            // game: game.clone().unwrap(),
-            area,
-            open: true,
-        };
-        let _: Vec<GameArea> = DATABASE.insert("game_area").content(ga).await.unwrap();
-    }
-
-    (StatusCode::OK, Json::<Game>(game.clone().unwrap())).into_response()
+    (StatusCode::OK, Json::<Game>(game.clone().unwrap()))
 }
 
-// TODO: Move this to somewhere more available, use GameAreas better
-#[derive(Serialize, Deserialize)]
-struct GameDetail {
-    game: Game,
-    areas: Vec<GameArea>,
-}
-
-pub async fn game_detail(name: Path<String>) -> (StatusCode, Json<Option<GameDetail>>) {
-    let mut result = DATABASE
-        .query(format!("SELECT * FROM game WHERE name='{}'", &name.0))
-        .query(format!("SELECT * FROM game_area WHERE game.name = '{}'", &name.0))
+pub async fn game_detail(name: Path<String>) -> (StatusCode, Json<Option<Game>>) {
+    let mut result: Option<Game> = DATABASE
+        .select(("game", name.to_string()))
         .await.unwrap();
-    let mut game: Option<Game> = result.take(0).expect("no game found");
-    let areas: Vec<GameArea> = result.take(1).expect("Expected areas");
 
-    if let Some(game) = game {
-        let details = GameDetail { game, areas };
-        (StatusCode::OK, Json(Some(details)))
+    if let Some(game) = result {
+        (StatusCode::OK, Json(Some(game)))
     } else {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<GameDetail>>(None))
+        (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<Game>>(None))
     }
-    // match result.take::<Vec<Area>>(0) {
-    //     Ok(_) => {
-    //         (StatusCode::OK, Json(Some(game.unwrap())))
-    //     }
-    //     Err(e) => {
-    //         tracing::error!("{}", e);
-    //         (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<Game>>(None))
-    //     }
-    // }
 }
 
 pub async fn game_delete(name: Path<String>) -> StatusCode {

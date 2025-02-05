@@ -10,7 +10,11 @@ use std::ops::Deref;
 
 async fn create_game(name: Option<String>) -> MutationResult<MutationValue, MutationError> {
     let client = reqwest::Client::new();
-    let json_body = CreateGame { name: name.clone() };
+    let json_body = match name {
+        Some(name) => Game::new(&name),
+        None => Game::default()
+    };
+
     let response = client.post(format!("{}/api/games", API_HOST.clone()))
         .json(&json_body)
         .send().await;

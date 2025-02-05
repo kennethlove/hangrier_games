@@ -27,17 +27,24 @@ pub fn GameDetail(name: String) -> Element {
     let game_query = use_get_query([QueryKey::Game(name), QueryKey::Games], fetch_game);
     match game_query.result().value() {
         QueryResult::Ok(QueryValue::Game(game_result)) => {
-            dioxus_logger::tracing::info!("{:?}", &game_result);
             rsx! {
                 h1 { "{game_result.name}" }
                 h2 { "{game_result.status}" }
 
                 h3 { "Areas" }
                 ul {
-                    for area in game_result.clone().areas {
-                        li { "{area.name}" }
+                    for (area, details) in game_result.areas.iter() {
+                        li {
+                            "{area}: {details.open}"
+                            ul {
+                                for item in &details.items {
+                                    li { "{item.name}" }
+                                }
+                            }
+                        }
                     }
                 }
+
             }
         }
         QueryResult::Loading(_) => {

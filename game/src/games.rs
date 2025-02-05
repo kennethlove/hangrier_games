@@ -12,7 +12,6 @@ use std::cell::RefCell;
 use std::fmt::Display;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
-use crate::areas::areas::GameArea;
 
 thread_local!(pub static GAME: RefCell<Game> = RefCell::new(Game::default()));
 
@@ -21,9 +20,6 @@ pub struct Game {
     pub name: String,
     pub status: GameStatus,
     pub day: Option<u32>,
-    #[serde(skip)]
-    pub areas: Vec<GameArea>,
-    // pub tributes: Vec<Tribute>,
 }
 
 impl Default for Game {
@@ -38,16 +34,7 @@ impl Default for Game {
             name,
             status: Default::default(),
             day: None,
-            areas: vec![],
         };
-
-        for area in Area::iter() {
-            game.areas.push(GameArea {
-                game: game.clone(),
-                area,
-                open: true
-            });
-        }
 
         game
     }

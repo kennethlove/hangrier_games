@@ -26,6 +26,7 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
 pub fn GameDetail(name: String) -> Element {
     let game_query = use_get_query([QueryKey::Game(name), QueryKey::Games], fetch_game);
     match game_query.result().value() {
+        // TODO: Implement new QueryValue for GameDetail w/ GameAreas
         QueryResult::Ok(QueryValue::Game(game_result)) => {
             dioxus_logger::tracing::info!("{:?}", &game_result);
             rsx! {
@@ -34,9 +35,9 @@ pub fn GameDetail(name: String) -> Element {
 
                 h3 { "Areas" }
                 ul {
-                    for area in game_result.clone().areas {
-                        li { "{area.area}" }
-                    }
+                    // for area in game_result.clone().areas {
+                    //     li { "{area.area}" }
+                    // }
                 }
 
             }

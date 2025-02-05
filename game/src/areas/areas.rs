@@ -2,14 +2,15 @@ use crate::areas::events::AreaEvent;
 use crate::items::Item;
 use crate::tributes::statuses::TributeStatus;
 use crate::tributes::Tribute;
-use serde::{Deserialize, Serialize};
-use std::fmt::Display;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt::{Display, Formatter};
 use std::str::FromStr;
+use serde::de::{EnumAccess, Error, Visitor};
 use strum_macros::EnumIter;
 use strum::IntoEnumIterator;
 use crate::games::Game;
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, EnumIter)]
+#[derive(Clone, Debug, Eq, PartialEq, EnumIter, Serialize, Deserialize)]
 pub enum Area {
     TheCornucopia,
     Northwest,
@@ -17,7 +18,6 @@ pub enum Area {
     Southeast,
     Southwest,
 }
-
 
 impl Display for Area {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -51,16 +51,7 @@ impl FromStr for Area {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct GameArea {
-    #[serde(rename="out")]
-    pub game: Game,
-    #[serde(rename="in")]
-    pub area: Area,
-    pub open: bool,
-}
-
-// impl Area {
+impl Area {
 //     pub fn new(name: &str) -> Self {
 //         let mut area = Area::default();
 //         area.name = name.to_string();
@@ -137,7 +128,7 @@ pub struct GameArea {
 //         //     .cloned()
 //         //     .collect()
 //     }
-// }
+}
 
 #[cfg(test)]
 mod tests {

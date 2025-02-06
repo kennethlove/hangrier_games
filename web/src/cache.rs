@@ -8,6 +8,7 @@ pub(crate) enum QueryKey {
     Game(String),
     Games,
     Tributes,
+    GameTributes,
 }
 
 #[derive(PartialEq, Debug)]

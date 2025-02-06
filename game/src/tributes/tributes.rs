@@ -38,8 +38,6 @@ pub struct Tribute {
     pub attributes: Attributes,
     /// Items the tribute owns
     pub items: Vec<Item>,
-    /// What game does this tribute belong to?
-    pub game: Game,
 }
 
 impl Tribute {
@@ -50,10 +48,8 @@ impl Tribute {
         let attributes = Attributes::new();
         let statistics = Statistics::default();
 
-        let game = GAME.with_borrow(|g| g.clone());
-
         Self {
-            area: Area::TheCornucopia,
+            area: Area::Cornucopia,
             name: name.clone(),
             district,
             brain,
@@ -63,7 +59,6 @@ impl Tribute {
             attributes,
             statistics,
             items: vec![],
-            game
         }
     }
 

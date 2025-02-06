@@ -2,14 +2,14 @@ use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
-use game::games::Game;
+use game::games::{Game, GAME};
 use game::tributes::Tribute;
 
 async fn fetch_game_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(name)) = keys.first() {
         if let Some(QueryKey::Tributes) = keys.last() {
             let response = reqwest::get(
-                format!("{}/api/game/{}/tributes", API_HOST.clone(), name)
+                format!("{}/api/games/{}/tributes", API_HOST.clone(), name)
             ).await.unwrap();
 
             match response.json::<Vec<Tribute>>().await {
@@ -30,6 +30,28 @@ async fn fetch_game_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, Que
 
 // pub async fn get_game_tributes()
 
-// pub fn GameTributes() -> Element {
-//
-// }
+#[component]
+pub fn GameTributes(name: String) -> Element {
+    let tributes_query = use_get_query(
+        [QueryKey::Game(name), QueryKey::Tributes],
+        fetch_game_tributes
+    );
+
+    match tributes_query.result().value() {
+        QueryResult::Ok(QueryValue::Tributes(tributes)) => {
+            rsx! {
+                ul {
+                    for tribute in tributes {
+                        li { "{tribute.name}" }
+                    }
+                }
+            }
+        },
+        QueryResult::Loading(_) => {
+            rsx! { p { "Loading..." } }
+        }
+        _ => {
+            rsx!("")
+        }
+    }
+}

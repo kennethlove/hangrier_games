@@ -17,12 +17,13 @@ use surrealdb::method::Query;
 use surrealdb::RecordId;
 use surrealdb::sql::Value;
 use game::tributes::Tribute;
+use crate::tributes::create_tribute;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
         .route("/", get(games_list).post(games_create))
         .route("/{name}", get(game_detail).delete(game_delete))
-        .route("/{name}/tributes", get(game_tributes))
+        .route("/{name}/tributes", get(game_tributes).post(create_tribute))
 });
 
 pub async fn games_list() -> impl IntoResponse {
@@ -41,7 +42,6 @@ pub async fn games_list() -> impl IntoResponse {
 }
 
 pub async fn games_create(Json(payload): Json<Game>) -> impl IntoResponse {
-    dbg!(&payload);
     let game: Option<Game> = DATABASE
         .create(("game", &payload.name))
         .content(payload)
@@ -72,9 +72,12 @@ pub async fn game_delete(name: Path<String>) -> StatusCode {
     }
 }
 
-pub async fn game_tributes(name: Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
+pub async fn game_tributes(Path(name): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
+    let record_id = RecordId::from(("game", name.to_string()));
     let tributes = DATABASE.query(
-        format!("SELECT tribute->plays_in->game FROM tribute WHERE game.name = '{}'", name.to_string())
+        format!("RETURN {}<-playing_in<-tribute.*", record_id)
     ).await.expect("No tributes");
-    (StatusCode::OK, Json(vec![]))
+    let mut tributes = tributes.check().expect("Failed to check tributes");
+    let tributes = tributes.take(0);
+    (StatusCode::OK, Json(tributes.expect("")))
 }

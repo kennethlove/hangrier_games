@@ -8,9 +8,9 @@ use strum::IntoEnumIterator;
 use crate::games::Game;
 
 
-#[derive(Clone, Debug, Eq, PartialEq, EnumIter, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, EnumIter, Hash, Deserialize, Serialize)]
 pub enum Area {
-    TheCornucopia,
+    Cornucopia,
     Northwest,
     Northeast,
     Southeast,
@@ -20,7 +20,7 @@ pub enum Area {
 impl Display for Area {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Area::TheCornucopia => f.write_str("The Cornucopia"),
+            Area::Cornucopia => f.write_str("Cornucopia"),
             Area::Northwest => f.write_str("Northwest"),
             Area::Northeast => f.write_str("Northeast"),
             Area::Southeast => f.write_str("Southeast"),
@@ -44,7 +44,7 @@ impl FromStr for Area {
             "northeast" => Ok(Area::Northeast),
             "southeast" => Ok(Area::Southeast),
             "southwest" => Ok(Area::Southwest),
-            _ => Ok(Area::TheCornucopia)
+            _ => Ok(Area::Cornucopia)
         }
     }
 }

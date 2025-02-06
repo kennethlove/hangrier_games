@@ -10,13 +10,15 @@ use std::ops::Deref;
 use game::tributes::Tribute;
 
 async fn create_tribute(name: Option<String>) -> MutationResult<MutationValue, MutationError> {
+    let game_name = GAME.with_borrow(|g| { g.name.clone() });
+
     let client = reqwest::Client::new();
     let json_body = match name {
         Some(name) => Tribute::new(name, None, None),
         None => Tribute::random()
     };
 
-    let response = client.post(format!("{}/api/tributes", API_HOST.clone()))
+    let response = client.post(format!("{}/api/games/{}/tributes", API_HOST.clone(), game_name))
         .json(&json_body)
         .send().await;
 
@@ -39,16 +41,17 @@ async fn create_tribute(name: Option<String>) -> MutationResult<MutationValue, M
 }
 
 #[component]
-pub fn CreateTributeButton() -> Element {
+pub fn CreateTributeButton(name: String) -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
     let mutate = use_mutation(create_tribute);
 
     let onclick = move |_| {
+        let name = name.clone();
         spawn(async move {
             mutate.manual_mutate(None).await;
             if mutate.result().is_ok() {
                 if let MutationResult::Ok(MutationValue::NewTribute(tribute)) = mutate.result().deref() {
-                    client.invalidate_queries(&[QueryKey::Tributes, QueryKey::Game(GAME.with_borrow(|g| g.clone().name))]);
+                    client.invalidate_queries(&[QueryKey::Game(name), QueryKey::Tributes]);
                 }
             } else {}
         });

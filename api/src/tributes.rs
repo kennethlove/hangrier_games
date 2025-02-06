@@ -24,20 +24,18 @@ pub static TRIBUTES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
         .route("/", post(create_tribute))
 });
 
-pub async fn create_tribute(Json(payload): Json<Tribute>) -> impl IntoResponse {
+pub async fn create_tribute(Path(name): Path<String>, Json(payload): Json<Tribute>) -> impl IntoResponse {
     let tribute: Option<Tribute> = DATABASE
         .create(("tribute", &payload.name.to_string()))
         .content(payload.clone())
         .await.expect("failed to create tribute");
 
-    let game = GAME.with(|g| g.clone());
-    dbg!(game);
 
     let _: Vec<TributePlaysIn> = DATABASE.insert("playing_in")
         .relation(
             TributePlaysIn {
                 tribute: RecordId::from(("tribute", &payload.name.to_string())),
-                game: RecordId::from(("game", GAME.with_borrow(|g| g.name.clone())))
+                game: RecordId::from(("game", name.to_string())),
             }
         ).await.expect("");
 

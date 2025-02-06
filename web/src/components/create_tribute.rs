@@ -51,7 +51,7 @@ pub fn CreateTributeButton(name: String) -> Element {
             mutate.manual_mutate(None).await;
             if mutate.result().is_ok() {
                 if let MutationResult::Ok(MutationValue::NewTribute(tribute)) = mutate.result().deref() {
-                    client.invalidate_queries(&[QueryKey::Game(name), QueryKey::Tributes]);
+                    client.invalidate_queries(&[QueryKey::Tributes(name)]);
                 }
             } else {}
         });

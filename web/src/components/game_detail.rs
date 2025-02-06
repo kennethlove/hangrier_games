@@ -3,7 +3,7 @@ use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::games::{Game, GAME};
-use crate::components::create_tribute::CreateTributeButton;
+use crate::components::create_tribute::{CreateTributeButton, CreateTributeForm};
 use crate::components::game_tributes::GameTributes;
 
 async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
@@ -49,7 +49,8 @@ pub fn GameDetail(name: String) -> Element {
                 }
 
                 h3 { "Tributes" }
-                CreateTributeButton { name: game_result.name.clone() }
+                CreateTributeButton { game_name: game_result.name.clone() }
+                CreateTributeForm { game_name: game_result.name.clone() }
                 GameTributes { name: game_result.name.clone() }
             }
         }

@@ -2,7 +2,8 @@ use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
-use game::games::Game;
+use game::games::{Game, GAME};
+use crate::components::create_tribute::CreateTributeButton;
 
 async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(name)) = keys.first() {
@@ -11,6 +12,7 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
 
         match response.json::<Game>().await {
             Ok(game) => {
+                GAME.set(game.clone());
                 QueryResult::Ok(QueryValue::Game(game))
             }
             Err(_) => {
@@ -45,6 +47,9 @@ pub fn GameDetail(name: String) -> Element {
                     }
                 }
 
+                h3 { "Tributes" }
+                CreateTributeButton {}
+                // GameTributes { game: game_result }
             }
         }
         QueryResult::Loading(_) => {

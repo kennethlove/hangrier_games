@@ -22,7 +22,6 @@ pub struct Game {
     pub status: GameStatus,
     pub day: Option<u32>,
     pub areas: BTreeMap<String, AreaDetails>,
-    // pub tributes: BTreeMap<String, Tribute>,
 }
 
 impl Default for Game {

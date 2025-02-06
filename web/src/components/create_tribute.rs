@@ -1,0 +1,65 @@
+use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
+use crate::routes::Routes;
+use crate::API_HOST;
+use dioxus::prelude::*;
+use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
+use game::games::{Game, GAME};
+use reqwest::{Error, Response};
+use shared::CreateGame;
+use std::ops::Deref;
+use game::tributes::Tribute;
+
+async fn create_tribute(name: Option<String>) -> MutationResult<MutationValue, MutationError> {
+    let client = reqwest::Client::new();
+    let json_body = match name {
+        Some(name) => Tribute::new(name, None, None),
+        None => Tribute::random()
+    };
+
+    let response = client.post(format!("{}/api/tributes", API_HOST.clone()))
+        .json(&json_body)
+        .send().await;
+
+    match response {
+        Ok(response) => {
+            match response.json::<Tribute>().await {
+                Ok(tribute) => {
+                    MutationResult::Ok(MutationValue::NewTribute(tribute))
+                }
+                Err(_) => {
+                    MutationResult::Err(MutationError::UnableToCreateTribute)
+                }
+            }
+        }
+        Err(e) => {
+            dioxus_logger::tracing::error!("error creating tribute: {:?}", e);
+            MutationResult::Err(MutationError::UnableToCreateTribute)
+        }
+    }
+}
+
+#[component]
+pub fn CreateTributeButton() -> Element {
+    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+    let mutate = use_mutation(create_tribute);
+
+    let onclick = move |_| {
+        spawn(async move {
+            mutate.manual_mutate(None).await;
+            if mutate.result().is_ok() {
+                if let MutationResult::Ok(MutationValue::NewTribute(tribute)) = mutate.result().deref() {
+                    client.invalidate_queries(&[QueryKey::Tributes, QueryKey::Game(GAME.with_borrow(|g| g.clone().name))]);
+                }
+            } else {}
+        });
+    };
+
+    rsx! {
+        button {
+            r#type: "button",
+            onclick,
+            label { "random tribute" }
+        }
+    }
+}
+

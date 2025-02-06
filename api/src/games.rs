@@ -16,11 +16,13 @@ use surrealdb::engine::any::Any;
 use surrealdb::method::Query;
 use surrealdb::RecordId;
 use surrealdb::sql::Value;
+use game::tributes::Tribute;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
         .route("/", get(games_list).post(games_create))
         .route("/{name}", get(game_detail).delete(game_delete))
+        .route("/{name}/tributes", get(game_tributes))
 });
 
 pub async fn games_list() -> impl IntoResponse {
@@ -39,6 +41,7 @@ pub async fn games_list() -> impl IntoResponse {
 }
 
 pub async fn games_create(Json(payload): Json<Game>) -> impl IntoResponse {
+    dbg!(&payload);
     let game: Option<Game> = DATABASE
         .create(("game", &payload.name))
         .content(payload)
@@ -67,4 +70,11 @@ pub async fn game_delete(name: Path<String>) -> StatusCode {
             StatusCode::INTERNAL_SERVER_ERROR
         }
     }
+}
+
+pub async fn game_tributes(name: Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
+    let tributes = DATABASE.query(
+        format!("SELECT tribute->plays_in->game FROM tribute WHERE game.name = '{}'", name.to_string())
+    ).await.expect("No tributes");
+    (StatusCode::OK, Json(vec![]))
 }

@@ -15,6 +15,9 @@ mod games_list;
 pub(crate) use games_list::GamesList;
 
 mod game_delete;
+mod create_tribute;
+mod game_tributes;
+
 pub(crate) use game_delete::GameDelete;
 pub(crate) use game_delete::DeleteGameModal;
 

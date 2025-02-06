@@ -2,7 +2,7 @@ use super::actions::{Action, AttackOutcome, AttackResult, TributeAction};
 use super::brains::Brain;
 use super::statuses::TributeStatus;
 use crate::areas::Area;
-use crate::games::GAME;
+use crate::games::{Game, GAME};
 use crate::items::{Attribute, Item};
 use crate::messages::GameMessage;
 use crate::tributes::events::TributeEvent;
@@ -12,21 +12,21 @@ use fake::Fake;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
-use uuid::Uuid;
+use rand::thread_rng;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Tribute {
-    /// What is their identifier?
-    pub id: Uuid,
     /// Where are they?
     pub area: Area,
     /// What is their current status?
     pub status: TributeStatus,
     /// This is their thinker
+    #[serde(skip)]
     pub brain: Brain,
     /// How they present themselves to the real world
     pub avatar: Option<String>,
     /// Who created them in the real world
+    #[serde(rename="player_name")]
     pub human_player_name: Option<String>,
     /// What they like to go by
     pub name: String,
@@ -38,6 +38,8 @@ pub struct Tribute {
     pub attributes: Attributes,
     /// Items the tribute owns
     pub items: Vec<Item>,
+    /// What game does this tribute belong to?
+    pub game: Game,
 }
 
 impl Tribute {
@@ -47,12 +49,11 @@ impl Tribute {
         let district  = district.unwrap_or(0);
         let attributes = Attributes::new();
         let statistics = Statistics::default();
-        let mut game = GAME.with_borrow_mut(|game| game.clone());
-        let area = game.get_or_create_area("the cornucopia");
+
+        let game = GAME.with_borrow(|g| g.clone());
 
         Self {
-            id: Uuid::new_v4(),
-            area: area.clone(),
+            area: Area::TheCornucopia,
             name: name.clone(),
             district,
             brain,
@@ -62,6 +63,7 @@ impl Tribute {
             attributes,
             statistics,
             items: vec![],
+            game
         }
     }
 

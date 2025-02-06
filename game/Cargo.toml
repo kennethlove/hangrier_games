@@ -5,11 +5,14 @@ edition = "2024"
 
 [dependencies]
 fake = "3.0.1"
-rand = "0.8.5"
-rstest = "0.23.0"
+rand = { version = "0.8.5" }
+rstest = "0.24.0"
 serde = { version = "1.0.216", features = ["derive"] }
-serde_with = { version = "3.11.0", features = ["json"] }
 strum = { version = "0.26.3", features = ["derive"] }
-witty-phrase-generator = "0.3.0"
-uuid = { version = "1.11.0", features = ["v4", "serde"] }
 strum_macros = "0.26.4"
+witty-phrase-generator = "0.3.0"
+
+[dependencies.getrandom]
+#features = ["wasm_js"]
+version = "0.2.15"
+features = ["js"]

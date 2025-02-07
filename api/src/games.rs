@@ -3,7 +3,7 @@ use axum::extract::Path;
 use axum::http::header::{CACHE_CONTROL, EXPIRES};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
-use axum::routing::{delete, get};
+use axum::routing::{delete, get, post};
 use axum::Json;
 use axum::Router;
 use game::areas::{Area, AreaDetails};
@@ -11,13 +11,15 @@ use game::games::Game;
 use serde::{Deserialize, Serialize};
 use shared::CreateGame;
 use std::sync::LazyLock;
+use serde_json::json;
 use strum::IntoEnumIterator;
 use surrealdb::engine::any::Any;
 use surrealdb::method::Query;
-use surrealdb::RecordId;
+use surrealdb::opt::PatchOp;
+use surrealdb::{RecordId, Response};
 use surrealdb::sql::Value;
 use game::tributes::Tribute;
-use crate::tributes::{create_tribute, delete_tribute};
+use crate::tributes::{create_tribute, create_tribute_record, delete_tribute};
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
@@ -26,6 +28,29 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
         .route("/{game_name}/tributes", get(game_tributes).post(create_tribute))
         .route("/{game_name}/tributes/{tribute_name}", delete(delete_tribute))
 });
+
+pub async fn games_create(Json(payload): Json<Game>) -> impl IntoResponse {
+    let game: Option<Game> = DATABASE
+        .create(("game", &payload.name))
+        .content(payload)
+        .await.expect("failed to create game");
+
+    for _ in 0..24 {
+        create_tribute_record(None, game.clone().unwrap().name).await;
+    }
+
+    (StatusCode::OK, Json::<Game>(game.clone().unwrap()))
+}
+
+pub async fn game_delete(game_name: Path<String>) -> StatusCode {
+    let game: Option<Game> = DATABASE.delete(("game", &game_name.0)).await.expect("Failed to delete game");
+    match game {
+        Some(_) => StatusCode::NO_CONTENT,
+        None => {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
+}
 
 pub async fn games_list() -> impl IntoResponse {
     match DATABASE.select("game").await {
@@ -42,15 +67,6 @@ pub async fn games_list() -> impl IntoResponse {
     }
 }
 
-pub async fn games_create(Json(payload): Json<Game>) -> impl IntoResponse {
-    let game: Option<Game> = DATABASE
-        .create(("game", &payload.name))
-        .content(payload)
-        .await.expect("failed to create game");
-
-    (StatusCode::OK, Json::<Game>(game.clone().unwrap()))
-}
-
 pub async fn game_detail(game_name: Path<String>) -> (StatusCode, Json<Option<Game>>) {
     let mut result: Option<Game> = DATABASE
         .select(("game", game_name.to_string()))
@@ -60,16 +76,6 @@ pub async fn game_detail(game_name: Path<String>) -> (StatusCode, Json<Option<Ga
         (StatusCode::OK, Json(Some(game)))
     } else {
         (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<Game>>(None))
-    }
-}
-
-pub async fn game_delete(game_name: Path<String>) -> StatusCode {
-    let game: Option<Game> = DATABASE.delete(("game", &game_name.0)).await.expect("Failed to delete game");
-    match game {
-        Some(_) => StatusCode::NO_CONTENT,
-        None => {
-            StatusCode::INTERNAL_SERVER_ERROR
-        }
     }
 }
 

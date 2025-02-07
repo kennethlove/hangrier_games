@@ -40,6 +40,30 @@ async fn create_tribute(name: Option<String>) -> MutationResult<MutationValue, M
     }
 }
 
+async fn fill_tributes(game_name: String) -> MutationResult<MutationValue, MutationError> {
+    let client = reqwest::Client::new();
+
+    let response = client.post(format!("{}/api/games/{}/fill-tributes", API_HOST.clone(), game_name))
+        .send().await;
+
+    match response {
+        Ok(response) => {
+            match response.json::<Vec<Tribute>>().await {
+                Ok(tributes) => {
+                    MutationResult::Ok(MutationValue::NewTributes(tributes))
+                }
+                Err(_) => {
+                    MutationResult::Err(MutationError::UnableToCreateTribute)
+                }
+            }
+        }
+        Err(e) => {
+            dioxus_logger::tracing::error!("error creating tribute: {:?}", e);
+            MutationResult::Err(MutationError::UnableToCreateTribute)
+        }
+    }
+}
+
 #[component]
 pub fn CreateTributeButton(game_name: String) -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
@@ -106,6 +130,32 @@ pub fn CreateTributeForm(game_name: String) -> Element {
                 r#type: "submit",
                 label { "create tribute" }
             }
+        }
+    }
+}
+
+#[component]
+pub fn FillTributesButton(game_name: String) -> Element {
+    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+    let mutate = use_mutation(fill_tributes);
+
+    let onclick = move |_| {
+        let game_name = game_name.clone();
+        spawn(async move {
+            mutate.manual_mutate(game_name.clone()).await;
+            if mutate.result().is_ok() {
+                if let MutationResult::Ok(MutationValue::NewTributes(tributes)) = mutate.result().deref() {
+                    client.invalidate_queries(&[QueryKey::Tributes(game_name.clone())]);
+                }
+            } else {}
+        });
+    };
+
+    rsx! {
+        button {
+            r#type: "button",
+            onclick,
+            label { "fill game" }
         }
     }
 }

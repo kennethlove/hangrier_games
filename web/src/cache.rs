@@ -8,6 +8,7 @@ pub(crate) enum QueryKey {
     Game(String),
     Games,
     Tributes(String),
+    TributeCount(String),
 }
 
 #[derive(PartialEq, Debug)]
@@ -31,6 +32,8 @@ pub(crate) enum MutationValue {
     GameDeleted(String),
     NewTribute(Tribute),
     TributeDeleted(String),
+    GameFilled(String),
+    NewTributes(Vec<Tribute>),
 }
 
 #[derive(PartialEq, Debug)]

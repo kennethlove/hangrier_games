@@ -4,6 +4,7 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::games::{Game, GAME};
 use game::tributes::Tribute;
+use crate::components::create_tribute::{CreateTributeButton, CreateTributeForm};
 use crate::components::tribute_delete::TributeDelete;
 
 async fn fetch_game_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
@@ -35,6 +36,12 @@ pub fn GameTributes(name: String) -> Element {
     match tributes_query.result().value() {
         QueryResult::Ok(QueryValue::Tributes(tributes)) => {
             rsx! {
+
+                if &tributes.len() < &(24usize) {
+                    CreateTributeButton { game_name: name.clone() }
+                    CreateTributeForm { game_name: name.clone() }
+                }
+
                 ul {
                     for tribute in tributes {
                         li {

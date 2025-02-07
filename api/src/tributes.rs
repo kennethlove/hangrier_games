@@ -6,23 +6,43 @@ use axum::Json;
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
 use surrealdb::RecordId;
-use game::games::Game;
+
+pub async fn create_tribute_record(tribute: Option<Tribute>, game_name: String) -> Option<Tribute> {
+    let mut tribute = tribute;
+    let mut id;
+
+    if tribute.is_none() {
+        tribute = Some(Tribute::random());
+    }
+    id = RecordId::from(("tribute", tribute.clone().unwrap().name.clone()));
+
+    let response: Option<Tribute> = DATABASE.create(&id).content(tribute).await.expect("Failed to create Tribute");
+    let _: Vec<TributePlaysIn> = DATABASE.insert("playing_in").relation(
+        TributePlaysIn {
+            tribute: id.clone(),
+            game: RecordId::from(("game", game_name)),
+        }
+    ).await.expect("Failed to connect Tribute to game");
+
+    response
+}
 
 pub async fn create_tribute(Path(game_name): Path<String>, Json(payload): Json<Tribute>) -> impl IntoResponse {
-    let tribute: Option<Tribute> = DATABASE
-        .create(("tribute", &payload.name.to_string()))
-        .content(payload.clone())
-        .await.expect("failed to create tribute");
-
-
-    let _: Vec<TributePlaysIn> = DATABASE.insert("playing_in")
-        .relation(
-            TributePlaysIn {
-                tribute: RecordId::from(("tribute", &payload.name.to_string())),
-                game: RecordId::from(("game", game_name.to_string())),
-            }
-        ).await.expect("");
-
+    let tribute: Option<Tribute> = create_tribute_record(Some(payload), game_name).await;
+    // let tribute: Option<Tribute> = DATABASE
+    //     .create(("tribute", &payload.name.to_string()))
+    //     .content(payload.clone())
+    //     .await.expect("failed to create tribute");
+    //
+    //
+    // let _: Vec<TributePlaysIn> = DATABASE.insert("playing_in")
+    //     .relation(
+    //         TributePlaysIn {
+    //             tribute: RecordId::from(("tribute", &payload.name.to_string())),
+    //             game: RecordId::from(("game", game_name.to_string())),
+    //         }
+    //     ).await.expect("");
+    //
     (StatusCode::OK, Json::<Tribute>(tribute.clone().unwrap()))
 }
 

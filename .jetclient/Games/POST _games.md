@@ -15,7 +15,6 @@ id = '008f0158-536a-4347-a833-32fafddd89e8'
 
 [body]
 type = 'JSON'
-raw = '{'
 ```
 
 ### Example

@@ -1,30 +1,14 @@
 use crate::DATABASE;
 use axum::extract::Path;
-use axum::http::header::{CACHE_CONTROL, EXPIRES};
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::{get, post};
 use axum::Json;
-use axum::Router;
-use game::areas::{Area, AreaDetails};
-use game::games::{Game, GAME};
-use serde::{Deserialize, Serialize};
-use shared::CreateGame;
-use std::sync::LazyLock;
-use strum::IntoEnumIterator;
-use surrealdb::engine::any::Any;
-use surrealdb::method::Query;
-use surrealdb::RecordId;
-use surrealdb::sql::Value;
 use game::tributes::Tribute;
-use crate::games::{game_delete, game_detail, games_create, games_list};
+use serde::{Deserialize, Serialize};
+use surrealdb::RecordId;
+use game::games::Game;
 
-pub static TRIBUTES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
-    Router::new()
-        .route("/", post(create_tribute))
-});
-
-pub async fn create_tribute(Path(name): Path<String>, Json(payload): Json<Tribute>) -> impl IntoResponse {
+pub async fn create_tribute(Path(game_name): Path<String>, Json(payload): Json<Tribute>) -> impl IntoResponse {
     let tribute: Option<Tribute> = DATABASE
         .create(("tribute", &payload.name.to_string()))
         .content(payload.clone())
@@ -35,7 +19,7 @@ pub async fn create_tribute(Path(name): Path<String>, Json(payload): Json<Tribut
         .relation(
             TributePlaysIn {
                 tribute: RecordId::from(("tribute", &payload.name.to_string())),
-                game: RecordId::from(("game", name.to_string())),
+                game: RecordId::from(("game", game_name.to_string())),
             }
         ).await.expect("");
 
@@ -52,4 +36,15 @@ struct TributePlaysIn {
 
 pub async fn tribute_detail(Path(name): Path<&str>) -> impl IntoResponse {
 
+}
+
+
+pub async fn delete_tribute(Path((game_name, tribute_name)): Path<(String, String)>) -> StatusCode {
+    let tribute: Option<Tribute> = DATABASE.delete(("tribute", &tribute_name)).await.expect("failed to delete tribute");
+    match tribute {
+        Some(_) => StatusCode::NO_CONTENT,
+        None => {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
 }

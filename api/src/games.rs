@@ -3,7 +3,7 @@ use axum::extract::Path;
 use axum::http::header::{CACHE_CONTROL, EXPIRES};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
-use axum::routing::get;
+use axum::routing::{delete, get};
 use axum::Json;
 use axum::Router;
 use game::areas::{Area, AreaDetails};
@@ -17,13 +17,14 @@ use surrealdb::method::Query;
 use surrealdb::RecordId;
 use surrealdb::sql::Value;
 use game::tributes::Tribute;
-use crate::tributes::create_tribute;
+use crate::tributes::{create_tribute, delete_tribute};
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
         .route("/", get(games_list).post(games_create))
-        .route("/{name}", get(game_detail).delete(game_delete))
-        .route("/{name}/tributes", get(game_tributes).post(create_tribute))
+        .route("/{game_name}", get(game_detail).delete(game_delete))
+        .route("/{game_name}/tributes", get(game_tributes).post(create_tribute))
+        .route("/{game_name}/tributes/{tribute_name}", delete(delete_tribute))
 });
 
 pub async fn games_list() -> impl IntoResponse {
@@ -50,9 +51,9 @@ pub async fn games_create(Json(payload): Json<Game>) -> impl IntoResponse {
     (StatusCode::OK, Json::<Game>(game.clone().unwrap()))
 }
 
-pub async fn game_detail(name: Path<String>) -> (StatusCode, Json<Option<Game>>) {
+pub async fn game_detail(game_name: Path<String>) -> (StatusCode, Json<Option<Game>>) {
     let mut result: Option<Game> = DATABASE
-        .select(("game", name.to_string()))
+        .select(("game", game_name.to_string()))
         .await.unwrap();
 
     if let Some(game) = result {
@@ -62,8 +63,8 @@ pub async fn game_detail(name: Path<String>) -> (StatusCode, Json<Option<Game>>)
     }
 }
 
-pub async fn game_delete(name: Path<String>) -> StatusCode {
-    let game: Option<Game> = DATABASE.delete(("game", &name.0)).await.expect("Failed to delete game");
+pub async fn game_delete(game_name: Path<String>) -> StatusCode {
+    let game: Option<Game> = DATABASE.delete(("game", &game_name.0)).await.expect("Failed to delete game");
     match game {
         Some(_) => StatusCode::NO_CONTENT,
         None => {
@@ -72,8 +73,8 @@ pub async fn game_delete(name: Path<String>) -> StatusCode {
     }
 }
 
-pub async fn game_tributes(Path(name): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
-    let record_id = RecordId::from(("game", name.to_string()));
+pub async fn game_tributes(Path(game_name): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
+    let record_id = RecordId::from(("game", game_name.to_string()));
     let tributes = DATABASE.query(
         format!("RETURN {}<-playing_in<-tribute.*", record_id)
     ).await.expect("No tributes");

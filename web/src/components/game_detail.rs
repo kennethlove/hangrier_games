@@ -3,8 +3,11 @@ use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::games::{Game, GAME};
+use game::tributes::Tribute;
+use shared::DeleteTribute;
 use crate::components::create_tribute::{CreateTributeButton, CreateTributeForm};
 use crate::components::game_tributes::GameTributes;
+use crate::components::tribute_delete::{DeleteTributeModal, TributeDelete};
 
 async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(name)) = keys.first() {
@@ -28,6 +31,10 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
 #[component]
 pub fn GameDetail(name: String) -> Element {
     let game_query = use_get_query([QueryKey::Game(name), QueryKey::Games], fetch_game);
+
+    let delete_tribute_signal: Signal<Option<DeleteTribute>> = use_signal(|| None);
+    use_context_provider(|| delete_tribute_signal);
+
     match game_query.result().value() {
         QueryResult::Ok(QueryValue::Game(game_result)) => {
             rsx! {
@@ -41,7 +48,9 @@ pub fn GameDetail(name: String) -> Element {
                             "{area}: {details.open}"
                             ul {
                                 for item in &details.items {
-                                    li { "{item.name}" }
+                                    li {
+                                        "{item.name}",
+                                    }
                                 }
                             }
                         }
@@ -52,6 +61,8 @@ pub fn GameDetail(name: String) -> Element {
                 CreateTributeButton { game_name: game_result.name.clone() }
                 CreateTributeForm { game_name: game_result.name.clone() }
                 GameTributes { name: game_result.name.clone() }
+
+                DeleteTributeModal {}
             }
         }
         QueryResult::Loading(_) => {

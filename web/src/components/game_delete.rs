@@ -57,7 +57,7 @@ pub fn DeleteGameModal() -> Element {
             spawn(async move {
                 mutate.manual_mutate(name.clone()).await;
                 if let MutationResult::Ok(MutationValue::GameDeleted(name)) = mutate.result().deref() {
-                    client.invalidate_queries(&[QueryKey::Games]);
+                    client.invalidate_queries(&[QueryKey::Tributes(name.clone())]);
                     delete_game_signal.set(None);
                 }
             });

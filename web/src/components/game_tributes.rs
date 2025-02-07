@@ -4,6 +4,7 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::games::{Game, GAME};
 use game::tributes::Tribute;
+use crate::components::tribute_delete::TributeDelete;
 
 async fn fetch_game_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tributes(name)) = keys.first() {
@@ -27,7 +28,7 @@ async fn fetch_game_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, Que
 #[component]
 pub fn GameTributes(name: String) -> Element {
     let tributes_query = use_get_query(
-        [QueryKey::Tributes(name)],
+        [QueryKey::Tributes(name.clone())],
         fetch_game_tributes
     );
 
@@ -36,7 +37,12 @@ pub fn GameTributes(name: String) -> Element {
             rsx! {
                 ul {
                     for tribute in tributes {
-                        li { "{tribute.name}" }
+                        li {
+                            "{tribute.name}",
+                            TributeDelete {
+                                tribute_name: tribute.clone().name,
+                            }
+                        }
                     }
                 }
             }

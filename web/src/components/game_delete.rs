@@ -6,6 +6,7 @@ use reqwest::{Response, StatusCode};
 use std::net::{IpAddr, Ipv4Addr};
 use std::ops::Deref;
 use std::time::Duration;
+use shared::DeleteGame;
 
 async fn delete_game(name: String) -> MutationResult<MutationValue, MutationError> {
     let client = reqwest::Client::new();
@@ -24,7 +25,7 @@ async fn delete_game(name: String) -> MutationResult<MutationValue, MutationErro
 
 #[component]
 pub fn GameDelete(game_name: String) -> Element {
-    let mut delete_game_signal: Signal<Option<String>> = use_context();
+    let mut delete_game_signal: Signal<Option<DeleteGame>> = use_context();
 
     let name = game_name.clone();
 
@@ -41,7 +42,7 @@ pub fn GameDelete(game_name: String) -> Element {
 }
 #[component]
 pub fn DeleteGameModal() -> Element {
-    let mut delete_game_signal: Signal<Option<String>> = use_context();
+    let mut delete_game_signal: Signal<Option<DeleteGame>> = use_context();
     let game_name = delete_game_signal.peek().clone();
     let name = game_name.clone().unwrap_or_default();
     let mutate = use_mutation(delete_game);
@@ -57,7 +58,7 @@ pub fn DeleteGameModal() -> Element {
             spawn(async move {
                 mutate.manual_mutate(name.clone()).await;
                 if let MutationResult::Ok(MutationValue::GameDeleted(name)) = mutate.result().deref() {
-                    client.invalidate_queries(&[QueryKey::Tributes(name.clone())]);
+                    client.invalidate_queries(&[QueryKey::Games]);
                     delete_game_signal.set(None);
                 }
             });

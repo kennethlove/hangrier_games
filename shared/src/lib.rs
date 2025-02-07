@@ -6,9 +6,4 @@ pub struct CreateGame {
 }
 
 pub type DeleteTribute = String;
-
-#[derive(Debug, Clone)]
-pub struct DeleteGame(pub String);
-
-// #[derive(Debug, Clone, Default)]
-// pub struct DeleteTribute(pub String);
+pub type DeleteGame = String;

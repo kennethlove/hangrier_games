@@ -22,6 +22,8 @@ pub struct Game {
     pub status: GameStatus,
     pub day: Option<u32>,
     pub areas: BTreeMap<String, AreaDetails>,
+    #[serde(default)]
+    pub tribute_count: u32,
 }
 
 impl Default for Game {
@@ -37,6 +39,7 @@ impl Default for Game {
             status: Default::default(),
             day: None,
             areas: BTreeMap::new(),
+            tribute_count: 0,
         };
 
         for area in Area::iter() {

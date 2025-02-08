@@ -5,9 +5,18 @@ use axum::response::IntoResponse;
 use axum::Json;
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use surrealdb::RecordId;
 
 pub async fn create_tribute_record(tribute: Option<Tribute>, game_name: String) -> Option<Tribute> {
+    let game_id = RecordId::from(("game", game_name.clone()));
+    let mut tribute_count = DATABASE.query(format!("RETURN count(SELECT id FROM playing_in WHERE out.name='{}')", game_name.clone())).await;
+    let tribute_count: Option<u32> = tribute_count.unwrap().take(0).unwrap();
+
+    if tribute_count >= Some(24) {
+        return None;
+    }
+
     let mut tribute = tribute;
     let mut id;
 
@@ -20,7 +29,7 @@ pub async fn create_tribute_record(tribute: Option<Tribute>, game_name: String) 
     let _: Vec<TributePlaysIn> = DATABASE.insert("playing_in").relation(
         TributePlaysIn {
             tribute: id.clone(),
-            game: RecordId::from(("game", game_name)),
+            game: game_id.clone(),
         }
     ).await.expect("Failed to connect Tribute to game");
 
@@ -29,21 +38,11 @@ pub async fn create_tribute_record(tribute: Option<Tribute>, game_name: String) 
 
 pub async fn create_tribute(Path(game_name): Path<String>, Json(payload): Json<Tribute>) -> impl IntoResponse {
     let tribute: Option<Tribute> = create_tribute_record(Some(payload), game_name).await;
-    // let tribute: Option<Tribute> = DATABASE
-    //     .create(("tribute", &payload.name.to_string()))
-    //     .content(payload.clone())
-    //     .await.expect("failed to create tribute");
-    //
-    //
-    // let _: Vec<TributePlaysIn> = DATABASE.insert("playing_in")
-    //     .relation(
-    //         TributePlaysIn {
-    //             tribute: RecordId::from(("tribute", &payload.name.to_string())),
-    //             game: RecordId::from(("game", game_name.to_string())),
-    //         }
-    //     ).await.expect("");
-    //
-    (StatusCode::OK, Json::<Tribute>(tribute.clone().unwrap()))
+    if tribute.is_none() {
+        (StatusCode::BAD_REQUEST, Json(json!({}))).into_response()
+    } else {
+        (StatusCode::OK, Json::<Tribute>(tribute.clone().unwrap())).into_response()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

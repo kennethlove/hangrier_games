@@ -1,13 +1,13 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
+use crate::components::create_tribute::{CreateTributeButton, CreateTributeForm};
+use crate::components::game_tributes::GameTributes;
+use crate::components::tribute_delete::{DeleteTributeModal, TributeDelete};
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::games::{Game, GAME};
 use game::tributes::Tribute;
 use shared::DeleteTribute;
-use crate::components::create_tribute::{CreateTributeButton, CreateTributeForm, FillTributesButton};
-use crate::components::game_tributes::GameTributes;
-use crate::components::tribute_delete::{DeleteTributeModal, TributeDelete};
 
 async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(name)) = keys.first() {
@@ -28,30 +28,9 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
     }
 }
 
-async fn count_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::TributeCount(name)) = keys.first() {
-        let response = reqwest::get(format!("{}/api/games/{}/tribute-count", API_HOST.clone(), name))
-            .await.unwrap();
-
-        match response.json::<Game>().await {
-            Ok(game) => {
-                GAME.set(game.clone());
-                QueryResult::Ok(QueryValue::Game(game))
-            }
-            Err(_) => {
-                QueryResult::Err(QueryError::GameNotFound(name.to_string()))
-            }
-        }
-    } else {
-        QueryResult::Err(QueryError::Unknown)
-    }
-
-}
-
 #[component]
 pub fn GameDetail(name: String) -> Element {
     let game_query = use_get_query([QueryKey::Game(name.clone()), QueryKey::Games], fetch_game);
-    let count_query = use_get_query([QueryKey::TributeCount(name.clone())], count_tributes);
 
     let delete_tribute_signal: Signal<Option<DeleteTribute>> = use_signal(|| None);
     use_context_provider(|| delete_tribute_signal);

@@ -1,3 +1,4 @@
+use crate::tributes::{create_tribute, create_tribute_record, delete_tribute};
 use crate::DATABASE;
 use axum::extract::Path;
 use axum::http::header::{CACHE_CONTROL, EXPIRES};
@@ -8,18 +9,17 @@ use axum::Json;
 use axum::Router;
 use game::areas::{Area, AreaDetails};
 use game::games::Game;
+use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use shared::CreateGame;
 use std::sync::LazyLock;
-use serde_json::json;
 use strum::IntoEnumIterator;
 use surrealdb::engine::any::Any;
 use surrealdb::method::Query;
 use surrealdb::opt::PatchOp;
-use surrealdb::{RecordId, Response};
 use surrealdb::sql::Value;
-use game::tributes::Tribute;
-use crate::tributes::{create_tribute, create_tribute_record, delete_tribute};
+use surrealdb::{RecordId, Response};
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
@@ -68,15 +68,22 @@ pub async fn games_list() -> impl IntoResponse {
 }
 
 pub async fn game_detail(game_name: Path<String>) -> (StatusCode, Json<Option<Game>>) {
-    let mut result: Option<Game> = DATABASE
-        .select(("game", game_name.to_string()))
+    let mut result = DATABASE
+        .query(format!("SELECT * FROM game WHERE name = '{}'", game_name.to_string()))
+        .query(format!("RETURN count(SELECT id FROM playing_in WHERE out.name = '{}')", game_name.to_string()))
         .await.unwrap();
 
-    if let Some(game) = result {
+    let game: Option<Game> = result.take(0).unwrap();
+    let count: Option<u32> = result.take(1).unwrap();
+    let mut game = game.unwrap();
+
+    game.tribute_count = count.unwrap();
+
+    // if let Some(game) = result {
         (StatusCode::OK, Json(Some(game)))
-    } else {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<Game>>(None))
-    }
+    // } else {
+    //     (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<Game>>(None))
+    // }
 }
 
 pub async fn game_tributes(Path(game_name): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {

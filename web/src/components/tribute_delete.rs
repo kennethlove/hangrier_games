@@ -2,12 +2,12 @@ use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValu
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
-use reqwest::{Response, StatusCode};
-use std::ops::Deref;
-use std::time::Duration;
 use game::games::GAME;
 use game::tributes::Tribute;
+use reqwest::{Response, StatusCode};
 use shared::DeleteTribute;
+use std::ops::Deref;
+use std::time::Duration;
 
 async fn delete_tribute(name: String) -> MutationResult<MutationValue, MutationError> {
     let game_name = GAME.with_borrow(|g| { g.name.clone() });

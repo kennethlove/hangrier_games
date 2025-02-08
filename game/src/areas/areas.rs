@@ -1,11 +1,11 @@
+use crate::games::Game;
 use crate::items::Item;
+use serde::de::{EnumAccess, Error, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::Display;
 use std::str::FromStr;
-use serde::de::{EnumAccess, Error, Visitor};
-use strum_macros::EnumIter;
 use strum::IntoEnumIterator;
-use crate::games::Game;
+use strum_macros::EnumIter;
 
 
 #[derive(Clone, Debug, Eq, PartialEq, EnumIter, Hash, Deserialize, Serialize)]
@@ -267,7 +267,7 @@ mod tests {
 
     #[test]
     fn partial_eq_with_reference() {
-        let area = Area::TheCornucopia;
+        let area = Area::Cornucopia;
         assert_eq!(area, &area);
     }
 }

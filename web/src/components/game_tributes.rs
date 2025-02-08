@@ -1,11 +1,11 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
+use crate::components::create_tribute::{CreateTributeButton, CreateTributeForm};
+use crate::components::tribute_delete::TributeDelete;
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::games::{Game, GAME};
 use game::tributes::Tribute;
-use crate::components::create_tribute::{CreateTributeButton, CreateTributeForm};
-use crate::components::tribute_delete::TributeDelete;
 
 async fn fetch_game_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tributes(name)) = keys.first() {
@@ -35,9 +35,10 @@ pub fn GameTributes(name: String) -> Element {
 
     match tributes_query.result().value() {
         QueryResult::Ok(QueryValue::Tributes(tributes)) => {
-            rsx! {
+            let tribute_count = &tributes.len();
 
-                if &tributes.len() < &(24usize) {
+            rsx! {
+                if tribute_count < &24usize {
                     CreateTributeButton { game_name: name.clone() }
                     CreateTributeForm { game_name: name.clone() }
                 }

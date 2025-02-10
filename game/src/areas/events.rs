@@ -1,7 +1,7 @@
+use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
-use rand::prelude::*;
 use strum::{EnumIter, IntoEnumIterator};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, EnumIter)]
@@ -48,7 +48,7 @@ impl Display for AreaEvent {
 
 impl AreaEvent {
     pub fn random() -> AreaEvent {
-        let mut rng = thread_rng();
+        let mut rng = rand::thread_rng();
         Self::iter().choose(&mut rng).unwrap().clone()
     }
 }

@@ -37,7 +37,7 @@ impl Animal {
     }
 
     pub fn random() -> Animal {
-        let mut rng = thread_rng();
+        let mut rng = rand::thread_rng();
         let animal = Animal::iter().choose(&mut rng).unwrap();
         animal
     }

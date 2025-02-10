@@ -1,4 +1,5 @@
 use rand::prelude::*;
+use rand::thread_rng;
 
 // Adjectives to come before "shield"
 // _____ shield

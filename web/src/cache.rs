@@ -34,6 +34,7 @@ pub(crate) enum MutationValue {
     TributeDeleted(String),
     GameFilled(String),
     NewTributes(Vec<Tribute>),
+    TributeUpdated(String, u8),
 }
 
 #[derive(PartialEq, Debug)]

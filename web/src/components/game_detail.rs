@@ -2,12 +2,13 @@ use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::create_tribute::{CreateTributeButton, CreateTributeForm};
 use crate::components::game_tributes::GameTributes;
 use crate::components::tribute_delete::{DeleteTributeModal, TributeDelete};
+use crate::components::tribute_edit::EditTributeModal;
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::games::{Game, GAME};
 use game::tributes::Tribute;
-use shared::DeleteTribute;
+use shared::EditTribute;
 
 async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(name)) = keys.first() {
@@ -32,8 +33,8 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
 pub fn GameDetail(name: String) -> Element {
     let game_query = use_get_query([QueryKey::Game(name.clone()), QueryKey::Games], fetch_game);
 
-    let delete_tribute_signal: Signal<Option<DeleteTribute>> = use_signal(|| None);
-    use_context_provider(|| delete_tribute_signal);
+    let edit_tribute_signal: Signal<Option<EditTribute>> = use_signal(|| None);
+    use_context_provider(|| edit_tribute_signal);
 
     match game_query.result().value() {
         QueryResult::Ok(QueryValue::Game(game_result)) => {
@@ -61,7 +62,7 @@ pub fn GameDetail(name: String) -> Element {
 
                 GameTributes { name: game_result.name.clone() }
 
-                DeleteTributeModal {}
+                EditTributeModal {}
             }
         }
         QueryResult::Loading(_) => {

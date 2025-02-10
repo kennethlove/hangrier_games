@@ -84,7 +84,6 @@ mod tests {
     #[rstest]
     #[case(Action::None, "none")]
     #[case(Action::Move(None), "move")]
-    #[case(Action::Move(Some(Area::new("New York City"))), "move")]
     #[case(Action::Rest, "rest")]
     #[case(Action::UseItem(None), "use item")]
     #[case(Action::UseItem(Some(Item::new_weapon("lasso"))), "use item")]

@@ -10,12 +10,14 @@ use fake::faker::name::raw::*;
 use fake::locales::*;
 use fake::Fake;
 use rand::prelude::*;
+use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
-use rand::thread_rng;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Tribute {
+    /// Identifier
+    pub identifier: String,
     /// Where are they?
     pub area: Area,
     /// What is their current status?
@@ -48,7 +50,10 @@ impl Tribute {
         let attributes = Attributes::new();
         let statistics = Statistics::default();
 
+        let id: String = fake::faker::lorem::en::Words(2..3).fake::<Vec<String>>().join("-");
+
         Self {
+            identifier: id,
             area: Area::Cornucopia,
             name: name.clone(),
             district,

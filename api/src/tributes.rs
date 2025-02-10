@@ -6,34 +6,37 @@ use axum::Json;
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use shared::EditTribute;
 use surrealdb::RecordId;
 
 pub async fn create_tribute_record(tribute: Option<Tribute>, game_name: String) -> Option<Tribute> {
     let game_id = RecordId::from(("game", game_name.clone()));
-    let mut tribute_count = DATABASE.query(format!("RETURN count(SELECT id FROM playing_in WHERE out.name='{}')", game_name.clone())).await;
+    let mut tribute_count = DATABASE.query(
+        format!("RETURN count(SELECT id FROM playing_in WHERE out.name='{}')", game_name.clone())
+    ).await;
     let tribute_count: Option<u32> = tribute_count.unwrap().take(0).unwrap();
 
     if tribute_count >= Some(24) {
         return None;
     }
 
-    let mut tribute = tribute;
-    let mut id;
+    let mut tribute = tribute.unwrap_or_else(|| Tribute::random());
+    tribute.district = (tribute_count.unwrap_or(1) % 12) + 1;
 
-    if tribute.is_none() {
-        tribute = Some(Tribute::random());
-    }
-    id = RecordId::from(("tribute", tribute.clone().unwrap().name.clone()));
+    let id = RecordId::from(("tribute", &tribute.identifier));
+    let new_tribute: Option<Tribute> = DATABASE
+        .create(&id)
+        .content(tribute)
+        .await.expect("Failed to create Tribute record");
 
-    let response: Option<Tribute> = DATABASE.create(&id).content(tribute).await.expect("Failed to create Tribute");
     let _: Vec<TributePlaysIn> = DATABASE.insert("playing_in").relation(
         TributePlaysIn {
-            tribute: id.clone(),
+            tribute: id,
             game: game_id.clone(),
         }
     ).await.expect("Failed to connect Tribute to game");
 
-    response
+    new_tribute
 }
 
 pub async fn create_tribute(Path(game_name): Path<String>, Json(payload): Json<Tribute>) -> impl IntoResponse {
@@ -65,5 +68,19 @@ pub async fn delete_tribute(Path((game_name, tribute_name)): Path<(String, Strin
         None => {
             StatusCode::INTERNAL_SERVER_ERROR
         }
+    }
+}
+
+pub async fn update_tribute(Path((game_name, tribute_name)): Path<(String, String)>, Json(payload): Json<EditTribute>) -> impl IntoResponse {
+    // dbg!(&payload);
+    let game_id = RecordId::from(("game", game_name.clone()));
+    let tribute_id = RecordId::from(("tribute", payload.clone().2.clone()));
+
+    let response: Option<Tribute> = DATABASE.update(tribute_id).merge(payload).await.expect("failed to update Tribute");
+
+    if response.is_none() {
+        (StatusCode::BAD_REQUEST, Json(json!({}))).into_response()
+    } else {
+        (StatusCode::OK, Json::<Tribute>(response.clone().unwrap())).into_response()
     }
 }

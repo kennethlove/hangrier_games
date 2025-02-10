@@ -18,9 +18,10 @@ mod game_delete;
 mod create_tribute;
 mod game_tributes;
 mod tribute_delete;
+mod tribute_edit;
 
-pub(crate) use game_delete::GameDelete;
 pub(crate) use game_delete::DeleteGameModal;
+pub(crate) use game_delete::GameDelete;
 
 
 

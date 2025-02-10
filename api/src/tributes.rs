@@ -24,6 +24,7 @@ pub async fn create_tribute_record(tribute: Option<Tribute>, game_name: String) 
     tribute.district = (tribute_count.unwrap_or(1) % 12) + 1;
 
     let id = RecordId::from(("tribute", &tribute.identifier));
+
     let new_tribute: Option<Tribute> = DATABASE
         .create(&id)
         .content(tribute)

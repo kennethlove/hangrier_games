@@ -12,7 +12,7 @@ async fn fetch_game_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, Que
     if let Some(QueryKey::Tributes(name)) = keys.first() {
         let response = reqwest::get(
             format!("{}/api/games/{}/tributes", API_HOST.clone(), name)
-        ).await.unwrap();
+        ).await.expect("failed to fetch game tributes");
 
         match response.json::<Vec<Tribute>>().await {
             Ok(tributes) => {

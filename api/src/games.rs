@@ -89,9 +89,10 @@ pub async fn game_detail(game_name: Path<String>) -> (StatusCode, Json<Option<Ga
 pub async fn game_tributes(Path(game_name): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
     let record_id = RecordId::from(("game", game_name.to_string()));
     let tributes = DATABASE.query(
-        format!("SELECT {}<-playing_in<-tribute,name,district,area,status,statistics,attributes,items,identifier FROM tribute ORDER district", record_id)
+        format!("SELECT {}<-playing_in<-name,district,area,status,statistics,attributes,items,identifier FROM tribute ORDER district", record_id)
     ).await.expect("No tributes");
     let mut tributes = tributes.check().expect("Failed to check tributes");
-    let tributes = tributes.take(0);
-    (StatusCode::OK, Json(tributes.expect("")))
+    let tributes: Vec<Tribute> = tributes.take(0).expect("Failed to take tributes");
+    dbg!(&tributes);
+    (StatusCode::OK, Json(tributes))
 }

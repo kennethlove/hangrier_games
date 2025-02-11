@@ -15,7 +15,6 @@ mod games_list;
 pub(crate) use games_list::GamesList;
 
 mod game_delete;
-mod create_tribute;
 mod game_tributes;
 mod tribute_delete;
 mod tribute_edit;

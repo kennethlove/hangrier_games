@@ -13,9 +13,10 @@ async fn edit_tribute(tribute: EditTribute) -> MutationResult<MutationValue, Mut
     let game_name = GAME.with_borrow(|g| { g.name.clone() });
     let name = tribute.clone().0;
     let district = tribute.clone().1;
+    let identifier = tribute.clone().2;
 
     let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}/tributes/{}", API_HOST.clone(), game_name, name);
+    let url: String = format!("{}/api/games/{}/tributes/{}", API_HOST.clone(), game_name, identifier);
 
     let response = client
         .put(url)
@@ -30,7 +31,7 @@ async fn edit_tribute(tribute: EditTribute) -> MutationResult<MutationValue, Mut
 }
 
 #[component]
-pub fn TributeEdit(name: String, district: u8, identifier: String) -> Element {
+pub fn TributeEdit(name: String, district: u32, identifier: String) -> Element {
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
 
     let onclick = move |_| {
@@ -50,10 +51,11 @@ pub fn EditTributeModal() -> Element {
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
     let game_name = GAME.with_borrow(|g| { g.name.clone() });
 
-    let tribute_details = edit_tribute_signal.peek().clone().unwrap_or_default();
-    let name = tribute_details.0.clone();
-    let district = tribute_details.1.clone();
-    let identifier = tribute_details.2.clone();
+    let tribute_details = edit_tribute_signal.read().clone().unwrap_or_default();
+    let mut name_signal: Signal<String> = use_signal(|| tribute_details.0.clone());
+    let mut district_signal: Signal<u32> = use_signal(|| tribute_details.1.clone());
+
+    dioxus_logger::tracing::info!("EditTributeModal: {:?}", &tribute_details);
 
     let mutate = use_mutation(edit_tribute);
 
@@ -63,9 +65,10 @@ pub fn EditTributeModal() -> Element {
 
     let save = move |_| {
         let game_name = game_name.clone();
-        let name = name.clone();
-        let district = district.clone();
-        let identifier = identifier.clone();
+        let tribute_details = edit_tribute_signal.read().clone().expect("No details provided");
+        let name = name_signal.read().clone();
+        let district = district_signal.read().clone();
+        let identifier = tribute_details.2;
 
         spawn(async move {
             let client = use_query_client::<QueryValue, QueryError, QueryKey>();
@@ -91,7 +94,10 @@ pub fn EditTributeModal() -> Element {
                         input {
                             r#type: "text",
                             name: "name",
-                            value: tribute_details.0,
+                            value: name_signal.read().clone(),
+                            oninput: move |e| {
+                                name_signal.set(e.value().clone());
+                            }
                         }
                     }
                     label {
@@ -100,7 +106,10 @@ pub fn EditTributeModal() -> Element {
                         input {
                             r#type: "number",
                             name: "district",
-                            value: tribute_details.1,
+                            value: district_signal.read().clone(),
+                            oninput: move |e| {
+                                district_signal.set(e.value().clone().parse().unwrap());
+                            }
                         }
                     }
                 }

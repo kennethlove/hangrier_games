@@ -26,7 +26,7 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
         .route("/", get(games_list).post(games_create))
         .route("/{game_name}", get(game_detail).delete(game_delete))
         .route("/{game_name}/tributes", get(game_tributes).post(create_tribute))
-        .route("/{game_name}/tributes/{tribute_name}", delete(delete_tribute).put(update_tribute))
+        .route("/{game_name}/tributes/{tribute_identifier}", delete(delete_tribute).put(update_tribute))
 });
 
 pub async fn games_create(Json(payload): Json<Game>) -> impl IntoResponse {
@@ -89,10 +89,16 @@ pub async fn game_detail(game_name: Path<String>) -> (StatusCode, Json<Option<Ga
 pub async fn game_tributes(Path(game_name): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
     let record_id = RecordId::from(("game", game_name.to_string()));
     let tributes = DATABASE.query(
-        format!("SELECT {}<-playing_in<-name,district,area,status,statistics,attributes,items,identifier FROM tribute ORDER district", record_id)
+        format!("SELECT '{}'<-playing_in<-tribute,id,name,district,area,status,statistics,attributes,items,identifier FROM tribute ORDER district", record_id)
     ).await.expect("No tributes");
-    let mut tributes = tributes.check().expect("Failed to check tributes");
-    let tributes: Vec<Tribute> = tributes.take(0).expect("Failed to take tributes");
-    dbg!(&tributes);
-    (StatusCode::OK, Json(tributes))
+
+    match tributes.check() {
+        Ok(mut tributes) => {
+            let tributes: Vec<Tribute> = tributes.take(0).expect("No tributes");
+            (StatusCode::OK, Json(tributes))
+        }
+        Err(e) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json::<Vec<Tribute>>(Vec::new()))
+        }
+    }
 }

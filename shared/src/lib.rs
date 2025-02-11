@@ -9,5 +9,5 @@ pub type DeleteTribute = String;
 pub type DeleteGame = String;
 
 // Name, District, Identifier
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct EditTribute(pub String, pub u8, pub String);
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct EditTribute(pub String, pub u32, pub String);

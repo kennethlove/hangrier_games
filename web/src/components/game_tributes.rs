@@ -1,5 +1,4 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
-use crate::components::create_tribute::{CreateTributeButton, CreateTributeForm};
 use crate::components::tribute_delete::TributeDelete;
 use crate::components::tribute_edit::TributeEdit;
 use crate::API_HOST;
@@ -45,7 +44,7 @@ pub fn GameTributes(name: String) -> Element {
                             "{tribute.name} - {tribute.district}",
                             TributeEdit {
                                 name: tribute.clone().name,
-                                district: tribute.district as u8,
+                                district: tribute.district,
                                 identifier: tribute.clone().identifier,
                             }
                         }

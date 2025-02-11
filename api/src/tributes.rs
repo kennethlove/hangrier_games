@@ -6,8 +6,9 @@ use axum::Json;
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use surrealdb::opt::PatchOp;
 use shared::EditTribute;
-use surrealdb::RecordId;
+use surrealdb::{RecordId, Response};
 
 pub async fn create_tribute_record(tribute: Option<Tribute>, game_name: String) -> Option<Tribute> {
     let game_id = RecordId::from(("game", game_name.clone()));
@@ -62,8 +63,8 @@ pub async fn tribute_detail(Path(name): Path<&str>) -> impl IntoResponse {
 }
 
 
-pub async fn delete_tribute(Path((game_name, tribute_name)): Path<(String, String)>) -> StatusCode {
-    let tribute: Option<Tribute> = DATABASE.delete(("tribute", &tribute_name)).await.expect("failed to delete tribute");
+pub async fn delete_tribute(Path((game_name, tribute_identifier)): Path<(String, String)>) -> StatusCode {
+    let tribute: Option<Tribute> = DATABASE.delete(("tribute", &tribute_identifier)).await.expect("failed to delete tribute");
     match tribute {
         Some(_) => StatusCode::NO_CONTENT,
         None => {
@@ -72,16 +73,18 @@ pub async fn delete_tribute(Path((game_name, tribute_name)): Path<(String, Strin
     }
 }
 
-pub async fn update_tribute(Path((game_name, tribute_name)): Path<(String, String)>, Json(payload): Json<EditTribute>) -> impl IntoResponse {
-    // dbg!(&payload);
-    let game_id = RecordId::from(("game", game_name.clone()));
-    let tribute_id = RecordId::from(("tribute", payload.clone().2.clone()));
+pub async fn update_tribute(Path((_game_name, tribute_identifier)): Path<(String, String)>, Json(payload): Json<EditTribute>) -> impl IntoResponse {
+    let response = DATABASE.query(
+        format!("UPDATE tribute SET name = '{}', district = {} WHERE identifier = '{}'", payload.0, payload.1, payload.2)
+    ).await;
 
-    let response: Option<Tribute> = DATABASE.update(tribute_id).merge(payload).await.expect("failed to update Tribute");
-
-    if response.is_none() {
-        (StatusCode::BAD_REQUEST, Json(json!({}))).into_response()
-    } else {
-        (StatusCode::OK, Json::<Tribute>(response.clone().unwrap())).into_response()
+    match response {
+        Ok(mut response) => {
+            let tribute: Option<Tribute> = response.take(0).unwrap();
+            (StatusCode::OK, Json::<Tribute>(tribute.unwrap())).into_response()
+        }
+        Err(e) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json::<String>(e.to_string())).into_response()
+        }
     }
 }

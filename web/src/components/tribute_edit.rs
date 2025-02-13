@@ -123,7 +123,6 @@ pub fn EditTributeForm() -> Element {
             }
             button {
                 r#type: "submit",
-                // onclick: save,
                 "Update"
             }
             button {

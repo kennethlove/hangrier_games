@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::tributes::{create_tribute, create_tribute_record, delete_tribute, update_tribute};
 use crate::DATABASE;
 use axum::extract::Path;
@@ -73,29 +74,26 @@ pub async fn game_detail(game_name: Path<String>) -> (StatusCode, Json<Option<Ga
         .query(format!("RETURN count(SELECT id FROM playing_in WHERE out.name = '{}')", game_name.to_string()))
         .await.unwrap();
 
-    let game: Option<Game> = result.take(0).unwrap();
-    let count: Option<u32> = result.take(1).unwrap();
-    let mut game = game.unwrap();
-
+    let game: Option<Game> = result.take(0).expect("No game found");
+    let count: Option<u32> = result.take(1).unwrap_or_default();
+    
+    let mut game = game.expect("No game found");
     game.tribute_count = count.unwrap();
 
-    // if let Some(game) = result {
-        (StatusCode::OK, Json(Some(game)))
-    // } else {
-    //     (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<Game>>(None))
-    // }
+    (StatusCode::OK, Json(Some(game)))
 }
 
 pub async fn game_tributes(Path(game_name): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
-    let record_id = RecordId::from(("game", game_name.to_string()));
     let tributes = DATABASE.query(
-        format!("SELECT '{}'<-playing_in<-tribute,id,name,district,area,status,statistics,attributes,items,identifier FROM tribute ORDER district", record_id)
+        format!("SELECT <-playing_in<-tribute.* as tributes FROM game WHERE name = '{}'", game_name.to_string()),
     ).await.expect("No tributes");
 
     match tributes.check() {
         Ok(mut tributes) => {
-            let tributes: Vec<Tribute> = tributes.take(0).expect("No tributes");
-            (StatusCode::OK, Json(tributes))
+            let tributes = tributes.take::<Vec<Vec<Tribute>>>("tributes").unwrap_or_default();
+            let mut tributes = tributes.first().unwrap_or(&vec![]).clone();
+            tributes.sort_by_key(|t| t.district);
+            (StatusCode::OK, Json(tributes.clone()))
         }
         Err(e) => {
             (StatusCode::INTERNAL_SERVER_ERROR, Json::<Vec<Tribute>>(Vec::new()))

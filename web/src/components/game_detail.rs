@@ -32,9 +32,6 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
 pub fn GameDetail(name: String) -> Element {
     let game_query = use_get_query([QueryKey::Game(name.clone()), QueryKey::Games], fetch_game);
 
-    let edit_tribute_signal: Signal<Option<EditTribute>> = use_signal(|| None);
-    use_context_provider(|| edit_tribute_signal);
-
     match game_query.result().value() {
         QueryResult::Ok(QueryValue::Game(game_result)) => {
             rsx! {
@@ -59,9 +56,7 @@ pub fn GameDetail(name: String) -> Element {
 
                 h3 { "Tributes" }
 
-                GameTributes { name: game_result.name.clone() }
-
-                EditTributeModal {}
+                GameTributes { game_name: game_result.name.clone() }
             }
         }
         QueryResult::Loading(_) => {

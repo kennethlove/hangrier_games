@@ -48,14 +48,29 @@ pub fn TributeEdit(name: String, district: u32, identifier: String) -> Element {
 
 #[component]
 pub fn EditTributeModal() -> Element {
+    let edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
+
+    rsx! {
+        dialog {
+            role: "confirm",
+            open: edit_tribute_signal.read().clone().is_some(),
+
+            if edit_tribute_signal.read().is_some() {
+                EditTributeForm {}
+            }
+        }
+    }
+}
+
+#[component]
+pub fn EditTributeForm() -> Element {
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
+
     let game_name = GAME.with_borrow(|g| { g.name.clone() });
 
-    let tribute_details = edit_tribute_signal.read().clone().unwrap_or_default();
+    let tribute_details = edit_tribute_signal.read().clone().unwrap();
     let mut name_signal: Signal<String> = use_signal(|| tribute_details.0.clone());
     let mut district_signal: Signal<u32> = use_signal(|| tribute_details.1.clone());
-
-    dioxus_logger::tracing::info!("EditTributeModal: {:?}", &tribute_details);
 
     let mutate = use_mutation(edit_tribute);
 
@@ -70,59 +85,58 @@ pub fn EditTributeModal() -> Element {
         let district = district_signal.read().clone();
         let identifier = tribute_details.2;
 
-        spawn(async move {
-            let client = use_query_client::<QueryValue, QueryError, QueryKey>();
-            mutate.manual_mutate(EditTribute(name, district, identifier)).await;
-            if let MutationResult::Ok(MutationValue::TributeUpdated(name, district)) = mutate.result().deref() {
-                client.invalidate_queries(&[QueryKey::Tributes(game_name.clone())]);
-                edit_tribute_signal.set(None);
+        match (name.is_empty(), (1u32..=12u32).contains(&district)) {
+            (false, true) => {
+                spawn(async move {
+                    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+                    mutate.manual_mutate(EditTribute(name, district, identifier)).await;
+                    if let MutationResult::Ok(MutationValue::TributeUpdated(name, district)) = mutate.result().deref() {
+                        client.invalidate_queries(&[QueryKey::Tributes(game_name.clone())]);
+                        edit_tribute_signal.set(None);
+                    }
+                });
             }
-        });
+            (_, _) => {}
+        }
     };
 
     rsx! {
-        dialog {
-            role: "confirm",
-            open: edit_tribute_signal.read().clone().is_some(),
-            div {
-                h1 { "Editing '{tribute_details.0}'" }
+        form {
+            label {
+                "Name",
 
-                form {
-                    label {
-                        "Name",
-
-                        input {
-                            r#type: "text",
-                            name: "name",
-                            value: name_signal.read().clone(),
-                            oninput: move |e| {
-                                name_signal.set(e.value().clone());
-                            }
-                        }
-                    }
-                    label {
-                        "District",
-
-                        input {
-                            r#type: "number",
-                            name: "district",
-                            value: district_signal.read().clone(),
-                            oninput: move |e| {
-                                district_signal.set(e.value().clone().parse().unwrap());
-                            }
-                        }
+                input {
+                    r#type: "text",
+                    name: "name",
+                    value: name_signal.read().clone(),
+                    oninput: move |e| {
+                        name_signal.set(e.value().clone());
                     }
                 }
-                button {
-                    r#type: "button",
-                    onclick: save,
-                    "Update"
+            }
+            label {
+                "District",
+
+                input {
+                    r#type: "number",
+                    name: "district",
+                    value: district_signal.read().clone(),
+                    max: 12,
+                    min: 1,
+                    oninput: move |e| {
+                        district_signal.set(e.value().clone().parse().unwrap());
+                    }
                 }
-                button {
-                    r#type: "button",
-                    onclick: dismiss,
-                    "Cancel"
-                }
+            }
+            button {
+                r#type: "button",
+                onclick: save,
+                "Update"
+            }
+            button {
+                r#type: "dialog",
+                onclick: dismiss,
+                "Cancel"
             }
         }
     }

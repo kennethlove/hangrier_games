@@ -11,8 +11,6 @@ use std::time::Duration;
 
 async fn edit_tribute(tribute: EditTribute) -> MutationResult<MutationValue, MutationError> {
     let game_name = GAME.with_borrow(|g| { g.name.clone() });
-    let name = tribute.clone().0;
-    let district = tribute.clone().1;
     let identifier = tribute.clone().2;
 
     let client = reqwest::Client::new();
@@ -24,7 +22,7 @@ async fn edit_tribute(tribute: EditTribute) -> MutationResult<MutationValue, Mut
         .send().await;
 
     if response.unwrap().status().is_success() {
-        MutationResult::Ok(MutationValue::TributeUpdated(name, district))
+        MutationResult::Ok(MutationValue::TributeUpdated(identifier))
     } else {
         MutationResult::Err(MutationError::Unknown)
     }
@@ -55,9 +53,7 @@ pub fn EditTributeModal() -> Element {
             role: "confirm",
             open: edit_tribute_signal.read().clone().is_some(),
 
-            if edit_tribute_signal.read().is_some() {
-                EditTributeForm {}
-            }
+            EditTributeForm {}
         }
     }
 }
@@ -65,12 +61,11 @@ pub fn EditTributeModal() -> Element {
 #[component]
 pub fn EditTributeForm() -> Element {
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
+    let tribute_details = edit_tribute_signal.read().clone().unwrap_or_default();
+    let name = tribute_details.0.clone();
+    let district = tribute_details.1;
 
     let game_name = GAME.with_borrow(|g| { g.name.clone() });
-
-    let tribute_details = edit_tribute_signal.read().clone().unwrap();
-    let mut name_signal: Signal<String> = use_signal(|| tribute_details.0.clone());
-    let mut district_signal: Signal<u32> = use_signal(|| tribute_details.1.clone());
 
     let mutate = use_mutation(edit_tribute);
 
@@ -78,59 +73,57 @@ pub fn EditTributeForm() -> Element {
         edit_tribute_signal.set(None);
     };
 
-    let save = move |_| {
+    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+
+    let save = move |e: Event<FormData>| {
         let game_name = game_name.clone();
         let tribute_details = edit_tribute_signal.read().clone().expect("No details provided");
-        let name = name_signal.read().clone();
-        let district = district_signal.read().clone();
-        let identifier = tribute_details.2;
+        let identifier = tribute_details.2.clone();
 
-        match (name.is_empty(), (1u32..=12u32).contains(&district)) {
-            (false, true) => {
-                spawn(async move {
-                    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
-                    mutate.manual_mutate(EditTribute(name, district, identifier)).await;
-                    if let MutationResult::Ok(MutationValue::TributeUpdated(name, district)) = mutate.result().deref() {
-                        client.invalidate_queries(&[QueryKey::Tributes(game_name.clone())]);
-                        edit_tribute_signal.set(None);
-                    }
-                });
-            }
-            (_, _) => {}
+        let data = e.data().values();
+        let name = data.get("name").expect("No name value").0[0].clone();
+        let district: u32 = data.get("district").expect("No district value").0[0].clone().parse().unwrap();
+
+        if !name.is_empty() && (1..=12u32).contains(&district) {
+            spawn(async move {
+                mutate.manual_mutate(EditTribute(name.clone(), district.clone(), identifier.clone())).await;
+                if let MutationResult::Ok(MutationValue::TributeUpdated(identifier)) = mutate.result().deref() {
+                    client.invalidate_queries(&[QueryKey::Tributes(game_name.clone())]);
+                    edit_tribute_signal.set(None);
+                }
+            });
         }
     };
 
     rsx! {
         form {
+            onsubmit: save,
             label {
                 "Name",
 
                 input {
                     r#type: "text",
                     name: "name",
-                    value: name_signal.read().clone(),
-                    oninput: move |e| {
-                        name_signal.set(e.value().clone());
-                    }
+                    value: name,
                 }
             }
             label {
                 "District",
 
-                input {
-                    r#type: "number",
+                select {
                     name: "district",
-                    value: district_signal.read().clone(),
-                    max: 12,
-                    min: 1,
-                    oninput: move |e| {
-                        district_signal.set(e.value().clone().parse().unwrap());
+                    for n in 1..=12u32 {
+                        option {
+                            value: n,
+                            selected: n == district,
+                            "{n}"
+                        }
                     }
                 }
             }
             button {
-                r#type: "button",
-                onclick: save,
+                r#type: "submit",
+                // onclick: save,
                 "Update"
             }
             button {

@@ -9,9 +9,9 @@ use game::tributes::Tribute;
 use shared::EditTribute;
 
 async fn fetch_game_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::Tributes(name)) = keys.first() {
+    if let Some(QueryKey::Tributes(game_name)) = keys.first() {
         let response = reqwest::get(
-            format!("{}/api/games/{}/tributes", API_HOST.clone(), name)
+            format!("{}/api/games/{}/tributes", API_HOST.clone(), game_name)
         ).await.expect("failed to fetch game tributes");
 
         match response.json::<Vec<Tribute>>().await {
@@ -19,7 +19,7 @@ async fn fetch_game_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, Que
                 QueryResult::Ok(QueryValue::Tributes(tributes))
             }
             Err(_) => {
-                QueryResult::Err(QueryError::GameNotFound(name.to_string()))
+                QueryResult::Err(QueryError::GameNotFound(game_name.to_string()))
             }
         }
     } else {
@@ -34,13 +34,8 @@ pub fn GameTributes(game_name: String) -> Element {
         fetch_game_tributes
     );
 
-    let edit_tribute_signal: Signal<Option<EditTribute>> = use_signal(|| None);
-    use_context_provider(|| edit_tribute_signal);
-
     match tributes_query.result().value() {
         QueryResult::Ok(QueryValue::Tributes(tributes)) => {
-            let tribute_count = &tributes.len();
-
             rsx! {
                 ul {
                     for tribute in tributes {
@@ -55,7 +50,6 @@ pub fn GameTributes(game_name: String) -> Element {
                     }
                 }
 
-                EditTributeModal {}
             }
         },
         QueryResult::Loading(_) => {

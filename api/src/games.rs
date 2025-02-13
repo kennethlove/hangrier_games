@@ -76,7 +76,7 @@ pub async fn game_detail(game_name: Path<String>) -> (StatusCode, Json<Option<Ga
 
     let game: Option<Game> = result.take(0).expect("No game found");
     let count: Option<u32> = result.take(1).unwrap_or_default();
-    
+
     let mut game = game.expect("No game found");
     game.tribute_count = count.unwrap();
 
@@ -85,13 +85,14 @@ pub async fn game_detail(game_name: Path<String>) -> (StatusCode, Json<Option<Ga
 
 pub async fn game_tributes(Path(game_name): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
     let tributes = DATABASE.query(
-        format!("SELECT <-playing_in<-tribute.* as tributes FROM game WHERE name = '{}'", game_name.to_string()),
+        format!(r#"SELECT * FROM tribute WHERE identifier IN (
+            SELECT <-playing_in<-tribute.identifier AS identifiers FROM game WHERE name = "{}"
+         )[0]["identifiers"]"#, game_name.to_string()),
     ).await.expect("No tributes");
 
     match tributes.check() {
         Ok(mut tributes) => {
-            let tributes = tributes.take::<Vec<Vec<Tribute>>>("tributes").unwrap_or_default();
-            let mut tributes = tributes.first().unwrap_or(&vec![]).clone();
+            let mut tributes: Vec<Tribute> = tributes.take(0).unwrap_or_default();
             tributes.sort_by_key(|t| t.district);
             (StatusCode::OK, Json(tributes.clone()))
         }

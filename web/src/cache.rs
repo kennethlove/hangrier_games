@@ -4,11 +4,9 @@ use game::tributes::Tribute;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum QueryKey {
     AllGames,
-    CreateGame(Option<String>),
     Game(String),
     Games,
     Tributes(String),
-    TributeCount(String),
 }
 
 #[derive(PartialEq, Debug)]
@@ -30,16 +28,12 @@ pub(crate) enum QueryValue {
 pub(crate) enum MutationValue {
     NewGame(Game),
     GameDeleted(String),
-    NewTribute(Tribute),
     TributeDeleted(String),
-    GameFilled(String),
-    NewTributes(Vec<Tribute>),
-    TributeUpdated(String, u32),
+    TributeUpdated(String),
 }
 
 #[derive(PartialEq, Debug)]
 pub(crate) enum MutationError {
     UnableToCreateGame,
     Unknown,
-    UnableToCreateTribute,
 }

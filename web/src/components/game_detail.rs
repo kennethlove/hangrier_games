@@ -4,7 +4,7 @@ use crate::components::tribute_delete::{DeleteTributeModal, TributeDelete};
 use crate::components::tribute_edit::EditTributeModal;
 use crate::API_HOST;
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_get_query, QueryResult};
+use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
 use game::games::{Game, GAME};
 use game::tributes::Tribute;
 use shared::EditTribute;
@@ -32,11 +32,22 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
 pub fn GameDetail(name: String) -> Element {
     let game_query = use_get_query([QueryKey::Game(name.clone()), QueryKey::Games], fetch_game);
 
+    let edit_tribute_signal: Signal<Option<EditTribute>> = use_signal(|| None);
+    use_context_provider(|| edit_tribute_signal);
+
     match game_query.result().value() {
         QueryResult::Ok(QueryValue::Game(game_result)) => {
             rsx! {
                 h1 { "{game_result.name}" }
                 h2 { "{game_result.status}" }
+                
+                h3 { "Tributes" }
+
+                GameTributes { game_name: game_result.name.clone() }
+
+                EditTributeModal {}
+
+                RefreshButton { game_name: game_result.name.clone() }
 
                 h3 { "Areas" }
                 ul {
@@ -54,9 +65,6 @@ pub fn GameDetail(name: String) -> Element {
                     }
                 }
 
-                h3 { "Tributes" }
-
-                GameTributes { game_name: game_result.name.clone() }
             }
         }
         QueryResult::Loading(_) => {
@@ -68,3 +76,19 @@ pub fn GameDetail(name: String) -> Element {
     }
 }
 
+#[component]
+fn RefreshButton(game_name: String) -> Element {
+    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+
+    let onclick = move |e| {
+        client.invalidate_queries(&[QueryKey::Tributes(game_name.clone())]);
+    };
+
+    rsx! {
+        button {
+            r#type: "button",
+            onclick: onclick,
+            "Refresh"
+        }
+    }
+}

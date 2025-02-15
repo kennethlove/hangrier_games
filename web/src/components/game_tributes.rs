@@ -7,6 +7,7 @@ use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::games::{Game, GAME};
 use game::tributes::Tribute;
 use shared::EditTribute;
+use std::borrow::Borrow;
 
 async fn fetch_game_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tributes(game_name)) = keys.first() {
@@ -33,9 +34,17 @@ pub fn GameTributes(game_name: String) -> Element {
         [QueryKey::Tributes(game_name.clone())],
         fetch_game_tributes
     );
+    let tribute_result = tributes_query.result();
+    let tribute_response = tribute_result.value();
+    
+    let game = GAME.borrow();
+    let mut game = game.take();
 
-    match tributes_query.result().value() {
+    match tribute_response {
         QueryResult::Ok(QueryValue::Tributes(tributes)) => {
+            game.tributes = tributes.clone();
+            GAME.set(game);
+            
             rsx! {
                 ul {
                     for tribute in tributes {

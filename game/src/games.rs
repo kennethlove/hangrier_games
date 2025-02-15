@@ -24,6 +24,8 @@ pub struct Game {
     pub areas: BTreeMap<String, AreaDetails>,
     #[serde(default)]
     pub tribute_count: u32,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub tributes: Vec<Tribute>,
 }
 
 impl Default for Game {
@@ -40,6 +42,7 @@ impl Default for Game {
             day: None,
             areas: BTreeMap::new(),
             tribute_count: 0,
+            tributes: Vec::new(),
         };
 
         for area in Area::iter() {

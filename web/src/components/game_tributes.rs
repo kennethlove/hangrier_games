@@ -1,6 +1,6 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::tribute_delete::TributeDelete;
-use crate::components::tribute_edit::{TributeEdit, EditTributeModal};
+use crate::components::tribute_edit::{EditTributeModal, TributeEdit};
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
@@ -58,7 +58,6 @@ pub fn GameTributes(game_name: String) -> Element {
                         }
                     }
                 }
-
             }
         },
         QueryResult::Loading(_) => {

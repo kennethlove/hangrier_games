@@ -2,7 +2,7 @@ use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValu
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
-use game::games::GAME;
+use game::games::{Game, GAME};
 use game::tributes::Tribute;
 use reqwest::{Response, StatusCode};
 use shared::{DeleteTribute, EditTribute};
@@ -65,7 +65,9 @@ pub fn EditTributeForm() -> Element {
     let name = tribute_details.0.clone();
     let district = tribute_details.1;
 
-    let game_name = GAME.with_borrow(|g| { g.name.clone() });
+    let game: Signal<Option<Game>> = use_context();
+    let game = game.unwrap();
+    let game_name = game.name.clone();
 
     let mutate = use_mutation(edit_tribute);
 
@@ -85,8 +87,11 @@ pub fn EditTributeForm() -> Element {
         let district: u32 = data.get("district").expect("No district value").0[0].clone().parse().unwrap();
 
         if !name.is_empty() && (1..=12u32).contains(&district) {
+            let edit_tribute = EditTribute(name.clone(), district.clone(), identifier.clone());
             spawn(async move {
-                mutate.manual_mutate(EditTribute(name.clone(), district.clone(), identifier.clone())).await;
+                mutate.manual_mutate(edit_tribute.clone()).await;
+                edit_tribute_signal.set(Some(edit_tribute.clone()));
+
                 if let MutationResult::Ok(MutationValue::TributeUpdated(identifier)) = mutate.result().deref() {
                     client.invalidate_queries(&[QueryKey::Tributes(game_name.clone())]);
                     edit_tribute_signal.set(None);

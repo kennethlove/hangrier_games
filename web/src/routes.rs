@@ -1,7 +1,7 @@
+use crate::cache::{QueryError, QueryKey, QueryValue};
+use crate::components::{App, CreateGameButton, CreateGameForm, DeleteGameModal, GameDetailPage, Games, GamesList};
 use dioxus::prelude::*;
 use dioxus_query::prelude::use_query_client;
-use crate::cache::{QueryError, QueryKey, QueryValue};
-use crate::components::{App, Games, GamesList, GameDetail, CreateGameButton, CreateGameForm, DeleteGameModal};
 
 
 #[component]
@@ -48,7 +48,7 @@ pub enum Routes {
                 #[route("/")]
                 GamesList {},
                 #[route("/:name")]
-                GameDetail { name: String },
+                GameDetailPage { name: String },
             #[end_layout]
         #[end_nest]
     #[end_layout]

@@ -79,7 +79,7 @@ pub fn GameListMember(game: Game) -> Element {
     rsx! {
         li {
             Link {
-                to: Routes::GameDetail {
+                to: Routes::GameDetailPage {
                     name: game.name.clone()
                 },
                 "{game.name}"

@@ -31,10 +31,13 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
 }
 
 #[component]
-fn GameStatusState(game: Game) -> Element {
-    let mut game_next_step: String;
+fn GameStatusState() -> Element {
+    let game: Signal<Option<Game>> = use_context();
+    let game = game.unwrap();
 
-    let game_ready = game_is_ready(game.tributes);
+    let game_next_step: String;
+
+    let game_ready = game_is_ready(&game.tributes);
 
     let game_status= match game.status {
         GameStatus::NotStarted => {
@@ -43,7 +46,6 @@ fn GameStatusState(game: Game) -> Element {
             } else {
                 game_next_step = "Wait".to_string();
             }
-            game_next_step = "Start".to_string();
             "Not started".to_string()
         },
         GameStatus::InProgress => {
@@ -70,10 +72,7 @@ fn GameStatusState(game: Game) -> Element {
     }
 }
 
-fn game_is_ready(tributes: Vec<Tribute>) -> bool {
-    let game = GAME.with_borrow(|g| { g.clone() });
-    let tributes = game.tributes.clone();
-
+fn game_is_ready(tributes: &Vec<Tribute>) -> bool {
     if tributes.len() == 0 { return false; }
     
     let mut tribute_spread: HashMap<u32, u32> = HashMap::new();
@@ -88,18 +87,15 @@ fn game_is_ready(tributes: Vec<Tribute>) -> bool {
 
     let mut valid = true;
 
-    for (district, count) in &tribute_spread {
+    for (_, count) in &tribute_spread {
         if *count != 2 { valid = false; }
     }
 
     valid
-    // Some(tribute_spread)
-
-    // tribute_spread.values().all(|c| *c == 2)
 }
 
 #[component]
-pub fn GameDetail(name: String) -> Element {
+pub fn GameDetailPage(name: String) -> Element {
     let edit_tribute_signal: Signal<Option<EditTribute>> = use_signal(|| None);
     use_context_provider(|| edit_tribute_signal);
 
@@ -107,34 +103,51 @@ pub fn GameDetail(name: String) -> Element {
     use_context_provider(|| game_signal);
 
     let game_query = use_get_query([QueryKey::Game(name.clone()), QueryKey::Games], fetch_game);
-    if let QueryResult::Ok(QueryValue::Game(game)) = game_query.result().value() {
-        game_signal.set(Some(game.clone()));
+    match game_query.result().value() {
+        QueryResult::Ok(QueryValue::Game(game)) => {
+            game_signal.set(Some(game.clone()));
+            rsx! {
+                GameDetails { game: game.clone() }
+            }
+        }
+        _ => { rsx! { p { "Loading...outer" }} }
+    }
+}
 
-        let game_name = game.name.clone();
-        rsx! {
-            div {
-                h1 { "{game.name}" }
+#[derive(Debug, Clone, PartialEq, Props)]
+struct GDP {
+    game: Game,
+}
 
-                GameStatusState { game: game.clone() }
+pub fn GameDetails(gdp: GDP) -> Element {
+    // let game_signal: Signal<Option<Game>> = use_context();
+    // dioxus_logger::tracing::debug!("{:?}", &game_signal.read());
+    let game = gdp.game;
+    let game_name = game.name.clone();
 
-                h3 { "Tributes" }
+    rsx! {
+        div {
+            h1 { "{game.name}" }
 
-                GameTributes { game_name: game.name.clone() }
+            GameStatusState {}
 
-                EditTributeModal {}
+            h3 { "Tributes" }
 
-                RefreshButton { game_name: game.name.clone() }
+            GameTributes { game_name: game.name.clone() }
 
-                h3 { "Areas" }
-                ul {
-                    for (area, details) in game.areas.iter() {
-                        li {
-                            "{area}: {details.open}"
-                            ul {
-                                for item in &details.items {
-                                    li {
-                                        "{item.name}",
-                                    }
+            EditTributeModal {}
+
+            RefreshButton { game_name: game.name.clone() }
+
+            h3 { "Areas" }
+            ul {
+                for (area, details) in game.areas.iter() {
+                    li {
+                        "{area}: {details.open}"
+                        ul {
+                            for item in &details.items {
+                                li {
+                                    "{item.name}",
                                 }
                             }
                         }
@@ -142,8 +155,6 @@ pub fn GameDetail(name: String) -> Element {
                 }
             }
         }
-    } else {
-        rsx! { p { "Loading..." } }
     }
 }
 

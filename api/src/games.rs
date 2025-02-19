@@ -4,11 +4,10 @@ use axum::extract::Path;
 use axum::http::header::{CACHE_CONTROL, EXPIRES};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
-use axum::routing::{delete, get};
+use axum::routing::{delete, get, post};
 use axum::Json;
 use axum::Router;
 use game::games::Game;
-use game::tributes::Tribute;
 use shared::EditGame;
 use std::sync::LazyLock;
 
@@ -16,7 +15,7 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
         .route("/", get(game_list).post(game_create))
         .route("/{game_identifier}", get(game_detail).delete(game_delete).put(game_update))
-        .route("/{game_identifier}/tributes", get(game_tributes).post(tribute_create))
+        .route("/{game_identifier}/tributes", post(tribute_create))
         .route("/{game_identifier}/tributes/{tribute_identifier}", delete(tribute_delete).put(tribute_update))
 });
 
@@ -86,26 +85,6 @@ pub async fn game_detail(game_identifier: Path<String>) -> (StatusCode, Json<Opt
         (StatusCode::OK, Json(Some(game)))
     } else {
         (StatusCode::NOT_FOUND, Json(None))
-    }
-}
-
-pub async fn game_tributes(Path(game_identifier): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
-    let tributes = DATABASE.query(
-        format!(r#"SELECT * FROM tribute WHERE identifier IN (
-            SELECT <-playing_in<-tribute.identifier AS identifiers FROM game WHERE identifier = "{}"
-         )[0]["identifiers"]"#, game_identifier),
-    ).await.expect("No tributes");
-
-    match tributes.check() {
-        Ok(mut tributes) => {
-            let mut tributes: Vec<Tribute> = tributes.take(0).unwrap_or_default();
-            tributes.sort_by_key(|t| t.district);
-            (StatusCode::OK, Json(tributes.clone()))
-        }
-        Err(e) => {
-            tracing::error!("{}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json::<Vec<Tribute>>(Vec::new()))
-        }
     }
 }
 

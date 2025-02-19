@@ -57,11 +57,6 @@ struct TributePlaysIn {
     game: RecordId,
 }
 
-pub async fn tribute_detail(Path(_identifier): Path<&str>) -> impl IntoResponse {
-
-}
-
-
 pub async fn tribute_delete(Path((_, tribute_identifier)): Path<(String, String)>) -> StatusCode {
     let tribute: Option<Tribute> = DATABASE.delete(("tribute", &tribute_identifier)).await.expect("failed to delete tribute");
     match tribute {

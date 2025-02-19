@@ -5,7 +5,7 @@ use game::games::Game;
 #[component]
 pub fn GameTributes() -> Element {
     let game_signal: Signal<Option<Game>> = use_context();
-    
+
     let game = game_signal.read().clone();
     let tributes = game.unwrap().tributes;
 
@@ -14,6 +14,11 @@ pub fn GameTributes() -> Element {
             for tribute in tributes {
                 li {
                     "{tribute.name} - {tribute.district}",
+                    ul {
+                        for item in tribute.clone().items {
+                            li { "{item.name}" }
+                        }
+                    }
                     TributeEdit {
                         identifier: tribute.clone().identifier,
                         district: tribute.district,

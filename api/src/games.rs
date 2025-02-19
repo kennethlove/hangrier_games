@@ -61,7 +61,9 @@ pub async fn game_detail(game_identifier: Path<String>) -> (StatusCode, Json<Opt
     let identifier = game_identifier.0;
     let mut result = DATABASE.query(format!(r#"
         SELECT *, (
-            SELECT * FROM tribute WHERE identifier INSIDE (
+            SELECT *, ->owns->item.* AS items
+            FROM tribute
+            WHERE identifier INSIDE (
                 SELECT <-playing_in<-tribute.identifier
                 AS identifiers
                 FROM game

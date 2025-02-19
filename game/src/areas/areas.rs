@@ -137,7 +137,7 @@ pub struct AreaDetails {
 impl AreaDetails {
     pub fn new(open: bool, items: Vec<Item>) -> Self {
         let mut items = items;
-        items.push(Item::new_random("test item"));
+        items.push(Item::new_random(None));
         AreaDetails { open, items }
     }
 }

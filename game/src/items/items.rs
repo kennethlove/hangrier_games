@@ -3,10 +3,12 @@ use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
+use fake::Fake;
 use strum::{EnumIter, IntoEnumIterator};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Item {
+    pub identifier: String,
     pub name: String,
     pub item_type: ItemType,
     pub quantity: u32,
@@ -22,7 +24,9 @@ impl Display for Item {
 
 impl Default for Item {
     fn default() -> Self {
+        let identifier: String = fake::faker::lorem::en::Words(2..3).fake::<Vec<String>>().join("-");
         Self {
+            identifier,
             name: String::from("Useless health potion"),
             item_type: ItemType::Consumable,
             quantity: 1,
@@ -40,7 +44,9 @@ impl Item {
         attribute: Attribute,
         effect: i32,
     ) -> Item {
+        let identifier: String = fake::faker::lorem::en::Words(2..3).fake::<Vec<String>>().join("-");
         Item {
+            identifier,
             name: name.to_string(),
             item_type,
             quantity,
@@ -49,15 +55,28 @@ impl Item {
         }
     }
 
-    pub fn new_random(name: &str) -> Item {
+    pub fn new_random(name: Option<&str>) -> Item {
         let mut rng = rand::thread_rng();
 
         let item_type = ItemType::random();
-        let quantity = rng.gen_range(1..=3);
-        let attribute = Attribute::random();
-        let effect = rng.gen_range(1..=10);
-
-        Item::new(name, item_type, quantity, attribute.unwrap(), effect)
+        let is_shield = rng.gen_bool(0.5);
+        
+        match (item_type, name) {
+            (ItemType::Consumable, Some(name)) => Self::new_consumable(name),
+            (ItemType::Consumable, None) => Self::new_random_consumable(),
+            (ItemType::Weapon, Some(name)) => {
+                match is_shield {
+                    false => Self::new_weapon(name),
+                    true => Self::new_shield(name)
+                }
+            }
+            (ItemType::Weapon, None) => {
+                match is_shield {
+                    false => Self::new_random_weapon(),
+                    true => Self::new_random_shield()
+                }
+            }
+        }
     }
 
     pub fn new_weapon(name: &str) -> Item {
@@ -272,7 +291,7 @@ mod tests {
 
     #[test]
     fn new_random_item() {
-        let item = Item::new_random("Test item");
+        let item = Item::new_random(Some("Test item"));
         assert_eq!(item.name, "Test item");
         assert!((1..=3).contains(&item.quantity));
     }

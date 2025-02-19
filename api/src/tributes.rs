@@ -8,6 +8,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use shared::EditTribute;
 use surrealdb::RecordId;
+use game::items::Item;
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+struct TributeOwns {
+    #[serde(rename = "in")]
+    tribute: RecordId,
+    #[serde(rename = "out")]
+    item: RecordId,
+}
 
 pub async fn tribute_record_create(tribute: Option<Tribute>, game_identifier: String) -> Option<Tribute> {
     let game_id = RecordId::from(("game", game_identifier.clone()));
@@ -20,7 +29,7 @@ pub async fn tribute_record_create(tribute: Option<Tribute>, game_identifier: St
         return None;
     }
 
-    let mut tribute = tribute.unwrap_or_else(|| Tribute::random());
+    let mut tribute = tribute.unwrap_or_else(Tribute::random);
     tribute.district = (tribute_count.unwrap_or(1) % 12) + 1;
 
     let id = RecordId::from(("tribute", &tribute.identifier));
@@ -32,10 +41,20 @@ pub async fn tribute_record_create(tribute: Option<Tribute>, game_identifier: St
 
     let _: Vec<TributePlaysIn> = DATABASE.insert("playing_in").relation(
         TributePlaysIn {
-            tribute: id,
+            tribute: id.clone(),
             game: game_id.clone(),
         }
     ).await.expect("Failed to connect Tribute to game");
+
+    let new_object: Item = Item::new_random(None);
+    let new_object_id: RecordId = RecordId::from(("item", &new_object.identifier));
+    let _: Option<Item> = DATABASE.insert(new_object_id.clone()).content(new_object.clone()).await.expect("Failed to update Item");
+    let _: Vec<TributeOwns> = DATABASE.insert("owns").relation(
+        TributeOwns {
+            tribute: id.clone(),
+            item: new_object_id.clone(),
+        }
+    ).await.expect("Failed to update Owns relation");
 
     new_tribute
 }

@@ -75,13 +75,13 @@ pub async fn delete_tribute(Path((game_name, tribute_identifier)): Path<(String,
 
 pub async fn update_tribute(Path((_game_name, tribute_identifier)): Path<(String, String)>, Json(payload): Json<EditTribute>) -> impl IntoResponse {
     let response = DATABASE.query(
-        format!("UPDATE tribute SET name = '{}', district = {} WHERE identifier = '{}'", payload.0, payload.1, payload.2)
+        format!("UPDATE tribute SET name = '{}', district = {} WHERE identifier = '{}'", payload.2, payload.1, payload.0)
     ).await;
 
     match response {
         Ok(mut response) => {
             let tribute: Option<Tribute> = response.take(0).unwrap();
-            (StatusCode::OK, Json::<Tribute>(tribute.unwrap())).into_response()
+            (StatusCode::OK, Json::<Tribute>(tribute.expect("No tribute updated."))).into_response()
         }
         Err(e) => {
             (StatusCode::INTERNAL_SERVER_ERROR, Json::<String>(e.to_string())).into_response()

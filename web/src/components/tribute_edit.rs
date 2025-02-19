@@ -11,7 +11,7 @@ use std::time::Duration;
 
 async fn edit_tribute(tribute: EditTribute) -> MutationResult<MutationValue, MutationError> {
     let game_name = GAME.with_borrow(|g| { g.name.clone() });
-    let identifier = tribute.clone().2;
+    let identifier = tribute.clone().0;
 
     let client = reqwest::Client::new();
     let url: String = format!("{}/api/games/{}/tributes/{}", API_HOST.clone(), game_name, identifier);
@@ -21,7 +21,7 @@ async fn edit_tribute(tribute: EditTribute) -> MutationResult<MutationValue, Mut
         .json(&tribute.clone())
         .send().await;
 
-    if response.unwrap().status().is_success() {
+    if response.expect("Failed to update tribute").status().is_success() {
         MutationResult::Ok(MutationValue::TributeUpdated(identifier))
     } else {
         MutationResult::Err(MutationError::Unknown)
@@ -33,7 +33,7 @@ pub fn TributeEdit(name: String, district: u32, identifier: String) -> Element {
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
 
     let onclick = move |_| {
-        edit_tribute_signal.set(Some(EditTribute(name.clone(), district.clone(), identifier.clone())));
+        edit_tribute_signal.set(Some(EditTribute(identifier.clone(), district.clone(), name.clone())));
     };
 
     rsx! {
@@ -62,7 +62,7 @@ pub fn EditTributeModal() -> Element {
 pub fn EditTributeForm() -> Element {
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
     let tribute_details = edit_tribute_signal.read().clone().unwrap_or_default();
-    let name = tribute_details.0.clone();
+    let name = tribute_details.2.clone();
     let district = tribute_details.1;
 
     let game: Signal<Option<Game>> = use_context();
@@ -80,14 +80,14 @@ pub fn EditTributeForm() -> Element {
     let save = move |e: Event<FormData>| {
         let game_name = game_name.clone();
         let tribute_details = edit_tribute_signal.read().clone().expect("No details provided");
-        let identifier = tribute_details.2.clone();
+        let identifier = tribute_details.0.clone();
 
         let data = e.data().values();
         let name = data.get("name").expect("No name value").0[0].clone();
         let district: u32 = data.get("district").expect("No district value").0[0].clone().parse().unwrap();
 
         if !name.is_empty() && (1..=12u32).contains(&district) {
-            let edit_tribute = EditTribute(name.clone(), district.clone(), identifier.clone());
+            let edit_tribute = EditTribute(identifier.clone(), district.clone(), name.clone());
             spawn(async move {
                 mutate.manual_mutate(edit_tribute.clone()).await;
                 edit_tribute_signal.set(Some(edit_tribute.clone()));

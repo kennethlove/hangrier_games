@@ -6,14 +6,13 @@ use axum::Json;
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use surrealdb::opt::PatchOp;
 use shared::EditTribute;
-use surrealdb::{RecordId, Response};
+use surrealdb::RecordId;
 
-pub async fn create_tribute_record(tribute: Option<Tribute>, game_name: String) -> Option<Tribute> {
-    let game_id = RecordId::from(("game", game_name.clone()));
-    let mut tribute_count = DATABASE.query(
-        format!("RETURN count(SELECT id FROM playing_in WHERE out.name='{}')", game_name.clone())
+pub async fn tribute_record_create(tribute: Option<Tribute>, game_identifier: String) -> Option<Tribute> {
+    let game_id = RecordId::from(("game", game_identifier.clone()));
+    let tribute_count = DATABASE.query(
+        format!("RETURN count(SELECT id FROM playing_in WHERE out.identifier='{}')", game_identifier.clone())
     ).await;
     let tribute_count: Option<u32> = tribute_count.unwrap().take(0).unwrap();
 
@@ -41,8 +40,8 @@ pub async fn create_tribute_record(tribute: Option<Tribute>, game_name: String) 
     new_tribute
 }
 
-pub async fn create_tribute(Path(game_name): Path<String>, Json(payload): Json<Tribute>) -> impl IntoResponse {
-    let tribute: Option<Tribute> = create_tribute_record(Some(payload), game_name).await;
+pub async fn tribute_create(Path(game_identifier): Path<String>, Json(payload): Json<Tribute>) -> impl IntoResponse {
+    let tribute: Option<Tribute> = tribute_record_create(Some(payload), game_identifier).await;
     if tribute.is_none() {
         (StatusCode::BAD_REQUEST, Json(json!({}))).into_response()
     } else {
@@ -58,12 +57,7 @@ struct TributePlaysIn {
     game: RecordId,
 }
 
-pub async fn tribute_detail(Path(name): Path<&str>) -> impl IntoResponse {
-
-}
-
-
-pub async fn delete_tribute(Path((game_name, tribute_identifier)): Path<(String, String)>) -> StatusCode {
+pub async fn tribute_delete(Path((_, tribute_identifier)): Path<(String, String)>) -> StatusCode {
     let tribute: Option<Tribute> = DATABASE.delete(("tribute", &tribute_identifier)).await.expect("failed to delete tribute");
     match tribute {
         Some(_) => StatusCode::NO_CONTENT,
@@ -73,15 +67,15 @@ pub async fn delete_tribute(Path((game_name, tribute_identifier)): Path<(String,
     }
 }
 
-pub async fn update_tribute(Path((_game_name, tribute_identifier)): Path<(String, String)>, Json(payload): Json<EditTribute>) -> impl IntoResponse {
+pub async fn tribute_update(Path((_game_identifier, _tribute_identifier)): Path<(String, String)>, Json(payload): Json<EditTribute>) -> impl IntoResponse {
     let response = DATABASE.query(
-        format!("UPDATE tribute SET name = '{}', district = {} WHERE identifier = '{}'", payload.0, payload.1, payload.2)
+        format!("UPDATE tribute SET name = '{}', district = {} WHERE identifier = '{}'", payload.2, payload.1, payload.0)
     ).await;
 
     match response {
         Ok(mut response) => {
             let tribute: Option<Tribute> = response.take(0).unwrap();
-            (StatusCode::OK, Json::<Tribute>(tribute.unwrap())).into_response()
+            (StatusCode::OK, Json::<Tribute>(tribute.expect("No tribute updated."))).into_response()
         }
         Err(e) => {
             (StatusCode::INTERNAL_SERVER_ERROR, Json::<String>(e.to_string())).into_response()

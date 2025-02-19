@@ -18,13 +18,15 @@ thread_local!(pub static GAME: RefCell<Game> = RefCell::new(Game::default()));
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Game {
+    pub identifier: String,
     pub name: String,
     pub status: GameStatus,
     pub day: Option<u32>,
     pub areas: BTreeMap<String, AreaDetails>,
     #[serde(default)]
     pub tribute_count: u32,
-    #[serde(skip_serializing, skip_deserializing)]
+    // #[serde(skip_serializing, skip_deserializing)]
+    #[serde(default)]
     pub tributes: Vec<Tribute>,
 }
 
@@ -37,6 +39,7 @@ impl Default for Game {
         };
 
         let mut game = Game {
+            identifier: name.clone(),
             name,
             status: Default::default(),
             day: None,
@@ -60,6 +63,7 @@ impl Game {
     pub fn new(name: &str) -> Self {
         let mut game = Game::default();
         game.name = name.to_string();
+        game.identifier = name.to_string();
         game
     }
 

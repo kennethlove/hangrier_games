@@ -249,7 +249,7 @@ impl Tribute {
             }
         };
 
-        if self.attributes.health <= 0 {
+        if self.attributes.health == 0 {
             // Attacker was killed by target
             println!(
                 "{}",
@@ -259,7 +259,7 @@ impl Tribute {
             self.status = TributeStatus::RecentlyDead;
             self.dies();
             AttackOutcome::Kill(target.clone(), self.clone())
-        } else if target.attributes.health <= 0 {
+        } else if target.attributes.health == 0 {
             // Target was killed by attacker
             println!(
                 "{}",
@@ -466,7 +466,7 @@ impl Tribute {
             _ => {}
         }
 
-        if self.attributes.health <= 0 {
+        if self.attributes.health == 0 {
             self.statistics.killed_by = Some(self.status.to_string());
             self.status = TributeStatus::RecentlyDead;
         }
@@ -511,7 +511,7 @@ impl Tribute {
                 self.status = TributeStatus::Burned;
             }
         }
-        if self.attributes.health <= 0 {
+        if self.attributes.health == 0 {
             println!(
                 "{}",
                 GameMessage::TributeDiesFromTributeEvent(self.clone(), tribute_event.clone())
@@ -556,7 +556,7 @@ impl Tribute {
         }
 
         // Tribute died to the period's events.
-        if self.status == TributeStatus::RecentlyDead || self.attributes.health <= 0 {
+        if self.status == TributeStatus::RecentlyDead || self.attributes.health == 0 {
             println!("{}", GameMessage::TributeDead(self.clone()));
         }
 
@@ -893,8 +893,8 @@ fn attack_contest(attacker: &Tribute, target: &Tribute) -> AttackResult {
 
     if let Some(weapon) = attacker.weapons().iter_mut().last() {
         tribute1_roll += weapon.effect as u32; // Add weapon damage
-        weapon.quantity -= 1;
-        if weapon.quantity <= 0 {
+        weapon.quantity = weapon.quantity.saturating_sub(1);
+        if weapon.quantity == 0 {
             println!(
                 "{}",
                 GameMessage::WeaponBreak(attacker.clone(), weapon.clone())
@@ -907,8 +907,8 @@ fn attack_contest(attacker: &Tribute, target: &Tribute) -> AttackResult {
 
     if let Some(shield) = target.defensive_items().iter_mut().last() {
         tribute2_roll += shield.effect as u32; // Add weapon defense
-        shield.quantity -= 1;
-        if shield.quantity <= 0 {
+        shield.quantity = shield.quantity.saturating_sub(1);
+        if shield.quantity == 0 {
             println!(
                 "{}",
                 GameMessage::ShieldBreak(attacker.clone(), shield.clone())

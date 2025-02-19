@@ -6,8 +6,11 @@ pub struct CreateGame {
 }
 
 pub type DeleteTribute = String;
-pub type DeleteGame = String;
-
-// Name, District, Identifier
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-pub struct EditTribute(pub String, pub u32, pub String);
+pub struct DeleteGame(pub String, pub String); // Identifier, name
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct EditTribute(pub String, pub u32, pub String); // Identifier, district, name
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+pub struct EditGame(pub String, pub String); // Identifier, name

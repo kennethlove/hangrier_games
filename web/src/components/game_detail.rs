@@ -1,6 +1,5 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::game_tributes::GameTributes;
-use crate::components::tribute_delete::{DeleteTributeModal, TributeDelete};
 use crate::components::tribute_edit::EditTributeModal;
 use crate::API_HOST;
 use dioxus::prelude::*;
@@ -10,10 +9,11 @@ use game::games::{Game, GAME};
 use game::tributes::Tribute;
 use shared::EditTribute;
 use std::collections::HashMap;
+use crate::components::game_edit::GameEdit;
 
 async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::Game(name)) = keys.first() {
-        let response = reqwest::get(format!("{}/api/games/{}", API_HOST.clone(), name))
+    if let Some(QueryKey::Game(identifier)) = keys.first() {
+        let response = reqwest::get(format!("{}/api/games/{}", API_HOST.clone(), identifier))
             .await.unwrap();
 
         match response.json::<Game>().await {
@@ -22,7 +22,7 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
                 QueryResult::Ok(QueryValue::Game(game))
             }
             Err(_) => {
-                QueryResult::Err(QueryError::GameNotFound(name.to_string()))
+                QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
             }
         }
     } else {
@@ -31,10 +31,13 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
 }
 
 #[component]
-fn GameStatusState(game: Game) -> Element {
-    let mut game_next_step: String;
+fn GameStatusState() -> Element {
+    let game: Signal<Option<Game>> = use_context();
+    let game = game.read().clone().unwrap();
 
-    let game_ready = game_is_ready(game.tributes);
+    let game_next_step: String;
+
+    let game_ready = game_is_ready(&game.tributes);
 
     let game_status= match game.status {
         GameStatus::NotStarted => {
@@ -43,7 +46,6 @@ fn GameStatusState(game: Game) -> Element {
             } else {
                 game_next_step = "Wait".to_string();
             }
-            game_next_step = "Start".to_string();
             "Not started".to_string()
         },
         GameStatus::InProgress => {
@@ -70,15 +72,12 @@ fn GameStatusState(game: Game) -> Element {
     }
 }
 
-fn game_is_ready(tributes: Vec<Tribute>) -> bool {
-    let game = GAME.with_borrow(|g| { g.clone() });
-    let tributes = game.tributes.clone();
-
-    if tributes.len() == 0 { return false; }
+fn game_is_ready(tributes: &Vec<Tribute>) -> bool {
+    if tributes.is_empty() { return false; }
     
     let mut tribute_spread: HashMap<u32, u32> = HashMap::new();
     for tribute in tributes {
-        if tribute_spread.get(&tribute.district).is_some() {
+        if tribute_spread.contains_key(&tribute.district) {
             let count = tribute_spread.get(&tribute.district).unwrap();
             tribute_spread.insert(tribute.district, count + 1);
         } else {
@@ -88,53 +87,69 @@ fn game_is_ready(tributes: Vec<Tribute>) -> bool {
 
     let mut valid = true;
 
-    for (district, count) in &tribute_spread {
+    for count in tribute_spread.values() {
         if *count != 2 { valid = false; }
     }
 
     valid
-    // Some(tribute_spread)
-
-    // tribute_spread.values().all(|c| *c == 2)
 }
 
 #[component]
-pub fn GameDetail(name: String) -> Element {
-    let edit_tribute_signal: Signal<Option<EditTribute>> = use_signal(|| None);
-    use_context_provider(|| edit_tribute_signal);
+pub fn GameDetailPage(identifier: String) -> Element {
+    let game_query = use_get_query([QueryKey::Game(identifier.clone()), QueryKey::Games], fetch_game);
+    let mut game_signal: Signal<Option<Game>> = use_context();
 
-    let mut game_signal: Signal<Option<Game>> = use_signal(|| None);
-    use_context_provider(|| game_signal);
+    match game_query.result().value() {
+        QueryResult::Ok(QueryValue::Game(game)) => {
+            game_signal.set(Some(game.clone()));
+            let detail = Gdp { game: game.clone() };
+            rsx! {
+                GameDetails { gdp: detail }
+            }
+        }
+        QueryResult::Err(e) => {
+            dioxus_logger::tracing::error!("{:?}", e);
+            rsx! { "Failed to load" }
+        }
+        _ => {
+            rsx! {
+                p { "Loading...outer" }
+            }
+        }
+    }
+}
 
-    let game_query = use_get_query([QueryKey::Game(name.clone()), QueryKey::Games], fetch_game);
-    if let QueryResult::Ok(QueryValue::Game(game)) = game_query.result().value() {
-        game_signal.set(Some(game.clone()));
+#[derive(Debug, Clone, PartialEq, Props)]
+pub struct Gdp {
+    game: Game,
+}
 
-        let game_name = game.name.clone();
-        rsx! {
-            div {
-                h1 { "{game.name}" }
+#[component]
+pub fn GameDetails(gdp: Gdp) -> Element {
+    let game = gdp.game;
 
-                GameStatusState { game: game.clone() }
+    rsx! {
+        div {
+            h1 {
+                "{game.name}",
+                GameEdit { identifier: game.identifier.clone(), name: game.name.clone() }
+            }
 
-                h3 { "Tributes" }
+            GameStatusState {}
 
-                GameTributes { game_name: game.name.clone() }
+            h3 { "Tributes" }
 
-                EditTributeModal {}
+            GameTributes { }
 
-                RefreshButton { game_name: game.name.clone() }
-
-                h3 { "Areas" }
-                ul {
-                    for (area, details) in game.areas.iter() {
-                        li {
-                            "{area}: {details.open}"
-                            ul {
-                                for item in &details.items {
-                                    li {
-                                        "{item.name}",
-                                    }
+            h3 { "Areas" }
+            ul {
+                for (area, details) in game.areas.iter() {
+                    li {
+                        "{area}: {details.open}"
+                        ul {
+                            for item in &details.items {
+                                li {
+                                    "{item.name}",
                                 }
                             }
                         }
@@ -142,17 +157,15 @@ pub fn GameDetail(name: String) -> Element {
                 }
             }
         }
-    } else {
-        rsx! { p { "Loading..." } }
     }
 }
 
 #[component]
-fn RefreshButton(game_name: String) -> Element {
+fn RefreshButton(game_identifier: String) -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
     let onclick = move |_| {
-        client.invalidate_queries(&[QueryKey::Tributes(game_name.clone())]);
+        client.invalidate_queries(&[QueryKey::Tributes(game_identifier.clone())]);
     };
 
     rsx! {

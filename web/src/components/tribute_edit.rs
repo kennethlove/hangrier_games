@@ -10,18 +10,18 @@ use std::ops::Deref;
 use std::time::Duration;
 
 async fn edit_tribute(tribute: EditTribute) -> MutationResult<MutationValue, MutationError> {
-    let game_name = GAME.with_borrow(|g| { g.name.clone() });
-    let identifier = tribute.clone().2;
+    let game_identifier = GAME.with_borrow(|g| { g.identifier.clone() });
+    let identifier = tribute.clone().0;
 
     let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}/tributes/{}", API_HOST.clone(), game_name, identifier);
+    let url: String = format!("{}/api/games/{}/tributes/{}", API_HOST.clone(), game_identifier, identifier);
 
     let response = client
         .put(url)
         .json(&tribute.clone())
         .send().await;
 
-    if response.unwrap().status().is_success() {
+    if response.expect("Failed to update tribute").status().is_success() {
         MutationResult::Ok(MutationValue::TributeUpdated(identifier))
     } else {
         MutationResult::Err(MutationError::Unknown)
@@ -29,11 +29,11 @@ async fn edit_tribute(tribute: EditTribute) -> MutationResult<MutationValue, Mut
 }
 
 #[component]
-pub fn TributeEdit(name: String, district: u32, identifier: String) -> Element {
+pub fn TributeEdit(identifier: String, district: u32, name: String) -> Element {
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
 
     let onclick = move |_| {
-        edit_tribute_signal.set(Some(EditTribute(name.clone(), district.clone(), identifier.clone())));
+        edit_tribute_signal.set(Some(EditTribute(identifier.clone(), district, name.clone())));
     };
 
     rsx! {
@@ -62,12 +62,15 @@ pub fn EditTributeModal() -> Element {
 pub fn EditTributeForm() -> Element {
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
     let tribute_details = edit_tribute_signal.read().clone().unwrap_or_default();
-    let name = tribute_details.0.clone();
+    let name = tribute_details.2.clone();
     let district = tribute_details.1;
 
     let game: Signal<Option<Game>> = use_context();
+    if game.peek().is_none() {
+        return rsx! {}
+    }
     let game = game.unwrap();
-    let game_name = game.name.clone();
+    let game_identifier = game.identifier.clone();
 
     let mutate = use_mutation(edit_tribute);
 
@@ -78,22 +81,22 @@ pub fn EditTributeForm() -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
     let save = move |e: Event<FormData>| {
-        let game_name = game_name.clone();
+        let game_identifier = game_identifier.clone();
         let tribute_details = edit_tribute_signal.read().clone().expect("No details provided");
-        let identifier = tribute_details.2.clone();
+        let identifier = tribute_details.0.clone();
 
         let data = e.data().values();
         let name = data.get("name").expect("No name value").0[0].clone();
         let district: u32 = data.get("district").expect("No district value").0[0].clone().parse().unwrap();
 
         if !name.is_empty() && (1..=12u32).contains(&district) {
-            let edit_tribute = EditTribute(name.clone(), district.clone(), identifier.clone());
+            let edit_tribute = EditTribute(identifier.clone(), district.clone(), name.clone());
             spawn(async move {
                 mutate.manual_mutate(edit_tribute.clone()).await;
                 edit_tribute_signal.set(Some(edit_tribute.clone()));
 
                 if let MutationResult::Ok(MutationValue::TributeUpdated(identifier)) = mutate.result().deref() {
-                    client.invalidate_queries(&[QueryKey::Tributes(game_name.clone())]);
+                    client.invalidate_queries(&[QueryKey::Game(game_identifier.clone())]);
                     edit_tribute_signal.set(None);
                 }
             });

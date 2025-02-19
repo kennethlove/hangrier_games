@@ -27,9 +27,10 @@ pub(crate) enum QueryValue {
 #[derive(PartialEq, Debug)]
 pub(crate) enum MutationValue {
     NewGame(Game),
-    GameDeleted(String),
+    GameDeleted(String, String), // Identifier, name
     TributeDeleted(String),
     TributeUpdated(String),
+    GameUpdated(String),
 }
 
 #[derive(PartialEq, Debug)]

@@ -25,7 +25,8 @@ pub struct Game {
     pub areas: BTreeMap<String, AreaDetails>,
     #[serde(default)]
     pub tribute_count: u32,
-    #[serde(skip_serializing, skip_deserializing)]
+    // #[serde(skip_serializing, skip_deserializing)]
+    #[serde(default)]
     pub tributes: Vec<Tribute>,
 }
 

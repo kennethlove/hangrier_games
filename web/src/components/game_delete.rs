@@ -8,29 +8,32 @@ use std::ops::Deref;
 use std::time::Duration;
 use shared::DeleteGame;
 
-async fn delete_game(name: String) -> MutationResult<MutationValue, MutationError> {
+async fn delete_game(delete_game_info: DeleteGame) -> MutationResult<MutationValue, MutationError> {
+    let identifier = delete_game_info.0;
+    let name = delete_game_info.1;
     let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}", API_HOST.clone(), name);
+    let url: String = format!("{}/api/games/{}", API_HOST.clone(), identifier);
 
     let response = client
         .delete(url)
         .send().await;
 
     if response.unwrap().status().is_success() {
-        MutationResult::Ok(MutationValue::GameDeleted(name))
+        MutationResult::Ok(MutationValue::GameDeleted(identifier, name))
     } else {
         MutationResult::Err(MutationError::Unknown)
     }
 }
 
 #[component]
-pub fn GameDelete(game_name: String) -> Element {
+pub fn GameDelete(game_identifier: String, game_name: String) -> Element {
     let mut delete_game_signal: Signal<Option<DeleteGame>> = use_context();
 
-    let name = game_name.clone();
-
     let onclick = move |_| {
-        delete_game_signal.set(Some(name.clone()));
+        let identifier = game_identifier.clone();
+        let name = game_name.clone();
+
+        delete_game_signal.set(Some(DeleteGame { 0: identifier, 1: name }));
     };
 
     rsx! {
@@ -40,12 +43,18 @@ pub fn GameDelete(game_name: String) -> Element {
         }
     }
 }
+
 #[component]
 pub fn DeleteGameModal() -> Element {
     let mut delete_game_signal: Signal<Option<DeleteGame>> = use_context();
-    let game_name = delete_game_signal.peek().clone();
-    let name = game_name.clone().unwrap_or_default();
+    let delete_game_info = delete_game_signal.read().clone();
     let mutate = use_mutation(delete_game);
+    
+    let name = {
+        if let Some(details) = delete_game_info.clone() {
+            details.1
+        } else { String::new() }
+    };
 
     let dismiss = move |_| {
         delete_game_signal.set(None);
@@ -54,17 +63,20 @@ pub fn DeleteGameModal() -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
     let delete = move |_| {
-        if let Some(name) = game_name.clone() {
+        if let Some(dg) = delete_game_info.clone() {
+            let identifier = dg.clone().0;
+            let name = dg.clone().1;
+            
             spawn(async move {
-                mutate.manual_mutate(name.clone()).await;
-                if let MutationResult::Ok(MutationValue::GameDeleted(name)) = mutate.result().deref() {
+                mutate.manual_mutate(dg.clone()).await;
+                if let MutationResult::Ok(MutationValue::GameDeleted(identifier, name)) = mutate.result().deref() {
                     client.invalidate_queries(&[QueryKey::Games]);
                     delete_game_signal.set(None);
                 }
             });
         }
     };
-
+    
     rsx! {
         dialog {
             role: "confirm",

@@ -80,11 +80,11 @@ pub fn GameListMember(game: Game) -> Element {
         li {
             Link {
                 to: Routes::GameDetailPage {
-                    name: game.name.clone()
+                    identifier: game.identifier.clone()
                 },
                 "{game.name}"
             }
-            GameDelete { game_name: game.name.clone() }
+            GameDelete { game_name: game.name.clone(), game_identifier: game.identifier.clone() }
         }
     }
 }

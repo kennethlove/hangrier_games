@@ -47,8 +47,8 @@ pub enum Routes {
             #[layout(Games)]
                 #[route("/")]
                 GamesList {},
-                #[route("/:name")]
-                GameDetailPage { name: String },
+                #[route("/:identifier")]
+                GameDetailPage { identifier: String },
             #[end_layout]
         #[end_nest]
     #[end_layout]

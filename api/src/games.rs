@@ -1,50 +1,40 @@
-use std::collections::HashMap;
-use crate::tributes::{create_tribute, create_tribute_record, delete_tribute, update_tribute};
+use crate::tributes::{tribute_create, tribute_record_create, tribute_delete, tribute_update};
 use crate::DATABASE;
 use axum::extract::Path;
 use axum::http::header::{CACHE_CONTROL, EXPIRES};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get};
 use axum::Json;
 use axum::Router;
-use game::areas::{Area, AreaDetails};
 use game::games::Game;
 use game::tributes::Tribute;
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-use shared::CreateGame;
+use shared::EditGame;
 use std::sync::LazyLock;
-use strum::IntoEnumIterator;
-use surrealdb::engine::any::Any;
-use surrealdb::method::Query;
-use surrealdb::opt::PatchOp;
-use surrealdb::sql::Value;
-use surrealdb::{RecordId, Response};
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
-        .route("/", get(games_list).post(games_create))
-        .route("/{game_name}", get(game_detail).delete(game_delete))
-        .route("/{game_name}/tributes", get(game_tributes).post(create_tribute))
-        .route("/{game_name}/tributes/{tribute_identifier}", delete(delete_tribute).put(update_tribute))
+        .route("/", get(game_list).post(game_create))
+        .route("/{game_identifier}", get(game_detail).delete(game_delete).put(game_update))
+        .route("/{game_identifier}/tributes", get(game_tributes).post(tribute_create))
+        .route("/{game_identifier}/tributes/{tribute_identifier}", delete(tribute_delete).put(tribute_update))
 });
 
-pub async fn games_create(Json(payload): Json<Game>) -> impl IntoResponse {
+pub async fn game_create(Json(payload): Json<Game>) -> impl IntoResponse {
     let game: Option<Game> = DATABASE
-        .create(("game", &payload.name))
+        .create(("game", &payload.identifier))
         .content(payload)
         .await.expect("failed to create game");
 
     for _ in 0..24 {
-        create_tribute_record(None, game.clone().unwrap().name).await;
+        tribute_record_create(None, game.clone().unwrap().name).await;
     }
 
     (StatusCode::OK, Json::<Game>(game.clone().unwrap()))
 }
 
-pub async fn game_delete(game_name: Path<String>) -> StatusCode {
-    let game: Option<Game> = DATABASE.delete(("game", &game_name.0)).await.expect("Failed to delete game");
+pub async fn game_delete(game_identifier: Path<String>) -> StatusCode {
+    let game: Option<Game> = DATABASE.delete(("game", &game_identifier.0)).await.expect("Failed to delete game");
     match game {
         Some(_) => StatusCode::NO_CONTENT,
         None => {
@@ -53,7 +43,7 @@ pub async fn game_delete(game_name: Path<String>) -> StatusCode {
     }
 }
 
-pub async fn games_list() -> impl IntoResponse {
+pub async fn game_list() -> impl IntoResponse {
     match DATABASE.select("game").await {
         Ok(games) => {
             let mut headers = HeaderMap::new();
@@ -68,26 +58,42 @@ pub async fn games_list() -> impl IntoResponse {
     }
 }
 
-pub async fn game_detail(game_name: Path<String>) -> (StatusCode, Json<Option<Game>>) {
-    let mut result = DATABASE
-        .query(format!("SELECT * FROM game WHERE name = '{}'", game_name.to_string()))
-        .query(format!("RETURN count(SELECT id FROM playing_in WHERE out.name = '{}')", game_name.to_string()))
-        .await.unwrap();
-
+pub async fn game_detail(game_identifier: Path<String>) -> (StatusCode, Json<Option<Game>>) {
+    let identifier = game_identifier.0;
+    let mut result = DATABASE.query(format!(r#"
+        SELECT *, (
+            SELECT * FROM tribute WHERE identifier INSIDE (
+                SELECT <-playing_in<-tribute.identifier
+                AS identifiers
+                FROM game
+                WHERE identifier = "{identifier}"
+            )[0]["identifiers"]
+            ORDER district
+        ) AS tributes, (
+            RETURN count(
+                SELECT id FROM playing_in
+                WHERE out.identifier = "{identifier}"
+            )
+        ) AS tribute_count
+        FROM game
+        WHERE identifier = "{identifier}"
+    "#))
+    .await.unwrap();
+    
     let game: Option<Game> = result.take(0).expect("No game found");
-    let count: Option<u32> = result.take(1).unwrap_or_default();
-
-    let mut game = game.expect("No game found");
-    game.tribute_count = count.unwrap();
-
-    (StatusCode::OK, Json(Some(game)))
+    
+    if let Some(game) = game {
+        (StatusCode::OK, Json(Some(game)))
+    } else {
+        (StatusCode::NOT_FOUND, Json(None))
+    }
 }
 
-pub async fn game_tributes(Path(game_name): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
+pub async fn game_tributes(Path(game_identifier): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
     let tributes = DATABASE.query(
         format!(r#"SELECT * FROM tribute WHERE identifier IN (
-            SELECT <-playing_in<-tribute.identifier AS identifiers FROM game WHERE name = "{}"
-         )[0]["identifiers"]"#, game_name.to_string()),
+            SELECT <-playing_in<-tribute.identifier AS identifiers FROM game WHERE identifier = "{}"
+         )[0]["identifiers"]"#, game_identifier),
     ).await.expect("No tributes");
 
     match tributes.check() {
@@ -97,7 +103,26 @@ pub async fn game_tributes(Path(game_name): Path<String>) -> (StatusCode, Json<V
             (StatusCode::OK, Json(tributes.clone()))
         }
         Err(e) => {
+            tracing::error!("{}", e);
             (StatusCode::INTERNAL_SERVER_ERROR, Json::<Vec<Tribute>>(Vec::new()))
         }
     }
+}
+
+pub async fn game_update(Path(_): Path<String>, Json(payload): Json<EditGame>) -> (StatusCode, Json<Option<Game>>) {
+    let response = DATABASE.query(
+        format!("UPDATE game SET name = '{}' WHERE identifier = '{}'", payload.1, payload.0)
+    ).await;
+
+    match response {
+        Ok(mut response) => {
+            let game: Option<Game> = response.take(0).unwrap();
+            (StatusCode::OK, Json::<Option<Game>>(game))
+        }
+        Err(e) => {
+            tracing::error!("{}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<Game>>(None))
+        }
+    }
+
 }

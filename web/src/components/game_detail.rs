@@ -1,6 +1,5 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::game_tributes::GameTributes;
-use crate::components::tribute_delete::{DeleteTributeModal, TributeDelete};
 use crate::components::tribute_edit::EditTributeModal;
 use crate::API_HOST;
 use dioxus::prelude::*;
@@ -8,13 +7,13 @@ use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
 use game::games::GameStatus;
 use game::games::{Game, GAME};
 use game::tributes::Tribute;
-use shared::{EditGame, EditTribute};
+use shared::EditTribute;
 use std::collections::HashMap;
-use crate::components::game_edit::{EditGameModal, GameEdit};
+use crate::components::game_edit::GameEdit;
 
 async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::Game(name)) = keys.first() {
-        let response = reqwest::get(format!("{}/api/games/{}", API_HOST.clone(), name))
+    if let Some(QueryKey::Game(identifier)) = keys.first() {
+        let response = reqwest::get(format!("{}/api/games/{}", API_HOST.clone(), identifier))
             .await.unwrap();
 
         match response.json::<Game>().await {
@@ -23,7 +22,7 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
                 QueryResult::Ok(QueryValue::Game(game))
             }
             Err(_) => {
-                QueryResult::Err(QueryError::GameNotFound(name.to_string()))
+                QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
             }
         }
     } else {
@@ -34,7 +33,7 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
 #[component]
 fn GameStatusState() -> Element {
     let game: Signal<Option<Game>> = use_context();
-    let game = game.unwrap();
+    let game = game.read().clone().unwrap();
 
     let game_next_step: String;
 
@@ -74,11 +73,11 @@ fn GameStatusState() -> Element {
 }
 
 fn game_is_ready(tributes: &Vec<Tribute>) -> bool {
-    if tributes.len() == 0 { return false; }
+    if tributes.is_empty() { return false; }
     
     let mut tribute_spread: HashMap<u32, u32> = HashMap::new();
     for tribute in tributes {
-        if tribute_spread.get(&tribute.district).is_some() {
+        if tribute_spread.contains_key(&tribute.district) {
             let count = tribute_spread.get(&tribute.district).unwrap();
             tribute_spread.insert(tribute.district, count + 1);
         } else {
@@ -88,7 +87,7 @@ fn game_is_ready(tributes: &Vec<Tribute>) -> bool {
 
     let mut valid = true;
 
-    for (_, count) in &tribute_spread {
+    for count in tribute_spread.values() {
         if *count != 2 { valid = false; }
     }
 
@@ -96,35 +95,38 @@ fn game_is_ready(tributes: &Vec<Tribute>) -> bool {
 }
 
 #[component]
-pub fn GameDetailPage(name: String) -> Element {
-    let edit_tribute_signal: Signal<Option<EditTribute>> = use_signal(|| None);
-    use_context_provider(|| edit_tribute_signal);
+pub fn GameDetailPage(identifier: String) -> Element {
+    let game_query = use_get_query([QueryKey::Game(identifier.clone()), QueryKey::Games], fetch_game);
+    let mut game_signal: Signal<Option<Game>> = use_context();
 
-    let mut game_signal: Signal<Option<Game>> = use_signal(|| None);
-    use_context_provider(|| game_signal);
-
-    let game_query = use_get_query([QueryKey::Game(name.clone()), QueryKey::Games], fetch_game);
     match game_query.result().value() {
         QueryResult::Ok(QueryValue::Game(game)) => {
             game_signal.set(Some(game.clone()));
+            let detail = Gdp { game: game.clone() };
             rsx! {
-                GameDetails { game: game.clone() }
+                GameDetails { gdp: detail }
             }
         }
-        _ => { rsx! { p { "Loading...outer" }} }
+        QueryResult::Err(e) => {
+            dioxus_logger::tracing::error!("{:?}", e);
+            rsx! { "Failed to load" }
+        }
+        _ => {
+            rsx! {
+                p { "Loading...outer" }
+            }
+        }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Props)]
-struct GDP {
+pub struct Gdp {
     game: Game,
 }
 
-pub fn GameDetails(gdp: GDP) -> Element {
-    // let game_signal: Signal<Option<Game>> = use_context();
-    // dioxus_logger::tracing::debug!("{:?}", &game_signal.read());
+#[component]
+pub fn GameDetails(gdp: Gdp) -> Element {
     let game = gdp.game;
-    let game_name = game.name.clone();
 
     rsx! {
         div {
@@ -134,16 +136,10 @@ pub fn GameDetails(gdp: GDP) -> Element {
             }
 
             GameStatusState {}
-            
-            EditGameModal {}
 
             h3 { "Tributes" }
 
-            GameTributes { game_name: game.name.clone() }
-
-            EditTributeModal {}
-
-            RefreshButton { game_name: game.name.clone() }
+            GameTributes { }
 
             h3 { "Areas" }
             ul {
@@ -165,11 +161,11 @@ pub fn GameDetails(gdp: GDP) -> Element {
 }
 
 #[component]
-fn RefreshButton(game_name: String) -> Element {
+fn RefreshButton(game_identifier: String) -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
     let onclick = move |_| {
-        client.invalidate_queries(&[QueryKey::Tributes(game_name.clone())]);
+        client.invalidate_queries(&[QueryKey::Tributes(game_identifier.clone())]);
     };
 
     rsx! {

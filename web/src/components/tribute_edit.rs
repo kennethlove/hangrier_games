@@ -10,11 +10,11 @@ use std::ops::Deref;
 use std::time::Duration;
 
 async fn edit_tribute(tribute: EditTribute) -> MutationResult<MutationValue, MutationError> {
-    let game_name = GAME.with_borrow(|g| { g.name.clone() });
+    let game_identifier = GAME.with_borrow(|g| { g.identifier.clone() });
     let identifier = tribute.clone().0;
 
     let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}/tributes/{}", API_HOST.clone(), game_name, identifier);
+    let url: String = format!("{}/api/games/{}/tributes/{}", API_HOST.clone(), game_identifier, identifier);
 
     let response = client
         .put(url)
@@ -33,7 +33,7 @@ pub fn TributeEdit(identifier: String, district: u32, name: String) -> Element {
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
 
     let onclick = move |_| {
-        edit_tribute_signal.set(Some(EditTribute(identifier.clone(), district.clone(), name.clone())));
+        edit_tribute_signal.set(Some(EditTribute(identifier.clone(), district, name.clone())));
     };
 
     rsx! {
@@ -66,8 +66,11 @@ pub fn EditTributeForm() -> Element {
     let district = tribute_details.1;
 
     let game: Signal<Option<Game>> = use_context();
+    if game.peek().is_none() {
+        return rsx! {}
+    }
     let game = game.unwrap();
-    let game_name = game.name.clone();
+    let game_identifier = game.identifier.clone();
 
     let mutate = use_mutation(edit_tribute);
 
@@ -78,7 +81,7 @@ pub fn EditTributeForm() -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
     let save = move |e: Event<FormData>| {
-        let game_name = game_name.clone();
+        let game_identifier = game_identifier.clone();
         let tribute_details = edit_tribute_signal.read().clone().expect("No details provided");
         let identifier = tribute_details.0.clone();
 
@@ -93,7 +96,7 @@ pub fn EditTributeForm() -> Element {
                 edit_tribute_signal.set(Some(edit_tribute.clone()));
 
                 if let MutationResult::Ok(MutationValue::TributeUpdated(identifier)) = mutate.result().deref() {
-                    client.invalidate_queries(&[QueryKey::Tributes(game_name.clone())]);
+                    client.invalidate_queries(&[QueryKey::Game(game_identifier.clone())]);
                     edit_tribute_signal.set(None);
                 }
             });

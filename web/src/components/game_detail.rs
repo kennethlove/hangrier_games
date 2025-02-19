@@ -8,8 +8,9 @@ use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
 use game::games::GameStatus;
 use game::games::{Game, GAME};
 use game::tributes::Tribute;
-use shared::EditTribute;
+use shared::{EditGame, EditTribute};
 use std::collections::HashMap;
+use crate::components::game_edit::{EditGameModal, GameEdit};
 
 async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(name)) = keys.first() {
@@ -127,9 +128,14 @@ pub fn GameDetails(gdp: GDP) -> Element {
 
     rsx! {
         div {
-            h1 { "{game.name}" }
+            h1 {
+                "{game.name}",
+                GameEdit { identifier: game.identifier.clone(), name: game.name.clone() }
+            }
 
             GameStatusState {}
+            
+            EditGameModal {}
 
             h3 { "Tributes" }
 

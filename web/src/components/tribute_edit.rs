@@ -29,7 +29,7 @@ async fn edit_tribute(tribute: EditTribute) -> MutationResult<MutationValue, Mut
 }
 
 #[component]
-pub fn TributeEdit(name: String, district: u32, identifier: String) -> Element {
+pub fn TributeEdit(identifier: String, district: u32, name: String) -> Element {
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
 
     let onclick = move |_| {

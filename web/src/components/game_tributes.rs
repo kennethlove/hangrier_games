@@ -51,9 +51,9 @@ pub fn GameTributes(game_name: String) -> Element {
                         li {
                             "{tribute.name} - {tribute.district}",
                             TributeEdit {
-                                name: tribute.clone().name,
-                                district: tribute.district,
                                 identifier: tribute.clone().identifier,
+                                district: tribute.district,
+                                name: tribute.clone().name,
                             }
                         }
                     }

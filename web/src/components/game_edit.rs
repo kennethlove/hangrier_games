@@ -2,89 +2,116 @@ use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValu
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
+use game::games::{Game, GAME};
+use game::tributes::Tribute;
 use reqwest::{Response, StatusCode};
-use std::net::{IpAddr, Ipv4Addr};
+use shared::{DeleteTribute, EditGame, EditTribute};
 use std::ops::Deref;
 use std::time::Duration;
-use shared::DeleteGame;
 
-struct EditGame(String);
+async fn edit_game(game: EditGame) -> MutationResult<MutationValue, MutationError> {
+    let identifier = game.0.clone();
 
-async fn edit_game(identifier: String, name: String) -> MutationResult<MutationValue, MutationError> {
     let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}", API_HOST.clone(), identifier);
+    let url: String = format!("{}/api/games/{}", API_HOST.clone(),identifier);
 
     let response = client
         .put(url)
-        .merge()
+        .json(&game.clone())
         .send().await;
 
-    if response.unwrap().status().is_success() {
-        MutationResult::Ok(MutationValue::GameDeleted(name))
+    if response.expect("Failed to update game").status().is_success() {
+        MutationResult::Ok(MutationValue::GameUpdated(identifier))
     } else {
         MutationResult::Err(MutationError::Unknown)
     }
 }
 
 #[component]
-pub fn GameDelete(game_name: String) -> Element {
-    let mut delete_game_signal: Signal<Option<DeleteGame>> = use_context();
-
-    let name = game_name.clone();
+pub fn GameEdit(identifier: String, name: String) -> Element {
+    let mut edit_game_signal: Signal<Option<EditGame>> = use_context();
 
     let onclick = move |_| {
-        delete_game_signal.set(Some(name.clone()));
+        edit_game_signal.set(Some(EditGame(identifier.clone(), name.clone())));
     };
 
     rsx! {
         button {
             onclick,
-            "x"
+            "e"
         }
     }
 }
+
 #[component]
-pub fn DeleteGameModal() -> Element {
-    let mut delete_game_signal: Signal<Option<DeleteGame>> = use_context();
-    let game_name = delete_game_signal.peek().clone();
-    let name = game_name.clone().unwrap_or_default();
-    let mutate = use_mutation(delete_game);
+pub fn EditGameModal() -> Element {
+    let edit_game_signal: Signal<Option<EditGame>> = use_context();
+
+    rsx! {
+        dialog {
+            role: "confirm",
+            open: edit_game_signal.read().clone().is_some(),
+
+            EditGameForm {}
+        }
+    }
+}
+
+#[component]
+pub fn EditGameForm() -> Element {
+    let mut edit_game_signal: Signal<Option<EditGame>> = use_context();
+    let game_details = edit_game_signal.read().clone().unwrap_or_default();
+    let name = game_details.1.clone();
+    let identifier = game_details.0.clone();
+
+    let mutate = use_mutation(edit_game);
 
     let dismiss = move |_| {
-        delete_game_signal.set(None);
+        edit_game_signal.set(None);
     };
 
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
-    let delete = move |_| {
-        if let Some(name) = game_name.clone() {
+    let save = move |e: Event<FormData>| {
+        let identifier = identifier.clone();
+
+        let data = e.data().values();
+        let name = data.get("name").expect("No name value").0[0].clone();
+
+        if !name.is_empty() {
+            let edit_game = EditGame(identifier.clone(), name.clone());
             spawn(async move {
-                mutate.manual_mutate(name.clone()).await;
-                if let MutationResult::Ok(MutationValue::GameDeleted(name)) = mutate.result().deref() {
-                    client.invalidate_queries(&[QueryKey::Games]);
-                    delete_game_signal.set(None);
+                mutate.manual_mutate(edit_game.clone()).await;
+                edit_game_signal.set(Some(edit_game.clone()));
+
+                if let MutationResult::Ok(MutationValue::GameUpdated(identifier)) = mutate.result().deref() {
+                    client.invalidate_queries(&[QueryKey::Tributes(identifier.clone())]);
+                    edit_game_signal.set(None);
                 }
             });
         }
     };
 
     rsx! {
-        dialog {
-            role: "confirm",
-            open: delete_game_signal.read().clone().is_some(),
-            div {
-                h1 { "Delete game" }
-                p { r#"Delete "{name}"?"#}
-                button {
-                    r#type: "button",
-                    onclick: delete,
-                    "Yes"
+        form {
+            onsubmit: save,
+            label {
+                "Name",
+
+                input {
+                    r#type: "text",
+                    name: "name",
+                    value: name,
                 }
-                button {
-                    r#type: "button",
-                    onclick: dismiss,
-                    "No"
-                }
+            }
+            button {
+                r#type: "submit",
+                "Update"
+            }
+            button {
+                r#type: "dialog",
+                onclick: dismiss,
+                "Cancel"
             }
         }
     }

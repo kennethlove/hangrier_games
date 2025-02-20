@@ -3,8 +3,8 @@ use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
-use fake::Fake;
 use strum::{EnumIter, IntoEnumIterator};
+use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Item {
@@ -24,7 +24,7 @@ impl Display for Item {
 
 impl Default for Item {
     fn default() -> Self {
-        let identifier: String = fake::faker::lorem::en::Words(2..3).fake::<Vec<String>>().join("-");
+        let identifier = Uuid::new_v4().to_string();
         Self {
             identifier,
             name: String::from("Useless health potion"),
@@ -44,7 +44,7 @@ impl Item {
         attribute: Attribute,
         effect: i32,
     ) -> Item {
-        let identifier: String = fake::faker::lorem::en::Words(2..3).fake::<Vec<String>>().join("-");
+        let identifier = Uuid::new_v4().to_string();
         Item {
             identifier,
             name: name.to_string(),

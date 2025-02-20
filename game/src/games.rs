@@ -12,7 +12,8 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::str::FromStr;
-use strum::IntoEnumIterator;
+use uuid::Uuid;
+use crate::items::Item;
 
 thread_local!(pub static GAME: RefCell<Game> = RefCell::new(Game::default()));
 
@@ -22,12 +23,14 @@ pub struct Game {
     pub name: String,
     pub status: GameStatus,
     pub day: Option<u32>,
+    #[serde(default)]
     pub areas: BTreeMap<String, AreaDetails>,
     #[serde(default)]
     pub tribute_count: u32,
-    // #[serde(skip_serializing, skip_deserializing)]
     #[serde(default)]
     pub tributes: Vec<Tribute>,
+    #[serde(default)]
+    pub items: Vec<Item>,
 }
 
 impl Default for Game {
@@ -38,33 +41,25 @@ impl Default for Game {
             name = words.join("-").to_string();
         };
 
-        let mut game = Game {
-            identifier: name.clone(),
+        Game {
+            identifier: Uuid::new_v4().to_string(),
             name,
             status: Default::default(),
             day: None,
             areas: BTreeMap::new(),
             tribute_count: 0,
             tributes: Vec::new(),
-        };
-
-        for area in Area::iter() {
-            game.areas.insert(
-                area.to_string(),
-                AreaDetails::new(true, vec![])
-            );
+            items: Vec::new(),
         }
-
-        game
     }
 }
 
 impl Game {
     pub fn new(name: &str) -> Self {
-        let mut game = Game::default();
-        game.name = name.to_string();
-        game.identifier = name.to_string();
-        game
+        Game {
+            name: name.to_string(),
+            ..Default::default()
+        }
     }
 
     pub fn where_am_i(&self, tribute: &Tribute) -> Option<Area> {

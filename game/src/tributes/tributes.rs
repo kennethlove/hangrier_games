@@ -13,6 +13,7 @@ use rand::prelude::*;
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
+use uuid::Uuid;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Tribute {
@@ -50,7 +51,7 @@ impl Tribute {
         let attributes = Attributes::new();
         let statistics = Statistics::default();
 
-        let id: String = fake::faker::lorem::en::Words(2..3).fake::<Vec<String>>().join("-");
+        let id: String = Uuid::new_v4().to_string();
 
         Self {
             identifier: id,

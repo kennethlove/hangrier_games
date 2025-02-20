@@ -141,20 +141,23 @@ pub fn GameDetails(gdp: Gdp) -> Element {
 
             GameTributes { }
 
-            h3 { "Areas" }
+            h3 { "Items" }
             ul {
-                for (area, details) in game.areas.iter() {
-                    li {
-                        "{area}: {details.open}"
-                        ul {
-                            for item in &details.items {
-                                li {
-                                    "{item.name}",
-                                }
-                            }
-                        }
-                    }
+                for item in game.items.iter() {
+                    li { "{item.name}" }
                 }
+                // for (area, details) in game.areas.iter() {
+                //     li {
+                //         "{area}: {details.open}"
+                //         ul {
+                //             for item in &details.items {
+                //                 li {
+                //                     "{item.name}",
+                //                 }
+                //             }
+                //         }
+                //     }
+                // }
             }
         }
     }

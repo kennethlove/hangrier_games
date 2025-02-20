@@ -4,11 +4,10 @@ use serde::de::{EnumAccess, Error, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::Display;
 use std::str::FromStr;
-use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 
-#[derive(Clone, Debug, Eq, PartialEq, EnumIter, Hash, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, EnumIter, Hash, Deserialize, Serialize, Ord, PartialOrd)]
 pub enum Area {
     Cornucopia,
     Northwest,

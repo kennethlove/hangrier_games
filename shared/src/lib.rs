@@ -14,3 +14,11 @@ pub struct EditTribute(pub String, pub u32, pub String); // Identifier, district
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct EditGame(pub String, pub String); // Identifier, name
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct GameArea {
+    pub identifier: String,
+    pub name: String,
+    pub open: bool,
+    pub area: String,
+}

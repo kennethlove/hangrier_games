@@ -1,11 +1,8 @@
-use crate::games::Game;
 use crate::items::Item;
-use serde::de::{EnumAccess, Error, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use std::fmt::Display;
 use std::str::FromStr;
 use strum_macros::EnumIter;
-
 
 #[derive(Clone, Debug, Eq, PartialEq, EnumIter, Hash, Deserialize, Serialize, Ord, PartialOrd)]
 pub enum Area {
@@ -49,34 +46,6 @@ impl FromStr for Area {
 }
 
 impl Area {
-//     pub fn new(name: &str) -> Self {
-//         let mut area = Area::default();
-//         area.name = name.to_string();
-//         area
-//     }
-//
-//     pub fn add_neighbor(&mut self, neighbor: Area) {
-//         // self.neighbors.push(neighbor);
-//     }
-//
-//     pub fn add_neighbors(&mut self, neighbors: Vec<&Area>) {
-//         for neighbor in neighbors {
-//             self.add_neighbor(neighbor.clone());
-//         }
-//     }
-//
-//     pub fn add_item(&mut self, item: Item) {
-//         // self.items.push(item);
-//     }
-//
-//     pub fn remove_item(&mut self, removed_item: &Item) {
-//         // self.items.retain(|item| item != removed_item);
-//     }
-//
-//     pub fn add_event(&mut self, event: AreaEvent) {
-//         // self.events.push(event);
-//     }
-//
 //     pub fn process_events(&mut self, mut tributes: Vec<Tribute>) -> Vec<Tribute> {
 //         // If there are events, close the area
 //         // if !self.events.is_empty() {
@@ -99,46 +68,16 @@ impl Area {
 //
 //         tributes
 //     }
-//
-//     pub fn tributes(&self) -> Vec<Tribute> {
-//         todo!();
-//         // GAME.with(|game| {
-//         //     game.borrow().tributes.iter()
-//         //         .filter(|t| t.area == self)
-//         //         .cloned()
-//         //         .collect()
-//         // })
-//     }
-//
-//     pub fn living_tributes(&self) -> Vec<Tribute> {
-//         todo!();
-//         // GAME.with(|game| {
-//         //     game.borrow().tributes.iter().filter(|t| t.is_alive()).cloned().collect()
-//         // })
-//     }
-//
-//     pub fn available_items(&self) -> Vec<Item> {
-//         todo!();
-//         // self.items
-//         //     .iter()
-//         //     .filter(|i| i.quantity > 0)
-//         //     .cloned()
-//         //     .collect()
-//     }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct AreaDetails {
+    pub identifier: String,
+    pub name: String,
+    pub area: String,
     pub open: bool,
-    pub items: Vec<Item>,
-}
-
-impl AreaDetails {
-    pub fn new(open: bool, items: Vec<Item>) -> Self {
-        let mut items = items;
-        items.push(Item::new_random(None));
-        AreaDetails { open, items }
-    }
+    // #[serde(default)]
+    // pub items: Vec<Item>,
 }
 
 #[cfg(test)]

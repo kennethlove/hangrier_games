@@ -13,9 +13,11 @@ use std::sync::LazyLock;
 use serde::{Deserialize, Serialize};
 use game::areas::Area;
 use strum::IntoEnumIterator;
-use surrealdb::RecordId;
+use surrealdb::{Error, RecordId, Response};
 use game::items::Item;
 use std::str::FromStr;
+use shared::GameArea;
+use uuid::Uuid;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
@@ -26,41 +28,78 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
 });
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct GameItem {
+pub struct GameAreaRecord {
     #[serde(rename="in")]
     game: RecordId,
     #[serde(rename="out")]
-    item: RecordId,
-    area: Area,
-}
-
-pub async fn give_game_items(game_identifier: String) -> Vec<GameItem> {
-    let game_id = RecordId::from(("game", game_identifier));
-    let mut output: Vec<GameItem> = Vec::new();
-
-    for area in Area::iter() {
-        for _ in 0..2 {
-            let new_item: Item = Item::new_random(None);
-            let new_item_id: RecordId = RecordId::from(("item", &new_item.identifier));
-            let _: Option<Item> = DATABASE.insert(new_item_id.clone()).content(new_item.clone()).await.expect("Failed to insert Item");
-            let game_record: Vec<GameItem> = DATABASE.insert("items").relation(
-                GameItem {
-                    game: game_id.clone(),
-                    item: new_item_id.clone(),
-                    area: area.clone(),
-                }
-            ).await.expect("Failed to update Items relation");
-            output.push(game_record.first().unwrap().clone());
-        }
-    }
-
-    output
+    area: RecordId,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct GameItemDetail {
-    area: String,
-    item: Item
+pub struct AreaItem {
+    #[serde(rename="in")]
+    area: RecordId,
+    #[serde(rename="out")]
+    item: RecordId
+}
+
+async fn game_area_record_create(area: Area, game_identifier: String) -> Option<GameAreaRecord> {
+    // Does the `area` exist for the game?
+    let mut existing_area = DATABASE.query(
+        format!(r#"
+        SELECT identifier
+        FROM area
+        WHERE original_name = '{}'
+        AND <-areas<-game.identifier = '{}'"#,
+            area,
+            game_identifier.clone()
+        )
+    ).await.expect("Failed to query game area");
+    let existing_area: Option<String> = existing_area.take(0).unwrap(); // e.g. "Cornucopia"
+
+    let game_id = RecordId::from(("game", game_identifier));
+
+    if let Some(area_id) = existing_area {
+        // if the `area` already exists
+        // create the `areas` record
+        DATABASE
+            .insert::<Option<GameAreaRecord>>(RecordId::from(("areas", area_id.clone())))
+            .relation([GameAreaRecord {
+                game: game_id.clone(),
+                area: RecordId::from_str(&area_id).unwrap(),
+            }])
+            .await.expect("Failed to link Area and Game")
+    } else {
+        // if the `area` doesn't exist
+        let identifier = Uuid::new_v4().to_string();
+        let area_id: RecordId = RecordId::from(("area", identifier.clone()));
+
+        // create the `area` record
+        match DATABASE
+            .insert::<Option<GameArea>>(area_id.clone())
+            .content(GameArea {
+                identifier: identifier.clone(),
+                name: area.to_string(),
+                open: true,
+                area: area.to_string()
+            })
+            .await {
+                Ok(Some(_)) => {
+                    // create the `areas` record
+                    DATABASE
+                        .insert::<Option<GameAreaRecord>>(RecordId::from(("areas", area_id.to_string())))
+                        .relation([GameAreaRecord {
+                            game: game_id.clone(),
+                            area: area_id.clone(),
+                        }]).await.expect("Failed to link Area and Game")
+                }
+                Err(e) => {
+                    eprintln!("{:?}", e);
+                    None
+                }
+                _ => None
+        }
+    }
 }
 
 pub async fn game_create(Json(payload): Json<Game>) -> impl IntoResponse {
@@ -68,22 +107,38 @@ pub async fn game_create(Json(payload): Json<Game>) -> impl IntoResponse {
         .create(("game", &payload.identifier))
         .content(payload.clone())
         .await.expect("failed to create game");
-    let mut game = game.unwrap();
+    let game = game.unwrap();
 
     for _ in 0..24 {
         tribute_record_create(None, payload.clone().identifier).await;
     }
 
-    give_game_items(payload.clone().identifier).await;
+    for area in Area::iter() {
+        let game_area = game_area_record_create(
+            area.clone(), // Area to link to,
+            payload.clone().identifier // Game to link to,
+        ).await.expect("Failed to create game area");
 
-    // for area in Area::iter() {
-    //     DATABASE.insert("items")).relation(
-    //         GameItem {
-    //             game: RecordId::from(("game", payload.identifier.clone())),
-    //             item: RecordId::from()
-    //         }
-    //     )
-    // }
+        for _ in 0..2 {
+            // Insert an item
+            let new_item: Item = Item::new_random(None);
+            let new_item_id: RecordId = RecordId::from(("item", &new_item.identifier));
+            DATABASE
+                .insert::<Option<Item>>(new_item_id.clone())
+                .content(new_item.clone())
+                .await.expect("failed to insert item");
+
+            // Insert an area-item relationship
+            let area_item: AreaItem = AreaItem {
+                area: game_area.area.clone(),
+                item: new_item_id.clone()
+            };
+            DATABASE
+                .insert::<Option<AreaItem>>(RecordId::from_str("items").unwrap())
+                .relation(area_item)
+                .await.expect("");
+        }
+    }
 
     (StatusCode::OK, Json::<Game>(game.clone()))
 }
@@ -99,7 +154,9 @@ pub async fn game_delete(game_identifier: Path<String>) -> StatusCode {
 }
 
 pub async fn game_list() -> impl IntoResponse {
-    match DATABASE.select("game").await {
+    let games = DATABASE.select("game").await;
+    
+    match games {
         Ok(games) => {
             let mut headers = HeaderMap::new();
             headers.insert(CACHE_CONTROL, "no-store".parse().unwrap());
@@ -135,19 +192,20 @@ pub async fn game_detail(game_identifier: Path<String>) -> (StatusCode, Json<Opt
         ) AS tribute_count,
         (
             SELECT *
-            FROM item
+            FROM area
             WHERE identifier INSIDE (
                 SELECT VALUE out.identifier as identifier
-            FROM items
-            WHERE in.identifier = "{identifier}")
-        ) AS items
+                FROM areas
+                WHERE in.identifier = "{identifier}"
+            )
+        ) as areas
         FROM game
         WHERE identifier = "{identifier}"
     "#))
     .await.unwrap();
-    
+
     let game: Option<Game> = result.take(0).expect("No game found");
-    
+
     if let Some(game) = game {
         (StatusCode::OK, Json(Some(game)))
     } else {

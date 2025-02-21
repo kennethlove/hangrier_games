@@ -84,7 +84,10 @@ pub fn GameListMember(game: Game) -> Element {
                 },
                 "{game.name}"
             }
-            GameDelete { game_name: game.name.clone(), game_identifier: game.identifier.clone() }
+            GameDelete {
+                game_name: game.name.clone(),
+                game_identifier: game.identifier.clone()
+            }
         }
     }
 }

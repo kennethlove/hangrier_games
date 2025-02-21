@@ -9,11 +9,9 @@ use rand::prelude::SliceRandom;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
-use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::str::FromStr;
 use uuid::Uuid;
-use crate::items::Item;
 
 thread_local!(pub static GAME: RefCell<Game> = RefCell::new(Game::default()));
 
@@ -24,20 +22,18 @@ pub struct Game {
     pub status: GameStatus,
     pub day: Option<u32>,
     #[serde(default)]
-    pub areas: BTreeMap<String, AreaDetails>,
+    pub areas: Vec<AreaDetails>,
     #[serde(default)]
     pub tribute_count: u32,
     #[serde(default)]
     pub tributes: Vec<Tribute>,
-    #[serde(default)]
-    pub items: Vec<Item>,
 }
 
 impl Default for Game {
     fn default() -> Game {
-        let wpgen = witty_phrase_generator::WPGen::new();
+        let wp_gen = witty_phrase_generator::WPGen::new();
         let mut name = String::new();
-        if let Some(words) = wpgen.with_words(3) {
+        if let Some(words) = wp_gen.with_words(3) {
             name = words.join("-").to_string();
         };
 
@@ -46,10 +42,9 @@ impl Default for Game {
             name,
             status: Default::default(),
             day: None,
-            areas: BTreeMap::new(),
+            areas: Vec::new(),
             tribute_count: 0,
             tributes: Vec::new(),
-            items: Vec::new(),
         }
     }
 }

@@ -55,18 +55,18 @@ async fn game_area_record_create(area: Area, game_identifier: String) -> Option<
             game_identifier.clone()
         )
     ).await.expect("Failed to query game area");
-    let existing_area: Option<String> = existing_area.take(0).unwrap(); // e.g. "Cornucopia"
+    let existing_area: Option<String> = existing_area.take(0).unwrap(); // e.g. a UUID
 
     let game_id = RecordId::from(("game", game_identifier));
 
-    if let Some(area_id) = existing_area {
+    if let Some(identifier) = existing_area {
         // if the `area` already exists
         // create the `areas` record
         DATABASE
-            .insert::<Option<GameAreaRecord>>(RecordId::from(("areas", area_id.clone())))
+            .insert::<Option<GameAreaRecord>>(RecordId::from(("areas", identifier.clone())))
             .relation([GameAreaRecord {
                 game: game_id.clone(),
-                area: RecordId::from_str(&area_id).unwrap(),
+                area: RecordId::from_str(&identifier).unwrap(),
             }])
             .await.expect("Failed to link Area and Game")
     } else {
@@ -75,7 +75,7 @@ async fn game_area_record_create(area: Area, game_identifier: String) -> Option<
         let area_id: RecordId = RecordId::from(("area", identifier.clone()));
 
         // create the `area` record
-        match DATABASE
+        let area = DATABASE
             .insert::<Option<GameArea>>(area_id.clone())
             .content(GameArea {
                 identifier: identifier.clone(),
@@ -83,22 +83,19 @@ async fn game_area_record_create(area: Area, game_identifier: String) -> Option<
                 open: true,
                 area: area.to_string()
             })
-            .await {
-                Ok(Some(_)) => {
-                    // create the `areas` record
-                    DATABASE
-                        .insert::<Option<GameAreaRecord>>(RecordId::from(("areas", area_id.to_string())))
-                        .relation([GameAreaRecord {
-                            game: game_id.clone(),
-                            area: area_id.clone(),
-                        }]).await.expect("Failed to link Area and Game")
-                }
-                Err(e) => {
-                    eprintln!("{:?}", e);
-                    None
-                }
-                _ => None
-        }
+            .await.expect("Failed to find Area and Game link");
+        
+        if let Some(area) = area {
+            // create the `areas` record
+            DATABASE
+                .insert::<Option<GameAreaRecord>>(
+                    RecordId::from(("areas", area_id.to_string()))
+                )
+                .relation(GameAreaRecord {
+                    game: game_id.clone(),
+                    area: area_id.clone(),
+                }).await.expect("Failed to link Area and Game")
+        } else { None }
     }
 }
 
@@ -119,25 +116,25 @@ pub async fn game_create(Json(payload): Json<Game>) -> impl IntoResponse {
             payload.clone().identifier // Game to link to,
         ).await.expect("Failed to create game area");
 
-        for _ in 0..2 {
-            // Insert an item
-            let new_item: Item = Item::new_random(None);
-            let new_item_id: RecordId = RecordId::from(("item", &new_item.identifier));
-            DATABASE
-                .insert::<Option<Item>>(new_item_id.clone())
-                .content(new_item.clone())
-                .await.expect("failed to insert item");
-
-            // Insert an area-item relationship
-            let area_item: AreaItem = AreaItem {
-                area: game_area.area.clone(),
-                item: new_item_id.clone()
-            };
-            DATABASE
-                .insert::<Option<AreaItem>>(RecordId::from_str("items").unwrap())
-                .relation(area_item)
-                .await.expect("");
-        }
+        // for _ in 0..2 {
+        //     // Insert an item
+        //     let new_item: Item = Item::new_random(None);
+        //     let new_item_id: RecordId = RecordId::from(("item", &new_item.identifier));
+        //     DATABASE
+        //         .insert::<Option<Item>>(new_item_id.clone())
+        //         .content(new_item.clone())
+        //         .await.expect("failed to insert item");
+        // 
+        //     // Insert an area-item relationship
+        //     let area_item: AreaItem = AreaItem {
+        //         area: game_area.area.clone(),
+        //         item: new_item_id.clone()
+        //     };
+        //     DATABASE
+        //         .insert::<Option<AreaItem>>(RecordId::from_str("items").unwrap())
+        //         .relation(area_item)
+        //         .await.expect("");
+        // }
     }
 
     (StatusCode::OK, Json::<Game>(game.clone()))

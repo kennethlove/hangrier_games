@@ -1,4 +1,5 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
+use crate::components::game_edit::GameEdit;
 use crate::components::game_tributes::GameTributes;
 use crate::components::tribute_edit::EditTributeModal;
 use crate::API_HOST;
@@ -9,7 +10,6 @@ use game::games::{Game, GAME};
 use game::tributes::Tribute;
 use shared::EditTribute;
 use std::collections::HashMap;
-use crate::components::game_edit::GameEdit;
 
 async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(identifier)) = keys.first() {
@@ -140,12 +140,12 @@ pub fn GameDetails(gdp: Gdp) -> Element {
             h3 { "Areas" }
             ul {
                 for area in game.areas {
-                    li { 
-                        "{area.name}",
+                    li {
+                        "{area.name}, open: {area.open}",
                         ul {
-                            // for item in area.items {
-                            //     li { "{item.name}" }
-                            // }
+                            for item in area.clone().items {
+                                li { "{item.name}" }
+                            }
                         }
                     }
                 }

@@ -14,15 +14,15 @@ pub fn GameTributes() -> Element {
             for tribute in tributes {
                 li {
                     "{tribute.name} - {tribute.district}",
-                    ul {
-                        for item in tribute.clone().items {
-                            li { "{item.name}" }
-                        }
-                    }
                     TributeEdit {
                         identifier: tribute.clone().identifier,
                         district: tribute.district,
                         name: tribute.clone().name,
+                    }
+                    ul {
+                        for item in tribute.clone().items {
+                            li { "{item.name}" }
+                        }
                     }
                 }
             }

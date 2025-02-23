@@ -76,15 +76,14 @@ pub struct AreaDetails {
     pub name: String,
     pub area: String,
     pub open: bool,
-    // #[serde(default)]
-    // pub items: Vec<Item>,
+    #[serde(default)]
+    pub items: Vec<Item>,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::games::Game;
-    use rstest::rstest;
 
     thread_local!(pub static GAME: Game = Game::default());
 

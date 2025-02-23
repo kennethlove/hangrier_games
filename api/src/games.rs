@@ -119,25 +119,25 @@ pub async fn game_create(Json(payload): Json<Game>) -> impl IntoResponse {
             payload.clone().identifier // Game to link to,
         ).await.expect("Failed to create game area");
 
-        // for _ in 0..2 {
-        //     // Insert an item
-        //     let new_item: Item = Item::new_random(None);
-        //     let new_item_id: RecordId = RecordId::from(("item", &new_item.identifier));
-        //     DATABASE
-        //         .insert::<Option<Item>>(new_item_id.clone())
-        //         .content(new_item.clone())
-        //         .await.expect("failed to insert item");
-        // 
-        //     // Insert an area-item relationship
-        //     let area_item: AreaItem = AreaItem {
-        //         area: game_area.area.clone(),
-        //         item: new_item_id.clone()
-        //     };
-        //     DATABASE
-        //         .insert::<Option<AreaItem>>(RecordId::from_str("items").unwrap())
-        //         .relation(area_item)
-        //         .await.expect("");
-        // }
+        for _ in 0..2 {
+            // Insert an item
+            let new_item: Item = Item::new_random(None);
+            let new_item_id: RecordId = RecordId::from(("item", &new_item.identifier));
+            DATABASE
+                .insert::<Option<Item>>(new_item_id.clone())
+                .content(new_item.clone())
+                .await.expect("failed to insert item");
+
+            // Insert an area-item relationship
+            let area_item: AreaItem = AreaItem {
+                area: game_area.area.clone(),
+                item: new_item_id.clone(),
+            };
+            DATABASE
+                .insert::<Vec<AreaItem>>("items")
+                .relation([area_item])
+                .await.expect("");
+        }
     }
 
     (StatusCode::OK, Json::<Game>(game.clone()))
@@ -174,7 +174,7 @@ pub async fn game_detail(game_identifier: Path<String>) -> (StatusCode, Json<Opt
     let identifier = game_identifier.0;
     let mut result = DATABASE.query(format!(r#"
         SELECT *, (
-            SELECT *, ->owns->item.* AS items
+            SELECT *, ->owns->item[*] AS items
             FROM tribute
             WHERE identifier INSIDE (
                 SELECT <-playing_in<-tribute.identifier
@@ -191,7 +191,7 @@ pub async fn game_detail(game_identifier: Path<String>) -> (StatusCode, Json<Opt
             )
         ) AS tribute_count,
         (
-            SELECT *
+            SELECT *, ->items->item[*] as items
             FROM area
             WHERE identifier INSIDE (
                 SELECT VALUE out.identifier as identifier

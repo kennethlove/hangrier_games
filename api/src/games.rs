@@ -1,4 +1,4 @@
-use crate::tributes::{tribute_create, tribute_record_create, tribute_delete, tribute_update};
+use crate::tributes::{tribute_create, tribute_delete, tribute_record_create, tribute_update};
 use crate::DATABASE;
 use axum::extract::Path;
 use axum::http::header::{CACHE_CONTROL, EXPIRES};
@@ -7,16 +7,16 @@ use axum::response::IntoResponse;
 use axum::routing::{delete, get, post};
 use axum::Json;
 use axum::Router;
-use game::games::Game;
-use shared::EditGame;
-use std::sync::LazyLock;
-use serde::{Deserialize, Serialize};
 use game::areas::Area;
+use game::games::Game;
+use game::items::Item;
+use serde::{Deserialize, Serialize};
+use shared::EditGame;
+use shared::GameArea;
+use std::str::FromStr;
+use std::sync::LazyLock;
 use strum::IntoEnumIterator;
 use surrealdb::{Error, RecordId, Response};
-use game::items::Item;
-use std::str::FromStr;
-use shared::GameArea;
 use uuid::Uuid;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
@@ -43,7 +43,35 @@ pub struct AreaItem {
     item: RecordId
 }
 
-async fn game_area_record_create(area: Area, game_identifier: String) -> Option<GameAreaRecord> {
+async fn game_area_create(area: Area) -> Option<GameArea> {
+    let identifier = Uuid::new_v4().to_string();
+    let area_id: RecordId = RecordId::from(("area", identifier.clone()));
+
+    // create the `area` record
+    DATABASE
+        .insert::<Option<GameArea>>(area_id.clone())
+        .content(GameArea {
+            identifier: identifier.clone(),
+            name: area.to_string(),
+            open: true,
+            area: area.to_string(),
+        })
+        .await.expect("Failed to find Area and Game link")
+}
+
+async fn game_area_record_create(identifier: String, game_id: RecordId) -> Option<Vec<GameAreaRecord>> {
+    DATABASE
+        .insert::<Option<Vec<GameAreaRecord>>>(
+            RecordId::from(("areas", identifier.clone()))
+        ).relation(
+        GameAreaRecord {
+            game: game_id.clone(),
+            area: RecordId::from(("area", &identifier)),
+        }
+    ).await.expect("Failed to link Area and Game")
+}
+
+async fn game_area_record_creator(area: Area, game_identifier: String) -> Option<GameAreaRecord> {
     // Does the `area` exist for the game?
     let mut existing_area = DATABASE.query(
         format!(r#"
@@ -58,45 +86,20 @@ async fn game_area_record_create(area: Area, game_identifier: String) -> Option<
     let existing_area: Option<String> = existing_area.take(0).unwrap(); // e.g. a UUID
 
     let game_id = RecordId::from(("game", game_identifier));
+    let gar: Option<Vec<GameAreaRecord>>;
 
     if let Some(identifier) = existing_area {
-        // if the `area` already exists
-        // create the `areas` record
-        DATABASE
-            .insert::<Option<GameAreaRecord>>(RecordId::from(("areas", identifier.clone())))
-            .relation([GameAreaRecord {
-                game: game_id.clone(),
-                area: RecordId::from_str(&identifier).unwrap(),
-            }])
-            .await.expect("Failed to link Area and Game")
+        // The `area` exists, create the `areas` connection
+        gar = game_area_record_create(identifier, game_id).await;
     } else {
-        // if the `area` doesn't exist
-        let identifier = Uuid::new_v4().to_string();
-        let area_id: RecordId = RecordId::from(("area", identifier.clone()));
-
-        // create the `area` record
-        let area = DATABASE
-            .insert::<Option<GameArea>>(area_id.clone())
-            .content(GameArea {
-                identifier: identifier.clone(),
-                name: area.to_string(),
-                open: true,
-                area: area.to_string()
-            })
-            .await.expect("Failed to find Area and Game link");
-        
-        if let Some(area) = area {
-            // create the `areas` record
-            DATABASE
-                .insert::<Option<GameAreaRecord>>(
-                    RecordId::from(("areas", area_id.to_string()))
-                )
-                .relation(GameAreaRecord {
-                    game: game_id.clone(),
-                    area: area_id.clone(),
-                }).await.expect("Failed to link Area and Game")
-        } else { None }
+        // The `area` does not exist, create the `area`
+        if let Some(area) = game_area_create(area).await {
+            // Then create the `areas` connection
+            let identifier = area.identifier.clone();
+            gar = game_area_record_create(identifier, game_id).await;
+        } else { return None; }
     }
+    gar.expect("Failed to link area and game.").clone().pop()
 }
 
 pub async fn game_create(Json(payload): Json<Game>) -> impl IntoResponse {
@@ -111,7 +114,7 @@ pub async fn game_create(Json(payload): Json<Game>) -> impl IntoResponse {
     }
 
     for area in Area::iter() {
-        let game_area = game_area_record_create(
+        let game_area = game_area_record_creator(
             area.clone(), // Area to link to,
             payload.clone().identifier // Game to link to,
         ).await.expect("Failed to create game area");

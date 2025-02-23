@@ -78,16 +78,20 @@ fn RefreshButton() -> Element {
 pub fn GameListMember(game: Game) -> Element {
     rsx! {
         li {
-            Link {
-                to: Routes::GameDetailPage {
-                    identifier: game.identifier.clone()
-                },
-                "{game.name}"
+            p {
+                Link {
+                    to: Routes::GameDetailPage {
+                        identifier: game.identifier.clone()
+                    },
+                    "{game.name}"
+                }
+                GameDelete {
+                    game_name: game.name.clone(),
+                    game_identifier: game.identifier.clone()
+                }
             }
-            GameDelete {
-                game_name: game.name.clone(),
-                game_identifier: game.identifier.clone()
-            }
+            p { "{game.tribute_count} tributes" }
+            p { "{game.status} - {game.ready}" }
         }
     }
 }

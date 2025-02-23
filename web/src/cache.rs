@@ -1,3 +1,4 @@
+use game::areas::AreaDetails;
 use game::games::Game;
 use game::tributes::Tribute;
 
@@ -7,6 +8,7 @@ pub(crate) enum QueryKey {
     Game(String),
     Games,
     Tributes(String),
+    Areas(String),
 }
 
 #[derive(PartialEq, Debug)]
@@ -22,6 +24,7 @@ pub(crate) enum QueryValue {
     Games(Vec<Game>),
     Game(Game),
     Tributes(Vec<Tribute>),
+    Areas(Vec<AreaDetails>),
 }
 
 #[derive(PartialEq, Debug)]

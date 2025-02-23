@@ -1,20 +1,26 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
-use crate::components::tribute_edit::TributeEdit;
+use crate::components::game_edit::GameEdit;
+use crate::components::game_tributes::GameTributes;
+use crate::components::tribute_edit::EditTributeModal;
 use crate::API_HOST;
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_get_query, QueryResult};
-use game::games::Game;
+use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
+use game::areas::AreaDetails;
+use game::games::GameStatus;
+use game::games::{Game, GAME};
 use game::tributes::Tribute;
+use shared::EditTribute;
+use std::collections::HashMap;
 
-async fn fetch_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::Tributes(identifier)) = keys.first() {
-        let response = reqwest::get(format!("{}/api/games/{}/tributes", API_HOST.clone(), identifier))
+async fn fetch_areas(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
+    if let Some(QueryKey::Areas(identifier)) = keys.first() {
+        let response = reqwest::get(format!("{}/api/games/{}/areas", API_HOST.clone(), identifier))
             .await
             .unwrap();
 
-        match response.json::<Vec<Tribute>>().await {
-            Ok(tributes) => {
-                QueryResult::Ok(QueryValue::Tributes(tributes))
+        match response.json::<Vec<AreaDetails>>().await {
+            Ok(areas) => {
+                QueryResult::Ok(QueryValue::Areas(areas))
             }
             Err(_) => QueryResult::Err(QueryError::GameNotFound(identifier.to_string())),
         }
@@ -24,36 +30,31 @@ async fn fetch_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryErr
 }
 
 #[component]
-pub fn GameTributes() -> Element {
+pub fn GameAreaList() -> Element {
     let game_signal: Signal<Option<Game>> = use_context();
 
     let game = game_signal.read().clone();
     let game = game.unwrap();
     let identifier = game.identifier.clone();
 
-    let tribute_query = use_get_query(
+    let area_query = use_get_query(
         [
-            QueryKey::Tributes(identifier.clone()),
+            QueryKey::Areas(identifier.clone()),
             QueryKey::Game(identifier.clone()),
             QueryKey::Games
         ],
-        fetch_tributes,
+        fetch_areas,
     );
 
-    match tribute_query.result().value() {
-        QueryResult::Ok(QueryValue::Tributes(tributes)) => {
+    match area_query.result().value() {
+        QueryResult::Ok(QueryValue::Areas(areas)) => {
             rsx! {
                 ul {
-                    for tribute in tributes {
+                    for area in areas {
                         li {
-                            "{tribute.name} - {tribute.district}",
-                            TributeEdit {
-                                identifier: tribute.clone().identifier,
-                                district: tribute.district,
-                                name: tribute.clone().name,
-                            }
+                            "{area.name}, open: {area.open}",
                             ul {
-                                for item in tribute.clone().items {
+                                for item in area.clone().items {
                                     li { "{item.name}" }
                                 }
                             }
@@ -72,3 +73,4 @@ pub fn GameTributes() -> Element {
         _ => { rsx! {} }
     }
 }
+

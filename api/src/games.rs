@@ -7,9 +7,10 @@ use axum::response::IntoResponse;
 use axum::routing::{delete, get, post};
 use axum::Json;
 use axum::Router;
-use game::areas::Area;
+use game::areas::{Area, AreaDetails};
 use game::games::Game;
 use game::items::Item;
+use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
 use shared::EditGame;
 use shared::GameArea;
@@ -23,7 +24,8 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
         .route("/", get(game_list).post(game_create))
         .route("/{game_identifier}", get(game_detail).delete(game_delete).put(game_update))
-        .route("/{game_identifier}/tributes", post(tribute_create))
+        .route("/{game_identifier}/areas", get(game_areas))
+        .route("/{game_identifier}/tributes", get(game_tributes).post(tribute_create))
         .route("/{game_identifier}/tributes/{tribute_identifier}", delete(tribute_delete).put(tribute_update))
 });
 
@@ -154,14 +156,28 @@ pub async fn game_delete(game_identifier: Path<String>) -> StatusCode {
 }
 
 pub async fn game_list() -> impl IntoResponse {
-    let games = DATABASE.select("game").await;
-    
-    match games {
+    // let games = DATABASE.select("game").await;
+    let mut games = DATABASE.query(r#"
+SELECT *, (
+    SELECT *, ->owns->item[*] AS items
+    FROM <-playing_in<-tribute[*]
+) AS tributes, (
+    SELECT *, ->items->item[*] AS items
+    FROM ->areas->area
+) AS areas, (
+    RETURN count(
+        SELECT id FROM <-playing_in<-tribute
+    )
+) AS tribute_count,
+count(<-playing_in<-tribute.id) == 24
+AND
+count(array::distinct(<-playing_in<-tribute.district)) == 12
+AS ready
+FROM game;"#).await.unwrap();
+
+    match games.take::<Vec<Game>>(0) {
         Ok(games) => {
-            let mut headers = HeaderMap::new();
-            headers.insert(CACHE_CONTROL, "no-store".parse().unwrap());
-            headers.insert(EXPIRES, "1".parse().unwrap());
-            (StatusCode::OK, headers, Json::<Vec<Game>>(games)).into_response()
+            (StatusCode::OK, Json::<Vec<Game>>(games)).into_response()
         }
         Err(e) => {
             tracing::error!("{}", e);
@@ -173,35 +189,24 @@ pub async fn game_list() -> impl IntoResponse {
 pub async fn game_detail(game_identifier: Path<String>) -> (StatusCode, Json<Option<Game>>) {
     let identifier = game_identifier.0;
     let mut result = DATABASE.query(format!(r#"
-        SELECT *, (
-            SELECT *, ->owns->item[*] AS items
-            FROM tribute
-            WHERE identifier INSIDE (
-                SELECT <-playing_in<-tribute.identifier
-                AS identifiers
-                FROM game
-                WHERE identifier = "{identifier}"
-            )[0]["identifiers"]
-            ORDER district
-        ) AS tributes, (
-            RETURN count(
-                SELECT id
-                FROM playing_in
-                WHERE out.identifier = "{identifier}"
-            )
-        ) AS tribute_count,
-        (
-            SELECT *, ->items->item[*] as items
-            FROM area
-            WHERE identifier INSIDE (
-                SELECT VALUE out.identifier as identifier
-                FROM areas
-                WHERE in.identifier = "{identifier}"
-            )
-        ) as areas
-        FROM game
-        WHERE identifier = "{identifier}"
-    "#))
+SELECT *, (
+    SELECT *, ->owns->item[*]
+    AS items
+    FROM <-playing_in<-tribute[*]
+    ORDER district
+)
+AS tributes, (
+    SELECT *, ->items->item[*] AS items
+    FROM ->areas->area
+) AS areas, (
+    RETURN count(SELECT id FROM <-playing_in<-tribute)
+) AS tribute_count,
+count(<-playing_in<-tribute.id) == 24
+AND
+count(array::distinct(<-playing_in<-tribute.district)) == 12
+AS ready
+FROM game
+WHERE identifier = "{identifier}";"#))
     .await.unwrap();
 
     let game: Option<Game> = result.take(0).expect("No game found");
@@ -228,5 +233,47 @@ pub async fn game_update(Path(_): Path<String>, Json(payload): Json<EditGame>) -
             (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<Game>>(None))
         }
     }
+}
 
+pub async fn game_areas(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<AreaDetails>>) {
+    let response = DATABASE.query(
+        format!(r#"
+SELECT (
+    SELECT *, ->items->item[*] AS items
+    FROM ->areas->area
+) AS areas FROM game WHERE identifier = "{identifier}";
+"#)).await;
+
+    match response {
+        Ok(mut response) => {
+            let areas: Vec<Vec<AreaDetails>> = response.take("areas").unwrap();
+            (StatusCode::OK, Json::<Vec<AreaDetails>>(areas[0].clone()))
+        }
+        Err(e) => {
+            tracing::error!("{}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(vec![]))
+        }
+    }
+}
+
+pub async fn game_tributes(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
+    let response = DATABASE.query(
+        format!(r#"
+SELECT (
+    SELECT *, ->owns->item[*] AS items
+    FROM <-playing_in<-tribute
+    ORDER district
+) AS tributes FROM game WHERE identifier = "{identifier}";
+"#)).await;
+
+    match response {
+        Ok(mut response) => {
+            let tributes: Vec<Vec<Tribute>> = response.take("tributes").unwrap();
+            (StatusCode::OK, Json::<Vec<Tribute>>(tributes[0].clone()))
+        }
+        Err(e) => {
+            tracing::error!("{}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(vec![]))
+        }
+    }
 }

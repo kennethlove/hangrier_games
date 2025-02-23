@@ -10,7 +10,8 @@ id = 'f5fff0aa-61f7-4e8e-9493-dec84ef2edcc'
 ```json5
 {
   "global": {
-    "GamesApi": "/api/games"
+    "GamesApi": "/api/games",
+    "Identifier": "b509c842-7578-4d48-8a8c-82b0102bd4a3"
   }
 }
 ```

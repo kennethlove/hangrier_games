@@ -27,6 +27,8 @@ pub struct Game {
     pub tribute_count: u32,
     #[serde(default)]
     pub tributes: Vec<Tribute>,
+    #[serde(default)]
+    pub ready: bool
 }
 
 impl Default for Game {
@@ -45,6 +47,7 @@ impl Default for Game {
             areas: Vec::new(),
             tribute_count: 0,
             tributes: Vec::new(),
+            ready: false
         }
     }
 }

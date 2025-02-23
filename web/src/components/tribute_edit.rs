@@ -96,7 +96,9 @@ pub fn EditTributeForm() -> Element {
                 edit_tribute_signal.set(Some(edit_tribute.clone()));
 
                 if let MutationResult::Ok(MutationValue::TributeUpdated(identifier)) = mutate.result().deref() {
-                    client.invalidate_queries(&[QueryKey::Game(game_identifier.clone())]);
+                    client.invalidate_queries(&[
+                        QueryKey::Tributes(game_identifier.clone()),
+                    ]);
                     edit_tribute_signal.set(None);
                 }
             });

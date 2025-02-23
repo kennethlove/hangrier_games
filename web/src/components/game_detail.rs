@@ -39,8 +39,6 @@ fn GameStatusState() -> Element {
     let game_next_step: String;
     let game_ready = game.ready;
 
-    // let game_ready = game_is_ready(&game.tributes);
-
     let game_status = match game.status {
         GameStatus::NotStarted => {
             if game_ready {
@@ -110,7 +108,7 @@ pub fn GameDetails(game: Game) -> Element {
                 GameEdit { identifier: game.identifier.clone(), name: game.name.clone() }
             }
 
-            GameStatusState {}
+            GameStatusState { }
 
             h3 { "Areas" }
 

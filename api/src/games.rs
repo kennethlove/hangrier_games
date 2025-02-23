@@ -1,4 +1,4 @@
-use crate::tributes::{tribute_create, tribute_delete, tribute_record_create, tribute_update};
+use crate::tributes::{tribute_create, tribute_delete, tribute_detail, tribute_record_create, tribute_update};
 use crate::DATABASE;
 use axum::extract::Path;
 use axum::http::header::{CACHE_CONTROL, EXPIRES};
@@ -12,8 +12,8 @@ use game::games::Game;
 use game::items::Item;
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
-use shared::EditGame;
 use shared::GameArea;
+use shared::{EditGame, TributeKey};
 use std::str::FromStr;
 use std::sync::LazyLock;
 use strum::IntoEnumIterator;
@@ -26,7 +26,7 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
         .route("/{game_identifier}", get(game_detail).delete(game_delete).put(game_update))
         .route("/{game_identifier}/areas", get(game_areas))
         .route("/{game_identifier}/tributes", get(game_tributes).post(tribute_create))
-        .route("/{game_identifier}/tributes/{tribute_identifier}", delete(tribute_delete).put(tribute_update))
+        .route("/{game_identifier}/tributes/{tribute_identifier}", get(tribute_detail).delete(tribute_delete).put(tribute_update))
 });
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -256,11 +256,11 @@ SELECT (
     }
 }
 
-pub async fn game_tributes(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
+pub async fn game_tributes(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<TributeKey>>) {
     let response = DATABASE.query(
         format!(r#"
 SELECT (
-    SELECT *, ->owns->item[*] AS items
+    SELECT identifier, district
     FROM <-playing_in<-tribute
     ORDER district
 ) AS tributes FROM game WHERE identifier = "{identifier}";
@@ -268,8 +268,8 @@ SELECT (
 
     match response {
         Ok(mut response) => {
-            let tributes: Vec<Vec<Tribute>> = response.take("tributes").unwrap();
-            (StatusCode::OK, Json::<Vec<Tribute>>(tributes[0].clone()))
+            let tributes: Vec<Vec<TributeKey>> = response.take("tributes").unwrap();
+            (StatusCode::OK, Json::<Vec<TributeKey>>(tributes[0].clone()))
         }
         Err(e) => {
             tracing::error!("{}", e);

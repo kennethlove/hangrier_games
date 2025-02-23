@@ -3,12 +3,12 @@ use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
+use game::items::Item;
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use shared::EditTribute;
 use surrealdb::RecordId;
-use game::items::Item;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 struct TributeOwns {
@@ -99,5 +99,21 @@ pub async fn tribute_update(Path((_game_identifier, _tribute_identifier)): Path<
         Err(e) => {
             (StatusCode::INTERNAL_SERVER_ERROR, Json::<String>(e.to_string())).into_response()
         }
+    }
+}
+
+pub async fn tribute_detail(Path((_game_identifier, tribute_identifier)): Path<(String, String)>) -> (StatusCode, Json<Option<Tribute>>) {
+    let mut result = DATABASE.query(format!(r#"
+SELECT *, ->owns->item[*] AS items
+FROM tribute
+WHERE identifier = "{tribute_identifier}"
+"#)).await.expect("Failed to find tribute");
+
+    let tribute: Option<Tribute> = result.take(0).expect("");
+
+    if let Some(tribute) = tribute {
+        (StatusCode::OK, Json::<Option<Tribute>>(Some(tribute)))
+    } else {
+        (StatusCode::NOT_FOUND, Json(None))
     }
 }

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateGame {
@@ -22,3 +23,16 @@ pub struct GameArea {
     pub open: bool,
     pub area: String,
 }
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct TributeKey {
+    pub identifier: String,
+    pub district: u32,
+}
+
+impl Display for TributeKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.identifier)
+    }
+}
+

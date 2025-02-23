@@ -1,6 +1,7 @@
 use game::areas::AreaDetails;
 use game::games::Game;
 use game::tributes::Tribute;
+use shared::TributeKey;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum QueryKey {
@@ -9,22 +10,26 @@ pub(crate) enum QueryKey {
     Games,
     Tributes(String),
     Areas(String),
+    Tribute(String),
 }
 
 #[derive(PartialEq, Debug)]
 pub(crate) enum QueryError {
+    BadJson,
     GameNotFound(String),
     NoGames,
+    TributeNotFound(String),
     Unknown,
-    BadJson,
 }
 
 #[derive(PartialEq, Debug)]
 pub(crate) enum QueryValue {
-    Games(Vec<Game>),
-    Game(Game),
-    Tributes(Vec<Tribute>),
     Areas(Vec<AreaDetails>),
+    Game(Game),
+    Games(Vec<Game>),
+    Tribute(Tribute),
+    Tributes(Vec<Tribute>),
+    GameTributes(Vec<TributeKey>),
 }
 
 #[derive(PartialEq, Debug)]

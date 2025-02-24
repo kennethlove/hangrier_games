@@ -2,17 +2,13 @@ use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValu
 use crate::components::game_areas::GameAreaList;
 use crate::components::game_edit::GameEdit;
 use crate::components::game_tributes::GameTributes;
-use crate::components::tribute_edit::EditTributeModal;
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, use_mutation, use_query_client, MutationResult, QueryResult};
-use game::areas::AreaDetails;
 use game::games::GameStatus;
 use game::games::{Game, GAME};
-use game::tributes::Tribute;
-use shared::EditTribute;
-use std::collections::HashMap;
 use std::ops::Deref;
+use reqwest::StatusCode;
 
 async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(identifier)) = keys.first() {
@@ -32,18 +28,27 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
     }
 }
 
-async fn start_game(identifier: String) -> MutationResult<MutationValue, MutationError> {
+async fn next_step(identifier: String) -> MutationResult<MutationValue, MutationError> {
     let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}/start", API_HOST.clone(), identifier);
+    let url: String = format!("{}/api/games/{}/next", API_HOST.clone(), identifier);
 
     let response = client
         .put(url)
-        .send().await;
+        .send().await.expect("Failed to advance game");
 
-    if response.expect("Failed to start game").status().is_success() {
-        MutationResult::Ok(MutationValue::GameUpdated(identifier))
-    } else {
-        MutationResult::Err(MutationError::Unknown)
+    match response.status() {
+        StatusCode::NO_CONTENT => {
+            MutationResult::Ok(MutationValue::GameFinished(identifier))
+        }
+        StatusCode::CREATED => {
+            MutationResult::Ok(MutationValue::GameStarted(identifier))
+        }
+        StatusCode::OK => {
+            MutationResult::Ok(MutationValue::GameAdvanced(identifier))
+        }
+        _ => {
+            MutationResult::Err(MutationError::UnableToAdvanceGame)
+        }
     }
 }
 
@@ -73,26 +78,43 @@ fn GameStatusState() -> Element {
         }
     };
 
-    let mutate = use_mutation(start_game);
+    let mutate = use_mutation(next_step);
     let game_id = game.identifier.clone();
     let game_day = game.day.unwrap_or(0);
 
-    let start_game = move |_| {
+    let next_step = move |_| {
         let game_id = game_id.clone();
         let mut game = game.clone();
-        match game.status {
-            GameStatus::NotStarted => {
-                spawn(async move {
-                    mutate.manual_mutate(game_id.clone()).await;
-
-                    if let MutationResult::Ok(MutationValue::GameUpdated(identifier)) = mutate.result().deref() {
-                        game.start();
-                        game_signal.set(Some(game.clone()));
+        
+        spawn(async move {
+            mutate.manual_mutate(game_id.clone()).await;
+            
+            match mutate.result().deref() {
+                MutationResult::Ok(mutation_result) => {
+                    match mutation_result {
+                        MutationValue::GameAdvanced(_) => {
+                            game.run_day_night_cycle();
+                        }
+                        MutationValue::GameFinished(_) => {
+                            game.end();
+                        }
+                        MutationValue::GameStarted(_) => {
+                            game.start();
+                        }
+                        _ => {}
                     }
-                });
+                    dioxus_logger::tracing::debug!("{:?}", game);
+                    game_signal.set(Some(game.clone()));
+                    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+
+                    client.invalidate_queries(&[QueryKey::Game(game_id.clone())]);
+                }
+                MutationResult::Err(MutationError::UnableToAdvanceGame) => {
+                    dioxus_logger::tracing::error!("Failed to advance game");
+                }
+                _ => {}
             }
-            _ => {}
-        }
+        });
     };
 
     rsx! {
@@ -101,7 +123,7 @@ fn GameStatusState() -> Element {
             "Game Status: {game_status}"
             button {
                 class: "button",
-                onclick: start_game,
+                onclick: next_step,
                 "{game_next_step}"
             }
         }

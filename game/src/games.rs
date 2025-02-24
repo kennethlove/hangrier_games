@@ -67,10 +67,7 @@ impl Game {
     }
 
     pub fn where_am_i(&self, tribute: &Tribute) -> Option<Area> {
-        todo!();
-        // if let Some(tribute) = self.tributes.iter().find(|t| *t == tribute) {
-        //     Some(tribute.area.clone())
-        // } else { None }
+        self.tributes.iter().find(|t| *t == tribute).map(|tribute| tribute.area.clone())
     }
 
     pub fn end(&mut self) {
@@ -83,30 +80,27 @@ impl Game {
     }
 
     pub fn living_tributes(&self) -> Vec<Tribute> {
-        todo!();
-        // self.tributes
-        //     .iter()
-        //     .filter(|t| t.is_alive())
-        //     .cloned()
-        //     .collect()
+        self.tributes
+            .iter()
+            .filter(|t| t.is_alive())
+            .cloned()
+            .collect()
     }
 
     pub fn dead_tributes(&self) -> Vec<Tribute> {
-        todo!();
-        // self.tributes
-        //     .iter()
-        //     .filter(|t| !t.is_alive())
-        //     .cloned()
-        //     .collect()
+        self.tributes
+            .iter()
+            .filter(|t| !t.is_alive())
+            .cloned()
+            .collect()
     }
 
     pub fn recently_dead_tributes(&self) -> Vec<Tribute> {
-        todo!();
-        // self.tributes
-        //     .iter()
-        //     .filter(|t| t.status == TributeStatus::RecentlyDead)
-        //     .cloned()
-        //     .collect()
+        self.tributes
+            .iter()
+            .filter(|t| t.status == TributeStatus::RecentlyDead)
+            .cloned()
+            .collect()
     }
 
     pub fn winner(&self) -> Option<Tribute> {

@@ -46,6 +46,15 @@ impl FromStr for Area {
 }
 
 impl Area {
+    pub fn neighbors(&self) -> Vec<Area> {
+        match self {
+            Area::Southeast => vec![Area::Cornucopia, Area::Northeast, Area::Southwest],
+            Area::Southwest => vec![Area::Cornucopia, Area::Northwest, Area::Southeast],
+            Area::Northeast => vec![Area::Cornucopia, Area::Northwest, Area::Southeast],
+            Area::Northwest => vec![Area::Cornucopia, Area::Northeast, Area::Southwest],
+            Area::Cornucopia => vec![Area::Northwest, Area::Northeast, Area::Southwest, Area::Southeast],
+        }
+    }
 //     pub fn process_events(&mut self, mut tributes: Vec<Tribute>) -> Vec<Tribute> {
 //         // If there are events, close the area
 //         // if !self.events.is_empty() {

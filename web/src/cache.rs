@@ -39,10 +39,14 @@ pub(crate) enum MutationValue {
     TributeDeleted(String),
     TributeUpdated(String),
     GameUpdated(String),
+    GameFinished(String),
+    GameStarted(String),
+    GameAdvanced(String),
 }
 
 #[derive(PartialEq, Debug)]
 pub(crate) enum MutationError {
     UnableToCreateGame,
     Unknown,
+    UnableToAdvanceGame,
 }

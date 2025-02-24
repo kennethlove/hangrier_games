@@ -26,7 +26,7 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
         .route("/", get(game_list).post(game_create))
         .route("/{game_identifier}", get(game_detail).delete(game_delete).put(game_update))
         .route("/{game_identifier}/areas", get(game_areas))
-        .route("/{game_identifier}/start", put(game_start))
+        .route("/{game_identifier}/next", put(next_step))
         .route("/{game_identifier}/tributes", get(game_tributes).post(tribute_create))
         .route("/{game_identifier}/tributes/{tribute_identifier}", get(tribute_detail).delete(tribute_delete).put(tribute_update))
 });
@@ -280,16 +280,45 @@ SELECT (
     }
 }
 
-pub async fn game_start(Path(identifier): Path<String>) -> StatusCode {
-    let record_id = RecordId::from(("game", identifier));
-    let mut response = DATABASE
-        .query(format!(r#"UPDATE {record_id} SET status = "{}""#, GameStatus::InProgress))
-        .await.expect("Failed to start game");
-    let game: Option<Game> = response.take(0).unwrap();
-    match game {
-        Some(_) => StatusCode::OK,
-        None => {
-            StatusCode::INTERNAL_SERVER_ERROR
+pub async fn next_step(Path(identifier): Path<String>) -> StatusCode {
+    let record_id = RecordId::from(("game", identifier.clone()));
+    let mut result = DATABASE.query(format!(r#"
+SELECT status FROM game WHERE identifier = "{identifier}";
+RETURN count(
+    SELECT in.identifier
+    FROM playing_in
+    WHERE out.identifier = "{identifier}"
+    AND in.status IN ["RecentlyDead", "Dead"]
+);"#)).await.expect("No game found");
+    let status: Option<String> = result.take("status").expect("No game found");
+    let dead_tribute_count: Option<u32> = result.take(1).unwrap_or(Some(0));
+
+    if let Some(status) = status {
+        let status = GameStatus::from_str(status.as_str()).expect("Invalid game status");
+        match status {
+            GameStatus::NotStarted => {
+                DATABASE
+                    .query(format!(r#"UPDATE {record_id} SET status = "{}""#, GameStatus::InProgress))
+                    .await.expect("Failed to start game");
+                StatusCode::CREATED
+            }
+            GameStatus::InProgress => {
+                match dead_tribute_count {
+                    Some(23) | Some(24) => {
+                        DATABASE
+                            .query(format!(r#"UPDATE {record_id} SET status = "{}""#, GameStatus::Finished))
+                            .await.expect("Failed to end game");
+                        StatusCode::NO_CONTENT
+                    }
+                    _ => {
+                        // TODO: Advance day somehow?
+                        StatusCode::OK
+                    }
+                }
+            }
+            GameStatus::Finished => {
+                StatusCode::NO_CONTENT
+            }
         }
-    }
+    } else { StatusCode::NOT_FOUND }
 }

@@ -13,6 +13,7 @@ use rand::prelude::*;
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
+use std::str::FromStr;
 use uuid::Uuid;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -287,9 +288,7 @@ impl Tribute {
 
     pub fn travels(&self, closed_areas: Vec<Area>, suggested_area: Option<Area>) -> TravelResult {
         let mut rng = thread_rng();
-        let area = GAME.with_borrow(|game| {
-            game.where_am_i(&self)
-        });
+        let area = self.area.clone();
         let mut new_area: Option<Area> = None;
 
         if let Some(suggestion) = suggested_area {
@@ -300,7 +299,7 @@ impl Tribute {
             }
         }
 
-        if new_area.is_some() && new_area == area {
+        if new_area.is_some() && new_area == Some(area.clone()) {
             println!(
                 "{}",
                 GameMessage::TributeTravelAlreadyThere(self.clone(), new_area.clone().unwrap())
@@ -314,7 +313,7 @@ impl Tribute {
                     "{}",
                     GameMessage::TributeTravel(
                         self.clone(),
-                        area.clone().unwrap(),
+                        area.clone(),
                         new_area.clone().unwrap()
                     )
                 );
@@ -328,7 +327,7 @@ impl Tribute {
             0 => {
                 println!(
                     "{}",
-                    GameMessage::TributeTravelTooTired(self.clone(), area.clone().unwrap())
+                    GameMessage::TributeTravelTooTired(self.clone(), area.clone())
                 );
                 TravelResult::Failure
             }
@@ -338,7 +337,7 @@ impl Tribute {
                 TravelResult::Failure => {
                     println!(
                         "{}",
-                        GameMessage::TributeTravelTooTired(self.clone(), area.clone().unwrap())
+                        GameMessage::TributeTravelTooTired(self.clone(), area.clone())
                     );
                     TravelResult::Failure
                 }
@@ -350,12 +349,12 @@ impl Tribute {
                     TravelResult::Failure => (),
                 }
                 // let neighbors = area.clone().unwrap().neighbors;
-                let neighbors: Vec<Area> = vec![];
+                let neighbors: Vec<Area> = area.clone().neighbors();
                 for area in &neighbors {
                     // If the tribute has more loyalty than not
                     if self.attributes.loyalty >= 50 {
+                        // TODO: revisit this
                         // If a neighboring area has a living district-mate
-                        todo!();
                         // if area
                         //     .living_tributes()
                         //     .iter()
@@ -375,15 +374,15 @@ impl Tribute {
                 let mut count = 0;
                 let new_area = loop {
                     let new_area = neighbors.choose(&mut rng).unwrap();
-                    if new_area == &area.clone().unwrap() || closed_areas.contains(new_area) {
+                    if new_area == &area.clone() || closed_areas.contains(new_area) {
                         count += 1;
 
                         if count == 10 {
                             println!(
                                 "{}",
-                                GameMessage::TributeTravelStay(self.clone(), area.clone().unwrap())
+                                GameMessage::TributeTravelStay(self.clone(), area.clone())
                             );
-                            return TravelResult::Success(area.clone().unwrap());
+                            return TravelResult::Success(area.clone());
                         }
                         continue;
                     }
@@ -393,7 +392,7 @@ impl Tribute {
                     "{}",
                     GameMessage::TributeTravel(
                         self.clone(),
-                        area.clone().unwrap(),
+                        area.clone(),
                         new_area.clone()
                     )
                 );
@@ -561,142 +560,141 @@ impl Tribute {
             println!("{}", GameMessage::TributeDead(self.clone()));
         }
 
-        let area = GAME.with_borrow(|game| { game.where_am_i(&self) });
-        let closed_areas: Vec<Area> = vec![];
-        // let closed_areas = self
-        //     .game
-        //     .clone()
-        //     .unwrap()
-        //     .areas
-        //     .iter()
-        //     .filter(|a| !a.open)
-        //     .cloned()
-        //     .collect::<Vec<Area>>();
+        let area = self.area.clone();
+        let closed_areas: Vec<Area> = GAME.with_borrow(|g| {
+            g.areas.clone()
+                .iter()
+                .filter(|a| !a.open)
+                .map(|a| {
+                    Area::from_str(a.area.clone().as_str()).expect("Invalid area")
+                })
+                .collect()
+        });
 
-        if suggested_action.is_some() {
+        if let Some(action) = suggested_action {
             self.brain
-                .set_preferred_action(suggested_action.unwrap(), probability.unwrap());
+                .set_preferred_action(action, probability.unwrap());
         }
 
-        todo!()
-        // let nearby_tributes = area.unwrap().living_tributes();
-        // let mut brain = self.brain.clone();
-        // let action = brain.act(&self, nearby_tributes.len());
-        //
-        // match &action {
-        //     Action::Move(area) => match self.travels(closed_areas.clone(), area.clone()) {
-        //         TravelResult::Success(_area) => {
-        //             // self.clone().game.unwrap().move_tribute(&self, area);
-        //         }
-        //         TravelResult::Failure => {
-        //             self.short_rests();
-        //         }
-        //     },
-        //     Action::Hide => {
-        //         self.hides();
-        //         self.take_action(&action, None);
-        //         println!("{}", GameMessage::TributeHide(self.clone()));
-        //     }
-        //     Action::Rest | Action::None => {
-        //         self.long_rests();
-        //         self.take_action(&action, None);
-        //         println!("{}", GameMessage::TributeLongRest(self.clone()));
-        //     }
-        //     Action::Attack => {
-        //         if let Some(mut target) = self.pick_target() {
-        //             if target.is_visible() {
-        //                 match self.attacks(&mut target) {
-        //                     AttackOutcome::Kill(mut attacker, mut target) => {
-        //                         if attacker.attributes.health <= 0 {
-        //                             attacker.dies();
-        //                         }
-        //                         if target.attributes.health <= 0 {
-        //                             target.dies();
-        //                         }
-        //                         if attacker.id == target.id {
-        //                             attacker.attributes.health = target.attributes.health.clone();
-        //                             attacker.statistics.day_killed =
-        //                                 target.statistics.day_killed.clone();
-        //                             attacker.statistics.killed_by =
-        //                                 target.statistics.killed_by.clone();
-        //                             attacker.status = target.status.clone();
-        //                             // return target;
-        //                         }
-        //                     }
-        //                     _ => (),
-        //                 }
-        //                 self.take_action(&action, Some(&target));
-        //             } else {
-        //                 println!(
-        //                     "{}",
-        //                     GameMessage::TributeAttackHidden(self.clone(), target.clone())
-        //                 );
-        //                 self.take_action(&Action::Attack, None);
-        //             }
-        //         }
-        //     }
-        //     Action::TakeItem => {
-        //         if let Some(item) = self.take_nearby_item() {
-        //             self.take_action(&action, None);
-        //             println!(
-        //                 "{}",
-        //                 GameMessage::TributeTakeItem(self.clone(), item.clone())
-        //             );
-        //         }
-        //     }
-        //     Action::UseItem(None) => {
-        //         // Get consumable items
-        //         let mut items = self.consumable_items();
-        //         if items.is_empty() {
-        //             self.long_rests();
-        //             self.take_action(&Action::Rest, None);
-        //         } else {
-        //             // Use random item
-        //             let item = items.choose_mut(&mut thread_rng()).unwrap();
-        //             match self.use_consumable(item.clone()) {
-        //                 true => {
-        //                     println!(
-        //                         "{}",
-        //                         GameMessage::TributeUseItem(self.clone(), item.clone())
-        //                     );
-        //                     self.take_action(&action, None);
-        //                 }
-        //                 false => {
-        //                     println!(
-        //                         "{}",
-        //                         GameMessage::TributeCannotUseItem(self.clone(), item.clone())
-        //                     );
-        //                     self.short_rests();
-        //                     self.take_action(&Action::Rest, None);
-        //                 }
-        //             };
-        //         }
-        //     }
-        //     Action::UseItem(item) => {
-        //         let items = self.consumable_items();
-        //         if let Some(item) = item {
-        //             if items.contains(item) {
-        //                 match self.use_consumable(item.clone()) {
-        //                     true => {
-        //                         println!(
-        //                             "{}",
-        //                             GameMessage::TributeUseItem(self.clone(), item.clone())
-        //                         );
-        //                         self.take_action(&action, None);
-        //                     }
-        //                     false => {
-        //                         println!(
-        //                             "{}",
-        //                             GameMessage::TributeCannotUseItem(self.clone(), item.clone())
-        //                         );
-        //                         self.short_rests();
-        //                         self.take_action(&Action::Rest, None);
-        //                     }
-        //                 };
-        //             }
-        //         }
-        //     }
-        // }
+        let nearby_tributes: Vec<Tribute> = GAME.with_borrow(|g| {
+            g.living_tributes().iter().filter(|t| t.area == area).cloned().collect()
+        });
+        let mut brain = self.brain.clone();
+        let action = brain.act(&self, nearby_tributes.len());
+        match &action {
+            Action::Move(area) => match self.travels(closed_areas.clone(), area.clone()) {
+                TravelResult::Success(_area) => {
+                    // self.clone().game.unwrap().move_tribute(&self, area);
+                }
+                TravelResult::Failure => {
+                    self.short_rests();
+                }
+            },
+            Action::Hide => {
+                self.hides();
+                self.take_action(&action, None);
+                println!("{}", GameMessage::TributeHide(self.clone()));
+            }
+            Action::Rest | Action::None => {
+                self.long_rests();
+                self.take_action(&action, None);
+                println!("{}", GameMessage::TributeLongRest(self.clone()));
+            }
+            Action::Attack => {
+                if let Some(mut target) = self.pick_target() {
+                    if target.is_visible() {
+                        match self.attacks(&mut target) {
+                            AttackOutcome::Kill(mut attacker, mut target) => {
+                                if attacker.attributes.health == 0 {
+                                    attacker.dies();
+                                }
+                                if target.attributes.health == 0 {
+                                    target.dies();
+                                }
+                                if attacker.identifier == target.identifier {
+                                    attacker.attributes.health = target.attributes.health.clone();
+                                    attacker.statistics.day_killed =
+                                        target.statistics.day_killed.clone();
+                                    attacker.statistics.killed_by =
+                                        target.statistics.killed_by.clone();
+                                    attacker.status = target.status.clone();
+                                    // return target;
+                                }
+                            }
+                            _ => (),
+                        }
+                        self.take_action(&action, Some(&target));
+                    } else {
+                        println!(
+                            "{}",
+                            GameMessage::TributeAttackHidden(self.clone(), target.clone())
+                        );
+                        self.take_action(&Action::Attack, None);
+                    }
+                }
+            }
+            Action::TakeItem => {
+                if let Some(item) = self.take_nearby_item() {
+                    self.take_action(&action, None);
+                    println!(
+                        "{}",
+                        GameMessage::TributeTakeItem(self.clone(), item.clone())
+                    );
+                }
+            }
+            Action::UseItem(None) => {
+                // Get consumable items
+                let mut items = self.consumable_items();
+                if items.is_empty() {
+                    self.long_rests();
+                    self.take_action(&Action::Rest, None);
+                } else {
+                    // Use random item
+                    let item = items.choose_mut(&mut thread_rng()).unwrap();
+                    match self.use_consumable(item.clone()) {
+                        true => {
+                            println!(
+                                "{}",
+                                GameMessage::TributeUseItem(self.clone(), item.clone())
+                            );
+                            self.take_action(&action, None);
+                        }
+                        false => {
+                            println!(
+                                "{}",
+                                GameMessage::TributeCannotUseItem(self.clone(), item.clone())
+                            );
+                            self.short_rests();
+                            self.take_action(&Action::Rest, None);
+                        }
+                    };
+                }
+            }
+            Action::UseItem(item) => {
+                let items = self.consumable_items();
+                if let Some(item) = item {
+                    if items.contains(item) {
+                        match self.use_consumable(item.clone()) {
+                            true => {
+                                println!(
+                                    "{}",
+                                    GameMessage::TributeUseItem(self.clone(), item.clone())
+                                );
+                                self.take_action(&action, None);
+                            }
+                            false => {
+                                println!(
+                                    "{}",
+                                    GameMessage::TributeCannotUseItem(self.clone(), item.clone())
+                                );
+                                self.short_rests();
+                                self.take_action(&Action::Rest, None);
+                            }
+                        };
+                    }
+                }
+            }
+        }
     }
 
     /// Save the tribute's latest action

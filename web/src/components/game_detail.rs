@@ -49,12 +49,12 @@ async fn start_game(identifier: String) -> MutationResult<MutationValue, Mutatio
 
 #[component]
 fn GameStatusState() -> Element {
-    let mut game_signal: Signal<Option<Game>> = use_context();
+    let mut game_signal: Signal<Option<Game<_>>> = use_context();
     let game = game_signal.read().clone().unwrap();
 
     let game_next_step: String;
 
-    let game_status = match game.status {
+    let game_status = match game.status() {
         GameStatus::NotStarted => {
             if game.ready {
                 game_next_step = "Start".to_string();

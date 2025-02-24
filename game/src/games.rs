@@ -13,10 +13,22 @@ use std::fmt::Display;
 use std::str::FromStr;
 use uuid::Uuid;
 
-thread_local!(pub static GAME: RefCell<Game> = RefCell::new(Game::default()));
+thread_local!(pub static GAME: RefCell<impl HasStatus> = RefCell::new(Game::<New>::default()));
+
+pub trait HasStatus {
+    type Game;
+
+    fn status(&self) -> GameStatus;
+}
+
+// Game states as structs
+pub struct New;
+pub struct Active;
+pub struct Finished;
+
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct Game {
+pub struct Game<S> {
     pub identifier: String,
     pub name: String,
     pub status: GameStatus,
@@ -31,8 +43,15 @@ pub struct Game {
     pub ready: bool
 }
 
-impl Default for Game {
-    fn default() -> Game {
+impl HasStatus for Game<New> {
+    type Game = Game<New>;
+    fn status(&self) -> GameStatus {
+        self.status.clone()
+    }
+}
+
+impl Default for Game<New> {
+    fn default() -> Game<New> {
         let wp_gen = witty_phrase_generator::WPGen::new();
         let mut name = String::new();
         if let Some(words) = wp_gen.with_words(3) {
@@ -52,35 +71,41 @@ impl Default for Game {
     }
 }
 
-impl Display for Game {
+impl Display for Game<_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name)
     }
 }
 
-impl Game {
-    pub fn new(name: &str) -> Self {
-        Game {
+impl Game<New> {
+    pub fn new(name: &str) -> Game<New> {
+        Game::<New> {
             name: name.to_string(),
             ..Default::default()
         }
     }
 
-    pub fn where_am_i(&self, tribute: &Tribute) -> Option<Area> {
-        todo!();
-        // if let Some(tribute) = self.tributes.iter().find(|t| *t == tribute) {
-        //     Some(tribute.area.clone())
-        // } else { None }
-    }
-
-    pub fn end(&mut self) {
-        self.status = GameStatus::Finished
-    }
-
-    // Runs at the start of the game
-    pub fn start(&mut self) {
+    pub fn start(&mut self) -> Game<Active> {
         self.status = GameStatus::InProgress;
+        self.into()
     }
+}
+
+impl HasStatus for Game<Active> {
+    type Game = Game<Active>;
+    fn status(&self) -> GameStatus {
+        self.status.clone()
+    }
+}
+
+impl Game<Active> {
+    pub fn end(&mut self) -> Game<Finished> {
+        self.status = GameStatus::Finished;
+        self.into()
+    }
+}
+
+impl Game<Active> {
 
     pub fn living_tributes(&self) -> Vec<Tribute> {
         todo!();
@@ -257,6 +282,13 @@ impl Game {
 
     pub fn move_tribute(&self, tribute: &mut Tribute, area: Area) {
         tribute.area = area;
+    }
+}
+
+impl HasStatus for Game<Finished> {
+    type Game = Game<Finished>;
+    fn status(&self) -> GameStatus {
+        self.status.clone()
     }
 }
 

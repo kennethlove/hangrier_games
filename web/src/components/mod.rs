@@ -15,14 +15,17 @@ mod games_list;
 pub(crate) use games_list::GamesList;
 
 mod game_delete;
+pub(crate) use game_delete::DeleteGameModal;
+pub(crate) use game_delete::GameDelete;
+
 mod game_tributes;
 mod tribute_delete;
 mod tribute_edit;
 mod game_edit;
 mod game_areas;
+mod tribute_detail;
+pub(crate) use tribute_detail::TributeDetail;
 
-pub(crate) use game_delete::DeleteGameModal;
-pub(crate) use game_delete::GameDelete;
 
 
 

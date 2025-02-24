@@ -4,11 +4,11 @@ use axum::extract::Path;
 use axum::http::header::{CACHE_CONTROL, EXPIRES};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, post, put};
 use axum::Json;
 use axum::Router;
 use game::areas::{Area, AreaDetails};
-use game::games::Game;
+use game::games::{Game, GameStatus};
 use game::items::Item;
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
@@ -17,6 +17,7 @@ use shared::{EditGame, TributeKey};
 use std::str::FromStr;
 use std::sync::LazyLock;
 use strum::IntoEnumIterator;
+use surrealdb::opt::PatchOp;
 use surrealdb::{Error, RecordId, Response};
 use uuid::Uuid;
 
@@ -25,6 +26,7 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
         .route("/", get(game_list).post(game_create))
         .route("/{game_identifier}", get(game_detail).delete(game_delete).put(game_update))
         .route("/{game_identifier}/areas", get(game_areas))
+        .route("/{game_identifier}/start", put(game_start))
         .route("/{game_identifier}/tributes", get(game_tributes).post(tribute_create))
         .route("/{game_identifier}/tributes/{tribute_identifier}", get(tribute_detail).delete(tribute_delete).put(tribute_update))
 });
@@ -256,11 +258,11 @@ SELECT (
     }
 }
 
-pub async fn game_tributes(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<TributeKey>>) {
+pub async fn game_tributes(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
     let response = DATABASE.query(
         format!(r#"
 SELECT (
-    SELECT identifier, district
+    SELECT *, ->owns->item[*] as items
     FROM <-playing_in<-tribute
     ORDER district
 ) AS tributes FROM game WHERE identifier = "{identifier}";
@@ -268,12 +270,26 @@ SELECT (
 
     match response {
         Ok(mut response) => {
-            let tributes: Vec<Vec<TributeKey>> = response.take("tributes").unwrap();
-            (StatusCode::OK, Json::<Vec<TributeKey>>(tributes[0].clone()))
+            let tributes: Vec<Vec<Tribute>> = response.take("tributes").unwrap();
+            (StatusCode::OK, Json::<Vec<Tribute>>(tributes[0].clone()))
         }
         Err(e) => {
             tracing::error!("{}", e);
             (StatusCode::INTERNAL_SERVER_ERROR, Json(vec![]))
+        }
+    }
+}
+
+pub async fn game_start(Path(identifier): Path<String>) -> StatusCode {
+    let record_id = RecordId::from(("game", identifier));
+    let mut response = DATABASE
+        .query(format!(r#"UPDATE {record_id} SET status = "{}""#, GameStatus::InProgress))
+        .await.expect("Failed to start game");
+    let game: Option<Game> = response.take(0).unwrap();
+    match game {
+        Some(_) => StatusCode::OK,
+        None => {
+            StatusCode::INTERNAL_SERVER_ERROR
         }
     }
 }

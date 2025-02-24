@@ -1,17 +1,18 @@
-use crate::cache::{QueryError, QueryKey, QueryValue};
+use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use crate::components::game_areas::GameAreaList;
 use crate::components::game_edit::GameEdit;
 use crate::components::game_tributes::GameTributes;
 use crate::components::tribute_edit::EditTributeModal;
 use crate::API_HOST;
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
+use dioxus_query::prelude::{use_get_query, use_mutation, use_query_client, MutationResult, QueryResult};
 use game::areas::AreaDetails;
 use game::games::GameStatus;
 use game::games::{Game, GAME};
 use game::tributes::Tribute;
 use shared::EditTribute;
 use std::collections::HashMap;
+use std::ops::Deref;
 
 async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(identifier)) = keys.first() {
@@ -31,10 +32,25 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
     }
 }
 
+async fn start_game(identifier: String) -> MutationResult<MutationValue, MutationError> {
+    let client = reqwest::Client::new();
+    let url: String = format!("{}/api/games/{}/start", API_HOST.clone(), identifier);
+
+    let response = client
+        .put(url)
+        .send().await;
+
+    if response.expect("Failed to start game").status().is_success() {
+        MutationResult::Ok(MutationValue::GameUpdated(identifier))
+    } else {
+        MutationResult::Err(MutationError::Unknown)
+    }
+}
+
 #[component]
 fn GameStatusState() -> Element {
-    let game: Signal<Option<Game>> = use_context();
-    let game = game.read().clone().unwrap();
+    let mut game_signal: Signal<Option<Game>> = use_context();
+    let game = game_signal.read().clone().unwrap();
 
     let game_next_step: String;
     let game_ready = game.ready;
@@ -58,14 +74,35 @@ fn GameStatusState() -> Element {
         }
     };
 
+    let mutate = use_mutation(start_game);
+    let game_id = game.identifier.clone();
+
+    let start_game = move |_| {
+        let game_id = game_id.clone();
+        let mut game = game.clone();
+        match game.status {
+            GameStatus::NotStarted => {
+                spawn(async move {
+                    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+                    mutate.manual_mutate(game_id.clone()).await;
+
+                    if let MutationResult::Ok(MutationValue::GameUpdated(identifier)) = mutate.result().deref() {
+                        game.status = GameStatus::InProgress;
+                        game_signal.set(Some(game.clone()));
+                    }
+                });
+            }
+            _ => {}
+        }
+    };
+
     rsx! {
         h2 {
             class: "game-status",
             "Game Status: {game_status}"
             button {
                 class: "button",
-                onclick: move |_| {
-                },
+                onclick: start_game,
                 "{game_next_step}"
             }
         }

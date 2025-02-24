@@ -53,11 +53,10 @@ fn GameStatusState() -> Element {
     let game = game_signal.read().clone().unwrap();
 
     let game_next_step: String;
-    let game_ready = game.ready;
 
     let game_status = match game.status {
         GameStatus::NotStarted => {
-            if game_ready {
+            if game.ready {
                 game_next_step = "Start".to_string();
             } else {
                 game_next_step = "Wait".to_string();
@@ -65,7 +64,7 @@ fn GameStatusState() -> Element {
             "Not started".to_string()
         }
         GameStatus::InProgress => {
-            game_next_step = "Finish".to_string();
+            game_next_step = "Play next step".to_string();
             "In progress".to_string()
         }
         GameStatus::Finished => {
@@ -76,6 +75,7 @@ fn GameStatusState() -> Element {
 
     let mutate = use_mutation(start_game);
     let game_id = game.identifier.clone();
+    let game_day = game.day.unwrap_or(0);
 
     let start_game = move |_| {
         let game_id = game_id.clone();
@@ -83,11 +83,10 @@ fn GameStatusState() -> Element {
         match game.status {
             GameStatus::NotStarted => {
                 spawn(async move {
-                    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
                     mutate.manual_mutate(game_id.clone()).await;
 
                     if let MutationResult::Ok(MutationValue::GameUpdated(identifier)) = mutate.result().deref() {
-                        game.status = GameStatus::InProgress;
+                        game.start();
                         game_signal.set(Some(game.clone()));
                     }
                 });
@@ -105,6 +104,9 @@ fn GameStatusState() -> Element {
                 onclick: start_game,
                 "{game_next_step}"
             }
+        }
+        h3 {
+            "Game round: Day { game_day }, Night { game_day }"
         }
     }
 }

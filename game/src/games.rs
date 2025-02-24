@@ -52,6 +52,12 @@ impl Default for Game {
     }
 }
 
+impl Display for Game {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
 impl Game {
     pub fn new(name: &str) -> Self {
         Game {
@@ -73,35 +79,7 @@ impl Game {
 
     // Runs at the start of the game
     pub fn start(&mut self) {
-        // TODO: add items to the cornucopia
-
-        // TODO: add tributes
-
         self.status = GameStatus::InProgress;
-    }
-
-    pub fn add_tribute(&mut self, tribute: Tribute) {
-        todo!();
-        // self.tributes.push(tribute);
-    }
-
-    pub fn remove_tribute(&mut self, tribute: &Tribute) {
-        todo!();
-        // self.tributes.retain(|item| item != tribute);
-    }
-
-    pub fn add_random_tribute(&mut self) {
-        todo!();
-        let tribute = Tribute::random();
-        self.add_tribute(tribute.clone());
-    }
-
-    pub fn shuffle_tributes(&mut self) {
-        todo!();
-        // let mut rng = rand::thread_rng();
-        // let mut tributes = self.tributes.clone();
-        // tributes.shuffle(&mut rng);
-        // self.tributes = tributes;
     }
 
     pub fn living_tributes(&self) -> Vec<Tribute> {
@@ -141,18 +119,6 @@ impl Game {
     pub fn get_area(&self, name: &str) -> Option<&Area> {
         todo!();
         // self.areas.iter().find(|a| a.name() == name)
-    }
-
-    pub fn get_or_create_area(&mut self, _name: &str) -> &Area {
-        todo!();
-        // match self.get_area(name) {
-        //     Some(area) => area,
-        //     None => {
-        //         let area = Area::new(name);
-        //         self.areas.push(area);
-        //         self.areas.last().unwrap()
-        //     }
-        // }
     }
 
     pub fn get_area_mut(&mut self, name: &str) -> Option<&mut Area> {
@@ -291,12 +257,6 @@ impl Game {
 
     pub fn move_tribute(&self, tribute: &mut Tribute, area: Area) {
         tribute.area = area;
-    }
-}
-
-impl Display for Game {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name)
     }
 }
 

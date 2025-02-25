@@ -9,7 +9,7 @@ mod games;
 pub(crate) use games::Games;
 
 mod game_detail;
-pub(crate) use game_detail::GameDetailPage;
+pub(crate) use game_detail::GamePage;
 
 mod games_list;
 pub(crate) use games_list::GamesList;

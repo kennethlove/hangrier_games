@@ -280,7 +280,7 @@ SELECT (
     }
 }
 
-pub async fn next_step(Path(identifier): Path<String>) -> StatusCode {
+pub async fn next_step(Path(identifier): Path<String>) -> (StatusCode, Json<Option<Game>>) {
     let record_id = RecordId::from(("game", identifier.clone()));
     let mut result = DATABASE.query(format!(r#"
 SELECT status FROM game WHERE identifier = "{identifier}";
@@ -300,7 +300,7 @@ RETURN count(
                 DATABASE
                     .query(format!(r#"UPDATE {record_id} SET status = "{}""#, GameStatus::InProgress))
                     .await.expect("Failed to start game");
-                StatusCode::CREATED
+                (StatusCode::CREATED, Json(None))
             }
             GameStatus::InProgress => {
                 match dead_tribute_count {
@@ -308,17 +308,54 @@ RETURN count(
                         DATABASE
                             .query(format!(r#"UPDATE {record_id} SET status = "{}""#, GameStatus::Finished))
                             .await.expect("Failed to end game");
-                        StatusCode::NO_CONTENT
+                        (StatusCode::NO_CONTENT, Json(None))
                     }
                     _ => {
                         // TODO: Advance day somehow?
-                        StatusCode::OK
+                        if let Some(mut game) = get_full_game(&identifier).await {
+                            game.run_day_night_cycle();
+                            
+                            let id = RecordId::from(("game", identifier.clone()));
+                            let updated_game: Option<Game> = DATABASE.update(id).content(game).await.expect("Failed to update game");
+                            if updated_game.is_some() {
+                                (StatusCode::OK, Json(Some(updated_game.unwrap())))
+                            } else {
+                                (StatusCode::NOT_FOUND, Json(None))
+                            }
+                        } else {
+                            (StatusCode::NOT_FOUND, Json(None))
+                        }
                     }
                 }
             }
             GameStatus::Finished => {
-                StatusCode::NO_CONTENT
+                (StatusCode::NO_CONTENT, Json(None))
             }
         }
-    } else { StatusCode::NOT_FOUND }
+    } else { (StatusCode::NOT_FOUND, Json(None)) }
+}
+
+async fn get_full_game(identifier: &str) -> Option<Game> {
+    let mut result = DATABASE.query(format!(r#"
+SELECT *, (
+    SELECT *, ->owns->item[*]
+    AS items
+    FROM <-playing_in<-tribute[*]
+    ORDER district
+)
+AS tributes, (
+    SELECT *, ->items->item[*] AS items
+    FROM ->areas->area
+) AS areas, (
+    RETURN count(SELECT id FROM <-playing_in<-tribute)
+) AS tribute_count,
+count(<-playing_in<-tribute.id) == 24
+AND
+count(array::distinct(<-playing_in<-tribute.district)) == 12
+AS ready
+FROM game
+WHERE identifier = "{identifier}";"#))
+        .await.unwrap();
+    result.take(0).expect("No game found")
+
 }

@@ -87,7 +87,7 @@ impl Tribute {
 
     /// Reduces health.
     pub fn takes_physical_damage(&mut self, damage: u32) {
-        self.attributes.health = std::cmp::max(0, self.attributes.health - damage);
+        self.attributes.health = self.attributes.health.saturating_sub(damage);
     }
 
     /// Reduces mental health.

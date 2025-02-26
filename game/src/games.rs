@@ -5,7 +5,7 @@ use crate::tributes::actions::Action;
 use crate::tributes::events::TributeEvent;
 use crate::tributes::statuses::TributeStatus;
 use crate::tributes::Tribute;
-use rand::prelude::SliceRandom;
+use rand::prelude::{IteratorRandom, SliceRandom};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
@@ -110,19 +110,23 @@ impl Game {
         }
     }
 
-    pub fn get_area(&self, name: &str) -> Option<&Area> {
-        todo!();
-        // self.areas.iter().find(|a| a.name() == name)
+    pub fn get_area(&self, name: &str) -> Option<&AreaDetails> {
+        self.areas.iter().find(|a| a.name == name)
     }
 
-    pub fn get_area_mut(&mut self, name: &str) -> Option<&mut Area> {
-        todo!();
-        // self.areas.iter_mut().find(|a| a.name() == name)
-    }
+    // pub fn get_area_mut(&mut self, name: &str) -> Option<&mut Area> {
+    //     self.areas.iter_mut().find(|a| a.name() == name)
+    // }
 
-    pub fn random_area(&self) -> Option<Area> {
-        todo!();
-        // self.areas.choose(&mut rand::thread_rng()).cloned()
+    pub fn random_area(&self) -> Option<AreaDetails> {
+        self.areas.choose(&mut rand::thread_rng()).cloned()
+    }
+    
+    pub fn random_open_area(&self) -> Option<AreaDetails> {
+        self.areas.iter()
+            .filter(|a| a.open)
+            .choose(&mut rand::thread_rng())
+            .cloned()
     }
 
     pub fn run_day_night_cycle(&mut self) {
@@ -133,7 +137,7 @@ impl Game {
             println!("{}", GameMessage::TributeWins(winner));
             self.end();
             return;
-        } else if living_tributes.len() == 0 {
+        } else if living_tributes.is_empty() {
             println!("{}", GameMessage::NoOneWins);
             self.end();
             return;
@@ -176,23 +180,27 @@ impl Game {
         let mut rng = rand::thread_rng();
         let day_event_frequency = 1.0 / 4.0;
         let night_event_frequency = 1.0 / 8.0;
+        
+        // TODO: Remove this
+        let area = self.random_open_area();
+        area.unwrap().events.push(AreaEvent::random());
 
         // Trigger any events for this cycle if we're past the first three days
         if self.day > Some(3) || !day {
-            // for _ in &self.areas {
-            //     if rng.gen_bool(if day {
-            //         day_event_frequency
-            //     } else {
-            //         night_event_frequency
-            //     }) {
-            //         AreaEvent::random();
-            //     }
-            // }
+            for area in self.areas.iter_mut() {
+                if rng.gen_bool(if day {
+                    day_event_frequency
+                } else {
+                    night_event_frequency
+                }) {
+                    let area_event = AreaEvent::random();
+                    area.events.push(area_event);
+                }
+            }
         }
 
         if self.day == Some(3) && day {
             // TODO: add goodies to the cornucopia
-            todo!();
             // let area = self.areas.iter_mut().find(|a| a.name() == "The Cornucopia").unwrap();
             // for _ in 0..=5 {
             //     area.add_item(Item::new_random_weapon());
@@ -202,21 +210,27 @@ impl Game {
         }
 
         if self.living_tributes().len() > 1 && self.living_tributes().len() < 6 {
-            AreaEvent::random();
+            if let Some(mut area) = self.random_open_area() {
+                let event = AreaEvent::random();
+                area.events.push(event);
+            }
 
             if rng.gen_bool(self.living_tributes().len() as f64 / 24.0) {
-                AreaEvent::random();
+                if let Some(mut area) = self.random_open_area() {
+                    let event = AreaEvent::random();
+                    area.events.push(event);
+                }
             }
         }
 
         self.living_tributes().shuffle(&mut rng);
 
-        for mut tribute in self.living_tributes() {
+        for tribute in self.living_tributes().iter_mut() {
             if !rng.gen_bool(tribute.attributes.luck as f64 / 100.0) {
-                tribute.handle_event(TributeEvent::random());
+                tribute.events.push(TributeEvent::random());
             }
 
-            if !tribute.is_alive() {
+            if !tribute.is_alive() && tribute.status != TributeStatus::Dead {
                 tribute.status = TributeStatus::RecentlyDead;
                 continue;
             }
@@ -241,6 +255,8 @@ impl Game {
                 }
             }
         }
+        
+        self.tributes = self.living_tributes();
     }
 
     pub fn clean_up_recent_deaths(&self) {

@@ -79,7 +79,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                     game_identifier: game.identifier.clone(),
                     tribute_identifier: tribute.identifier.clone()
                 },
-                "{tribute.name} - {tribute.district}"
+                "{tribute.name} - {tribute.district} - {tribute.area}"
             }
             TributeEdit {
                 identifier: tribute.clone().identifier,

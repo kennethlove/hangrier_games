@@ -311,14 +311,13 @@ RETURN count(
                         (StatusCode::NO_CONTENT, Json(None))
                     }
                     _ => {
-                        // TODO: Advance day somehow?
                         if let Some(mut game) = get_full_game(&identifier).await {
                             game.run_day_night_cycle();
                             
-                            let id = RecordId::from(("game", identifier.clone()));
-                            let updated_game: Option<Game> = DATABASE.update(id).content(game).await.expect("Failed to update game");
-                            if updated_game.is_some() {
-                                (StatusCode::OK, Json(Some(updated_game.unwrap())))
+                            let updated_game: Option<Game> = save_game(game).await;
+
+                            if let Some(game) = updated_game {
+                                (StatusCode::OK, Json(Some(game)))
                             } else {
                                 (StatusCode::NOT_FOUND, Json(None))
                             }
@@ -358,4 +357,54 @@ WHERE identifier = "{identifier}";"#))
         .await.unwrap();
     result.take(0).expect("No game found")
 
+}
+
+async fn save_game(mut game: Game) -> Option<Game> {
+    let game_identifier = RecordId::from(("game", game.identifier.clone()));
+    let areas = game.areas.clone();
+    game.areas = vec![];
+
+    for mut area in areas {
+        let id = RecordId::from(("area", area.identifier.clone()));
+        let items = area.items.clone();
+        area.items = vec![];
+
+        save_items(items).await;
+
+        DATABASE
+            .update::<Option<AreaDetails>>(id)
+            .content(area)
+            .await.expect("Failed to update area items");
+    }
+
+    let tributes = game.tributes.clone();
+    game.tributes = vec![];
+
+    for mut tribute in tributes {
+        let id = RecordId::from(("tribute", tribute.identifier.clone()));
+        let items = tribute.items.clone();
+        tribute.items = vec![];
+
+        save_items(items).await;
+
+        DATABASE
+            .update::<Option<Tribute>>(id)
+            .content(tribute)
+            .await.expect("Failed to update area items");
+    }
+
+    DATABASE
+        .update::<Option<Game>>(game_identifier)
+        .content(game)
+        .await.expect("Failed to update game")
+}
+
+async fn save_items(items: Vec<Item>) {
+    for item in items {
+        let id = RecordId::from(("item", item.identifier.clone()));
+        DATABASE
+            .update::<Option<Item>>(id)
+            .content(item)
+            .await.expect("Failed to update item");
+    }
 }

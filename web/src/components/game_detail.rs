@@ -101,8 +101,9 @@ fn GameStatusState() -> Element {
                             MutationValue::GameFinished(_) => {
                                 game.end();
                             }
-                            MutationValue::GameStarted(_) => {
+                            MutationValue::GameStarted(game_identifier) => {
                                 game.start();
+                                client.invalidate_queries(&[QueryKey::Game(game_identifier.into())]);
                             }
                             _ => {}
                         }

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::fmt::Display;
 use std::str::FromStr;
 use strum_macros::EnumIter;
+use crate::areas::events::AreaEvent;
 
 #[derive(Clone, Debug, Eq, PartialEq, EnumIter, Hash, Deserialize, Serialize, Ord, PartialOrd)]
 pub enum Area {
@@ -55,31 +56,9 @@ impl Area {
             Area::Cornucopia => vec![Area::Northwest, Area::Northeast, Area::Southwest, Area::Southeast],
         }
     }
-//     pub fn process_events(&mut self, mut tributes: Vec<Tribute>) -> Vec<Tribute> {
-//         // If there are events, close the area
-//         // if !self.events.is_empty() {
-//         //     self.open = false;
-//         // }
-//
-//         // for event in self.events.iter() {
-//         //     for tribute in tributes.iter_mut() {
-//         //         match event {
-//         //             AreaEvent::Wildfire => tribute.set_status(TributeStatus::Burned),
-//         //             AreaEvent::Flood => tribute.set_status(TributeStatus::Drowned),
-//         //             AreaEvent::Earthquake => tribute.set_status(TributeStatus::Buried),
-//         //             AreaEvent::Avalanche => tribute.set_status(TributeStatus::Buried),
-//         //             AreaEvent::Blizzard => tribute.set_status(TributeStatus::Frozen),
-//         //             AreaEvent::Landslide => tribute.set_status(TributeStatus::Buried),
-//         //             AreaEvent::Heatwave => tribute.set_status(TributeStatus::Overheated),
-//         //         }
-//         //     }
-//         // }
-//
-//         tributes
-//     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Default, Deserialize, Debug, PartialEq)]
 pub struct AreaDetails {
     pub identifier: String,
     pub name: String,
@@ -87,6 +66,34 @@ pub struct AreaDetails {
     pub open: bool,
     #[serde(default)]
     pub items: Vec<Item>,
+    #[serde(default)]
+    pub events: Vec<AreaEvent>,
+}
+
+impl AreaDetails {
+    pub fn handle_event(&mut self) -> AreaDetails {
+        // If there are events, close the area
+        if !self.events.is_empty() {
+            self.open = false;
+        }
+        
+        self.clone()
+        
+        // for event in self.events.iter() {
+        //     for tribute in tributes.iter_mut() {
+        //         match event {
+        //             AreaEvent::Wildfire => tribute.set_status(TributeStatus::Burned),
+        //             AreaEvent::Flood => tribute.set_status(TributeStatus::Drowned),
+        //             AreaEvent::Earthquake => tribute.set_status(TributeStatus::Buried),
+        //             AreaEvent::Avalanche => tribute.set_status(TributeStatus::Buried),
+        //             AreaEvent::Blizzard => tribute.set_status(TributeStatus::Frozen),
+        //             AreaEvent::Landslide => tribute.set_status(TributeStatus::Buried),
+        //             AreaEvent::Heatwave => tribute.set_status(TributeStatus::Overheated),
+        //         }
+        //     }
+        // }
+
+    }
 }
 
 #[cfg(test)]

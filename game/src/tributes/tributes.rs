@@ -42,6 +42,9 @@ pub struct Tribute {
     pub attributes: Attributes,
     /// Items the tribute owns
     pub items: Vec<Item>,
+    /// Events that have happened to the tribute
+    #[serde(default)]
+    pub events: Vec<TributeEvent>
 }
 
 impl Tribute {
@@ -66,6 +69,7 @@ impl Tribute {
             attributes,
             statistics,
             items: vec![],
+            events: vec![],
         }
     }
 
@@ -92,7 +96,7 @@ impl Tribute {
 
     /// Reduces mental health.
     pub fn takes_mental_damage(&mut self, damage: u32) {
-        self.attributes.sanity = std::cmp::max(0, self.attributes.sanity - damage);
+        self.attributes.sanity = self.attributes.sanity.saturating_sub(damage);
     }
 
     /// Restores health.
@@ -583,7 +587,8 @@ impl Tribute {
         let action = brain.act(&self, nearby_tributes.len());
         match &action {
             Action::Move(area) => match self.travels(closed_areas.clone(), area.clone()) {
-                TravelResult::Success(_area) => {
+                TravelResult::Success(area) => {
+                    self.area = area.clone();
                     // self.clone().game.unwrap().move_tribute(&self, area);
                 }
                 TravelResult::Failure => {
@@ -695,6 +700,7 @@ impl Tribute {
                 }
             }
         }
+        dbg!(&self);
     }
 
     /// Save the tribute's latest action

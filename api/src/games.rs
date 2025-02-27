@@ -1,4 +1,4 @@
-use crate::tributes::{tribute_create, tribute_delete, tribute_detail, tribute_record_create, tribute_update};
+use crate::tributes::{tribute_create, tribute_delete, tribute_detail, tribute_record_create, tribute_update, TributeOwns};
 use crate::DATABASE;
 use axum::extract::Path;
 use axum::http::header::{CACHE_CONTROL, EXPIRES};
@@ -312,8 +312,8 @@ RETURN count(
                     }
                     _ => {
                         if let Some(mut game) = get_full_game(&identifier).await {
-                            game.run_day_night_cycle();
-                            
+
+                            let game = game.run_day_night_cycle();
                             let updated_game: Option<Game> = save_game(game).await;
 
                             if let Some(game) = updated_game {
@@ -369,7 +369,7 @@ async fn save_game(mut game: Game) -> Option<Game> {
         let items = area.items.clone();
         area.items = vec![];
 
-        save_items(items).await;
+        save_items(items, id.clone()).await;
 
         DATABASE
             .update::<Option<AreaDetails>>(id)
@@ -385,7 +385,7 @@ async fn save_game(mut game: Game) -> Option<Game> {
         let items = tribute.items.clone();
         tribute.items = vec![];
 
-        save_items(items).await;
+        save_items(items, id.clone()).await;
 
         DATABASE
             .update::<Option<Tribute>>(id)
@@ -399,12 +399,45 @@ async fn save_game(mut game: Game) -> Option<Game> {
         .await.expect("Failed to update game")
 }
 
-async fn save_items(items: Vec<Item>) {
+async fn save_items(items: Vec<Item>, owner: RecordId) {
+    let ids: Vec<String> = items.iter().map(|item| item.identifier.clone()).collect();
+    let is_area = owner.table() == "area";
+
+    if is_area {
+        let _ = DATABASE.query(format!(
+            r#"DELETE FROM items WHERE out.identifier NOT IN ["{}"] AND in == {}"#,
+            ids.join(r#"",""#),
+            owner.clone()
+        )).await.expect("Failed to delete owns items");
+    } else {
+        let _ = DATABASE.query(format!(
+            r#"DELETE FROM owns WHERE out.identifier NOT IN ["{}"] AND in == {}"#,
+            ids.join(r#"",""#),
+            owner.clone()
+        )).await.expect("Failed to delete owns items");
+    }
+
     for item in items {
-        let id = RecordId::from(("item", item.identifier.clone()));
+        let item_identifier = RecordId::from(("item", item.identifier.clone()));
         DATABASE
-            .update::<Option<Item>>(id)
+            .update::<Option<Item>>(item_identifier.clone())
             .content(item)
             .await.expect("Failed to update item");
+
+        if is_area {
+            let _: Vec<TributeOwns> = DATABASE.upsert("items").merge(
+                AreaItem {
+                    area: owner.clone(),
+                    item: item_identifier.clone(),
+                }
+            ).await.expect("Failed to update Items relation");
+        } else {
+            let _: Vec<TributeOwns> = DATABASE.upsert("owns").merge(
+                TributeOwns {
+                    tribute: owner.clone(),
+                    item: item_identifier.clone(),
+                }
+            ).await.expect("Failed to update Owns relation");
+        }
     }
 }

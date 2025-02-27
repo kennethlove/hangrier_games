@@ -129,18 +129,18 @@ impl Game {
             .cloned()
     }
 
-    pub fn run_day_night_cycle(&mut self) {
+    pub fn run_day_night_cycle(&mut self) -> Game {
         self.day = Some(self.day.unwrap_or(0) + 1);
         let living_tributes = self.living_tributes();
 
         if let Some(winner) = self.winner() {
             println!("{}", GameMessage::TributeWins(winner));
             self.end();
-            return;
+            return self.clone();
         } else if living_tributes.is_empty() {
             println!("{}", GameMessage::NoOneWins);
             self.end();
-            return;
+            return self.clone();
         }
 
         // Make any announcements for the day
@@ -174,6 +174,8 @@ impl Game {
 
         // Clean up any deaths
         self.clean_up_recent_deaths();
+        
+        self.clone()
     }
 
     pub fn do_day_night_cycle(&mut self, day: bool) {
@@ -223,21 +225,23 @@ impl Game {
             }
         }
 
-        self.living_tributes().shuffle(&mut rng);
-
-        for tribute in self.living_tributes().iter_mut() {
+        self.tributes.shuffle(&mut rng);
+        let mut updated_tributes: Vec<Tribute> = vec![];
+        
+        for mut tribute in self.tributes.clone() {
             if !rng.gen_bool(tribute.attributes.luck as f64 / 100.0) {
                 tribute.events.push(TributeEvent::random());
             }
 
             if !tribute.is_alive() && tribute.status != TributeStatus::Dead {
                 tribute.status = TributeStatus::RecentlyDead;
+                updated_tributes.push(tribute);
                 continue;
             }
 
             match (self.day, day) {
                 (Some(1), true) => {
-                    tribute.do_day_night(Some(Action::Move(None)), Some(0.5), day);
+                    tribute = tribute.do_day_night(Some(Action::Move(None)), Some(0.5), day);
                 }
                 (Some(3), true) => {
                     // let cornucopia: Option<Area> = self
@@ -251,12 +255,14 @@ impl Game {
                     // tribute.do_day_night(Some(Action::Move(cornucopia)), Some(0.75), day);
                 }
                 (_, _) => {
-                    tribute.do_day_night(None, None, day);
+                    tribute = tribute.do_day_night(None, None, day);
+                    // dbg!(&tribute);
                 }
             }
+            updated_tributes.push(tribute);
         }
         
-        self.tributes = self.living_tributes();
+        self.tributes = updated_tributes;
     }
 
     pub fn clean_up_recent_deaths(&self) {

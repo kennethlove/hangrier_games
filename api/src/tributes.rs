@@ -11,11 +11,11 @@ use shared::EditTribute;
 use surrealdb::RecordId;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-struct TributeOwns {
+pub struct TributeOwns {
     #[serde(rename = "in")]
-    tribute: RecordId,
+    pub tribute: RecordId,
     #[serde(rename = "out")]
-    item: RecordId,
+    pub item: RecordId,
 }
 
 pub async fn tribute_record_create(tribute: Option<Tribute>, game_identifier: String) -> Option<Tribute> {

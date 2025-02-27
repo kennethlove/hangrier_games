@@ -530,7 +530,7 @@ impl Tribute {
         suggested_action: Option<Action>,
         probability: Option<f64>,
         day: bool,
-    ) {
+    ) -> Tribute {
         // Tribute is already dead, do nothing.
         if !self.is_alive() {
             println!("{}", GameMessage::TributeAlreadyDead(self.clone()));
@@ -584,7 +584,8 @@ impl Tribute {
             g.living_tributes().iter().filter(|t| t.area == area).cloned().collect()
         });
         let mut brain = self.brain.clone();
-        let action = brain.act(&self, nearby_tributes.len());
+        let action = brain.act(self, nearby_tributes.len());
+        let action = Action::TakeItem;
         match &action {
             Action::Move(area) => match self.travels(closed_areas.clone(), area.clone()) {
                 TravelResult::Success(area) => {
@@ -608,25 +609,22 @@ impl Tribute {
             Action::Attack => {
                 if let Some(mut target) = self.pick_target() {
                     if target.is_visible() {
-                        match self.attacks(&mut target) {
-                            AttackOutcome::Kill(mut attacker, mut target) => {
-                                if attacker.attributes.health == 0 {
-                                    attacker.dies();
-                                }
-                                if target.attributes.health == 0 {
-                                    target.dies();
-                                }
-                                if attacker.identifier == target.identifier {
-                                    attacker.attributes.health = target.attributes.health.clone();
-                                    attacker.statistics.day_killed =
-                                        target.statistics.day_killed.clone();
-                                    attacker.statistics.killed_by =
-                                        target.statistics.killed_by.clone();
-                                    attacker.status = target.status.clone();
-                                    // return target;
-                                }
+                        if let AttackOutcome::Kill(mut attacker, mut target) = self.attacks(&mut target) {
+                            if attacker.attributes.health == 0 {
+                                attacker.dies();
                             }
-                            _ => (),
+                            if target.attributes.health == 0 {
+                                target.dies();
+                            }
+                            if attacker.identifier == target.identifier {
+                                attacker.attributes.health = target.attributes.health.clone();
+                                attacker.statistics.day_killed =
+                                    target.statistics.day_killed;
+                                attacker.statistics.killed_by =
+                                    target.statistics.killed_by.clone();
+                                attacker.status = target.status.clone();
+                                // return target;
+                            }
                         }
                         self.take_action(&action, Some(&target));
                     } else {
@@ -640,11 +638,13 @@ impl Tribute {
             }
             Action::TakeItem => {
                 if let Some(item) = self.take_nearby_item() {
-                    self.take_action(&action, None);
                     println!(
                         "{}",
                         GameMessage::TributeTakeItem(self.clone(), item.clone())
                     );
+                    self.items.push(item);
+                    println!("{:?}", &self.items);
+                    self.take_action(&action, None);
                 }
             }
             Action::UseItem(None) => {
@@ -662,6 +662,7 @@ impl Tribute {
                                 "{}",
                                 GameMessage::TributeUseItem(self.clone(), item.clone())
                             );
+                            self.items.retain(|i| i != item);
                             self.take_action(&action, None);
                         }
                         false => {
@@ -685,6 +686,7 @@ impl Tribute {
                                     "{}",
                                     GameMessage::TributeUseItem(self.clone(), item.clone())
                                 );
+                                self.items.retain(|i| i != item);
                                 self.take_action(&action, None);
                             }
                             false => {
@@ -700,7 +702,7 @@ impl Tribute {
                 }
             }
         }
-        dbg!(&self);
+        self.clone()
     }
 
     /// Save the tribute's latest action
@@ -713,20 +715,17 @@ impl Tribute {
     /// Take item from area
     fn take_nearby_item(&mut self) -> Option<Item> {
         let mut rng = thread_rng();
-        let area = GAME.with_borrow(|game| { game.where_am_i(&self) });
-        if area.is_none() {
-            None
-        } else {
-            todo!();
-            // let mut area = area.unwrap();
-            // let items = area.available_items();
-            // let item = items.choose(&mut rng).unwrap();
-            //
-            // self.take_item(&item);
-            // area.remove_item(&item);
-            //
-            // Some(item.clone())
-        }
+        let area = GAME.with_borrow(|g| {
+            g.areas.iter()
+                .find(move |a| a.area == self.area.to_string())
+                .cloned()
+        });
+        if let Some(area) = area {
+            if area.items.is_empty() { None } else {
+                let item = area.items.choose(&mut rng).unwrap().clone();
+                Some(item)
+            }
+        } else { None }
     }
 
     /// Take a prescribed item

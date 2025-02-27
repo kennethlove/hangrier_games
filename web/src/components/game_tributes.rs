@@ -79,13 +79,14 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                     game_identifier: game.identifier.clone(),
                     tribute_identifier: tribute.identifier.clone()
                 },
-                "{tribute.name} - {tribute.district} - {tribute.area}"
+                "{tribute.name} - {tribute.district} - {tribute.area}" 
             }
             TributeEdit {
                 identifier: tribute.clone().identifier,
                 district: tribute.district,
                 name: tribute.clone().name,
             }
+            p { "HP: {tribute.attributes.health} - Status: {tribute.status}" }
             ul {
                 for item in tribute.clone().items {
                     li { "{item.name}" }

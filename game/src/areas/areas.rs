@@ -4,6 +4,7 @@ use std::fmt::Display;
 use std::str::FromStr;
 use strum_macros::EnumIter;
 use crate::areas::events::AreaEvent;
+use crate::items::items::OwnsItems;
 
 #[derive(Clone, Debug, Eq, PartialEq, EnumIter, Hash, Deserialize, Serialize, Ord, PartialOrd)]
 pub enum Area {
@@ -68,6 +69,25 @@ pub struct AreaDetails {
     pub items: Vec<Item>,
     #[serde(default)]
     pub events: Vec<AreaEvent>,
+}
+
+impl OwnsItems for AreaDetails {
+    fn add_item(&mut self, item: Item) {
+        self.items.push(item);
+    }
+    
+    fn use_item(&mut self, item: Item) -> Option<Item> {
+        let used_item = self.items.iter_mut().find(|i| *i == &item);
+        
+        if let Some(used_item) = used_item {
+            if used_item.quantity > 0 {
+                let item = used_item.clone();
+                used_item.quantity = used_item.quantity.saturating_sub(1);
+                return Some(item)
+            }
+        }
+        None
+    }
 }
 
 impl AreaDetails {

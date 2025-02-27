@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
 use std::str::FromStr;
 use uuid::Uuid;
+use crate::items::items::OwnsItems;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Tribute {
@@ -41,10 +42,36 @@ pub struct Tribute {
     /// Attributes like health
     pub attributes: Attributes,
     /// Items the tribute owns
+    #[serde(default)]
     pub items: Vec<Item>,
     /// Events that have happened to the tribute
     #[serde(default)]
     pub events: Vec<TributeEvent>
+}
+
+impl Default for Tribute {
+    fn default() -> Self {
+        Self::new("Tribute".to_string(), None, None)
+    }
+}
+
+impl OwnsItems for Tribute {
+    fn add_item(&mut self, item: Item) {
+        self.items.push(item);
+    }
+
+    fn use_item(&mut self, item: Item) -> Option<Item> {
+        let used_item = self.items.iter_mut().find(|i| *i == &item);
+
+        if let Some(used_item) = used_item {
+            if used_item.quantity > 0 {
+                let item = used_item.clone();
+                used_item.quantity = used_item.quantity.saturating_sub(1);
+                return Some(item)
+            }
+        }
+        None
+    }
 }
 
 impl Tribute {
@@ -127,18 +154,14 @@ impl Tribute {
         self.heals_mental_damage(5);
     }
 
-    /// Marks the tribute as recently dead and reveals them.
+    /// Marks the tribute as dead and reveals them.
     pub fn dies(&mut self) {
-        self.status = TributeStatus::RecentlyDead;
+        self.status = TributeStatus::Dead;
         self.attributes.is_hidden = false;
     }
 
     pub fn is_alive(&self) -> bool {
-        match (&self.status, self.attributes.health) {
-            (_, 0) => false,
-            (TributeStatus::RecentlyDead | TributeStatus::Dead, _) => false,
-            _ => true,
-        }
+        self.attributes.health > 0 && self.status != TributeStatus::Dead && self.status != TributeStatus::RecentlyDead
     }
 
     /// Hides the tribute from view.
@@ -566,13 +589,12 @@ impl Tribute {
         }
 
         let areas = game.areas.clone();
-        let mut area = areas.iter().find(|a| a.area == self.area.to_string()).expect("Area not found");
-        let closed_areas: Vec<AreaDetails> = areas
+        let mut area = areas.iter()
+            .find(|a| a.area == self.area.to_string())
+            .expect("Area not found").clone();
+        let closed_areas: Vec<AreaDetails> = areas.clone()
             .iter()
             .filter(|a| !a.open)
-            // .map(|a| {
-            //     Area::from_str(a.area.clone().as_str()).expect("Invalid area")
-            // })
             .cloned()
             .collect();
 
@@ -586,7 +608,6 @@ impl Tribute {
         
         let mut brain = self.brain.clone();
         let action = brain.act(self, nearby_tributes.len());
-        let action = Action::TakeItem;
         match &action {
             Action::Move(area) => match self.travels(
                 closed_areas
@@ -649,8 +670,6 @@ impl Tribute {
                         "{}",
                         GameMessage::TributeTakeItem(self.clone(), item.clone())
                     );
-                    self.items.push(item);
-                    println!("{:?}", &self.items);
                     self.take_action(&action, None);
                 }
             }
@@ -669,7 +688,7 @@ impl Tribute {
                                 "{}",
                                 GameMessage::TributeUseItem(self.clone(), item.clone())
                             );
-                            self.items.retain(|i| i != item);
+                            self.use_item(item.clone());
                             self.take_action(&action, None);
                         }
                         false => {
@@ -693,7 +712,7 @@ impl Tribute {
                                     "{}",
                                     GameMessage::TributeUseItem(self.clone(), item.clone())
                                 );
-                                self.items.retain(|i| i != item);
+                                self.use_item(item.clone());
                                 self.take_action(&action, None);
                             }
                             false => {
@@ -722,12 +741,15 @@ impl Tribute {
     /// Take item from area
     fn take_nearby_item(&mut self, area_details: &mut AreaDetails) -> Option<Item> {
         let mut rng = thread_rng();
-        let mut items = area_details.items.clone();
+        let items = area_details.items.clone();
         if items.is_empty() { None } else {
             let item = items.choose(&mut rng).unwrap().clone();
-            items.retain(|i| i != &item);
-            area_details.items = items;
-            Some(item)
+            if let Some(item) = area_details.use_item(item.clone()) {
+                self.add_item(item.clone());
+                dbg!(&self.items);
+                return Some(item.clone());
+            }
+            None
         }
     }
 
@@ -737,14 +759,19 @@ impl Tribute {
         #[allow(unused_assignments)]
         let mut item = items.iter().last().unwrap().clone();
         // If the tribute has the item...
-        if let Some(selected_item) = items.iter().filter(|i| i.name == chosen_item.name).last() {
+        if let Some(selected_item) = items.iter()
+            .filter(|i| i.identifier == chosen_item.identifier).next_back()
+        {
             // select it
             item = selected_item.clone();
         } else {
             // otherwise, quit because you can't use an item you don't have
             return false;
         }
-        item.quantity -= 1;
+        
+        if let None = self.use_item(item.clone()) {
+            return false;
+        }
 
         // Apply item effect
         match item.attribute {
@@ -934,12 +961,6 @@ fn attack_contest(attacker: &Tribute, target: &Tribute) -> AttackResult {
         }
     } else {
         AttackResult::Miss
-    }
-}
-
-impl Default for Tribute {
-    fn default() -> Self {
-        Self::new("Tribute".to_string(), None, None)
     }
 }
 

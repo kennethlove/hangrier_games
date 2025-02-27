@@ -6,6 +6,11 @@ use std::str::FromStr;
 use strum::{EnumIter, IntoEnumIterator};
 use uuid::Uuid;
 
+pub trait OwnsItems {
+    fn add_item(&mut self, item: Item);
+    fn use_item(&mut self, item: Item) -> Option<Item>;
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Item {
     pub identifier: String,

@@ -174,7 +174,7 @@ impl Game {
 
         // Clean up any deaths
         self.clean_up_recent_deaths();
-        
+
         self.clone()
     }
 
@@ -185,7 +185,7 @@ impl Game {
         
         // TODO: Remove this
         let area = self.random_open_area();
-        area.unwrap().events.push(AreaEvent::random());
+        // area.unwrap().events.push(AreaEvent::random());
 
         // Trigger any events for this cycle if we're past the first three days
         if self.day > Some(3) || !day {
@@ -196,7 +196,7 @@ impl Game {
                     night_event_frequency
                 }) {
                     let area_event = AreaEvent::random();
-                    area.events.push(area_event);
+                    // area.events.push(area_event);
                 }
             }
         }
@@ -227,7 +227,7 @@ impl Game {
 
         self.tributes.shuffle(&mut rng);
         let mut updated_tributes: Vec<Tribute> = vec![];
-        
+
         for mut tribute in self.tributes.clone() {
             if !rng.gen_bool(tribute.attributes.luck as f64 / 100.0) {
                 tribute.events.push(TributeEvent::random());
@@ -256,7 +256,6 @@ impl Game {
                 }
                 (_, _) => {
                     tribute = tribute.do_day_night(None, None, day, self);
-                    // dbg!(&tribute);
                 }
             }
             updated_tributes.push(tribute);

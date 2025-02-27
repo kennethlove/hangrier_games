@@ -135,11 +135,11 @@ impl Brain {
                     .saturating_sub(tribute.attributes.sanity as i32);
                 match sense {
                     // Smart enough to know better, hides
-                    ..36 => Action::Hide,
+                    ..36 => Action::Move(None),
                     // Too dumb to know better, attacks
                     80.. => Action::Attack,
                     // Average intelligence, moves
-                    _ => Action::Move(None),
+                    _ => Action::Hide,
                 }
             }
         }

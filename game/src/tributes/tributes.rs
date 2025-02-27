@@ -1,7 +1,7 @@
 use super::actions::{Action, AttackOutcome, AttackResult, TributeAction};
 use super::brains::Brain;
 use super::statuses::TributeStatus;
-use crate::areas::Area;
+use crate::areas::{Area, AreaDetails};
 use crate::games::{Game, GAME};
 use crate::items::{Attribute, Item};
 use crate::messages::GameMessage;
@@ -530,6 +530,7 @@ impl Tribute {
         suggested_action: Option<Action>,
         probability: Option<f64>,
         day: bool,
+        mut game: &Game,
     ) -> Tribute {
         // Tribute is already dead, do nothing.
         if !self.is_alive() {
@@ -564,30 +565,36 @@ impl Tribute {
             println!("{}", GameMessage::TributeDead(self.clone()));
         }
 
-        let area = self.area.clone();
-        let closed_areas: Vec<Area> = GAME.with_borrow(|g| {
-            g.areas.clone()
-                .iter()
-                .filter(|a| !a.open)
-                .map(|a| {
-                    Area::from_str(a.area.clone().as_str()).expect("Invalid area")
-                })
-                .collect()
-        });
+        let areas = game.areas.clone();
+        let mut area = areas.iter().find(|a| a.area == self.area.to_string()).expect("Area not found");
+        let closed_areas: Vec<AreaDetails> = areas
+            .iter()
+            .filter(|a| !a.open)
+            // .map(|a| {
+            //     Area::from_str(a.area.clone().as_str()).expect("Invalid area")
+            // })
+            .cloned()
+            .collect();
 
         if let Some(action) = suggested_action {
             self.brain
                 .set_preferred_action(action, probability.unwrap());
         }
 
-        let nearby_tributes: Vec<Tribute> = GAME.with_borrow(|g| {
-            g.living_tributes().iter().filter(|t| t.area == area).cloned().collect()
-        });
+        let nearby_tributes: Vec<Tribute> = game.living_tributes().iter()
+            .filter(|t| t.area == self.area).cloned().collect();
+        
         let mut brain = self.brain.clone();
         let action = brain.act(self, nearby_tributes.len());
         let action = Action::TakeItem;
         match &action {
-            Action::Move(area) => match self.travels(closed_areas.clone(), area.clone()) {
+            Action::Move(area) => match self.travels(
+                closed_areas
+                    .into_iter()
+                    .map(|ca| Area::from_str(&ca.area).unwrap())
+                    .collect::<Vec<Area>>(),
+                area.clone())
+            {
                 TravelResult::Success(area) => {
                     self.area = area.clone();
                     // self.clone().game.unwrap().move_tribute(&self, area);
@@ -637,7 +644,7 @@ impl Tribute {
                 }
             }
             Action::TakeItem => {
-                if let Some(item) = self.take_nearby_item() {
+                if let Some(item) = self.take_nearby_item(&mut area) {
                     println!(
                         "{}",
                         GameMessage::TributeTakeItem(self.clone(), item.clone())
@@ -713,24 +720,15 @@ impl Tribute {
     }
 
     /// Take item from area
-    fn take_nearby_item(&mut self) -> Option<Item> {
+    fn take_nearby_item(&mut self, area_details: &mut AreaDetails) -> Option<Item> {
         let mut rng = thread_rng();
-        let area = GAME.with_borrow(|g| {
-            g.areas.iter()
-                .find(move |a| a.area == self.area.to_string())
-                .cloned()
-        });
-        if let Some(area) = area {
-            if area.items.is_empty() { None } else {
-                let item = area.items.choose(&mut rng).unwrap().clone();
-                Some(item)
-            }
-        } else { None }
-    }
-
-    /// Take a prescribed item
-    fn take_item(&mut self, item: &Item) {
-        self.items.push(item.clone());
+        let mut items = area_details.items.clone();
+        if items.is_empty() { None } else {
+            let item = items.choose(&mut rng).unwrap().clone();
+            items.retain(|i| i != &item);
+            area_details.items = items;
+            Some(item)
+        }
     }
 
     fn use_consumable(&mut self, chosen_item: Item) -> bool {

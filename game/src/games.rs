@@ -241,7 +241,7 @@ impl Game {
 
             match (self.day, day) {
                 (Some(1), true) => {
-                    tribute = tribute.do_day_night(Some(Action::Move(None)), Some(0.5), day);
+                    tribute = tribute.do_day_night(Some(Action::Move(None)), Some(0.5), day, self);
                 }
                 (Some(3), true) => {
                     // let cornucopia: Option<Area> = self
@@ -255,7 +255,7 @@ impl Game {
                     // tribute.do_day_night(Some(Action::Move(cornucopia)), Some(0.75), day);
                 }
                 (_, _) => {
-                    tribute = tribute.do_day_night(None, None, day);
+                    tribute = tribute.do_day_night(None, None, day, self);
                     // dbg!(&tribute);
                 }
             }

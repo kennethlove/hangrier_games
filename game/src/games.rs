@@ -1,5 +1,7 @@
 use crate::areas::events::AreaEvent;
 use crate::areas::{Area, AreaDetails};
+use crate::items::items::OwnsItems;
+use crate::items::Item;
 use crate::messages::GameMessage;
 use crate::tributes::actions::Action;
 use crate::tributes::events::TributeEvent;
@@ -10,6 +12,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::fmt::Display;
+use std::ops::Index;
 use std::str::FromStr;
 use uuid::Uuid;
 
@@ -66,10 +69,6 @@ impl Game {
         }
     }
 
-    pub fn where_am_i(&self, tribute: &Tribute) -> Option<Area> {
-        self.tributes.iter().find(|t| *t == tribute).map(|tribute| tribute.area.clone())
-    }
-
     pub fn end(&mut self) {
         self.status = GameStatus::Finished
     }
@@ -105,7 +104,7 @@ impl Game {
 
     pub fn winner(&self) -> Option<Tribute> {
         match self.living_tributes().len() {
-            1 => Some(self.living_tributes()[0].clone()),
+            1 => Some(self.living_tributes().index(0).clone()),
             _ => None,
         }
     }
@@ -161,6 +160,10 @@ impl Game {
             GameMessage::TributesLeft(living_tributes.len() as u32)
         );
 
+        for area in self.areas.iter_mut() {
+            area.events.clear();
+        }
+
         // Run the day
         self.do_day_night_cycle(true);
 
@@ -182,10 +185,10 @@ impl Game {
         let mut rng = rand::thread_rng();
         let day_event_frequency = 1.0 / 4.0;
         let night_event_frequency = 1.0 / 8.0;
-        
+
         // TODO: Remove this
         let area = self.random_open_area();
-        // area.unwrap().events.push(AreaEvent::random());
+        area.unwrap().events.push(AreaEvent::random());
 
         // Trigger any events for this cycle if we're past the first three days
         if self.day > Some(3) || !day {
@@ -196,19 +199,21 @@ impl Game {
                     night_event_frequency
                 }) {
                     let area_event = AreaEvent::random();
-                    // area.events.push(area_event);
+                    area.events.push(area_event);
                 }
             }
         }
 
         if self.day == Some(3) && day {
             // TODO: add goodies to the cornucopia
-            // let area = self.areas.iter_mut().find(|a| a.name() == "The Cornucopia").unwrap();
-            // for _ in 0..=5 {
-            //     area.add_item(Item::new_random_weapon());
-            //     area.add_item(Item::new_random_consumable());
-            //     area.add_item(Item::new_random_shield());
-            // }
+            let mut area = self.areas.iter_mut()
+                .find(|a| a.area == "Cornucopia".to_string())
+                .expect("Cannot find Cornucopia");
+            for _ in 0..=5 {
+                area.add_item(Item::new_random_weapon());
+                area.add_item(Item::new_random_consumable());
+                area.add_item(Item::new_random_shield());
+            }
         }
 
         if self.living_tributes().len() > 1 && self.living_tributes().len() < 6 {
@@ -244,15 +249,7 @@ impl Game {
                     tribute = tribute.do_day_night(Some(Action::Move(None)), Some(0.5), day, self);
                 }
                 (Some(3), true) => {
-                    // let cornucopia: Option<Area> = self
-                    //     .areas
-                    //     .iter()
-                    //     .filter(|a| a.name() == "cornucopia")
-                    //     .cloned()
-                    //     .collect::<Vec<Area>>()
-                    //     .first()
-                    //     .cloned();
-                    // tribute.do_day_night(Some(Action::Move(cornucopia)), Some(0.75), day);
+                    tribute.do_day_night(Some(Action::Move(Some(Area::Cornucopia))), Some(0.75), day, self);
                 }
                 (_, _) => {
                     tribute = tribute.do_day_night(None, None, day, self);

@@ -1,6 +1,7 @@
 use super::actions::{Action, AttackOutcome, AttackResult, TributeAction};
 use super::brains::Brain;
 use super::statuses::TributeStatus;
+use crate::areas::events::AreaEvent;
 use crate::areas::{Area, AreaDetails};
 use crate::games::{Game, GAME};
 use crate::items::items::OwnsItems;
@@ -416,7 +417,10 @@ impl Tribute {
         }
     }
 
-    pub fn process_status(&mut self) {
+    pub fn process_status(&mut self, game: &Game) {
+        // First, apply any area events for the current area
+        self.apply_area_effects(game);
+
         let status = self.status.clone();
         match status {
             TributeStatus::Wounded => {
@@ -554,7 +558,7 @@ impl Tribute {
         }
 
         // Update the tribute based on the period's events.
-        self.process_status();
+        self.process_status(&game);
 
         // Nighttime terror
         if !day && self.is_alive() {
@@ -573,6 +577,7 @@ impl Tribute {
 
         if thread_rng().gen_bool(chance) {
             let item = Item::new_random_consumable();
+            self.add_item(item.clone());
             println!("{}", GameMessage::SponsorGift(self.clone(), item.clone()));
         }
 
@@ -582,9 +587,6 @@ impl Tribute {
         }
 
         let areas = game.areas.clone();
-        // let mut area = areas.iter()
-        //     .find(|a| a.area == self.area.to_string())
-        //     .expect("Area not found").clone();
         let closed_areas: Vec<AreaDetails> =
             areas.clone().iter().filter(|a| !a.open).cloned().collect();
 
@@ -887,6 +889,24 @@ impl Tribute {
     pub fn status(&self) -> TributeStatus { self.status.clone() }
 
     pub fn set_status(&mut self, status: TributeStatus) { self.status = status; }
+
+    fn apply_area_effects(&mut self, game: &Game) {
+        let area_details = game.areas.iter()
+            .find(|a| a.area == self.area.to_string())
+            .expect("Area not found");
+
+        for event in &area_details.events {
+            match event {
+                AreaEvent::Wildfire => self.set_status(TributeStatus::Burned),
+                AreaEvent::Flood => self.set_status(TributeStatus::Drowned),
+                AreaEvent::Earthquake => self.set_status(TributeStatus::Buried),
+                AreaEvent::Avalanche => self.set_status(TributeStatus::Buried),
+                AreaEvent::Blizzard => self.set_status(TributeStatus::Frozen),
+                AreaEvent::Landslide => self.set_status(TributeStatus::Buried),
+                AreaEvent::Heatwave => self.set_status(TributeStatus::Overheated),
+            }
+        }
+    }
 }
 
 #[derive(Debug)]

@@ -455,6 +455,7 @@ async fn save_items(items: Vec<Item>, owner: RecordId) {
         }
 
         if item.quantity > 0 {
+            dbg!(&item, &owner);
             if is_area {
                 let _: Vec<TributeOwns> = DATABASE.insert("items").relation(
                     AreaItem {

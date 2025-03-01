@@ -253,14 +253,29 @@ impl Game {
         self.tributes = updated_tributes;
     }
 
-    pub fn clean_up_recent_deaths(&self) {
+    pub fn clean_up_recent_deaths(&mut self) {
         for mut tribute in self.recently_dead_tributes() {
+            let area = self.get_area_details_mut(tribute.area.clone());
+            if let Some(mut area) = area {
+                for item in tribute.items.iter() {
+                    area.add_item(item.clone());
+                }
+            }
+
             tribute.dies();
         }
     }
 
     pub fn move_tribute(&self, tribute: &mut Tribute, area: Area) {
         tribute.area = area;
+    }
+
+    fn get_area_details(&self, area: Area) -> Option<AreaDetails> {
+        self.areas.iter().cloned().find(|a| a.area == area.to_string())
+    }
+
+    fn get_area_details_mut(&mut self, area: Area) -> Option<&mut AreaDetails> {
+        self.areas.iter_mut().find(|a| a.area == area.to_string())
     }
 }
 

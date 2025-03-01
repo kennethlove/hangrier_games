@@ -180,7 +180,9 @@ impl Game {
 
         // TODO: Remove this
         let area = self.random_open_area();
-        area.unwrap().events.push(AreaEvent::random());
+        if area.is_some() {
+            area.unwrap().events.push(AreaEvent::random());
+        }
 
         // Trigger any events for this cycle if we're past the first three days
         if self.day > Some(3) || !day {

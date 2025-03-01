@@ -7,8 +7,9 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, use_mutation, use_query_client, MutationResult, QueryResult};
 use game::games::GameStatus;
 use game::games::{Game, GAME};
-use std::ops::Deref;
+use game::tributes::Tribute;
 use reqwest::StatusCode;
+use std::ops::Deref;
 
 async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(identifier)) = keys.first() {
@@ -82,11 +83,19 @@ fn GameStatusState() -> Element {
         let mutate = use_mutation(next_step);
         let game_id = game.identifier.clone();
         let game_day = game.day.unwrap_or(0);
+        let tribute_count = game.clone()
+            .tributes.into_iter()
+            .filter(|t| t.is_alive())
+            .collect::<Vec<Tribute>>()
+            .len();
+        let winner_name = {
+            if game.winner().is_some() { game.winner().unwrap().name } else { String::new() }
+        };
 
         let next_step = move |_| {
             let game_id = game_id.clone();
             let mut game = game.clone();
-            
+
             let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
             spawn(async move {
@@ -128,6 +137,10 @@ fn GameStatusState() -> Element {
             }
             h3 {
                 "Game round: Day { game_day }, Night { game_day }"
+            }
+            h4 { "{tribute_count} tributes remain alive."}
+            if winner_name.len() > 0 {
+                h1 { "{winner_name} wins!"}
             }
         }
     } else {

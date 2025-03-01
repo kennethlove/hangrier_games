@@ -233,8 +233,8 @@ impl Game {
                 tribute.events.push(TributeEvent::random());
             }
 
-            if !tribute.is_alive() && tribute.status != TributeStatus::Dead {
-                tribute.status = TributeStatus::RecentlyDead;
+            if !tribute.is_alive() {
+                tribute.status = TributeStatus::Dead;
                 updated_tributes.push(tribute);
                 continue;
             }

@@ -77,16 +77,24 @@ impl OwnsItems for AreaDetails {
     }
     
     fn use_item(&mut self, item: Item) -> Option<Item> {
-        let used_item = self.items.iter_mut().find(|i| *i == &item);
-        
-        if let Some(used_item) = used_item {
-            if used_item.quantity > 0 {
-                let item = used_item.clone();
-                used_item.quantity = used_item.quantity.saturating_sub(1);
-                return Some(item)
+        let index = self.items.iter().position(|i| *i == item);
+        let mut used_item = self.items.swap_remove(index.unwrap());
+
+        if used_item.quantity > 0 {
+            let item = used_item.clone();
+            used_item.quantity = used_item.quantity.saturating_sub(1);
+
+            if used_item.quantity == 0 {
+                self.remove_item(used_item);
             }
+            return Some(item)
         }
         None
+    }
+
+    fn remove_item(&mut self, item: Item) {
+        self.items.retain(|i| *i.identifier != item.identifier);
+        dbg!(&item, &self.items);
     }
 }
 

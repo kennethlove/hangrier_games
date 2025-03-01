@@ -369,7 +369,7 @@ async fn save_game(mut game: Game) -> Option<Game> {
         let items = area.items.clone();
         area.items = vec![];
 
-        save_items(items, id.clone()).await;
+        let _ = save_items(items, id.clone()).await;
 
         DATABASE
             .update::<Option<AreaDetails>>(id)
@@ -385,7 +385,7 @@ async fn save_game(mut game: Game) -> Option<Game> {
         let items = tribute.items.clone();
         tribute.items = vec![];
 
-        save_items(items, id.clone()).await;
+        let _ = save_items(items, id.clone()).await;
 
         DATABASE
             .update::<Option<Tribute>>(id)
@@ -415,7 +415,7 @@ async fn save_items(items: Vec<Item>, owner: RecordId) {
             DATABASE
                 .delete::<Option<Item>>(item_identifier.clone())
                 .await.expect("Failed to delete item");
-                return;
+            return;
         } else {
             DATABASE
                 .update::<Option<Item>>(item_identifier.clone())
@@ -423,21 +423,22 @@ async fn save_items(items: Vec<Item>, owner: RecordId) {
                 .await.expect("Failed to update item");
         }
 
-        if is_area {
-            // dbg!(&item.name, &item.quantity);
-            let _: Vec<TributeOwns> = DATABASE.insert("items").relation(
-                AreaItem {
-                    area: owner.clone(),
-                    item: item_identifier.clone(),
-                }
-            ).await.expect("Failed to update Items relation");
-        } else {
-            let _: Vec<TributeOwns> = DATABASE.insert("owns").relation(
-                TributeOwns {
-                    tribute: owner.clone(),
-                    item: item_identifier.clone(),
-                }
-            ).await.expect("Failed to update Owns relation");
-        }
+        if item.quantity > 0 {
+            if is_area {
+                let _: Vec<TributeOwns> = DATABASE.insert("items").relation(
+                    AreaItem {
+                        area: owner.clone(),
+                        item: item_identifier.clone(),
+                    }
+                ).await.expect("Failed to update Items relation");
+            } else {
+                let _: Vec<TributeOwns> = DATABASE.insert("owns").relation(
+                    TributeOwns {
+                        tribute: owner.clone(),
+                        item: item_identifier.clone(),
+                    }
+                ).await.expect("Failed to update Owns relation");
+            }
+        } else {}
     }
 }

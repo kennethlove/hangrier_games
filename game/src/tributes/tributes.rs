@@ -72,6 +72,10 @@ impl OwnsItems for Tribute {
         }
         None
     }
+
+    fn remove_item(&mut self, item: Item) {
+        self.items.retain(|i| i != &item);
+    }
 }
 
 impl Tribute {
@@ -286,7 +290,6 @@ impl Tribute {
             );
             self.statistics.killed_by = Some(target.name.clone());
             self.status = TributeStatus::RecentlyDead;
-            self.dies();
             AttackOutcome::Kill(target.clone(), self.clone())
         } else if target.attributes.health == 0 {
             // Target was killed by attacker
@@ -296,7 +299,6 @@ impl Tribute {
             );
             target.statistics.killed_by = Some(self.name.clone());
             target.status = TributeStatus::RecentlyDead;
-            target.dies();
             AttackOutcome::Kill(self.clone(), target.clone())
         } else {
             AttackOutcome::Miss(self.clone(), target.clone())
@@ -746,7 +748,6 @@ impl Tribute {
             let item = items.choose(&mut rng).unwrap().clone();
             if let Some(item) = area_details.use_item(item.clone()) {
                 self.add_item(item.clone());
-                dbg!(&self.items);
                 return Some(item.clone());
             }
             None
@@ -769,7 +770,7 @@ impl Tribute {
             return false;
         }
         
-        if let None = self.use_item(item.clone()) {
+        if self.use_item(item.clone()).is_none() {
             return false;
         }
 

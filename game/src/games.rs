@@ -109,14 +109,6 @@ impl Game {
         }
     }
 
-    pub fn get_area(&self, name: &str) -> Option<&AreaDetails> {
-        self.areas.iter().find(|a| a.name == name)
-    }
-
-    // pub fn get_area_mut(&mut self, name: &str) -> Option<&mut Area> {
-    //     self.areas.iter_mut().find(|a| a.name() == name)
-    // }
-
     pub fn random_area(&self) -> Option<AreaDetails> {
         self.areas.choose(&mut rand::thread_rng()).cloned()
     }

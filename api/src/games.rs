@@ -14,10 +14,12 @@ use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
 use shared::GameArea;
 use shared::{EditGame, TributeKey};
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::LazyLock;
 use strum::IntoEnumIterator;
 use surrealdb::opt::PatchOp;
+use surrealdb::sql::{Id, Thing};
 use surrealdb::{Error, RecordId, Response};
 use uuid::Uuid;
 
@@ -148,12 +150,41 @@ pub async fn game_create(Json(payload): Json<Game>) -> impl IntoResponse {
 }
 
 pub async fn game_delete(game_identifier: Path<String>) -> StatusCode {
-    let game: Option<Game> = DATABASE.delete(("game", &game_identifier.0)).await.expect("Failed to delete game");
+    let game_identifier = game_identifier.to_string().clone();
+    let mut result = DATABASE.query(format!(r#"
+    SELECT <-playing_in<-tribute as tribute,
+           <-playing_in<-tribute->owns->item as item,
+           <-playing_in<-tribute->owns as owns
+    FROM game WHERE identifier = "{game_identifier}";
+
+    SELECT ->areas->area AS area,
+           ->areas->area->items->item AS item,
+           ->areas->area->items as items,
+           ->areas AS areas
+    FROM game WHERE identifier = "{game_identifier}";
+    "#)).await.expect("Failed to find game pieces");
+
+    let game_pieces: Option<HashMap<String, Vec<Thing>>> = result.take(0).unwrap();
+    let area_pieces: Option<HashMap<String, Vec<Thing>>> = result.take(1).unwrap();
+    if game_pieces.is_some() { delete_pieces(game_pieces.unwrap()).await };
+    if area_pieces.is_some() { delete_pieces(area_pieces.unwrap()).await };
+
+    let game: Option<Game> = DATABASE.delete(("game", &game_identifier)).await.expect("Failed to delete game");
     match game {
         Some(_) => StatusCode::NO_CONTENT,
         None => {
             StatusCode::INTERNAL_SERVER_ERROR
         }
+    }
+}
+
+async fn delete_pieces(pieces: HashMap<String, Vec<Thing>>) {
+    for (table, ids) in pieces {
+        let _ = DATABASE.query(
+            format!("DELETE {table} WHERE id IN [{}]",
+                    ids.iter().map(|i| format!(r#"{table}:{}"#, i.id.to_string()))
+                        .collect::<Vec<String>>().join(","))
+        ).await.expect(format!("Failed to delete {} pieces.", table).as_str());
     }
 }
 

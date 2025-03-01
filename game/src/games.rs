@@ -197,14 +197,14 @@ impl Game {
         }
 
         if self.day == Some(3) && day {
-            // TODO: add goodies to the cornucopia
             let mut area = self.areas.iter_mut()
                 .find(|a| a.area == "Cornucopia".to_string())
                 .expect("Cannot find Cornucopia");
-            for _ in 0..=5 {
+            for _ in 0..=3 {
                 area.add_item(Item::new_random_weapon());
                 area.add_item(Item::new_random_consumable());
                 area.add_item(Item::new_random_shield());
+                area.add_item(Item::new_random_consumable());
             }
         }
 

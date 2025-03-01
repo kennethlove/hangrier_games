@@ -400,6 +400,8 @@ async fn save_game(mut game: Game) -> Option<Game> {
         let items = area.items.clone();
         area.items = vec![];
 
+        if !area.events.is_empty() { area.open = false }
+
         let _ = save_items(items, id.clone()).await;
 
         DATABASE
@@ -455,7 +457,6 @@ async fn save_items(items: Vec<Item>, owner: RecordId) {
         }
 
         if item.quantity > 0 {
-            dbg!(&item, &owner);
             if is_area {
                 let _: Vec<TributeOwns> = DATABASE.insert("items").relation(
                     AreaItem {

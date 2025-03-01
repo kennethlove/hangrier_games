@@ -48,7 +48,6 @@ impl Brain {
 
     /// The AI for a tribute. Automatic decisions based on current state.
     fn decide_on_action(&mut self, tribute: &Tribute, nearby_tributes: usize) -> Action {
-        return Action::TakeItem;
         // if tribute.attributes.movement <= 0 {
         //     return Action::Rest;
         // }

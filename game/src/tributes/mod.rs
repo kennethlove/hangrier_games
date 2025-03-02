@@ -185,9 +185,22 @@ impl Tribute {
         }
     }
 
+    /// Tribute attacks another tribute
+    /// Potentially fatal to either tribute
     pub fn attacks(&mut self, target: &mut Tribute) -> AttackOutcome {
+        // Is the tribute attempting suicide?
         if self == target {
             println!("{}", GameMessage::TributeSelfHarm(self.clone()));
+
+            // Attack always succeeds
+            target.takes_physical_damage(self.attributes.strength);
+
+            println!("{}", GameMessage::TributeAttackWin(self.clone(), target.clone()));
+
+            if target.attributes.health > 0 {
+                println!("{}", GameMessage::TributeAttackWound(self.clone(), target.clone()));
+                return AttackOutcome::Wound(self.clone(), target.clone());
+            }
         }
 
         // `self` is the attacker
@@ -197,16 +210,10 @@ impl Tribute {
                 target.statistics.defeats += 1;
                 self.statistics.wins += 1;
 
-                println!(
-                    "{}",
-                    GameMessage::TributeAttackWin(self.clone(), target.clone())
-                );
+                println!("{}", GameMessage::TributeAttackWin(self.clone(), target.clone()));
 
                 if target.attributes.health > 0 {
-                    println!(
-                        "{}",
-                        GameMessage::TributeAttackWound(self.clone(), target.clone())
-                    );
+                    println!("{}", GameMessage::TributeAttackWound(self.clone(), target.clone()));
                     return AttackOutcome::Wound(self.clone(), target.clone());
                 }
             }
@@ -216,16 +223,10 @@ impl Tribute {
                 target.statistics.defeats += 1;
                 self.statistics.wins += 1;
 
-                println!(
-                    "{}",
-                    GameMessage::TributeAttackWinExtra(self.clone(), target.clone())
-                );
+                println!("{}", GameMessage::TributeAttackWinExtra(self.clone(), target.clone()));
 
                 if target.attributes.health > 0 {
-                    println!(
-                        "{}",
-                        GameMessage::TributeAttackWound(self.clone(), target.clone())
-                    );
+                    println!("{}", GameMessage::TributeAttackWound(self.clone(), target.clone()));
                     return AttackOutcome::Wound(self.clone(), target.clone());
                 }
             }
@@ -234,16 +235,10 @@ impl Tribute {
                 self.statistics.defeats += 1;
                 target.statistics.wins += 1;
 
-                println!(
-                    "{}",
-                    GameMessage::TributeAttackLose(self.clone(), target.clone())
-                );
+                println!("{}", GameMessage::TributeAttackLose(self.clone(), target.clone()));
 
                 if self.attributes.health > 0 {
-                    println!(
-                        "{}",
-                        GameMessage::TributeAttackWound(target.clone(), self.clone())
-                    );
+                    println!("{}", GameMessage::TributeAttackWound(target.clone(), self.clone()));
                     return AttackOutcome::Wound(target.clone(), self.clone());
                 }
             }
@@ -252,24 +247,15 @@ impl Tribute {
                 self.statistics.defeats += 1;
                 target.statistics.wins += 1;
 
-                println!(
-                    "{}",
-                    GameMessage::TributeAttackLoseExtra(self.clone(), target.clone())
-                );
+                println!("{}", GameMessage::TributeAttackLoseExtra(self.clone(), target.clone()));
 
                 if self.attributes.health > 0 {
-                    println!(
-                        "{}",
-                        GameMessage::TributeAttackWound(target.clone(), self.clone())
-                    );
+                    println!("{}", GameMessage::TributeAttackWound(target.clone(), self.clone()));
                     return AttackOutcome::Wound(target.clone(), self.clone());
                 }
             }
             AttackResult::Miss => {
-                println!(
-                    "{}",
-                    GameMessage::TributeAttackMiss(self.clone(), target.clone())
-                );
+                println!("{}", GameMessage::TributeAttackMiss(self.clone(), target.clone()));
                 self.statistics.draws += 1;
                 target.statistics.draws += 1;
 
@@ -279,19 +265,13 @@ impl Tribute {
 
         if self.attributes.health == 0 {
             // Attacker was killed by target
-            println!(
-                "{}",
-                GameMessage::TributeAttackDied(self.clone(), target.clone())
-            );
+            println!("{}", GameMessage::TributeAttackDied(self.clone(), target.clone()));
             self.statistics.killed_by = Some(target.name.clone());
             self.status = TributeStatus::RecentlyDead;
             AttackOutcome::Kill(target.clone(), self.clone())
         } else if target.attributes.health == 0 {
             // Target was killed by attacker
-            println!(
-                "{}",
-                GameMessage::TributeAttackSuccessKill(self.clone(), target.clone())
-            );
+            println!("{}", GameMessage::TributeAttackSuccessKill(self.clone(), target.clone()));
             target.statistics.killed_by = Some(self.name.clone());
             target.status = TributeStatus::RecentlyDead;
             AttackOutcome::Kill(self.clone(), target.clone())
@@ -546,6 +526,16 @@ impl Tribute {
             println!("{}", GameMessage::TributeDead(self.clone()));
         }
 
+        let areas = game.areas.clone();
+        let closed_areas: Vec<AreaDetails> = areas.clone().iter()
+            .filter(|a| !a.events.is_empty())
+            .cloned().collect();
+
+        let number_of_nearby_tributes: usize = game.living_tributes().iter()
+            .filter(|t| t.area == self.area)
+            .collect::<Vec<_>>()
+            .len();
+
         // Any generous patrons this round?
         self.receive_patron_gift();
 
@@ -555,15 +545,6 @@ impl Tribute {
         if let Some(action) = suggested_action {
             self.brain.set_preferred_action(action, probability.unwrap());
         }
-
-        let areas = game.areas.clone();
-        let closed_areas: Vec<AreaDetails> = areas.clone().iter()
-            .filter(|a| !a.open)
-            .cloned().collect();
-
-        let number_of_nearby_tributes: Vec<Tribute> = game.living_tributes().iter()
-            .filter(|t| t.area == self.area)
-            .len();
 
         let mut brain = self.brain.clone();
         let action = brain.act(self, number_of_nearby_tributes);
@@ -917,38 +898,41 @@ fn apply_violence_stress(tribute: &mut Tribute) {
     }
 }
 
+/// Generate attack data for each tribute.
+/// Each rolls a d20 to decide basic attack/defense value.
+/// Strength and any weapon are added to the attack roll.
+/// Defense and any shield are added to the defense roll.
+/// If eiter roll is more than 1.5x the other, that triggers a "decisive" victory.
 fn attack_contest(attacker: &Tribute, target: &Tribute) -> AttackResult {
-    let mut tribute1_roll = thread_rng().gen_range(1..=20); // Base roll
-    tribute1_roll += attacker.attributes.strength; // Add strength
+    // Get attack roll + strength modifier
+    let mut attack_roll: i32 = thread_rng().gen_range(1..=20); // Base roll
+    attack_roll += attacker.attributes.strength as i32; // Add strength
 
+    // If the attacker has a weapon, use it
     if let Some(weapon) = attacker.weapons().iter_mut().last() {
-        tribute1_roll += weapon.effect as u32; // Add weapon damage
+        attack_roll += weapon.effect; // Add weapon damage
         weapon.quantity = weapon.quantity.saturating_sub(1);
         if weapon.quantity == 0 {
-            println!(
-                "{}",
-                GameMessage::WeaponBreak(attacker.clone(), weapon.clone())
-            );
+            println!("{}", GameMessage::WeaponBreak(attacker.clone(), weapon.clone()));
         }
     }
 
-    let mut tribute2_roll = thread_rng().gen_range(1..=20); // Base roll
-    tribute2_roll += target.attributes.defense; // Add defense
+    // Get defense roll + defense modifier
+    let mut defense_roll: i32 = target.attributes.defense as i32; // Add defense
 
+    // If the defender has a shield, use it
     if let Some(shield) = target.defensive_items().iter_mut().last() {
-        tribute2_roll += shield.effect as u32; // Add weapon defense
+        defense_roll += shield.effect; // Add shield defense
         shield.quantity = shield.quantity.saturating_sub(1);
         if shield.quantity == 0 {
-            println!(
-                "{}",
-                GameMessage::ShieldBreak(attacker.clone(), shield.clone())
-            );
+            println!("{}", GameMessage::ShieldBreak(attacker.clone(), shield.clone()));
         }
     }
 
-    match tribute1_roll.cmp(&tribute2_roll) {
-        Ordering::Less => {
-            let difference = tribute2_roll as f64 - (tribute1_roll as f64 * 1.5);
+    // Compare attack vs defense
+    match attack_roll.cmp(&defense_roll) {
+        Ordering::Less => { // If the defender wins
+            let difference = defense_roll as f64 - (attack_roll as f64 * 1.5);
             if difference > 0.0 {
                 // Defender wins significantly
                 AttackResult::DefenderWinsDecisively
@@ -956,9 +940,9 @@ fn attack_contest(attacker: &Tribute, target: &Tribute) -> AttackResult {
                 AttackResult::DefenderWins
             }
         }
-        Ordering::Equal => AttackResult::Miss,
-        Ordering::Greater => {
-            let difference = tribute1_roll as f64 - (tribute2_roll as f64 * 1.5);
+        Ordering::Equal => AttackResult::Miss, // If they tie
+        Ordering::Greater => { // If the attacker wins
+            let difference = attack_roll as f64 - (defense_roll as f64 * 1.5);
 
             if difference > 0.0 {
                 // Attacker wins significantly

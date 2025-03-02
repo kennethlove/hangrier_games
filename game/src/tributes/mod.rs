@@ -121,35 +121,30 @@ impl Tribute {
     }
 
     /// Reduces health.
-    pub fn takes_physical_damage(&mut self, damage: u32) {
+    fn takes_physical_damage(&mut self, damage: u32) {
         self.attributes.health = self.attributes.health.saturating_sub(damage);
     }
 
     /// Reduces mental health.
-    pub fn takes_mental_damage(&mut self, damage: u32) {
+    fn takes_mental_damage(&mut self, damage: u32) {
         self.attributes.sanity = self.attributes.sanity.saturating_sub(damage);
     }
 
     /// Restores health.
-    pub fn heals(&mut self, health: u32) {
+    fn heals(&mut self, health: u32) {
         self.attributes.health = std::cmp::min(100, self.attributes.health + health);
     }
 
     /// Restores mental health.
-    pub fn heals_mental_damage(&mut self, health: u32) {
+    fn heals_mental_damage(&mut self, health: u32) {
         self.attributes.sanity = std::cmp::min(100, self.attributes.sanity + health);
     }
 
-    /// Consumes movement and removes hidden status.
-    pub fn moves(&mut self) {
-        self.attributes.movement = self.attributes.movement.saturating_sub(self.attributes.speed);
-        self.attributes.is_hidden = false;
-    }
-
     /// Restores movement.
-    pub fn short_rests(&mut self) { self.attributes.movement = 100; }
+    fn short_rests(&mut self) { self.attributes.movement = 100; }
 
-    pub fn long_rests(&mut self) {
+    /// Restores movement, some health, and some sanity
+    fn long_rests(&mut self) {
         self.short_rests();
         self.heals(5);
         self.heals_mental_damage(5);
@@ -161,6 +156,7 @@ impl Tribute {
         self.attributes.is_hidden = false;
     }
 
+    /// Does the tribute have health and an OK status?
     pub fn is_alive(&self) -> bool {
         self.attributes.health > 0
             && self.status != TributeStatus::Dead
@@ -168,13 +164,10 @@ impl Tribute {
     }
 
     /// Hides the tribute from view.
-    pub fn hides(&mut self) { self.attributes.is_hidden = true; }
-
-    /// Reveals the tribute to view.
-    pub fn reveals(&mut self) { self.attributes.is_hidden = false; }
+    fn hides(&mut self) { self.attributes.is_hidden = true; }
 
     /// Tribute is lonely/homesick/etc., loses some sanity.
-    pub fn suffers(&mut self) {
+    fn suffers(&mut self) {
         let loneliness = self.attributes.bravery as f64 / 100.0; // how lonely is the tribute?
 
         if loneliness.round() < 0.25 {
@@ -187,7 +180,7 @@ impl Tribute {
 
     /// Tribute attacks another tribute
     /// Potentially fatal to either tribute
-    pub fn attacks(&mut self, target: &mut Tribute) -> AttackOutcome {
+    fn attacks(&mut self, target: &mut Tribute) -> AttackOutcome {
         // Is the tribute attempting suicide?
         if self == target {
             println!("{}", GameMessage::TributeSelfHarm(self.clone()));
@@ -290,7 +283,7 @@ impl Tribute {
         }
     }
 
-    pub fn travels(&self, closed_areas: Vec<Area>, suggested_area: Option<Area>) -> TravelResult {
+    fn travels(&self, closed_areas: Vec<Area>, suggested_area: Option<Area>) -> TravelResult {
         let mut rng = thread_rng();
         let area = self.area.clone();
         let mut new_area: Option<Area> = None;
@@ -379,7 +372,7 @@ impl Tribute {
         }
     }
 
-    pub fn process_status(&mut self, game: &Game) {
+    fn process_status(&mut self, game: &Game) {
         // First, apply any area events for the current area
         self.apply_area_effects(game);
 
@@ -497,10 +490,7 @@ impl Tribute {
             }
         }
         if self.attributes.health == 0 {
-            println!(
-                "{}",
-                GameMessage::TributeDiesFromTributeEvent(self.clone(), tribute_event.clone())
-            );
+            println!("{}", GameMessage::TributeDiesFromTributeEvent(self.clone(), tribute_event.clone()));
             self.statistics.killed_by = Some(self.status.to_string());
             self.status = TributeStatus::RecentlyDead;
         }
@@ -724,6 +714,7 @@ impl Tribute {
         }
     }
 
+    /// Use consumable item from inventory
     fn use_consumable(&mut self, chosen_item: Item) -> bool {
         let items = self.consumable_items();
 
@@ -776,7 +767,8 @@ impl Tribute {
         true
     }
 
-    pub fn available_items(&self) -> Vec<Item> {
+    /// What items does the tribute have?
+    fn available_items(&self) -> Vec<Item> {
         self.items
             .iter()
             .filter(|i| i.quantity > 0)
@@ -784,7 +776,8 @@ impl Tribute {
             .collect()
     }
 
-    pub fn weapons(&self) -> Vec<Item> {
+    /// Which items are marked as weapons?
+    fn weapons(&self) -> Vec<Item> {
         self.available_items()
             .iter()
             .filter(|i| i.is_weapon())
@@ -792,7 +785,8 @@ impl Tribute {
             .collect()
     }
 
-    pub fn defensive_items(&self) -> Vec<Item> {
+    /// Which items are marked as shields?
+    fn defensive_items(&self) -> Vec<Item> {
         self.available_items()
             .iter()
             .filter(|i| i.is_defensive())
@@ -800,6 +794,7 @@ impl Tribute {
             .collect()
     }
 
+    /// Which items are marked as consumable?
     pub fn consumable_items(&self) -> Vec<Item> {
         self.available_items()
             .iter()
@@ -808,7 +803,8 @@ impl Tribute {
             .collect()
     }
 
-    pub fn pick_target(&self, game: &mut Game) -> Option<Tribute> {
+    /// Pick an appropriate target from nearby tributes
+    fn pick_target(&self, game: &mut Game) -> Option<Tribute> {
         let tributes: Vec<Tribute> = game
             .living_tributes()
             .iter()
@@ -848,8 +844,6 @@ impl Tribute {
             }
         }
     }
-
-    pub fn status(&self) -> TributeStatus { self.status.clone() }
 
     pub fn set_status(&mut self, status: TributeStatus) { self.status = status; }
 
@@ -1023,7 +1017,7 @@ impl Default for Attributes {
 
 impl Attributes {
     /// Provides a randomized set of Attributes
-    fn new() -> Self {
+    pub fn new() -> Self {
         let mut rng = thread_rng();
 
         Self {
@@ -1047,11 +1041,6 @@ impl Attributes {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::games::Game;
-    use rstest::{fixture, rstest};
-
-    #[fixture]
-    fn game() -> Game { Game::default() }
 
     #[test]
     fn new() {
@@ -1062,34 +1051,24 @@ mod tests {
         assert_eq!(tribute.status, TributeStatus::Healthy);
     }
 
-    #[rstest]
-    fn takes_physical_damage(_game: Game) {
+    #[test]
+    fn takes_physical_damage() {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         let hp = tribute.attributes.health.clone();
         tribute.takes_physical_damage(10);
         assert_eq!(tribute.attributes.health, hp - 10);
     }
 
-    #[rstest]
-    fn takes_mental_damage(_game: Game) {
+    #[test]
+    fn takes_mental_damage() {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         let mp = tribute.attributes.sanity.clone();
         tribute.takes_mental_damage(10);
         assert_eq!(tribute.attributes.sanity, mp - 10);
     }
 
-    #[rstest]
-    fn moves_and_rests(_game: Game) {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
-        tribute.attributes.speed = 50;
-        tribute.moves();
-        assert_eq!(tribute.attributes.movement, 50);
-        tribute.short_rests();
-        assert_eq!(tribute.attributes.movement, 100);
-    }
-
-    #[rstest]
-    fn is_hidden_true(_game: Game) {
+    #[test]
+    fn is_hidden_true() {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         tribute.attributes.intelligence = 100;
         tribute.attributes.is_hidden = true;

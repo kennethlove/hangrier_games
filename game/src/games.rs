@@ -86,15 +86,7 @@ impl Game {
             .collect()
     }
 
-    pub fn dead_tributes(&self) -> Vec<Tribute> {
-        self.tributes
-            .iter()
-            .filter(|t| !t.is_alive())
-            .cloned()
-            .collect()
-    }
-
-    pub fn recently_dead_tributes(&self) -> Vec<Tribute> {
+    fn recently_dead_tributes(&self) -> Vec<Tribute> {
         self.tributes
             .iter()
             .filter(|t| t.status == TributeStatus::RecentlyDead)
@@ -109,11 +101,11 @@ impl Game {
         }
     }
 
-    pub fn random_area(&self) -> Option<AreaDetails> {
+    fn random_area(&self) -> Option<AreaDetails> {
         self.areas.choose(&mut rand::thread_rng()).cloned()
     }
-    
-    pub fn random_open_area(&self) -> Option<AreaDetails> {
+
+    fn random_open_area(&self) -> Option<AreaDetails> {
         self.areas.iter()
             .filter(|a| a.open())
             .choose(&mut rand::thread_rng())
@@ -176,7 +168,7 @@ impl Game {
         self.clone()
     }
 
-    pub fn do_a_cycle(&mut self, day: bool) {
+    fn do_a_cycle(&mut self, day: bool) {
         let mut rng = rand::thread_rng();
         let day_event_frequency = 1.0 / 4.0;
         let night_event_frequency = 1.0 / 8.0;
@@ -264,7 +256,7 @@ impl Game {
         self.tributes = updated_tributes;
     }
 
-    pub fn clean_up_recent_deaths(&mut self) {
+    fn clean_up_recent_deaths(&mut self) {
         for mut tribute in self.recently_dead_tributes() {
             let area = self.get_area_details_mut(tribute.area.clone());
             if let Some(area) = area {
@@ -275,11 +267,6 @@ impl Game {
 
             tribute.dies();
         }
-    }
-
-    #[allow(dead_code)]
-    fn get_area_details(&self, area: Area) -> Option<AreaDetails> {
-        self.areas.iter().find(|&a| a.area == area.to_string()).cloned()
     }
 
     fn get_area_details_mut(&mut self, area: Area) -> Option<&mut AreaDetails> {

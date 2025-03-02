@@ -147,17 +147,15 @@ impl Game {
             }
         }
 
-        println!(
-            "{}",
-            GameMessage::TributesLeft(living_tributes.len() as u32)
-        );
+        println!("{}", GameMessage::TributesLeft(living_tributes.len() as u32));
 
+        // Clear all events from the previous cycle
         for area in self.areas.iter_mut() {
             area.events.clear();
         }
 
         // Run the day
-        self.do_day_night_cycle(true);
+        self.do_a_cycle(true);
 
         // Clean up any deaths
         self.clean_up_recent_deaths();
@@ -165,7 +163,7 @@ impl Game {
         println!("{}", GameMessage::GameNightStart(self.day.unwrap()));
 
         // Run the night
-        self.do_day_night_cycle(false);
+        self.do_a_cycle(false);
 
         // Clean up any deaths
         self.clean_up_recent_deaths();
@@ -178,7 +176,7 @@ impl Game {
         self.clone()
     }
 
-    pub fn do_day_night_cycle(&mut self, day: bool) {
+    pub fn do_a_cycle(&mut self, day: bool) {
         let mut rng = rand::thread_rng();
         let day_event_frequency = 1.0 / 4.0;
         let night_event_frequency = 1.0 / 8.0;
@@ -212,18 +210,21 @@ impl Game {
                 .expect("Cannot find Cornucopia");
             for _ in 0..=3 {
                 area.add_item(Item::new_random_weapon());
-                area.add_item(Item::new_random_consumable());
                 area.add_item(Item::new_random_shield());
+                area.add_item(Item::new_random_consumable());
                 area.add_item(Item::new_random_consumable());
             }
         }
 
-        if self.living_tributes().len() > 1 && self.living_tributes().len() < 6 {
+        // When we're getting low on tributes, close more areas by spawning
+        // more events.
+        if self.living_tributes().len() > 1 && self.living_tributes().len() < 8 {
             if let Some(mut area) = self.random_open_area() {
                 let event = AreaEvent::random();
                 area.events.push(event);
             }
 
+            // If the tributes are really unlucky, they get two events.
             if rng.gen_bool(self.living_tributes().len() as f64 / 24.0) {
                 if let Some(mut area) = self.random_open_area() {
                     let event = AreaEvent::random();
@@ -274,10 +275,6 @@ impl Game {
 
             tribute.dies();
         }
-    }
-
-    pub fn move_tribute(&self, tribute: &mut Tribute, area: Area) {
-        tribute.area = area;
     }
 
     #[allow(dead_code)]

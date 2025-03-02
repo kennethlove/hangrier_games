@@ -1,11 +1,11 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
-use dioxus::prelude::*;
-use dioxus_query::prelude::{use_init_query_client, use_query_client};
-use game::games::Game;
-use shared::{DeleteGame, EditGame, EditTribute};
 use crate::components::game_edit::EditGameModal;
 use crate::components::tribute_edit::EditTributeModal;
 use crate::routes::Routes;
+use dioxus::prelude::*;
+use dioxus_query::prelude::use_init_query_client;
+use game::games::Game;
+use shared::{DeleteGame, EditGame, EditTribute};
 
 #[component]
 pub fn App() -> Element {

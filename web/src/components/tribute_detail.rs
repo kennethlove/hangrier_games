@@ -21,7 +21,7 @@ async fn fetch_tribute(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryErro
 
             match response.json::<Option<Tribute>>().await {
                 Ok(Some(tribute)) => {
-                    QueryResult::Ok(QueryValue::Tribute(tribute))
+                    QueryResult::Ok(QueryValue::Tribute(Box::new(tribute)))
                 }
                 _ => QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
             }

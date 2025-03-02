@@ -20,7 +20,7 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
         match response.json::<Game>().await {
             Ok(game) => {
                 GAME.set(game.clone());
-                QueryResult::Ok(QueryValue::Game(game))
+                QueryResult::Ok(QueryValue::Game(Box::new(game)))
             }
             Err(_) => QueryResult::Err(QueryError::GameNotFound(identifier.to_string())),
         }
@@ -55,7 +55,7 @@ async fn next_step(identifier: String) -> MutationResult<MutationValue, Mutation
 
 #[component]
 fn GameStatusState() -> Element {
-    let mut game_signal: Signal<Option<Game>> = use_context();
+    let game_signal: Signal<Option<Game>> = use_context();
     let game = game_signal.read();
     
     if let Some(game) = game.clone() {
@@ -83,6 +83,7 @@ fn GameStatusState() -> Element {
         let mutate = use_mutation(next_step);
         let game_id = game.identifier.clone();
         let game_day = game.day.unwrap_or(0);
+        let game_finished = game.status == GameStatus::Finished;
         let tribute_count = game.clone()
             .tributes.into_iter()
             .filter(|t| t.is_alive())
@@ -132,6 +133,7 @@ fn GameStatusState() -> Element {
                 button {
                     class: "button",
                     onclick: next_step,
+                    disabled: game_finished,
                     "{game_next_step}"
                 }
             }
@@ -139,7 +141,7 @@ fn GameStatusState() -> Element {
                 "Game round: Day { game_day }, Night { game_day }"
             }
             h4 { "{tribute_count} tributes remain alive."}
-            if winner_name.len() > 0 {
+            if !winner_name.is_empty() {
                 h1 { "{winner_name} wins!"}
             }
         }
@@ -167,9 +169,9 @@ pub fn GameDetailPage(identifier: String) -> Element {
 
     match game_query.result().value() {
         QueryResult::Ok(QueryValue::Game(game)) => {
-            game_signal.set(Some(game.clone()));
+            game_signal.set(Some(*game.clone()));
             rsx! {
-                GameDetails { game: game.clone() }
+                GameDetails { game: *game.clone() }
             }
         }
         QueryResult::Err(e) => {

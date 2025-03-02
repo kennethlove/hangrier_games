@@ -1,10 +1,9 @@
 use crate::tributes::{tribute_create, tribute_delete, tribute_detail, tribute_record_create, tribute_update, TributeOwns};
 use crate::DATABASE;
 use axum::extract::Path;
-use axum::http::header::{CACHE_CONTROL, EXPIRES};
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::{delete, get, post, put};
+use axum::routing::{get, put};
 use axum::Json;
 use axum::Router;
 use game::areas::{Area, AreaDetails};
@@ -12,15 +11,14 @@ use game::games::{Game, GameStatus};
 use game::items::Item;
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
+use shared::EditGame;
 use shared::GameArea;
-use shared::{EditGame, TributeKey};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::LazyLock;
 use strum::IntoEnumIterator;
-use surrealdb::opt::PatchOp;
-use surrealdb::sql::{Id, Thing};
-use surrealdb::{Error, RecordId, Response};
+use surrealdb::sql::Thing;
+use surrealdb::RecordId;
 use uuid::Uuid;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
@@ -182,9 +180,9 @@ async fn delete_pieces(pieces: HashMap<String, Vec<Thing>>) {
     for (table, ids) in pieces {
         let _ = DATABASE.query(
             format!("DELETE {table} WHERE id IN [{}]",
-                    ids.iter().map(|i| format!(r#"{table}:{}"#, i.id.to_string()))
+                    ids.iter().map(|i| format!(r#"{table}:{}"#, i.id))
                         .collect::<Vec<String>>().join(","))
-        ).await.expect(format!("Failed to delete {} pieces.", table).as_str());
+        ).await.unwrap_or_else(|_| panic!("Failed to delete {} pieces.", table));
     }
 }
 
@@ -472,6 +470,6 @@ async fn save_items(items: Vec<Item>, owner: RecordId) {
                     }
                 ).await.expect("Failed to update Owns relation");
             }
-        } else {}
+        }
     }
 }

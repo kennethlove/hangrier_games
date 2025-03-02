@@ -1,16 +1,9 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
-use crate::components::game_edit::GameEdit;
-use crate::components::game_tributes::GameTributes;
-use crate::components::tribute_edit::EditTributeModal;
 use crate::API_HOST;
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
+use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::areas::AreaDetails;
-use game::games::GameStatus;
-use game::games::{Game, GAME};
-use game::tributes::Tribute;
-use shared::EditTribute;
-use std::collections::HashMap;
+use game::games::Game;
 
 async fn fetch_areas(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Areas(identifier)) = keys.first() {

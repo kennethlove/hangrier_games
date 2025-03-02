@@ -1,9 +1,5 @@
-use crate::cache::{QueryError, QueryKey, QueryValue};
-use crate::components::{
-    App, CreateGameButton, CreateGameForm, DeleteGameModal, GamePage, Games,
-    GamesList, TributeDetail};
+use crate::components::{GamePage, Games, GamesList, TributeDetail};
 use dioxus::prelude::*;
-use dioxus_query::prelude::use_query_client;
 
 
 #[component]

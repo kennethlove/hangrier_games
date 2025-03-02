@@ -31,7 +31,7 @@ impl FromStr for TributeStatus {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.to_lowercase().as_str().contains("mauled") {
-            if let Some(animal_name) = s.splitn(2, ':').skip(1).next() {
+            if let Some(animal_name) = s.split_once(':').map(|x| x.1) {
                 if let Ok(animal) = Animal::from_str(animal_name.trim()) {
                     return Ok(Self::Mauled(animal));
                 }
@@ -81,7 +81,7 @@ impl Display for TributeStatus {
             TributeStatus::Drowned => write!(f, "drowned"),
             TributeStatus::Burned => write!(f, "burned"),
             TributeStatus::Buried => write!(f, "buried"),
-            TributeStatus::Mauled(animal) => write!(f, "mauled: {}", animal.to_string()),
+            TributeStatus::Mauled(animal) => write!(f, "mauled: {}", animal),
         }
     }
 }

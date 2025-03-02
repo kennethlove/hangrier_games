@@ -76,7 +76,7 @@ impl Display for GameMessage {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
             GameMessage::GameDayStart(day_number) => {
-                write!(f, "{}", format!("=== ☀️ Day {} begins! ===", day_number))
+                write!(f, "=== ☀️ Day {} begins! ===", day_number)
             }
             GameMessage::FirstDayStart => {
                 write!(f, "=== 🎉 The Hunger Games begin! 🎉 ===")
@@ -85,437 +85,180 @@ impl Display for GameMessage {
                 write!(f, "=== 😋 Day 3: Feast Day ===")
             }
             GameMessage::TributesLeft(tribute_count) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("=== 📌 Tributes alive: {} ===", tribute_count)
-                )
+                write!(f, "=== 📌 Tributes alive: {} ===", tribute_count)
             }
             GameMessage::GameNightStart(day_number) => {
-                write!(f, "{}", format!("=== 🌙 Night {} begins ===", day_number))
+                write!(f, "=== 🌙 Night {} begins ===", day_number)
             }
             GameMessage::DailyDeathAnnouncement(death_count) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("=== 💀 Tributes dead: {} ===", death_count)
-                )
+                write!(f, "=== 💀 Tributes dead: {} ===", death_count)
             }
             GameMessage::DeathAnnouncement(tribute) => {
-                write!(f, "{}", format!("=== 🪦 {} has died ===", tribute.name))
+                write!(f, "=== 🪦 {} has died ===", tribute.name)
             }
             GameMessage::NoOneWins => {
                 write!(f, "=== 🎭 No one wins! ===")
             }
             GameMessage::TributeWins(tribute) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("=== 🏆 The winner is {} ===", tribute.name)
-                )
+                write!(f, "=== 🏆 The winner is {} ===", tribute.name)
             }
             GameMessage::TributeRest(tribute) => {
-                write!(f, "{}", format!("😪 {} rests", tribute.name))
+                write!(f, "😪 {} rests", tribute.name)
             }
             GameMessage::TributeLongRest(tribute) => {
-                write!(
-                    f,
-                    "{}",
-                    format!(
-                        "💤 {} rests and recovers a little health and sanity",
-                        tribute.name
-                    )
-                )
+                write!(f, "💤 {} rests and recovers a little health and sanity", tribute.name)
             }
             GameMessage::TributeHide(tribute) => {
-                write!(f, "{}", format!("🫥 {} tries to hide", tribute.name))
+                write!(f, "🫥 {} tries to hide", tribute.name)
             }
             GameMessage::TributeTravel(tribute, area_a, area_b) => {
-                write!(
-                    f,
-                    "{}",
-                    format!(
-                        "🚶 {} moves from {} to {}",
-                        tribute.name,
-                        area_a.to_string(),
-                        area_b.to_string()
-                    )
-                )
+                write!(f, "🚶 {} moves from {} to {}", tribute.name, area_a, area_b)
             }
             GameMessage::TributeTakeItem(tribute, item) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🔨 {} takes a(n) {}", tribute.name, item.name)
-                )
+                write!(f, "🔨 {} takes a(n) {}", tribute.name, item.name)
             }
             GameMessage::TributeCannotUseItem(tribute, item) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("❌ {} cannot use a(n) {}", tribute.name, item.name)
-                )
+                write!(f, "❌ {} cannot use a(n) {}", tribute.name, item.name)
             }
             GameMessage::TributeUseItem(tribute, item) => {
-                write!(
-                    f,
-                    "{}",
-                    format!(
-                        "💊 {} uses a(n) {}, gains {} {}",
-                        tribute.name, item.name, item.effect, item.attribute
-                    )
-                )
+                write!(f, "💊 {} uses a(n) {}, gains {} {}", tribute.name, item.name, item.effect, item.attribute)
             }
             GameMessage::TributeTravelTooTired(tribute, area) => {
-                write!(
-                    f,
-                    "{}",
-                    format!(
-                        "😴 {} is too tired to move from {}, rests instead",
-                        tribute.name,
-                        area.to_string()
-                    )
-                )
+                write!(f, "😴 {} is too tired to move from {}, rests instead", tribute.name, area)
             }
             GameMessage::TributeTravelAlreadyThere(tribute, area) => {
-                write!(
-                    f,
-                    "{}",
-                    format!(
-                        "🤔 {} is already in the {}, stays put",
-                        tribute.name,
-                        area.to_string()
-                    )
-                )
+                write!(f, "🤔 {} is already in the {}, stays put", tribute.name, area)
             }
             GameMessage::TributeTravelFollow(tribute, area) => {
-                write!(
-                    f,
-                    "{}",
-                    format!(
-                        "🫡 {} follows their district mate to {}",
-                        tribute.name,
-                        area.to_string()
-                    )
-                )
+                write!(f, "🫡 {} follows their district mate to {}", tribute.name, area)
             }
             GameMessage::TributeTravelStay(tribute, area) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🪑 {} stays in {}", tribute.name, area.to_string())
-                )
+                write!(f, "🪑 {} stays in {}", tribute.name, area)
             }
             GameMessage::TributeBleeds(tribute) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🩸 {} bleeds from their wounds.", tribute.name)
-                )
+                write!(f, "🩸 {} bleeds from their wounds.", tribute.name)
             }
             GameMessage::TributeSick(tribute) => {
-                write!(
-                    f,
-                    "{}",
-                    format!(
-                        "🤒 {} contracts dysentery, loses strength and speed",
-                        tribute.name
-                    )
-                )
+                write!(f, "🤒 {} contracts dysentery, loses strength and speed", tribute.name)
             }
             GameMessage::TributeElectrocuted(tribute) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🌩️ {} is struck by lightning, loses health", tribute.name)
-                )
+                write!(f, "🌩️ {} is struck by lightning, loses health", tribute.name)
             }
             GameMessage::TributeFrozen(tribute) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🥶 {} suffers from hypothermia, loses speed.", tribute.name)
-                )
+                write!(f, "🥶 {} suffers from hypothermia, loses speed.", tribute.name)
             }
             GameMessage::TributeOverheated(tribute) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🥵 {} suffers from heat stroke, loses speed.", tribute.name)
-                )
+                write!(f, "🥵 {} suffers from heat stroke, loses speed.", tribute.name)
             }
             GameMessage::TributeDehydrated(tribute) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🌵 {} is severely dehydrated, loses strength", tribute.name)
-                )
+                write!(f, "🌵 {} is severely dehydrated, loses strength", tribute.name)
             }
             GameMessage::TributeStarving(tribute) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🍴 {} is ravenously hungry, loses strength", tribute.name)
-                )
+                write!(f, "🍴 {} is ravenously hungry, loses strength", tribute.name)
             }
             GameMessage::TributePoisoned(tribute) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🧪 {} eats something poisonous, loses sanity", tribute.name)
-                )
+                write!(f, "🧪 {} eats something poisonous, loses sanity", tribute.name)
             }
             GameMessage::TributeBrokenArm(tribute) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🦴 {} injures their arm, loses strength.", tribute.name)
-                )
+                write!(f, "🦴 {} injures their arm, loses strength.", tribute.name)
             }
             GameMessage::TributeBrokenLeg(tribute) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🦴 {} injures their leg, loses speed.", tribute.name)
-                )
+                write!(f, "🦴 {} injures their leg, loses speed.", tribute.name)
             }
             GameMessage::TributeInfected(tribute) => {
-                write!(
-                    f,
-                    "{}",
-                    format!(
-                        "🤢 {} gets an infection, loses health and sanity",
-                        tribute.name
-                    )
-                )
+                write!(f, "🤢 {} gets an infection, loses health and sanity", tribute.name)
             }
             GameMessage::TributeDrowned(tribute) => {
-                write!(
-                    f,
-                    "{}",
-                    format!(
-                        "🏊 {} partially drowns, loses health and sanity",
-                        tribute.name
-                    )
-                )
+                write!(f, "🏊 {} partially drowns, loses health and sanity", tribute.name)
             }
             GameMessage::TributeMauled(tribute, count, animal, damage) => {
-                write!(
-                    f,
-                    "{}",
-                    format!(
-                        "🐾 {} is attacked by {} {}, takes {} damage!",
-                        tribute.name,
-                        count,
-                        animal.plural(),
-                        damage
-                    )
-                )
+                write!(f, "🐾 {} is attacked by {} {}, takes {} damage!", tribute.name, count, animal.plural(), damage)
             }
             GameMessage::TributeBurned(tribute) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🔥 {} gets burned, loses health", tribute.name)
-                )
+                write!(f, "🔥 {} gets burned, loses health", tribute.name)
             }
             GameMessage::TributeHorrified(tribute, damage) => {
-                write!(
-                    f,
-                    "{}",
-                    format!(
-                        "😱 {} is horrified by the violence, loses {} sanity.",
-                        tribute.name, damage
-                    )
-                )
+                write!(f, "😱 {} is horrified by the violence, loses {} sanity.", tribute.name, damage)
             }
             GameMessage::TributeSuffer(tribute) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("😭 {} suffers from loneliness and terror.", tribute.name)
-                )
+                write!(f, "😭 {} suffers from loneliness and terror.", tribute.name)
             }
             GameMessage::TributeSelfHarm(tribute) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🤦 {} tries to attack themself!", tribute.name)
-                )
+                write!(f, "🤦 {} tries to attack themself!", tribute.name)
             }
             GameMessage::TributeSuicide(tribute) => {
-                write!(f, "{}", format!("🪒 {} attempts suicide.", tribute.name))
+                write!(f, "🪒 {} attempts suicide.", tribute.name)
             }
             GameMessage::TributeAttackWin(tribute, target) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🔪 {} attacks {}, and wins!", tribute.name, target.name)
-                )
+                write!(f, "🔪 {} attacks {}, and wins!", tribute.name, target.name)
             }
             GameMessage::TributeAttackWinExtra(tribute, target) => {
-                write!(
-                    f,
-                    "{}",
-                    format!(
-                        "🔪 {} attacks {}, and wins decisively!",
-                        tribute.name, target.name
-                    )
-                )
+                write!(f, "🔪 {} attacks {}, and wins decisively!", tribute.name, target.name)
             }
             GameMessage::TributeAttackWound(tribute, target) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🤕 {} wounds {}", tribute.name, target.name)
-                )
+                write!(f, "🤕 {} wounds {}", tribute.name, target.name)
             }
             GameMessage::TributeAttackLose(tribute, target) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🤣 {} attacks {}, but loses!", tribute.name, target.name)
-                )
+                write!(f, "🤣 {} attacks {}, but loses!", tribute.name, target.name)
             }
             GameMessage::TributeAttackLoseExtra(tribute, target) => {
-                write!(
-                    f,
-                    "{}",
-                    format!(
-                        "🤣 {} attacks {}, but loses decisively!",
-                        tribute.name, target.name
-                    )
-                )
+                write!(f, "🤣 {} attacks {}, but loses decisively!", tribute.name, target.name)
             }
             GameMessage::TributeAttackMiss(tribute, target) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("😰 {} attacks {}, but misses!", tribute.name, target.name)
-                )
+                write!(f, "😰 {} attacks {}, but misses!", tribute.name, target.name)
             }
             GameMessage::TributeAttackDied(tribute, target) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("☠️ {} is killed by {}", tribute.name, target.name)
-                )
+                write!(f, "☠️ {} is killed by {}", tribute.name, target.name)
             }
             GameMessage::TributeAttackSuccessKill(tribute, target) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("☠️ {} successfully kills {}", tribute.name, target.name)
-                )
+                write!(f, "☠️ {} successfully kills {}", tribute.name, target.name)
             }
             GameMessage::TributeAttackHidden(tribute, target) => {
-                write!(
-                    f,
-                    "{}",
-                    format!(
-                        "🤔 {} can't attack {}, they're hidden",
-                        tribute.name, target.name
-                    )
-                )
+                write!(f, "🤔 {} can't attack {}, they're hidden", tribute.name, target.name)
             }
             GameMessage::TributeDiesFromStatus(tribute, status) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("💀 {} dies from {}", tribute.name, status.to_string())
-                )
+                write!(f, "💀 {} dies from {}", tribute.name, status)
             }
             GameMessage::TributeDiesFromAreaEvent(tribute, area_event) => {
-                write!(
-                    f,
-                    "{}",
-                    format!(
-                        "🪦 {} died in the {}.",
-                        tribute.name,
-                        area_event.to_string()
-                    )
-                )
+                write!(f, "🪦 {} died in the {}.", tribute.name, area_event)
             }
             GameMessage::TributeDiesFromTributeEvent(tribute, tribute_event) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("💀 {} dies by {}", tribute.name, tribute_event.to_string())
-                )
+                write!(f, "💀 {} dies by {}", tribute.name, tribute_event)
             }
             GameMessage::TributeAlreadyDead(tribute) => {
-                write!(f, "{}", format!("‼️ {} is already dead!", tribute.name))
+                write!(f, "‼️ {} is already dead!", tribute.name)
             }
             GameMessage::TributeDead(tribute) => {
-                write!(f, "{}", format!("❗️ {} is dead!", tribute.name))
+                write!(f, "❗️ {} is dead!", tribute.name)
             }
             GameMessage::WeaponBreak(tribute, weapon) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🗡️ {} breaks their {}", tribute.name, weapon.name)
-                )
+                write!(f, "🗡️ {} breaks their {}", tribute.name, weapon.name)
             }
             GameMessage::ShieldBreak(tribute, shield) => {
-                write!(
-                    f,
-                    "{}",
-                    format!("🛡️ {} breaks their {}", tribute.name, shield.name)
-                )
+                write!(f, "🛡️ {} breaks their {}", tribute.name, shield.name)
             }
             GameMessage::SponsorGift(tribute, item) => {
-                write!(
-                    f,
-                    "{}",
-                    format!(
-                        "🎁 {} receives a(n) {} ({}x {} +{})",
-                        tribute.name, item.name, item.quantity, item.attribute, item.effect
-                    )
-                )
+                write!(f, "🎁 {} receives a(n) {} ({}x {} +{})", tribute.name, item.name, item.quantity, item.attribute, item.effect)
             }
             GameMessage::AreaEvent(area_event, area) => {
                 let area_name = area.to_string().replace("The ", "");
-                write!(
-                    f,
-                    "{}",
-                    format!(
-                        "=== ⚠️ A(n) {} has occurred in the {} ===",
-                        area_event.to_string(),
-                        area_name
-                    )
-                )
+                write!(f, "=== ⚠️ A(n) {} has occurred in the {} ===", area_event, area_name)
             }
             GameMessage::AreaClose(area) => {
                 let area_name = area.to_string().replace("The ", "");
-                write!(
-                    f,
-                    "{}",
-                    format!("=== 🔔 The {} is uninhabitable ===", area_name)
-                )
+                write!(f, "=== 🔔 The {} is uninhabitable ===", area_name)
             }
             GameMessage::AreaOpen(area) => {
                 let area_name = area.to_string().replace("The ", "");
-                write!(
-                    f,
-                    "{}",
-                    format!("=== 🔔 The {} is habitable again ===", area_name)
-                )
+                write!(f, "=== 🔔 The {} is habitable again ===", area_name)
             }
             GameMessage::TrappedInArea(tribute, area) => {
                 let area_name = area.to_string().replace("The ", "");
-                write!(
-                    f,
-                    "{}",
-                    format!("💥 {} is trapped in the {}.", tribute.name, area_name)
-                )
+                write!(f, "💥 {} is trapped in the {}.", tribute.name, area_name)
             }
             GameMessage::DiedInArea(tribute, area) => {
                 let area_name = area.to_string().replace("The ", "");
-                write!(
-                    f,
-                    "{}",
-                    format!("💥 {} died in the {}.", tribute.name, area_name)
-                )
+                write!(f, "💥 {} died in the {}.", tribute.name, area_name)
             }
         }
     }

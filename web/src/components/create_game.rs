@@ -1,11 +1,8 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
-use crate::routes::Routes;
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use game::games::Game;
-use reqwest::{Error, Response};
-use shared::CreateGame;
 use std::ops::Deref;
 
 async fn create_game(name: Option<String>) -> MutationResult<MutationValue, MutationError> {
@@ -46,10 +43,10 @@ pub fn CreateGameButton() -> Element {
         spawn(async move {
             mutate.manual_mutate(None).await;
             if mutate.result().is_ok() {
-                if let MutationResult::Ok(MutationValue::NewGame(game)) = mutate.result().deref() {
+                if let MutationResult::Ok(MutationValue::NewGame(_game)) = mutate.result().deref() {
                     client.invalidate_queries(&[QueryKey::Games]);
                 }
-            } else {}
+            }
         });
     };
 
@@ -65,7 +62,7 @@ pub fn CreateGameButton() -> Element {
 #[component]
 pub fn CreateGameForm() -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
-    let mut game_name_signal: Signal<String> = use_signal(|| String::default());
+    let mut game_name_signal: Signal<String> = use_signal(String::default);
     let mutate = use_mutation(create_game);
 
     let onsubmit = move |_| {
@@ -77,14 +74,14 @@ pub fn CreateGameForm() -> Element {
             if mutate.result().is_ok() {
 
                 match mutate.result().deref() {
-                    MutationResult::Ok(MutationValue::NewGame(game)) => {
+                    MutationResult::Ok(MutationValue::NewGame(_game)) => {
                         client.invalidate_queries(&[QueryKey::Games]);
                         game_name_signal.set(String::default());
                     },
                     MutationResult::Err(MutationError::UnableToCreateGame) => {},
                     _ => {}
                 }
-            } else {}
+            }
         });
     };
 

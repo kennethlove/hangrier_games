@@ -3,12 +3,10 @@ use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use game::games::GAME;
-use game::tributes::Tribute;
-use reqwest::{Response, StatusCode};
 use shared::DeleteTribute;
 use std::ops::Deref;
-use std::time::Duration;
 
+#[allow(dead_code)]
 async fn delete_tribute(name: String) -> MutationResult<MutationValue, MutationError> {
     let game_name = GAME.with_borrow(|g| { g.name.clone() });
 
@@ -60,7 +58,7 @@ pub fn DeleteTributeModal() -> Element {
             let game_name = game_name.clone();
             spawn(async move {
                 mutate.manual_mutate(tribute_name.clone()).await;
-                if let MutationResult::Ok(MutationValue::TributeDeleted(tribute_name)) = mutate.result().deref() {
+                if let MutationResult::Ok(MutationValue::TributeDeleted(_tribute_name)) = mutate.result().deref() {
                     client.invalidate_queries(&[QueryKey::Tributes(game_name.clone())]);
                     delete_tribute_signal.set(None);
                 }

@@ -16,7 +16,7 @@ async fn fetch_games(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError>
                     QueryResult::Err(QueryError::BadJson)
                 }
             },
-            Err(e) => {
+            Err(_) => {
                 QueryResult::Err(QueryError::NoGames)
             }
         }

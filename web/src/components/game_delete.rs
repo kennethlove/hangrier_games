@@ -2,11 +2,8 @@ use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValu
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
-use reqwest::{Response, StatusCode};
-use std::net::{IpAddr, Ipv4Addr};
-use std::ops::Deref;
-use std::time::Duration;
 use shared::DeleteGame;
+use std::ops::Deref;
 
 async fn delete_game(delete_game_info: DeleteGame) -> MutationResult<MutationValue, MutationError> {
     let identifier = delete_game_info.0;
@@ -33,7 +30,7 @@ pub fn GameDelete(game_identifier: String, game_name: String) -> Element {
         let identifier = game_identifier.clone();
         let name = game_name.clone();
 
-        delete_game_signal.set(Some(DeleteGame { 0: identifier, 1: name }));
+        delete_game_signal.set(Some(DeleteGame(identifier, name)));
     };
 
     rsx! {
@@ -64,12 +61,9 @@ pub fn DeleteGameModal() -> Element {
 
     let delete = move |_| {
         if let Some(dg) = delete_game_info.clone() {
-            let identifier = dg.clone().0;
-            let name = dg.clone().1;
-            
             spawn(async move {
                 mutate.manual_mutate(dg.clone()).await;
-                if let MutationResult::Ok(MutationValue::GameDeleted(identifier, name)) = mutate.result().deref() {
+                if let MutationResult::Ok(MutationValue::GameDeleted(_, _)) = mutate.result().deref() {
                     client.invalidate_queries(&[QueryKey::Games]);
                     delete_game_signal.set(None);
                 }

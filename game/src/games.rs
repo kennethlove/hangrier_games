@@ -1,7 +1,7 @@
 use crate::areas::events::AreaEvent;
 use crate::areas::{Area, AreaDetails};
-use crate::items::items::OwnsItems;
 use crate::items::Item;
+use crate::items::OwnsItems;
 use crate::messages::GameMessage;
 use crate::tributes::actions::Action;
 use crate::tributes::events::TributeEvent;
@@ -170,6 +170,11 @@ impl Game {
         // Clean up any deaths
         self.clean_up_recent_deaths();
 
+        match self.tributes.len() {
+            0 | 1 => self.status = GameStatus::Finished,
+            _ => self.status = GameStatus::InProgress,
+        }
+
         self.clone()
     }
 
@@ -180,9 +185,7 @@ impl Game {
 
         // TODO: Remove this
         let area = self.random_open_area();
-        if area.is_some() {
-            area.unwrap().events.push(AreaEvent::random());
-        }
+        area.expect("No open area found").events.push(AreaEvent::random());
 
         // Trigger any events for this cycle if we're past the first three days
         if self.day > Some(3) || !day {
@@ -199,8 +202,8 @@ impl Game {
         }
 
         if self.day == Some(3) && day {
-            let mut area = self.areas.iter_mut()
-                .find(|a| a.area == "Cornucopia".to_string())
+            let area = self.areas.iter_mut()
+                .find(|a| a.area == *"Cornucopia")
                 .expect("Cannot find Cornucopia");
             for _ in 0..=3 {
                 area.add_item(Item::new_random_weapon());
@@ -258,7 +261,7 @@ impl Game {
     pub fn clean_up_recent_deaths(&mut self) {
         for mut tribute in self.recently_dead_tributes() {
             let area = self.get_area_details_mut(tribute.area.clone());
-            if let Some(mut area) = area {
+            if let Some(area) = area {
                 for item in tribute.items.iter() {
                     area.add_item(item.clone());
                 }
@@ -272,8 +275,9 @@ impl Game {
         tribute.area = area;
     }
 
+    #[allow(dead_code)]
     fn get_area_details(&self, area: Area) -> Option<AreaDetails> {
-        self.areas.iter().cloned().find(|a| a.area == area.to_string())
+        self.areas.iter().find(|&a| a.area == area.to_string()).cloned()
     }
 
     fn get_area_details_mut(&mut self, area: Area) -> Option<&mut AreaDetails> {

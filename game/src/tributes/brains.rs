@@ -134,11 +134,11 @@ impl Brain {
                     .saturating_sub(tribute.attributes.intelligence as i32)
                     .saturating_sub(tribute.attributes.sanity as i32);
                 match sense {
-                    // Smart enough to know better, hides
+                    // Smart enough to know better, moves
                     ..36 => Action::Move(None),
                     // Too dumb to know better, attacks
                     80.. => Action::Attack,
-                    // Average intelligence, moves
+                    // Average intelligence, hides
                     _ => Action::Hide,
                 }
             }
@@ -299,7 +299,7 @@ mod tests {
         tribute.attributes.intelligence = 50;
         tribute.attributes.sanity = 50;
         let action = tribute.brain.act(&tribute.clone(), 6);
-        assert_eq!(action, Action::Hide);
+        assert_eq!(action, Action::Move(None));
     }
 
     #[rstest]
@@ -307,7 +307,7 @@ mod tests {
         tribute.attributes.intelligence = 20;
         tribute.attributes.sanity = 20;
         let action = tribute.brain.act(&tribute.clone(), 6);
-        assert_eq!(action, Action::Move(None));
+        assert_eq!(action, Action::Hide);
     }
 
     #[rstest]

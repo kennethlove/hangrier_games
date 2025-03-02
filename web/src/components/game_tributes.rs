@@ -6,8 +6,6 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::games::Game;
 use game::tributes::Tribute;
-use serde::{Deserialize, Serialize};
-use shared::TributeKey;
 
 async fn fetch_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tributes(identifier)) = keys.first() {

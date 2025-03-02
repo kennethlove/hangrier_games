@@ -22,16 +22,18 @@ pub(crate) enum QueryError {
     Unknown,
 }
 
+#[allow(dead_code)]
 #[derive(PartialEq, Debug)]
 pub(crate) enum QueryValue {
     Areas(Vec<AreaDetails>),
-    Game(Game),
+    Game(Box<Game>),
     Games(Vec<Game>),
-    Tribute(Tribute),
+    Tribute(Box<Tribute>),
     Tributes(Vec<Tribute>),
     GameTributes(Vec<TributeKey>),
 }
 
+#[allow(dead_code)]
 #[derive(PartialEq, Debug)]
 pub(crate) enum MutationValue {
     NewGame(Game),

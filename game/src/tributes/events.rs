@@ -25,7 +25,7 @@ impl FromStr for TributeEvent {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.to_lowercase().contains("animal attack") {
-            return if let Some(animal_name) = s.splitn(2, ':').skip(1).next() {
+            return if let Some(animal_name) = s.split_once(':').map(|x| x.1) {
                 if let Ok(animal) = Animal::from_str(animal_name.trim()) {
                     Ok(TributeEvent::AnimalAttack(animal))
                 } else { Err(()) }
@@ -72,7 +72,7 @@ impl TributeEvent {
     pub fn random() -> TributeEvent {
         let mut rng = rand::thread_rng();
         let animal = Animal::random();
-        let events = vec![
+        let events = [
             TributeEvent::AnimalAttack(animal),
             TributeEvent::Dysentery,
             TributeEvent::LightningStrike,

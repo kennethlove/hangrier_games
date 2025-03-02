@@ -3,11 +3,8 @@ use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use game::games::{Game, GAME};
-use game::tributes::Tribute;
-use reqwest::{Response, StatusCode};
-use shared::{DeleteTribute, EditTribute};
+use shared::EditTribute;
 use std::ops::Deref;
-use std::time::Duration;
 
 async fn edit_tribute(tribute: EditTribute) -> MutationResult<MutationValue, MutationError> {
     let game_identifier = GAME.with_borrow(|g| { g.identifier.clone() });
@@ -90,12 +87,12 @@ pub fn EditTributeForm() -> Element {
         let district: u32 = data.get("district").expect("No district value").0[0].clone().parse().unwrap();
 
         if !name.is_empty() && (1..=12u32).contains(&district) {
-            let edit_tribute = EditTribute(identifier.clone(), district.clone(), name.clone());
+            let edit_tribute = EditTribute(identifier.clone(), district, name.clone());
             spawn(async move {
                 mutate.manual_mutate(edit_tribute.clone()).await;
-                edit_tribute_signal.set(Some(edit_tribute.clone()));
+                edit_tribute_signal.set(Some(edit_tribute));
 
-                if let MutationResult::Ok(MutationValue::TributeUpdated(identifier)) = mutate.result().deref() {
+                if let MutationResult::Ok(MutationValue::TributeUpdated(_identifier)) = mutate.result().deref() {
                     client.invalidate_queries(&[
                         QueryKey::Tributes(game_identifier.clone()),
                     ]);

@@ -541,50 +541,33 @@ impl Tribute {
         // Update the tribute based on the period's events.
         self.process_status(game);
 
-        // Nighttime terror
-        if !day && self.is_alive() {
-            self.suffers();
-        }
-
-        // Gift from patrons?
-        let chance = match self.district {
-            1 | 2 => 1.0 / 10.0,
-            3 | 4 => 1.0 / 15.0,
-            5 | 6 => 1.0 / 20.0,
-            7 | 8 => 1.0 / 25.0,
-            9 | 10 => 1.0 / 30.0,
-            _ => 1.0 / 50.0,
-        };
-
-        if thread_rng().gen_bool(chance) {
-            let item = Item::new_random_consumable();
-            self.add_item(item.clone());
-            println!("{}", GameMessage::SponsorGift(self.clone(), item.clone()));
-        }
-
         // Tribute died to the period's events.
         if self.status == TributeStatus::RecentlyDead || self.attributes.health == 0 {
             println!("{}", GameMessage::TributeDead(self.clone()));
         }
 
-        let areas = game.areas.clone();
-        let closed_areas: Vec<AreaDetails> =
-            areas.clone().iter().filter(|a| !a.open).cloned().collect();
+        // Any generous patrons this round?
+        self.receive_patron_gift();
+
+        // Nighttime terror
+        if !day && self.is_alive() { self.suffers(); }
 
         if let Some(action) = suggested_action {
-            self.brain
-                .set_preferred_action(action, probability.unwrap());
+            self.brain.set_preferred_action(action, probability.unwrap());
         }
 
-        let nearby_tributes: Vec<Tribute> = game
-            .living_tributes()
-            .iter()
+        let areas = game.areas.clone();
+        let closed_areas: Vec<AreaDetails> = areas.clone().iter()
+            .filter(|a| !a.open)
+            .cloned().collect();
+
+        let number_of_nearby_tributes: Vec<Tribute> = game.living_tributes().iter()
             .filter(|t| t.area == self.area)
-            .cloned()
-            .collect();
+            .len();
 
         let mut brain = self.brain.clone();
-        let action = brain.act(self, nearby_tributes.len());
+        let action = brain.act(self, number_of_nearby_tributes);
+
         match &action {
             Action::Move(area) => match self.travels(
                 closed_areas
@@ -706,6 +689,25 @@ impl Tribute {
             }
         }
         self.clone()
+    }
+
+    /// Receive a patron gift, broken down by district
+    fn receive_patron_gift(&mut self) {
+        // Gift from patrons?
+        let chance = match self.district {
+            1 | 2 => 1.0 / 10.0,
+            3 | 4 => 1.0 / 15.0,
+            5 | 6 => 1.0 / 20.0,
+            7 | 8 => 1.0 / 25.0,
+            9 | 10 => 1.0 / 30.0,
+            _ => 1.0 / 50.0,
+        };
+
+        if thread_rng().gen_bool(chance) {
+            let item = Item::new_random_consumable();
+            self.add_item(item.clone());
+            println!("{}", GameMessage::SponsorGift(self.clone(), item.clone()));
+        }
     }
 
     /// Save the tribute's latest action

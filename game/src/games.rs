@@ -185,7 +185,12 @@ impl Game {
 
         // TODO: Remove this
         let area = self.random_open_area();
-        area.expect("No open area found").events.push(AreaEvent::random());
+        if let Some(mut area) = area {
+            area.events.push(AreaEvent::random());
+        } else {
+            let mut area = self.random_area().expect("No areas?");
+            area.open = true;
+        }
 
         // Trigger any events for this cycle if we're past the first three days
         if self.day > Some(3) || !day {

@@ -851,7 +851,7 @@ impl Tribute {
 
     pub fn pick_target(&self, game: &mut Game) -> Option<Tribute> {
         let tributes: Vec<Tribute> = game
-            .tributes
+            .living_tributes()
             .iter()
             .filter(|t| t.area == self.area)
             .cloned()

@@ -76,6 +76,7 @@ fn RefreshButton() -> Element {
 
 #[component]
 pub fn GameListMember(game: Game) -> Element {
+    let living_count = game.living_tributes().len();
     rsx! {
         li {
             p {
@@ -90,7 +91,7 @@ pub fn GameListMember(game: Game) -> Element {
                     game_identifier: game.identifier.clone()
                 }
             }
-            p { "{game.tribute_count} tributes" }
+            p { "{living_count} / {game.tribute_count} tributes" }
             p { "{game.status} - {game.ready}" }
         }
     }

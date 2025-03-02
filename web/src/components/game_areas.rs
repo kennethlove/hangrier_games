@@ -45,7 +45,7 @@ pub fn GameAreaList() -> Element {
                 ul {
                     for area in areas {
                         li {
-                            "{area.name}, open: {area.open}",
+                            "{area.name}, open: {area.open()}",
                             p { "items" }
                             ul {
                                 for item in area.clone().items {

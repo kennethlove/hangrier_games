@@ -66,7 +66,6 @@ pub struct AreaDetails {
     pub identifier: String,
     pub name: String,
     pub area: String,
-    pub open: bool,
     #[serde(default)]
     pub items: Vec<Item>,
     #[serde(default)]
@@ -100,13 +99,8 @@ impl OwnsItems for AreaDetails {
 }
 
 impl AreaDetails {
-    pub fn handle_event(&mut self) -> AreaDetails {
-        // If there are events, close the area
-        if !self.events.is_empty() {
-            self.open = false;
-        }
-
-        self.clone()
+    pub fn open(&self) -> bool {
+        !self.events.is_empty()
     }
 }
 

@@ -19,7 +19,6 @@ pub struct EditGame(pub String, pub String); // Identifier, name
 pub struct GameArea {
     pub identifier: String,
     pub name: String,
-    pub open: bool,
     pub area: String,
 }
 

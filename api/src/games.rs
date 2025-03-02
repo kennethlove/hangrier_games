@@ -57,7 +57,6 @@ async fn game_area_create(area: Area) -> Option<GameArea> {
         .content(GameArea {
             identifier: identifier.clone(),
             name: area.to_string(),
-            open: true,
             area: area.to_string(),
         })
         .await.expect("Failed to find Area and Game link")
@@ -397,8 +396,6 @@ async fn save_game(mut game: Game) -> Option<Game> {
         let id = RecordId::from(("area", area.identifier.clone()));
         let items = area.items.clone();
         area.items = vec![];
-
-        if !area.events.is_empty() { area.open = false }
 
         let _ = save_items(items, id.clone()).await;
 

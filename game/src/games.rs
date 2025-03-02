@@ -115,7 +115,7 @@ impl Game {
     
     pub fn random_open_area(&self) -> Option<AreaDetails> {
         self.areas.iter()
-            .filter(|a| a.open)
+            .filter(|a| a.open())
             .choose(&mut rand::thread_rng())
             .cloned()
     }
@@ -189,7 +189,7 @@ impl Game {
             area.events.push(AreaEvent::random());
         } else {
             let mut area = self.random_area().expect("No areas?");
-            area.open = true;
+            area.events.clear();
         }
 
         // Trigger any events for this cycle if we're past the first three days

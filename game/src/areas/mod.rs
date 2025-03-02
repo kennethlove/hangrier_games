@@ -107,21 +107,6 @@ impl AreaDetails {
         }
 
         self.clone()
-
-        // for event in self.events.iter() {
-        // for tribute in tributes.iter_mut() {
-        //     match event {
-        //         AreaEvent::Wildfire => tribute.set_status(TributeStatus::Burned),
-        //         AreaEvent::Flood => tribute.set_status(TributeStatus::Drowned),
-        //         AreaEvent::Earthquake => tribute.set_status(TributeStatus::Buried),
-        //         AreaEvent::Avalanche => tribute.set_status(TributeStatus::Buried),
-        //         AreaEvent::Blizzard => tribute.set_status(TributeStatus::Frozen),
-        //         AreaEvent::Landslide => tribute.set_status(TributeStatus::Buried),
-        //         AreaEvent::Heatwave => tribute.set_status(TributeStatus::Overheated),
-        //     }
-        // }
-        // }
-
     }
 }
 

@@ -142,8 +142,7 @@ impl Tribute {
 
     /// Consumes movement and removes hidden status.
     pub fn moves(&mut self) {
-        self.attributes.movement =
-            std::cmp::max(0, self.attributes.movement - self.attributes.speed);
+        self.attributes.movement = self.attributes.movement.saturating_sub(self.attributes.speed);
         self.attributes.is_hidden = false;
     }
 
@@ -325,23 +324,13 @@ impl Tribute {
         }
 
         if new_area.is_some() && new_area == Some(area.clone()) {
-            println!(
-                "{}",
-                GameMessage::TributeTravelAlreadyThere(self.clone(), new_area.clone().unwrap())
-            );
+            println!("{}", GameMessage::TributeTravelAlreadyThere(self.clone(), new_area.clone().unwrap()));
             return TravelResult::Failure;
         }
 
         let handle_suggested_area = || -> TravelResult {
             if let Some(new_area) = new_area {
-                println!(
-                    "{}",
-                    GameMessage::TributeTravel(
-                        self.clone(),
-                        area.clone(),
-                        new_area.clone()
-                    )
-                );
+                println!("{}", GameMessage::TributeTravel(self.clone(), area.clone(), new_area.clone()));
                 return TravelResult::Success(new_area);
             }
             TravelResult::Failure
@@ -350,20 +339,14 @@ impl Tribute {
         match self.attributes.movement {
             // No movement left, can't move
             0 => {
-                println!(
-                    "{}",
-                    GameMessage::TributeTravelTooTired(self.clone(), area.clone())
-                );
+                println!("{}", GameMessage::TributeTravelTooTired(self.clone(), area.clone()));
                 TravelResult::Failure
             }
             // Low movement, can only move to suggested area
             1..=10 => match handle_suggested_area() {
                 TravelResult::Success(area) => TravelResult::Success(area),
                 TravelResult::Failure => {
-                    println!(
-                        "{}",
-                        GameMessage::TributeTravelTooTired(self.clone(), area.clone())
-                    );
+                    println!("{}", GameMessage::TributeTravelTooTired(self.clone(), area.clone()));
                     TravelResult::Failure
                 }
             },
@@ -403,20 +386,14 @@ impl Tribute {
                         count += 1;
 
                         if count == 10 {
-                            println!(
-                                "{}",
-                                GameMessage::TributeTravelStay(self.clone(), area.clone())
-                            );
+                            println!("{}", GameMessage::TributeTravelStay(self.clone(), area.clone()));
                             return TravelResult::Success(area.clone());
                         }
                         continue;
                     }
                     break new_area.clone();
                 };
-                println!(
-                    "{}",
-                    GameMessage::TributeTravel(self.clone(), area.clone(), new_area.clone())
-                );
+                println!("{}", GameMessage::TributeTravel(self.clone(), area.clone(), new_area.clone()));
                 TravelResult::Success(new_area)
             }
         }
@@ -426,8 +403,7 @@ impl Tribute {
         // First, apply any area events for the current area
         self.apply_area_effects(game);
 
-        let status = self.status.clone();
-        match status {
+        match self.status.clone() {
             TributeStatus::Wounded => {
                 self.takes_physical_damage(1);
             }

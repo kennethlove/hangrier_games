@@ -15,7 +15,7 @@ use shared::EditGame;
 use shared::GameArea;
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 use strum::IntoEnumIterator;
 use surrealdb::sql::Thing;
 use surrealdb::RecordId;
@@ -308,7 +308,13 @@ SELECT (
     }
 }
 
-pub async fn next_step(Path(identifier): Path<String>) -> (StatusCode, Json<Option<Game>>) {
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct GameResponse {
+    game: Option<Game>,
+    output: String
+}
+
+pub async fn next_step(Path(identifier): Path<String>) -> (StatusCode, Json<GameResponse>) {
     let record_id = RecordId::from(("game", identifier.clone()));
     let mut result = DATABASE.query(format!(r#"
 SELECT status FROM game WHERE identifier = "{identifier}";
@@ -328,7 +334,7 @@ RETURN count(
                 DATABASE
                     .query(format!(r#"UPDATE {record_id} SET status = "{}""#, GameStatus::InProgress))
                     .await.expect("Failed to start game");
-                (StatusCode::CREATED, Json(None))
+                (StatusCode::CREATED, Json(GameResponse::default()))
             }
             GameStatus::InProgress => {
                 match dead_tribute_count {
@@ -336,30 +342,37 @@ RETURN count(
                         DATABASE
                             .query(format!(r#"UPDATE {record_id} SET status = "{}""#, GameStatus::Finished))
                             .await.expect("Failed to end game");
-                        (StatusCode::NO_CONTENT, Json(None))
+                        (StatusCode::NO_CONTENT, Json(GameResponse::default()))
                     }
                     _ => {
                         if let Some(mut game) = get_full_game(&identifier).await {
 
+                            std::io::set_output_capture(Some(Default::default()));
                             let game = game.run_day_night_cycle();
-                            let updated_game: Option<Game> = save_game(game).await;
+                            let captured = std::io::set_output_capture(None);
+                            let captured = captured.unwrap();
+                            let captured = Arc::try_unwrap(captured).unwrap();
+                            let captured = captured.into_inner().unwrap();
+                            let captured = String::from_utf8(captured).unwrap();
+
+                            let updated_game: Option<Game> = save_game(game, &captured).await;
 
                             if let Some(game) = updated_game {
-                                (StatusCode::OK, Json(Some(game)))
+                                (StatusCode::OK, Json(GameResponse { game: Some(game), output: captured }))
                             } else {
-                                (StatusCode::NOT_FOUND, Json(None))
+                                (StatusCode::NOT_FOUND, Json(GameResponse { game: None, output: captured }))
                             }
                         } else {
-                            (StatusCode::NOT_FOUND, Json(None))
+                            (StatusCode::NOT_FOUND, Json(GameResponse::default()))
                         }
                     }
                 }
             }
             GameStatus::Finished => {
-                (StatusCode::NO_CONTENT, Json(None))
+                (StatusCode::NO_CONTENT, Json(GameResponse::default()))
             }
         }
-    } else { (StatusCode::NOT_FOUND, Json(None)) }
+    } else { (StatusCode::NOT_FOUND, Json(GameResponse::default())) }
 }
 
 async fn get_full_game(identifier: &str) -> Option<Game> {
@@ -387,7 +400,14 @@ WHERE identifier = "{identifier}";"#))
 
 }
 
-async fn save_game(mut game: Game) -> Option<Game> {
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GameLog {
+    pub game_identifier: RecordId,
+    pub day: Option<u32>,
+    pub message: String,
+}
+
+async fn save_game(mut game: Game, captured: &String) -> Option<Game> {
     let game_identifier = RecordId::from(("game", game.identifier.clone()));
     let areas = game.areas.clone();
     game.areas = vec![];
@@ -421,8 +441,17 @@ async fn save_game(mut game: Game) -> Option<Game> {
             .await.expect("Failed to update area items");
     }
 
+    let game_log = GameLog {
+        game_identifier: game_identifier.clone(),
+        day: game.day,
+        message: captured.clone(),
+    };
+    DATABASE.insert::<Vec<GameLog>>("game_log")
+        .content(game_log)
+        .await.expect("Failed to update game log");
+
     DATABASE
-        .update::<Option<Game>>(game_identifier)
+        .update::<Option<Game>>(game_identifier.clone())
         .content(game)
         .await.expect("Failed to update game")
 }

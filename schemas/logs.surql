@@ -1,0 +1,5 @@
+DEFINE TABLE OVERWRITE game_log SCHEMAFULL;
+
+DEFINE FIELD OVERWRITE game_identifier ON game_log;
+DEFINE FIELD OVERWRITE day ON game_log;
+DEFINE FIELD OVERWRITE message ON game_log;

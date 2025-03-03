@@ -1,3 +1,5 @@
+#![feature(internal_output_capture)]
+
 mod games;
 mod tributes;
 

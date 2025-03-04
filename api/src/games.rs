@@ -234,7 +234,13 @@ AS tributes, (
 count(<-playing_in<-tribute.id) == 24
 AND
 count(array::distinct(<-playing_in<-tribute.district)) == 12
-AS ready
+AS ready, (
+    SELECT *
+    FROM game_log
+    WHERE game_identifier = "{identifier}"
+    ORDER BY day DESC
+    LIMIT 1
+) AS log
 FROM game
 WHERE identifier = "{identifier}";"#))
     .await.unwrap();
@@ -402,7 +408,7 @@ WHERE identifier = "{identifier}";"#))
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GameLog {
-    pub game_identifier: RecordId,
+    pub game_identifier: String,
     pub day: Option<u32>,
     pub message: String,
 }
@@ -442,7 +448,7 @@ async fn save_game(mut game: Game, captured: &String) -> Option<Game> {
     }
 
     let game_log = GameLog {
-        game_identifier: game_identifier.clone(),
+        game_identifier: game.identifier.clone(),
         day: game.day,
         message: captured.clone(),
     };

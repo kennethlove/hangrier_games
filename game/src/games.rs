@@ -18,6 +18,19 @@ use uuid::Uuid;
 
 thread_local!(pub static GAME: RefCell<Game> = RefCell::new(Game::default()));
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GameLogEntry {
+    pub game_identifier: String,
+    pub day: u32,
+    pub message: String,
+}
+
+impl Display for GameLogEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Game {
     pub identifier: String,
@@ -31,7 +44,9 @@ pub struct Game {
     #[serde(default)]
     pub tributes: Vec<Tribute>,
     #[serde(default)]
-    pub ready: bool
+    pub ready: bool,
+    #[serde(default)]
+    pub log: Vec<GameLogEntry>,
 }
 
 impl Default for Game {
@@ -45,12 +60,7 @@ impl Default for Game {
         Game {
             identifier: Uuid::new_v4().to_string(),
             name,
-            status: Default::default(),
-            day: None,
-            areas: Vec::new(),
-            tribute_count: 0,
-            tributes: Vec::new(),
-            ready: false
+            ..Default::default()
         }
     }
 }

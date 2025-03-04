@@ -60,7 +60,13 @@ impl Default for Game {
         Game {
             identifier: Uuid::new_v4().to_string(),
             name,
-            ..Default::default()
+            status: Default::default(),
+            day: None,
+            areas: vec![],
+            tribute_count: 0,
+            tributes: vec![],
+            ready: false,
+            log: vec![],
         }
     }
 }

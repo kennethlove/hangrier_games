@@ -444,6 +444,8 @@ impl Tribute {
             _ => {}
         }
 
+        self.events.clear();
+
         if self.attributes.health == 0 {
             self.statistics.killed_by = Some(self.status.to_string());
             self.status = TributeStatus::RecentlyDead;

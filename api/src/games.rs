@@ -11,11 +11,11 @@ use game::games::{Game, GameStatus};
 use game::items::Item;
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
-use shared::EditGame;
+use shared::{EditGame};
 use shared::GameArea;
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::{Arc, LazyLock};
+use std::sync::{LazyLock};
 use strum::IntoEnumIterator;
 use surrealdb::sql::Thing;
 use surrealdb::RecordId;
@@ -353,15 +353,10 @@ RETURN count(
                     _ => {
                         if let Some(mut game) = get_full_game(&identifier).await {
 
-                            std::io::set_output_capture(Some(Default::default()));
                             let game = game.run_day_night_cycle();
-                            let captured = std::io::set_output_capture(None);
-                            let captured = captured.unwrap();
-                            let captured = Arc::try_unwrap(captured).unwrap();
-                            let captured = captured.into_inner().unwrap();
-                            let captured = String::from_utf8(captured).unwrap();
+                            let captured = String::new();
 
-                            let updated_game: Option<Game> = save_game(game, &captured).await;
+                            let updated_game: Option<Game> = save_game(game).await;
 
                             if let Some(game) = updated_game {
                                 (StatusCode::OK, Json(GameResponse { game: Some(game), output: captured }))
@@ -413,7 +408,7 @@ pub struct GameLog {
     pub message: String,
 }
 
-async fn save_game(mut game: Game, captured: &String) -> Option<Game> {
+async fn save_game(mut game: Game) -> Option<Game> {
     let game_identifier = RecordId::from(("game", game.identifier.clone()));
     let areas = game.areas.clone();
     game.areas = vec![];
@@ -450,7 +445,7 @@ async fn save_game(mut game: Game, captured: &String) -> Option<Game> {
     let game_log = GameLog {
         game_identifier: game.identifier.clone(),
         day: game.day,
-        message: captured.clone(),
+        message: "".to_string(),
     };
     DATABASE.insert::<Vec<GameLog>>("game_log")
         .content(game_log)

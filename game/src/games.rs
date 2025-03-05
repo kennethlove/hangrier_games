@@ -129,6 +129,8 @@ impl Game {
     }
 
     pub fn run_day_night_cycle(&mut self) -> Game {
+        tracing::info!("DAY NIGHT CYCLE");
+
         self.day = Some(self.day.unwrap_or(0) + 1);
         let living_tributes = self.living_tributes();
 
@@ -151,11 +153,13 @@ impl Game {
                 println!("{}", GameMessage::FeastDayStart);
             }
             _ => {
-                println!("{}", GameMessage::GameDayStart(self.day.unwrap()));
+                let _message = GameMessage::GameDayStart(self.day.unwrap());
+                println!("game {}", GameMessage::GameDayStart(self.day.unwrap()));
             }
         }
 
         println!("{}", GameMessage::TributesLeft(living_tributes.len() as u32));
+        tracing::info!("{}", GameMessage::TributesLeft(living_tributes.len() as u32));
 
         // Clear all events from the previous cycle
         for area in self.areas.iter_mut() {
@@ -320,3 +324,4 @@ impl FromStr for GameStatus {
         }
     }
 }
+

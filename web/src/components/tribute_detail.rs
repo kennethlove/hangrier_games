@@ -65,7 +65,9 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                 h3 { "Items" }
                 ul {
                     for item in tribute.clone().items {
-                        li { "{item.name}" }
+                        li {
+                            onclick: move |_| {},
+                            "{item.name}" }
                     }
                 }
             }

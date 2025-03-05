@@ -35,6 +35,7 @@ async fn main() {
         .with(
             tracing_subscriber::fmt::layer()
                 .with_target(true)
+                .with_filter(tracing_subscriber::filter::LevelFilter::INFO)
         )
         .with(
             HangryGamesLogLayer
@@ -94,7 +95,7 @@ async fn main() {
         );
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    tracing::info!("listening on {}", listener.local_addr().unwrap());
+    tracing::debug!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, router).await.unwrap();
 }
 

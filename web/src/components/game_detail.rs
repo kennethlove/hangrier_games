@@ -6,7 +6,7 @@ use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, use_mutation, use_query_client, MutationResult, QueryResult};
 use game::games::{GameStatus};
-use game::games::{Game, GAME};
+use game::games::{Game};
 use game::tributes::Tribute;
 use reqwest::StatusCode;
 use std::ops::Deref;
@@ -19,7 +19,7 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
 
         match response.json::<Game>().await {
             Ok(game) => {
-                GAME.set(game.clone());
+                // GAME.set(game.clone());
                 QueryResult::Ok(QueryValue::Game(Box::new(game)))
             }
             Err(_) => QueryResult::Err(QueryError::GameNotFound(identifier.to_string())),

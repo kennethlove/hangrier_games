@@ -19,7 +19,9 @@ use std::sync::{LazyLock};
 use strum::IntoEnumIterator;
 use surrealdb::sql::Thing;
 use surrealdb::RecordId;
+use tracing::info;
 use uuid::Uuid;
+use game::STORY;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
@@ -353,8 +355,10 @@ RETURN count(
                     _ => {
                         if let Some(mut game) = get_full_game(&identifier).await {
 
-                            let game = game.run_day_night_cycle();
-                            let captured = String::new();
+                            let game = game.run_day_night_cycle().await;
+                            let story = STORY.lock().await;
+                            info!("{:?}", &story);
+                            let captured = story.join("\n");
 
                             let updated_game: Option<Game> = save_game(game).await;
 

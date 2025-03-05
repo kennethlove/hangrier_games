@@ -10,13 +10,13 @@ use crate::tributes::Tribute;
 use rand::prelude::{IteratorRandom, SliceRandom};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
 use std::fmt::Display;
 use std::ops::Index;
 use std::str::FromStr;
-use tracing::Level;
 use tracing::info;
 use uuid::Uuid;
+
+use crate::STORY;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GameLogEntry {
@@ -128,7 +128,9 @@ impl Game {
             .cloned()
     }
 
-    pub fn run_day_night_cycle(&mut self) -> Game {
+    pub async fn run_day_night_cycle(&mut self) -> Game {
+        let mut record = STORY.lock().await;
+
         self.day = Some(self.day.unwrap_or(0) + 1);
         let living_tributes = self.living_tributes();
 
@@ -148,20 +150,29 @@ impl Game {
         match self.day {
             Some(1) => {
                 // println!("{}", GameMessage::FirstDayStart);
-                info!(target: "api::game", "{}", GameMessage::FirstDayStart);
+                // info!(target: "api::game", "{}", GameMessage::FirstDayStart);
+                record.push(format!("{}", GameMessage::FirstDayStart));
             }
             Some(3) => {
                 // println!("{}", GameMessage::FeastDayStart);
-                info!(target: "api::game", "{}", GameMessage::FeastDayStart);
+                // info!(target: "api::game", "{}", GameMessage::FeastDayStart);
+                record.push(format!("{}", GameMessage::FeastDayStart));
             }
             _ => {
+                record.push(format!("{}", GameMessage::GameDayStart(self.day.unwrap())));
                 // println!("{}", GameMessage::GameDayStart(self.day.unwrap()));
-                info!(target: "api::game", "{}", GameMessage::GameDayStart(self.day.unwrap()));
+                // info!(
+                //     target: "api::game",
+                //     game = self.identifier.as_str(),
+                //     day = self.day.clone(),
+                //     "{}", GameMessage::GameDayStart(self.day.unwrap())
+                // );
             }
         }
 
         // println!("{}", GameMessage::TributesLeft(living_tributes.len() as u32));
-        info!(target: "api::game", "{}", GameMessage::TributesLeft(living_tributes.len() as u32));
+        // info!(target: "api::game", "{}", GameMessage::TributesLeft(living_tributes.len() as u32));
+        record.push(format!("{}", GameMessage::TributesLeft(living_tributes.len() as u32)));
 
         // Clear all events from the previous cycle
         for area in self.areas.iter_mut() {
@@ -175,7 +186,8 @@ impl Game {
         self.clean_up_recent_deaths();
 
         // println!("{}", GameMessage::GameNightStart(self.day.unwrap()));
-        info!(target: "api::game", "{}", GameMessage::GameNightStart(self.day.unwrap()));
+        // info!(target: "api::game", "{}", GameMessage::GameNightStart(self.day.unwrap()));
+        record.push(format!("{}", GameMessage::GameNightStart(self.day.unwrap())));
 
         // Run the night
         self.do_a_cycle(false);
@@ -187,6 +199,8 @@ impl Game {
             0 | 1 => self.status = GameStatus::Finished,
             _ => self.status = GameStatus::InProgress,
         }
+
+        info!(target: "api", "{:?}", record);
 
         self.clone()
     }

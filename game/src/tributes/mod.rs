@@ -23,6 +23,7 @@ use std::cmp::{Ordering, PartialEq};
 use std::str::FromStr;
 use tracing::info;
 use uuid::Uuid;
+use crate::STORY;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Tribute {
@@ -191,7 +192,8 @@ impl Tribute {
             target.takes_physical_damage(self.attributes.strength);
 
             // println!("{}", GameMessage::TributeAttackWin(self.clone(), target.clone()));
-            info!(target: "api::tribute", "{}", GameMessage::TributeAttackWin(self.clone(), target.clone()));
+            // info!(target: "api::tribute", "{}", GameMessage::TributeAttackWin(self.clone(), target.clone()));
+            STORY.lock().await.push(format!("{}", GameMessage::TributeAttackWin(self.clone(), target.clone())));
 
             if target.attributes.health > 0 {
                 // println!("{}", GameMessage::TributeAttackWound(self.clone(), target.clone()));

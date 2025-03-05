@@ -5,8 +5,7 @@ use tracing::{Event, Id};
 use tracing::field::Field;
 use tracing::span::Attributes;
 use tracing_subscriber::Layer;
-use tracing_subscriber::layer::{Context, SubscriberExt};
-use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::layer::{Context};
 
 pub struct HangryGamesLogLayer;
 

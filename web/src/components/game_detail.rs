@@ -5,7 +5,7 @@ use crate::components::game_tributes::GameTributes;
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, use_mutation, use_query_client, MutationResult, QueryResult};
-use game::games::{GameLogEntry, GameStatus};
+use game::games::{GameStatus};
 use game::games::{Game, GAME};
 use game::tributes::Tribute;
 use reqwest::StatusCode;

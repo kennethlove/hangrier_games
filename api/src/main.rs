@@ -1,5 +1,3 @@
-#![feature(internal_output_capture)]
-
 mod games;
 mod tributes;
 
@@ -17,8 +15,10 @@ use surrealdb_migrations::MigrationRunner;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any as CorsAny, CorsLayer};
 use tower_http::trace::TraceLayer;
+use tracing_subscriber::Layer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use game::logging::HangryGamesLogLayer;
 
 pub static DATABASE: LazyLock<Surreal<Any>> = LazyLock::new(Surreal::init);
 
@@ -28,10 +28,18 @@ async fn main() {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                format!("{}=debug,tower_http=debug,surrealdb=debug,surrealdb_client=debug", env!("CARGO_CRATE_NAME")).into()
+                format!("{}=debug,tower_http=debug,surrealdb=debug,surrealdb_client=debug",
+                        env!("CARGO_CRATE_NAME")).into()
             })
         )
-        .with(tracing_subscriber::fmt::layer())
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_target(true)
+        )
+        .with(
+            HangryGamesLogLayer
+                .with_filter(tracing_subscriber::filter::LevelFilter::INFO)
+        )
         .init();
 
     DATABASE.connect(env::var("SURREAL_HOST").unwrap()).await.expect("Failed to connect to database");
@@ -86,7 +94,7 @@ async fn main() {
         );
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    tracing::debug!("listening on {}", listener.local_addr().unwrap());
+    tracing::info!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, router).await.unwrap();
 }
 

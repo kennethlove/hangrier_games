@@ -16,7 +16,6 @@ use surrealdb_migrations::MigrationRunner;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any as CorsAny, CorsLayer};
 use tower_http::trace::TraceLayer;
-use tracing_subscriber::Layer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -32,7 +31,7 @@ fn initialize_logging() {
     //     .with_writer(Arc::new(file))
     //     .json();
 
-    let log_targets = tracing_subscriber::filter::Targets::new()
+    let _log_targets = tracing_subscriber::filter::Targets::new()
         .with_target("api::game", tracing::Level::INFO)
         .with_target("api::tribute", tracing::Level::INFO);
 

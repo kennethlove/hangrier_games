@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-axum = "0.8.1"
+axum = { version = "0.8.1", features = ["macros"] }
 dotenvy = "0.15.7"
 game = { path = "../game" }
 mockall = "0.13.1"
@@ -28,3 +28,6 @@ surrealdb = { version = "2.1.4", features = ["kv-mem"] }
 
 [target.'cfg(unix)'.dependencies]
 surrealdb = { version = "2.1.4", features = ["kv-rocksdb"] }
+
+[dependencies.getrandom]
+version = "0.2.15"

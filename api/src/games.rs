@@ -4,12 +4,12 @@ use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{get, put};
-use axum::Json;
+use axum::{Json};
 use axum::Router;
 use game::areas::{Area, AreaDetails};
 use game::games::{Game, GameStatus};
 use game::items::Item;
-use game::tributes::Tribute;
+use game::tributes::{Tribute, TributeLogEntry};
 use serde::{Deserialize, Serialize};
 use shared::{EditGame};
 use shared::GameArea;
@@ -322,7 +322,7 @@ pub struct GameResponse {
     output: String
 }
 
-pub async fn next_step(Path(identifier): Path<String>) -> (StatusCode, Json<GameResponse>) {
+pub async fn next_step(Path(identifier): Path<String>) -> impl IntoResponse { //(StatusCode, Json<GameResponse>) {
     let record_id = RecordId::from(("game", identifier.clone()));
     let mut result = DATABASE.query(format!(r#"
 SELECT status FROM game WHERE identifier = "{identifier}";
@@ -342,7 +342,7 @@ RETURN count(
                 DATABASE
                     .query(format!(r#"UPDATE {record_id} SET status = "{}""#, GameStatus::InProgress))
                     .await.expect("Failed to start game");
-                (StatusCode::CREATED, Json(GameResponse::default()))
+                (StatusCode::CREATED, Json(GameResponse::default())).into_response()
             }
             GameStatus::InProgress => {
                 match dead_tribute_count {
@@ -350,34 +350,33 @@ RETURN count(
                         DATABASE
                             .query(format!(r#"UPDATE {record_id} SET status = "{}""#, GameStatus::Finished))
                             .await.expect("Failed to end game");
-                        (StatusCode::NO_CONTENT, Json(GameResponse::default()))
+                        (StatusCode::NO_CONTENT, Json(GameResponse::default())).into_response()
                     }
                     _ => {
                         if let Some(mut game) = get_full_game(&identifier).await {
 
                             let game = game.run_day_night_cycle().await;
                             let story = STORY.lock().await;
-                            info!("{:?}", &story);
                             let captured = story.join("\n");
 
                             let updated_game: Option<Game> = save_game(game).await;
 
                             if let Some(game) = updated_game {
-                                (StatusCode::OK, Json(GameResponse { game: Some(game), output: captured }))
+                                (StatusCode::OK, Json(GameResponse { game: Some(game), output: captured })).into_response()
                             } else {
-                                (StatusCode::NOT_FOUND, Json(GameResponse { game: None, output: captured }))
+                                (StatusCode::NOT_FOUND, Json(GameResponse { game: None, output: captured })).into_response()
                             }
                         } else {
-                            (StatusCode::NOT_FOUND, Json(GameResponse::default()))
+                            (StatusCode::NOT_FOUND, Json(GameResponse::default())).into_response()
                         }
                     }
                 }
             }
             GameStatus::Finished => {
-                (StatusCode::NO_CONTENT, Json(GameResponse::default()))
+                (StatusCode::NO_CONTENT, Json(GameResponse::default())).into_response()
             }
         }
-    } else { (StatusCode::NOT_FOUND, Json(GameResponse::default())) }
+    } else { (StatusCode::NOT_FOUND, Json(GameResponse::default())).into_response() }
 }
 
 async fn get_full_game(identifier: &str) -> Option<Game> {
@@ -440,20 +439,28 @@ async fn save_game(mut game: Game) -> Option<Game> {
 
         let _ = save_items(items, id.clone()).await;
 
+        let logs = tribute.log.clone();
+        tribute.log = vec![];
+
+        let _ = save_tribute_logs(logs).await;
+
         DATABASE
             .update::<Option<Tribute>>(id)
             .content(tribute)
             .await.expect("Failed to update area items");
     }
 
-    let game_log = GameLog {
-        game_identifier: game.identifier.clone(),
-        day: game.day,
-        message: "".to_string(),
-    };
-    DATABASE.insert::<Vec<GameLog>>("game_log")
-        .content(game_log)
-        .await.expect("Failed to update game log");
+    for log in game.log.iter() {
+        let game_log = GameLog {
+            game_identifier: log.game_identifier.clone(),
+            day: Option::from(log.day),
+            message: log.message.clone(),
+        };
+        DATABASE.insert::<Vec<GameLog>>("game_log")
+            .content(game_log)
+            .await.expect("Failed to update game log");
+    }
+    game.log = vec![];
 
     DATABASE
         .update::<Option<Game>>(game_identifier.clone())
@@ -502,5 +509,13 @@ async fn save_items(items: Vec<Item>, owner: RecordId) {
                 ).await.expect("Failed to update Owns relation");
             }
         }
+    }
+}
+
+async fn save_tribute_logs(logs: Vec<TributeLogEntry>) {
+    for log in logs {
+        DATABASE.insert::<Vec<TributeLogEntry>>("tribute_log")
+            .content(log)
+            .await.expect("Failed to update game log");
     }
 }

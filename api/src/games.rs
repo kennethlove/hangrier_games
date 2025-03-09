@@ -8,7 +8,7 @@ use axum::Json;
 use axum::Router;
 use game::areas::{Area, AreaDetails};
 use game::games::{Game, GameStatus};
-use game::globals::{add_to_story, clear_story, get_story};
+use game::globals::{clear_story, get_story};
 use game::items::Item;
 use game::tributes::{Tribute, TributeLogEntry};
 use serde::{Deserialize, Serialize};
@@ -240,8 +240,8 @@ AS ready, (
     SELECT *
     FROM game_log
     WHERE game_identifier = "{identifier}"
-    ORDER BY day DESC
-    LIMIT 1
+    AND day = $parent.day
+    ORDER BY day ASC
 ) AS log
 FROM game
 WHERE identifier = "{identifier}";"#))
@@ -353,12 +353,10 @@ RETURN count(
                         (StatusCode::NO_CONTENT, Json(GameResponse::default())).into_response()
                     }
                     _ => {
-                        let mut captured = String::new();
-
                         if let Some(mut game) = get_full_game(&identifier).await {
                             let game = game.run_day_night_cycle().await;
                             info!(target: "api::game", "{:?}", &game);
-                            captured = get_story().await.join("\n");
+                            let captured = get_story().await.join("\n");
                             clear_story().await.expect("Failed to clear story");
 
                             let updated_game: Option<Game> = save_game(game).await;

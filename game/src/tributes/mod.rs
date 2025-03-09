@@ -542,8 +542,6 @@ impl Tribute {
             add_to_lore(format!("{}", GameMessage::SponsorGift(self.clone(), gift.clone()))).await;
         }
 
-        info!(target: "api::tribute", "at tribute action");
-
         // Nighttime terror
         if !day && self.is_alive() { self.suffers(); }
 
@@ -666,8 +664,6 @@ impl Tribute {
 
     /// Receive a patron gift, broken down by district
     async fn receive_patron_gift(&mut self) -> Option<Item> {
-        info!(target: "api::tribute", "receiving patron gift maybe");
-
         // Gift from patrons?
         let chance = match self.district {
             1 | 2 => 1.0 / 10.0,

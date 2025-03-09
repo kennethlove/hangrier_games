@@ -15,7 +15,7 @@ use std::ops::Index;
 use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::STORY;
+use crate::globals::{add_to_story, get_story};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GameLogEntry {
@@ -128,32 +128,30 @@ impl Game {
     }
 
     pub async fn run_day_night_cycle(&mut self) -> Game {
-        let mut record = STORY.lock().await;
-
-        tracing::info!(target: "api::game", "{:?}", &record);
+        tracing::info!(target: "api::game", "{}", "run day night cycle");
 
         self.day = Some(self.day.unwrap_or(0) + 1);
         let living_tributes = self.living_tributes();
 
         if let Some(winner) = self.winner() {
-            // println!("{}", GameMessage::TributeWins(winner));
-            record.push(format!("{}", GameMessage::TributeWins(winner)));
+            add_to_story(format!("{}", GameMessage::TributeWins(winner))).await;
             self.end();
             return self.clone();
         } else if living_tributes.is_empty() {
-            record.push(format!("{}", GameMessage::NoOneWins));
+            add_to_story(format!("{}", GameMessage::NoOneWins)).await;
             self.end();
             return self.clone();
         }
 
         // Make any announcements for the day
         match self.day {
-            Some(1) => { record.push(format!("{}", GameMessage::FirstDayStart)); }
-            Some(3) => { record.push(format!("{}", GameMessage::FeastDayStart)); }
-            _ => { record.push(format!("{}", GameMessage::GameDayStart(self.day.unwrap()))); }
+            Some(1) => { add_to_story(format!("{}", GameMessage::FirstDayStart)).await; }
+            Some(3) => { add_to_story(format!("{}", GameMessage::FeastDayStart)).await; }
+            _ => { add_to_story(format!("{}", GameMessage::GameDayStart(self.day.unwrap()))).await; }
         }
 
-        record.push(format!("{}", GameMessage::TributesLeft(living_tributes.len() as u32)));
+        // record.push(format!("{}", GameMessage::TributesLeft(living_tributes.len() as u32)));
+        add_to_story(format!("{}", GameMessage::TributesLeft(living_tributes.len() as u32))).await;
 
         // Clear all events from the previous cycle
         for area in self.areas.iter_mut() {
@@ -164,29 +162,26 @@ impl Game {
         self.do_a_cycle(true).await;
 
         // Clean up any deaths
-        self.clean_up_recent_deaths();
+        self.clean_up_recent_deaths().await;
 
-        record.push(format!("{}", GameMessage::GameNightStart(self.day.unwrap())));
+        add_to_story(format!("{}", GameMessage::GameNightStart(self.day.unwrap()))).await;
 
         // Run the night
         self.do_a_cycle(false).await;
 
         // Clean up any deaths
-        self.clean_up_recent_deaths();
+        self.clean_up_recent_deaths().await;
 
         match self.tributes.len() {
             0 | 1 => self.status = GameStatus::Finished,
             _ => self.status = GameStatus::InProgress,
         }
 
-        if !record.is_empty() {
-            self.log = record.iter().map(|r| GameLogEntry {
-                game_identifier: self.identifier.clone(),
-                day: self.day.unwrap(),
-                message: r.clone(),
-            }).collect();
-        }
-        record.clear();
+        self.log = get_story().await.iter().map(|r| GameLogEntry {
+            game_identifier: self.identifier.clone(),
+            day: self.day.unwrap(),
+            message: r.clone(),
+        }).collect();
 
         self.clone()
     }
@@ -280,7 +275,7 @@ impl Game {
         self.tributes = updated_tributes;
     }
 
-    fn clean_up_recent_deaths(&mut self) {
+    async fn clean_up_recent_deaths(&mut self) {
         for mut tribute in self.recently_dead_tributes() {
             let area = self.get_area_details_mut(tribute.area.clone());
             if let Some(area) = area {

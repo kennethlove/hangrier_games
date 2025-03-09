@@ -1,0 +1,36 @@
+use lazy_static::lazy_static;
+use tokio::sync::Mutex;
+
+// STORY is for game log messages
+// pub static STORY: LazyLock<Arc<AsyncMutex<Vec<String>>>> = LazyLock::new(|| Arc::new(AsyncMutex::new(Vec::<String>::new())));
+
+lazy_static! {
+    static ref STORY: Mutex<Vec<String>> = Mutex::new(Vec::new());
+}
+lazy_static! {
+    static ref LORE: Mutex<Vec<String>> = Mutex::new(Vec::new());
+}
+
+pub async fn add_to_story(story: String) {
+    STORY.lock().await.push(story);
+}
+
+pub async fn get_story() -> Vec<String> {
+    STORY.lock().await.clone()
+}
+
+pub async fn clear_story() -> Result<(), String> {
+    STORY.lock().await.clear();
+    Ok(())
+}
+
+pub async fn add_to_lore(lore: String) {
+    LORE.lock().await.push(lore);
+}
+
+pub async fn get_lore() -> Vec<String> {
+    LORE.lock().await.clone()
+}
+
+// LORE is for tribute log messages
+// pub static LORE: LazyLock<Arc<Mutex<Vec<String>>>> = LazyLock::new(|| Arc::new(Mutex::new(Vec::<String>::new())));

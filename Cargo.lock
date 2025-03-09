@@ -2056,6 +2056,7 @@ version = "0.1.0"
 dependencies = [
  "fake",
  "getrandom 0.2.15",
+ "lazy_static",
  "rand 0.8.5",
  "rstest",
  "serde",

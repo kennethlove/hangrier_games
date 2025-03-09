@@ -4,24 +4,24 @@ use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{get, put};
-use axum::{Json};
+use axum::Json;
 use axum::Router;
 use game::areas::{Area, AreaDetails};
 use game::games::{Game, GameStatus};
+use game::globals::{add_to_story, clear_story, get_story};
 use game::items::Item;
 use game::tributes::{Tribute, TributeLogEntry};
 use serde::{Deserialize, Serialize};
-use shared::{EditGame};
+use shared::EditGame;
 use shared::GameArea;
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::{LazyLock};
+use std::sync::LazyLock;
 use strum::IntoEnumIterator;
 use surrealdb::sql::Thing;
 use surrealdb::RecordId;
 use tracing::info;
 use uuid::Uuid;
-use game::STORY;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
@@ -322,7 +322,7 @@ pub struct GameResponse {
     output: String
 }
 
-pub async fn next_step(Path(identifier): Path<String>) -> impl IntoResponse { //(StatusCode, Json<GameResponse>) {
+pub async fn next_step(Path(identifier): Path<String>) -> impl IntoResponse {
     let record_id = RecordId::from(("game", identifier.clone()));
     let mut result = DATABASE.query(format!(r#"
 SELECT status FROM game WHERE identifier = "{identifier}";
@@ -353,11 +353,13 @@ RETURN count(
                         (StatusCode::NO_CONTENT, Json(GameResponse::default())).into_response()
                     }
                     _ => {
-                        if let Some(mut game) = get_full_game(&identifier).await {
+                        let mut captured = String::new();
 
+                        if let Some(mut game) = get_full_game(&identifier).await {
                             let game = game.run_day_night_cycle().await;
-                            let story = STORY.lock().await;
-                            let captured = story.join("\n");
+                            info!(target: "api::game", "{:?}", &game);
+                            captured = get_story().await.join("\n");
+                            clear_story().await.expect("Failed to clear story");
 
                             let updated_game: Option<Game> = save_game(game).await;
 

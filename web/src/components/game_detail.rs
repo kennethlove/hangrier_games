@@ -5,8 +5,8 @@ use crate::components::game_tributes::GameTributes;
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, use_mutation, use_query_client, MutationResult, QueryResult};
-use game::games::{GameStatus};
-use game::games::{Game};
+use game::games::Game;
+use game::games::GameStatus;
 use game::tributes::Tribute;
 use reqwest::StatusCode;
 use std::ops::Deref;
@@ -15,7 +15,7 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
     if let Some(QueryKey::Game(identifier)) = keys.first() {
         let response = reqwest::get(format!("{}/api/games/{}", API_HOST.clone(), identifier))
             .await
-            .unwrap();
+            .expect("Failed to fetch game details");
 
         match response.json::<Game>().await {
             Ok(game) => {
@@ -36,6 +36,8 @@ async fn next_step(identifier: String) -> MutationResult<MutationValue, Mutation
     let response = client
         .put(url)
         .send().await.expect("Failed to advance game");
+
+    dioxus_logger::tracing::info!("{:?}", &response);
 
     match response.status() {
         StatusCode::NO_CONTENT => {
@@ -93,7 +95,7 @@ fn GameStatusState() -> Element {
             if game.winner().is_some() { game.winner().unwrap().name } else { String::new() }
         };
 
-        let next_step = move |_| {
+        let next_step_handler = move |_| {
             let game_id = game_id.clone();
             let mut game = game.clone();
 
@@ -101,6 +103,8 @@ fn GameStatusState() -> Element {
 
             spawn(async move {
                 mutate.manual_mutate(game_id.clone()).await;
+
+                dioxus_logger::tracing::info!("{}", "here");
 
                 match mutate.result().deref() {
                     MutationResult::Ok(mutation_result) => {
@@ -132,7 +136,7 @@ fn GameStatusState() -> Element {
                 "Game Status: {game_status}"
                 button {
                     class: "button",
-                    onclick: next_step,
+                    onclick: next_step_handler,
                     disabled: game_finished,
                     "{game_next_step}"
                 }

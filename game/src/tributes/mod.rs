@@ -160,6 +160,7 @@ impl Tribute {
     pub fn dies(&mut self) {
         self.status = TributeStatus::Dead;
         self.attributes.is_hidden = false;
+        self.items.clear();
     }
 
     /// Does the tribute have health and an OK status?
@@ -893,7 +894,7 @@ fn apply_violence_stress(tribute: &mut Tribute) {
 /// Strength and any weapon are added to the attack roll.
 /// Defense and any shield are added to the defense roll.
 /// If eiter roll is more than 1.5x the other, that triggers a "decisive" victory.
-async fn attack_contest(attacker: &Tribute, target: &Tribute) -> AttackResult {
+async fn attack_contest(attacker: &mut Tribute, target: &Tribute) -> AttackResult {
     // Get attack roll + strength modifier
     let mut attack_roll: i32 = thread_rng().gen_range(1..=20); // Base roll
     attack_roll += attacker.attributes.strength as i32; // Add strength

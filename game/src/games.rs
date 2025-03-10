@@ -160,7 +160,7 @@ impl Game {
         self.do_a_cycle(true).await;
 
         // Clean up any deaths
-        self.clean_up_recent_deaths().await;
+        // self.clean_up_recent_deaths().await;
 
         add_to_story(format!("{}", GameMessage::GameNightStart(self.day.unwrap()))).await;
 

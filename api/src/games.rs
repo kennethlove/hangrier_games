@@ -449,7 +449,8 @@ async fn save_game(mut game: Game) -> Option<Game> {
 
     for mut tribute in tributes {
         let id = RecordId::from(("tribute", tribute.identifier.clone()));
-        let items = tribute.items.clone();
+        let mut items = tribute.items.clone();
+        if !tribute.is_alive() { items.clear(); }
         tribute.items = vec![];
 
         let _ = save_items(items, id.clone()).await;

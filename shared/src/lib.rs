@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -27,3 +28,4 @@ pub struct TributeKey {
     pub identifier: String,
     pub district: u32,
 }
+

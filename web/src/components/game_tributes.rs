@@ -85,6 +85,11 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 name: tribute.clone().name,
             }
             p { "HP: {tribute.attributes.health} - Status: {tribute.status}" }
+
+            for log in tribute.clone().log {
+                p { "{log.message}" }
+            }
+
             ul {
                 for item in tribute.clone().items {
                     li { "{item.name}" }

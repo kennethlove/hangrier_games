@@ -8,8 +8,9 @@ use axum::Json;
 use axum::Router;
 use game::areas::{Area, AreaDetails};
 use game::games::{Game, GameStatus};
+use game::globals::{clear_story, get_story};
 use game::items::Item;
-use game::tributes::Tribute;
+use game::tributes::{Tribute, TributeLogEntry};
 use serde::{Deserialize, Serialize};
 use shared::EditGame;
 use shared::GameArea;
@@ -19,6 +20,8 @@ use std::sync::LazyLock;
 use strum::IntoEnumIterator;
 use surrealdb::sql::Thing;
 use surrealdb::RecordId;
+use tokio::io::AsyncReadExt;
+use tracing::info;
 use uuid::Uuid;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
@@ -218,10 +221,19 @@ FROM game;"#).await.unwrap();
 
 pub async fn game_detail(game_identifier: Path<String>) -> (StatusCode, Json<Option<Game>>) {
     let identifier = game_identifier.0;
+    let mut day = DATABASE.query(format!("SELECT day FROM game WHERE identifier = '{identifier}' LIMIT 1")).await;
+    let day: Option<i64> = day.unwrap().take("day").unwrap();
+    let day: i64 = day.unwrap_or(0);
+
     let mut result = DATABASE.query(format!(r#"
 SELECT *, (
-    SELECT *, ->owns->item[*]
-    AS items
+    SELECT *,
+    ->owns->item[*] AS items, (
+        SELECT *
+        FROM tribute_log
+        WHERE tribute_identifier = $parent.identifier
+        AND day = {day}
+    ) AS log
     FROM <-playing_in<-tribute[*]
     ORDER district
 )
@@ -234,7 +246,13 @@ AS tributes, (
 count(<-playing_in<-tribute.id) == 24
 AND
 count(array::distinct(<-playing_in<-tribute.district)) == 12
-AS ready
+AS ready, (
+    SELECT *
+    FROM game_log
+    WHERE game_identifier = "{identifier}"
+    AND day = $parent.day
+    ORDER BY day ASC
+) AS log
 FROM game
 WHERE identifier = "{identifier}";"#))
     .await.unwrap();
@@ -287,10 +305,16 @@ SELECT (
 }
 
 pub async fn game_tributes(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
+    let mut game_day = DATABASE.query(format!("SELECT day FROM game WHERE identifier = '{identifier}'")).await.unwrap();
+    let game_day: Option<i64> = game_day.take("day").unwrap();
+    let game_day: i64 = game_day.unwrap_or(0);
+
+
     let response = DATABASE.query(
         format!(r#"
 SELECT (
-    SELECT *, ->owns->item[*] as items
+    SELECT *, ->owns->item[*] as items,
+    (SELECT * FROM tribute_log WHERE tribute_identifier = $parent.identifier AND day = {game_day} ORDER BY id DESC) AS log
     FROM <-playing_in<-tribute
     ORDER district
 ) AS tributes FROM game WHERE identifier = "{identifier}";
@@ -308,7 +332,13 @@ SELECT (
     }
 }
 
-pub async fn next_step(Path(identifier): Path<String>) -> (StatusCode, Json<Option<Game>>) {
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct GameResponse {
+    game: Option<Game>,
+    output: String
+}
+
+pub async fn next_step(Path(identifier): Path<String>) -> impl IntoResponse {
     let record_id = RecordId::from(("game", identifier.clone()));
     let mut result = DATABASE.query(format!(r#"
 SELECT status FROM game WHERE identifier = "{identifier}";
@@ -328,7 +358,7 @@ RETURN count(
                 DATABASE
                     .query(format!(r#"UPDATE {record_id} SET status = "{}""#, GameStatus::InProgress))
                     .await.expect("Failed to start game");
-                (StatusCode::CREATED, Json(None))
+                (StatusCode::CREATED, Json(GameResponse::default())).into_response()
             }
             GameStatus::InProgress => {
                 match dead_tribute_count {
@@ -336,30 +366,32 @@ RETURN count(
                         DATABASE
                             .query(format!(r#"UPDATE {record_id} SET status = "{}""#, GameStatus::Finished))
                             .await.expect("Failed to end game");
-                        (StatusCode::NO_CONTENT, Json(None))
+                        (StatusCode::NO_CONTENT, Json(GameResponse::default())).into_response()
                     }
                     _ => {
                         if let Some(mut game) = get_full_game(&identifier).await {
+                            let game = game.run_day_night_cycle().await;
+                            let captured = get_story().await.join("\n");
+                            clear_story().await.expect("Failed to clear story");
 
-                            let game = game.run_day_night_cycle();
                             let updated_game: Option<Game> = save_game(game).await;
 
                             if let Some(game) = updated_game {
-                                (StatusCode::OK, Json(Some(game)))
+                                (StatusCode::OK, Json(GameResponse { game: Some(game), output: captured })).into_response()
                             } else {
-                                (StatusCode::NOT_FOUND, Json(None))
+                                (StatusCode::NOT_FOUND, Json(GameResponse { game: None, output: captured })).into_response()
                             }
                         } else {
-                            (StatusCode::NOT_FOUND, Json(None))
+                            (StatusCode::NOT_FOUND, Json(GameResponse::default())).into_response()
                         }
                     }
                 }
             }
             GameStatus::Finished => {
-                (StatusCode::NO_CONTENT, Json(None))
+                (StatusCode::NO_CONTENT, Json(GameResponse::default())).into_response()
             }
         }
-    } else { (StatusCode::NOT_FOUND, Json(None)) }
+    } else { (StatusCode::NOT_FOUND, Json(GameResponse::default())).into_response() }
 }
 
 async fn get_full_game(identifier: &str) -> Option<Game> {
@@ -387,6 +419,13 @@ WHERE identifier = "{identifier}";"#))
 
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GameLog {
+    pub game_identifier: String,
+    pub day: Option<u32>,
+    pub message: String,
+}
+
 async fn save_game(mut game: Game) -> Option<Game> {
     let game_identifier = RecordId::from(("game", game.identifier.clone()));
     let areas = game.areas.clone();
@@ -410,10 +449,16 @@ async fn save_game(mut game: Game) -> Option<Game> {
 
     for mut tribute in tributes {
         let id = RecordId::from(("tribute", tribute.identifier.clone()));
-        let items = tribute.items.clone();
+        let mut items = tribute.items.clone();
+        if !tribute.is_alive() { items.clear(); }
         tribute.items = vec![];
 
         let _ = save_items(items, id.clone()).await;
+
+        let logs = tribute.log.clone();
+        tribute.log = vec![];
+
+        let _ = save_tribute_logs(logs).await;
 
         DATABASE
             .update::<Option<Tribute>>(id)
@@ -421,8 +466,20 @@ async fn save_game(mut game: Game) -> Option<Game> {
             .await.expect("Failed to update area items");
     }
 
+    for log in game.log.iter() {
+        let game_log = GameLog {
+            game_identifier: log.game_identifier.clone(),
+            day: Option::from(log.day),
+            message: log.message.clone(),
+        };
+        DATABASE.insert::<Vec<GameLog>>("game_log")
+            .content(game_log)
+            .await.expect("Failed to update game log");
+    }
+    game.log = vec![];
+
     DATABASE
-        .update::<Option<Game>>(game_identifier)
+        .update::<Option<Game>>(game_identifier.clone())
         .content(game)
         .await.expect("Failed to update game")
 }
@@ -468,5 +525,13 @@ async fn save_items(items: Vec<Item>, owner: RecordId) {
                 ).await.expect("Failed to update Owns relation");
             }
         }
+    }
+}
+
+async fn save_tribute_logs(logs: Vec<TributeLogEntry>) {
+    for log in logs {
+        DATABASE.insert::<Vec<TributeLogEntry>>("tribute_log")
+            .content(log)
+            .await.expect("Failed to update game log");
     }
 }

@@ -105,7 +105,7 @@ pub async fn tribute_update(Path((_game_identifier, _tribute_identifier)): Path<
 pub async fn tribute_detail(Path((_game_identifier, tribute_identifier)): Path<(String, String)>) -> (StatusCode, Json<Option<Tribute>>) {
     let mut result = DATABASE.query(format!(r#"
 SELECT *, ->owns->item[*] AS items,
-(SELECT * FROM tribute_logs WHERE tribute_identifier = {tribute_identifier} AND day = $parent->playing_in->day)
+(SELECT * FROM tribute_log WHERE tribute_identifier = "{tribute_identifier}" ORDER BY day) AS log
 FROM tribute
 WHERE identifier = "{tribute_identifier}"
 "#)).await.expect("Failed to find tribute");

@@ -128,8 +128,6 @@ impl Game {
     }
 
     pub async fn run_day_night_cycle(&mut self) -> Game {
-        tracing::info!(target: "api::game", "{}", "run day night cycle");
-
         self.day = Some(self.day.unwrap_or(0) + 1);
         let living_tributes = self.living_tributes();
 

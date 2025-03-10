@@ -70,6 +70,14 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                             "{item.name}" }
                     }
                 }
+
+                h3 { "Log" }
+                dl {
+                    for log in tribute.clone().log {
+                        dt { "Day {log.day}"}
+                        dd {"{log.message}" }
+                    }
+                }
             }
         }
         QueryResult::Err(QueryError::TributeNotFound(identifier)) => {

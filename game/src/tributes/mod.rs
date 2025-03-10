@@ -6,7 +6,7 @@ pub mod statuses;
 use crate::areas::events::AreaEvent;
 use crate::areas::{Area, AreaDetails};
 use crate::games::Game;
-use crate::globals::{add_to_lore, get_lore};
+use crate::globals::{add_to_lore, clear_lore, get_lore};
 use crate::items::OwnsItems;
 use crate::items::{Attribute, Item};
 use crate::messages::GameMessage;
@@ -513,6 +513,7 @@ impl Tribute {
         day: bool,
         game: &mut Game,
     ) -> Tribute {
+        let _ = clear_lore().await;
         // Tribute is already dead, do nothing.
         if !self.is_alive() {
             add_to_lore(format!("{}", GameMessage::TributeAlreadyDead(self.clone()))).await;
@@ -657,6 +658,7 @@ impl Tribute {
         self.log = get_lore().await.iter()
             .map(|l| TributeLogEntry {
                 tribute_identifier: self.identifier.clone(),
+                day: game.day.unwrap(),
                 message: l.clone()
             }).collect();
         self.clone()
@@ -1035,12 +1037,14 @@ impl Attributes {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TributeLogEntry {
     pub tribute_identifier: String,
+    #[serde(default)]
+    pub day: u32,
     pub message: String,
 }
 
 impl Display for TributeLogEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
+        write!(f, "Day: {}, {}", self.day, self.message)
     }
 }
 

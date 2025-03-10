@@ -9,4 +9,5 @@ DEFINE FIELD OVERWRITE message ON game_log;
 DEFINE TABLE OVERWRITE tribute_log SCHEMAFULL;
 
 DEFINE FIELD OVERWRITE tribute_identifier ON tribute_log;
+DEFINE FIELD OVERWRITE day ON tribute_log;
 DEFINE FIELD OVERWRITE message ON tribute_log;

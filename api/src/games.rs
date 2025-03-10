@@ -20,6 +20,7 @@ use std::sync::LazyLock;
 use strum::IntoEnumIterator;
 use surrealdb::sql::Thing;
 use surrealdb::RecordId;
+use tokio::io::AsyncReadExt;
 use tracing::info;
 use uuid::Uuid;
 
@@ -220,10 +221,19 @@ FROM game;"#).await.unwrap();
 
 pub async fn game_detail(game_identifier: Path<String>) -> (StatusCode, Json<Option<Game>>) {
     let identifier = game_identifier.0;
+    let mut day = DATABASE.query(format!("SELECT day FROM game WHERE identifier = '{identifier}' LIMIT 1")).await;
+    let day: Option<i64> = day.unwrap().take("day").unwrap();
+    let day: i64 = day.unwrap_or(0);
+
     let mut result = DATABASE.query(format!(r#"
 SELECT *, (
-    SELECT *, ->owns->item[*]
-    AS items
+    SELECT *,
+    ->owns->item[*] AS items, (
+        SELECT *
+        FROM tribute_log
+        WHERE tribute_identifier = $parent.identifier
+        AND day = {day}
+    ) AS log
     FROM <-playing_in<-tribute[*]
     ORDER district
 )
@@ -295,10 +305,16 @@ SELECT (
 }
 
 pub async fn game_tributes(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
+    let mut game_day = DATABASE.query(format!("SELECT day FROM game WHERE identifier = '{identifier}'")).await.unwrap();
+    let game_day: Option<i64> = game_day.take("day").unwrap();
+    let game_day: i64 = game_day.unwrap_or(0);
+
+
     let response = DATABASE.query(
         format!(r#"
 SELECT (
-    SELECT *, ->owns->item[*] as items
+    SELECT *, ->owns->item[*] as items,
+    (SELECT * FROM tribute_log WHERE tribute_identifier = $parent.identifier AND day = {game_day} ORDER BY id DESC) AS log
     FROM <-playing_in<-tribute
     ORDER district
 ) AS tributes FROM game WHERE identifier = "{identifier}";
@@ -355,7 +371,6 @@ RETURN count(
                     _ => {
                         if let Some(mut game) = get_full_game(&identifier).await {
                             let game = game.run_day_night_cycle().await;
-                            info!(target: "api::game", "{:?}", &game);
                             let captured = get_story().await.join("\n");
                             clear_story().await.expect("Failed to clear story");
 

@@ -661,7 +661,7 @@ impl Tribute {
                 tribute_identifier: self.identifier.clone(),
                 day: game.day.unwrap(),
                 message: l.clone(),
-                instant: std::time::UNIX_EPOCH.elapsed().unwrap().as_millis()
+                instant: std::time::UNIX_EPOCH.elapsed().unwrap().as_nanos()
             }).collect();
         self.clone()
     }

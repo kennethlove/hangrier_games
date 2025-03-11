@@ -8,7 +8,7 @@ use axum::Json;
 use axum::Router;
 use game::areas::{Area, AreaDetails};
 use game::games::{Game, GameStatus};
-use game::globals::{clear_story, get_story, approx_instant};
+use game::globals::{clear_story, get_story};
 use game::items::Item;
 use game::tributes::{Tribute, TributeLogEntry};
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,6 @@ use shared::GameArea;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::LazyLock;
-use std::time::Instant;
 use strum::IntoEnumIterator;
 use surrealdb::sql::Thing;
 use surrealdb::RecordId;
@@ -251,7 +250,7 @@ AS ready, (
     FROM game_log
     WHERE game_identifier = "{identifier}"
     AND day = $parent.day
-    ORDER BY instant ASC
+    ORDER BY instant
 ) AS log
 FROM game
 WHERE identifier = "{identifier}";"#))
@@ -314,7 +313,7 @@ pub async fn game_tributes(Path(identifier): Path<String>) -> (StatusCode, Json<
         format!(r#"
 SELECT (
     SELECT *, ->owns->item[*] as items,
-    (SELECT * FROM tribute_log WHERE tribute_identifier = $parent.identifier AND day = {game_day} ORDER BY id DESC) AS log
+    (SELECT * FROM tribute_log WHERE tribute_identifier = $parent.identifier AND day = {game_day} ORDER BY instant) AS log
     FROM <-playing_in<-tribute
     ORDER district
 ) AS tributes FROM game WHERE identifier = "{identifier}";
@@ -472,7 +471,7 @@ async fn save_game(mut game: Game) -> Option<Game> {
             game_identifier: log.game_identifier.clone(),
             day: Option::from(log.day),
             message: log.message.clone(),
-            instant: std::time::UNIX_EPOCH.elapsed().unwrap().as_millis(),
+            instant: std::time::UNIX_EPOCH.elapsed().unwrap().as_nanos(),
         };
         DATABASE.insert::<Vec<GameLog>>("game_log")
             .content(game_log)

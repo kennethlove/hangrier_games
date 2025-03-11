@@ -1,4 +1,3 @@
-use std::time::Instant;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
@@ -47,7 +46,7 @@ pub async fn add_to_story(story: String) {
     STORY.lock().await.push(
         LogMessage {
             message: story,
-            instant: std::time::UNIX_EPOCH.elapsed().unwrap().as_millis()
+            instant: std::time::UNIX_EPOCH.elapsed().unwrap().as_nanos()
         }
     );
 }
@@ -69,7 +68,7 @@ pub async fn add_to_lore(lore: String) {
     LORE.lock().await.push(
         LogMessage {
             message: lore,
-            instant: std::time::UNIX_EPOCH.elapsed().unwrap().as_millis()
+            instant: std::time::UNIX_EPOCH.elapsed().unwrap().as_nanos()
         }
     );
 }

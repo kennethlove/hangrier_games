@@ -660,7 +660,8 @@ impl Tribute {
             .map(|l| TributeLogEntry {
                 tribute_identifier: self.identifier.clone(),
                 day: game.day.unwrap(),
-                message: l.clone()
+                message: l.clone(),
+                instant: std::time::UNIX_EPOCH.elapsed().unwrap().as_millis()
             }).collect();
         self.clone()
     }
@@ -1041,6 +1042,7 @@ pub struct TributeLogEntry {
     #[serde(default)]
     pub day: u32,
     pub message: String,
+    pub instant: u128
 }
 
 impl Display for TributeLogEntry {

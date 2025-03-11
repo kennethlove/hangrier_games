@@ -8,7 +8,7 @@ use axum::Json;
 use axum::Router;
 use game::areas::{Area, AreaDetails};
 use game::games::{Game, GameStatus};
-use game::globals::{clear_story, get_story};
+use game::globals::{clear_story, get_story, approx_instant};
 use game::items::Item;
 use game::tributes::{Tribute, TributeLogEntry};
 use serde::{Deserialize, Serialize};
@@ -17,11 +17,10 @@ use shared::GameArea;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::LazyLock;
+use std::time::Instant;
 use strum::IntoEnumIterator;
 use surrealdb::sql::Thing;
 use surrealdb::RecordId;
-use tokio::io::AsyncReadExt;
-use tracing::info;
 use uuid::Uuid;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
@@ -221,7 +220,7 @@ FROM game;"#).await.unwrap();
 
 pub async fn game_detail(game_identifier: Path<String>) -> (StatusCode, Json<Option<Game>>) {
     let identifier = game_identifier.0;
-    let mut day = DATABASE.query(format!("SELECT day FROM game WHERE identifier = '{identifier}' LIMIT 1")).await;
+    let day = DATABASE.query(format!("SELECT day FROM game WHERE identifier = '{identifier}' LIMIT 1")).await;
     let day: Option<i64> = day.unwrap().take("day").unwrap();
     let day: i64 = day.unwrap_or(0);
 
@@ -233,6 +232,7 @@ SELECT *, (
         FROM tribute_log
         WHERE tribute_identifier = $parent.identifier
         AND day = {day}
+        ORDER BY instant
     ) AS log
     FROM <-playing_in<-tribute[*]
     ORDER district
@@ -251,7 +251,7 @@ AS ready, (
     FROM game_log
     WHERE game_identifier = "{identifier}"
     AND day = $parent.day
-    ORDER BY day ASC
+    ORDER BY instant ASC
 ) AS log
 FROM game
 WHERE identifier = "{identifier}";"#))
@@ -424,6 +424,7 @@ pub struct GameLog {
     pub game_identifier: String,
     pub day: Option<u32>,
     pub message: String,
+    pub instant: u128
 }
 
 async fn save_game(mut game: Game) -> Option<Game> {
@@ -471,6 +472,7 @@ async fn save_game(mut game: Game) -> Option<Game> {
             game_identifier: log.game_identifier.clone(),
             day: Option::from(log.day),
             message: log.message.clone(),
+            instant: std::time::UNIX_EPOCH.elapsed().unwrap().as_millis(),
         };
         DATABASE.insert::<Vec<GameLog>>("game_log")
             .content(game_log)

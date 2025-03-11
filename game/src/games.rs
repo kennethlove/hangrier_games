@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::ops::Index;
 use std::str::FromStr;
+use std::time::Instant;
 use uuid::Uuid;
 
 use crate::globals::{add_to_story, get_story};
@@ -20,6 +21,7 @@ use crate::globals::{add_to_story, get_story};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GameLogEntry {
     pub game_identifier: String,
+    #[serde(default)]
     pub day: u32,
     pub message: String,
 }
@@ -178,7 +180,7 @@ impl Game {
         self.log = get_story().await.iter().map(|r| GameLogEntry {
             game_identifier: self.identifier.clone(),
             day: self.day.unwrap(),
-            message: r.clone(),
+            message: r.clone()
         }).collect();
 
         self.clone()

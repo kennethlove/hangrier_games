@@ -396,8 +396,8 @@ RETURN count(
 async fn get_full_game(identifier: &str) -> Option<Game> {
     let mut result = DATABASE.query(format!(r#"
 SELECT *, (
-    SELECT *, ->owns->item[*]
-    AS items
+    SELECT *, ->owns->item[*] AS items,
+    (SELECT * FROM tribute_log WHERE tribute_identifier = $parent.identifier) as log
     FROM <-playing_in<-tribute[*]
     ORDER district
 )
@@ -407,6 +407,7 @@ AS tributes, (
 ) AS areas, (
     RETURN count(SELECT id FROM <-playing_in<-tribute)
 ) AS tribute_count,
+(SELECT * FROM game_log WHERE game_identifier = $parent.identifier) as log,
 count(<-playing_in<-tribute.id) == 24
 AND
 count(array::distinct(<-playing_in<-tribute.district)) == 12

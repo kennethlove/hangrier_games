@@ -5,7 +5,7 @@ use crate::routes::Routes;
 pub fn Navbar() -> Element {
     rsx! {
         div {
-            class: "flex flex-row place-content-between",
+            class: "flex flex-row place-content-between mb-4",
             h1 {
                 class: "text-3xl",
                 "Hangry Games"

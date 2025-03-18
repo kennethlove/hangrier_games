@@ -84,6 +84,7 @@ fn GameStatusState() -> Element {
 
         let mutate = use_mutation(next_step);
         let game_id = game.identifier.clone();
+        let game_name = game.name.clone();
         let game_day = game.day.unwrap_or(0);
         let game_finished = game.status == GameStatus::Finished;
         let tribute_count = game.clone()
@@ -94,6 +95,7 @@ fn GameStatusState() -> Element {
         let winner_name = {
             if game.winner().is_some() { game.winner().unwrap().name } else { String::new() }
         };
+        let g = game.clone();
 
         let next_step_handler = move |_| {
             let game_id = game_id.clone();
@@ -103,8 +105,6 @@ fn GameStatusState() -> Element {
 
             spawn(async move {
                 mutate.manual_mutate(game_id.clone()).await;
-
-                dioxus_logger::tracing::info!("{}", "here");
 
                 match mutate.result().deref() {
                     MutationResult::Ok(mutation_result) => {
@@ -131,22 +131,54 @@ fn GameStatusState() -> Element {
         };
 
         rsx! {
-            h2 {
-                class: "game-status",
-                "Game Status: {game_status}"
-                button {
-                    class: "button",
-                    onclick: next_step_handler,
-                    disabled: game_finished,
-                    "{game_next_step}"
+            div {
+                class: "flex flex-col gap-2 border p-2",
+                div {
+                    class: "flex flex-row gap-4 place-content-between",
+                    h2 {
+                        class: "text-xl",
+                        "{game_name}"
+                    }
+                    div {
+                        class: "flex flex-row gap-2",
+                        GameEdit { identifier: g.identifier, name: g.name }
+                        button {
+                            class: "button border px-2 py-1",
+                            onclick: next_step_handler,
+                            disabled: game_finished,
+                            "{game_next_step}"
+                        }
+                    }
                 }
-            }
-            h3 {
-                "Game round: Day { game_day }, Night { game_day }"
-            }
-            h4 { "{tribute_count} tributes remain alive."}
-            if !winner_name.is_empty() {
-                h1 { "{winner_name} wins!"}
+
+                if !winner_name.is_empty() {
+                    h1 { "Winner: {winner_name}!"}
+                }
+
+                div {
+                    class: "flex flex-row place-content-between",
+                    p {
+                        span {
+                            class: "block text-sm",
+                            "status"
+                        }
+                        "{game_status}"
+                    }
+                    p {
+                        span {
+                            class: "block text-sm",
+                            "day"
+                        }
+                        "{game_day}"
+                    }
+                    p {
+                        span {
+                            class: "block text-sm",
+                            "tributes alive"
+                        }
+                        "{tribute_count}"
+                    }
+                }
             }
         }
     } else {
@@ -157,7 +189,10 @@ fn GameStatusState() -> Element {
 #[component]
 pub fn GamePage(identifier: String) -> Element {
     rsx! {
-        GameStatusState {}
+        div {
+            class: "mb-4",
+            GameStatusState {}
+        }
         GameDetailPage { identifier }
     }
 
@@ -194,25 +229,25 @@ pub fn GameDetailPage(identifier: String) -> Element {
 pub fn GameDetails(game: Game) -> Element {
     rsx! {
         div {
-            h1 {
-                "{game.name}",
-                GameEdit { identifier: game.identifier.clone(), name: game.name.clone() }
+            div {
+                class: "grid grid-cols-2 gap-8",
+
+                div {
+                    h3 {
+                        class: "text-xl mb-2",
+                        "Areas"
+                    }
+                    GameAreaList { }
+                }
+                div {
+                    h3 {
+                        class: "text-xl mb-2",
+                        "Tributes"
+                    }
+
+                    GameTributes { }
+                }
             }
-
-            h3 { "Output" }
-
-            for log in game.log {
-                pre { "{log.message}" }
-            }
-
-            h3 { "Areas" }
-
-            GameAreaList { }
-
-            h3 { "Tributes" }
-
-            GameTributes { }
-
         }
     }
 }

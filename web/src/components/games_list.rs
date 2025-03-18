@@ -31,7 +31,7 @@ pub fn GamesList() -> Element {
 
     rsx! {
         div {
-            class: "flex flex-row gap-2 place-content-center my-4",
+            class: "flex flex-row gap-2 place-content-center mb-4",
             CreateGameButton {}
             CreateGameForm {}
         }

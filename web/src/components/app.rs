@@ -31,8 +31,7 @@ pub fn App() -> Element {
         }
 
         div {
-            class: "container",
-            h1 { "Hangry Games" }
+            class: "grid grid-flow-row min-v-full min-h-screen bg-red-50 p-2 frame",
 
             Router::<Routes> {}
 
@@ -45,3 +44,4 @@ pub fn App() -> Element {
         EditTributeModal {}
     }
 }
+

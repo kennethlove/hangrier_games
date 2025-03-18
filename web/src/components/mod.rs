@@ -23,6 +23,11 @@ mod tribute_edit;
 mod game_edit;
 mod game_areas;
 mod tribute_detail;
+mod navbar;
+pub(crate) use navbar::Navbar;
+mod home;
+pub(crate) use home::Home;
+
 pub(crate) use tribute_detail::TributeDetail;
 
 

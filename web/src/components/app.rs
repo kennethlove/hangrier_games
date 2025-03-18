@@ -26,16 +26,22 @@ pub fn App() -> Element {
     let copyright = "&copy; 2025";
 
     rsx! {
-        h1 { "Hangry Games" }
+        document::Stylesheet {
+            href: asset!("/assets/dist/main.css")
+        }
 
-        Router::<Routes> {}
+        div {
+            class: "container",
+            h1 { "Hangry Games" }
+
+            Router::<Routes> {}
+
+            p {
+                dangerous_inner_html: "{copyright}",
+            }
+        }
 
         EditGameModal {}
         EditTributeModal {}
-        
-        p {
-            dangerous_inner_html: "{copyright}",
-        }
-
     }
 }

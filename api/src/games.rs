@@ -530,10 +530,27 @@ async fn save_items(items: Vec<Item>, owner: RecordId) {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct TbLog {
+    #[serde(rename = "in")]
+    tribute: RecordId,
+    #[serde(rename = "out")]
+    tribute_log: RecordId
+}
+
 async fn save_tribute_logs(logs: Vec<TributeLogEntry>) {
     for log in logs {
-        DATABASE.insert::<Vec<TributeLogEntry>>("tribute_log")
-            .content(log)
+        let tribute_log_id = RecordId::from(("tribute_log", &log.identifier));
+        let tribute_id = RecordId::from(("tribute", &log.tribute_identifier));
+
+        let _: Option<TributeLogEntry> = DATABASE.insert(&tribute_log_id)
+            .content(log.clone())
             .await.expect("Failed to update game log");
+
+        let _ = DATABASE.insert::<Vec<TbLog>>("tb_log")
+            .relation(TbLog {
+                tribute: tribute_id,
+                tribute_log: tribute_log_id
+            }).await;
     }
 }

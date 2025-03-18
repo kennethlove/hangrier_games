@@ -658,6 +658,7 @@ impl Tribute {
         }
         self.log = get_lore().await.iter()
             .map(|l| TributeLogEntry {
+                identifier: uuid::Uuid::new_v4().to_string(),
                 tribute_identifier: self.identifier.clone(),
                 day: game.day.unwrap(),
                 message: l.clone(),
@@ -1042,7 +1043,8 @@ pub struct TributeLogEntry {
     #[serde(default)]
     pub day: u32,
     pub message: String,
-    pub instant: u128
+    pub instant: u128,
+    pub identifier: String,
 }
 
 impl Display for TributeLogEntry {

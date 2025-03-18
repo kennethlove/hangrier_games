@@ -7,7 +7,7 @@ pub fn Navbar() -> Element {
         div {
             class: "flex flex-row place-content-between",
             h1 {
-                class: "text-xl",
+                class: "text-3xl",
                 "Hangry Games"
             }
 

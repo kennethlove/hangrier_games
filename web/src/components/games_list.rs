@@ -30,14 +30,20 @@ pub fn GamesList() -> Element {
     let games_query = use_get_query([QueryKey::AllGames, QueryKey::Games], fetch_games);
 
     rsx! {
-        CreateGameButton {}
-        CreateGameForm {}
+        div {
+            class: "flex flex-row gap-2 place-content-center my-4",
+            CreateGameButton {}
+            CreateGameForm {}
+        }
 
         match games_query.result().value() {
             QueryResult::Ok(QueryValue::Games(games)) => {
                 rsx! {
                     if games.is_empty() {
-                        p { "No games yet" }
+                        p {
+                            class: "pb-4",
+                            "No games yet"
+                        }
                     } else {
                         ul {
                             for game in games {
@@ -68,6 +74,7 @@ fn RefreshButton() -> Element {
 
     rsx! {
         button {
+            class: "border px-2 py-1",
             onclick: onclick,
             "Refresh"
         }
@@ -79,20 +86,37 @@ pub fn GameListMember(game: Game) -> Element {
     let living_count = game.living_tributes().len();
     rsx! {
         li {
-            p {
-                Link {
-                    to: Routes::GamePage {
-                        identifier: game.identifier.clone()
-                    },
-                    "{game.name}"
+            class: "block w-full border p-2 mb-4",
+            div {
+                class: "flex place-content-between",
+                h2 {
+                    class: "text-xl",
+                    Link {
+                        to: Routes::GamePage {
+                            identifier: game.identifier.clone()
+                        },
+                        "{game.name}"
+                    }
                 }
                 GameDelete {
                     game_name: game.name.clone(),
                     game_identifier: game.identifier.clone()
                 }
             }
-            p { "{living_count} / {game.tribute_count} tributes" }
-            p { "{game.status} - {game.ready}" }
+            div {
+                class: "flex flex-row place-content-between",
+                p { "{living_count} / {game.tribute_count} tributes left" }
+                p { "Day {game.day.unwrap_or_default()}" }
+                p {
+                    if game.ready {
+                        span {
+                            class: "bg-green-500 px-1",
+                            "o"
+                        }
+                    }
+                    "Status: {game.status}"
+                }
+            }
         }
     }
 }

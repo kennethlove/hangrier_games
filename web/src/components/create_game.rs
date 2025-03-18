@@ -52,9 +52,10 @@ pub fn CreateGameButton() -> Element {
 
     rsx! {
         button {
+            class: "py-1 px-2 border whitespace-nowrap",
             r#type: "button",
             onclick,
-            label { "quickstart" }
+            label { "Quickstart" }
         }
     }
 }
@@ -87,8 +88,17 @@ pub fn CreateGameForm() -> Element {
 
     rsx! {
         form {
+            class: "flex flex-row justify-center gap-2",
             onsubmit,
+            label {
+                r#for: "game-name",
+                class: "sr-only",
+                "Game name"
+            }
             input {
+                class: "block placeholder-gray-900 focus:outline-none border w-half px-2 py-1 text-gray-900",
+                id: "game-name",
+                name: "game-name",
                 r#type: "text",
                 placeholder: "Game name",
                 value: game_name_signal.read().clone(),
@@ -97,8 +107,9 @@ pub fn CreateGameForm() -> Element {
                 }
             }
             button {
+                class: "py-1 px-2 border whitespace-nowrap",
                 r#type: "submit",
-                label { "create game" }
+                label { "Create game" }
             }
         }
     }

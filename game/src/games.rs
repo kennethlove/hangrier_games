@@ -2,7 +2,7 @@ use crate::areas::events::AreaEvent;
 use crate::areas::{Area, AreaDetails};
 use crate::items::Item;
 use crate::items::OwnsItems;
-use crate::messages::{add_game_message, add_message, clear_messages, GameOutput, MessageSource};
+use crate::messages::{add_game_message, clear_messages};
 use crate::tributes::actions::Action;
 use crate::tributes::events::TributeEvent;
 use crate::tributes::statuses::TributeStatus;
@@ -15,7 +15,7 @@ use std::ops::Index;
 use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::globals::{add_to_story, get_story};
+use crate::output::GameOutput;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GameLogEntry {

@@ -44,6 +44,7 @@ pub fn GameTributes() -> Element {
         QueryResult::Ok(QueryValue::Tributes(tributes)) => {
             rsx! {
                 ul {
+                    class: "grid gap-4 grid-cols-2",
                     for tribute in tributes {
                         GameTributeListMember {
                             tribute: tribute.clone()
@@ -72,29 +73,47 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
 
     rsx! {
         li {
-            Link {
-                to: Routes::TributeDetail {
-                    game_identifier: game.identifier.clone(),
-                    tribute_identifier: tribute.identifier.clone()
-                },
-                "{tribute.name} - {tribute.district} - {tribute.area}" 
+            class: "border p-2",
+            div {
+                class: "flex flex-row gap-2 place-content-between",
+                h4 {
+                    Link {
+                        to: Routes::TributeDetail {
+                            game_identifier: game.identifier.clone(),
+                            tribute_identifier: tribute.identifier.clone()
+                        },
+                        "{tribute.name}"
+                    }
+                }
+                TributeEdit {
+                    identifier: tribute.clone().identifier,
+                    district: tribute.district,
+                    name: tribute.clone().name,
+                }
             }
-            TributeEdit {
-                identifier: tribute.clone().identifier,
-                district: tribute.district,
-                name: tribute.clone().name,
-            }
-            p { "HP: {tribute.attributes.health} - Status: {tribute.status}" }
 
-            for log in tribute.clone().log {
-                p { "{log.message}" }
-            }
+            p { "{tribute.district}" }
+            p { "{tribute.area}"}
 
+            p { "HP: {tribute.attributes.health}" }
+            p { "Status: {tribute.status}" }
+
+            h5 { "Items" }
             ul {
+                class: "p-2",
                 for item in tribute.clone().items {
                     li { "{item.name}" }
                 }
             }
+
+            h5 { "Log" }
+            ul {
+                class: "p-2",
+                for log in tribute.clone().log {
+                    li { "{log.message}" }
+                }
+            }
+
         }
     }
 }

@@ -33,8 +33,9 @@ pub fn GameEdit(identifier: String, name: String) -> Element {
 
     rsx! {
         button {
+            class: "button border px-2 py-1",
             onclick,
-            "e"
+            "edit"
         }
     }
 }

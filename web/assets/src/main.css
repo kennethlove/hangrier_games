@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../rpg-awesome.min.css";
 
 .frame {
     grid-template-rows: min-content auto min-content;

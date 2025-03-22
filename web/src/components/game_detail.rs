@@ -10,6 +10,7 @@ use game::games::GameStatus;
 use game::tributes::Tribute;
 use reqwest::StatusCode;
 use std::ops::Deref;
+use crate::components::full_game_log::FullGameLog;
 
 async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(identifier)) = keys.first() {
@@ -233,11 +234,25 @@ pub fn GameDetails(game: Game) -> Element {
                 class: "grid grid-cols-2 gap-8",
 
                 div {
-                    h3 {
-                        class: "text-xl mb-2",
-                        "Areas"
+                    class: "flex flex-col gap-4",
+                    div {
+                        h3 {
+                            class: "text-xl mb-2",
+                            "Areas",
+                            i {
+                                class: "ra ra-aura"
+                            }
+                        }
+                        GameAreaList { }
                     }
-                    GameAreaList { }
+
+                    div {
+                        h3 {
+                            class: "text-xl mb-2",
+                            "Day log"
+                        }
+                        FullGameLog { day: game.day.unwrap_or_default() }
+                    }
                 }
                 div {
                     h3 {

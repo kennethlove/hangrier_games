@@ -4,6 +4,7 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::areas::AreaDetails;
 use game::games::Game;
+use shared::LogEntry;
 
 async fn fetch_areas(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Areas(identifier)) = keys.first() {

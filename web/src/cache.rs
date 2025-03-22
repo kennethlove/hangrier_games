@@ -2,6 +2,7 @@ use game::areas::AreaDetails;
 use game::games::Game;
 use game::tributes::Tribute;
 use shared::TributeKey;
+use game::globals::LogMessage;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum QueryKey {
@@ -11,6 +12,7 @@ pub(crate) enum QueryKey {
     Tributes(String),
     Areas(String),
     Tribute(String),
+    Log(String, u32), // Game identifier, day
 }
 
 #[derive(PartialEq, Debug)]
@@ -31,6 +33,7 @@ pub(crate) enum QueryValue {
     Tribute(Box<Tribute>),
     Tributes(Vec<Tribute>),
     GameTributes(Vec<TributeKey>),
+    Logs(Vec<LogMessage>),
 }
 
 #[allow(dead_code)]

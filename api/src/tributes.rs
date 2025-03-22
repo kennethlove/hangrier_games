@@ -24,13 +24,13 @@ pub async fn tribute_record_create(tribute: Option<Tribute>, game_identifier: St
         format!("RETURN count(SELECT id FROM playing_in WHERE out.identifier='{}')", game_identifier.clone())
     ).await;
     let tribute_count: Option<u32> = tribute_count.unwrap().take(0).unwrap();
-
     if tribute_count >= Some(24) {
         return None;
     }
 
     let mut tribute = tribute.unwrap_or_else(Tribute::random);
     tribute.district = (tribute_count.unwrap_or(1) % 12) + 1;
+    tribute.statistics.game = game_identifier;
 
     let id = RecordId::from(("tribute", &tribute.identifier));
 

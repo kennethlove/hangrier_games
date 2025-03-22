@@ -5,11 +5,17 @@ use crate::threats::animals::Animal;
 use crate::tributes::events::TributeEvent;
 use crate::tributes::statuses::TributeStatus;
 use crate::tributes::Tribute;
+use chrono::{DateTime, Utc};
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize, Serializer};
+use std::collections::VecDeque;
 use std::fmt::{Display, Formatter};
+use std::sync::Mutex;
+use uuid::Uuid;
 
 // Collection on strings to be used as output for the game
 #[allow(dead_code)]
-pub enum GameMessage {
+pub enum GameOutput {
     GameDayStart(u32),
     FirstDayStart,
     FeastDayStart,
@@ -72,194 +78,307 @@ pub enum GameMessage {
     DiedInArea(Tribute, Area),
 }
 
-impl Display for GameMessage {
+impl Display for GameOutput {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
-            GameMessage::GameDayStart(day_number) => {
+            GameOutput::GameDayStart(day_number) => {
                 write!(f, "=== ☀️ Day {} begins! ===", day_number)
             }
-            GameMessage::FirstDayStart => {
+            GameOutput::FirstDayStart => {
                 write!(f, "=== 🎉 The Hunger Games begin! 🎉 ===")
             }
-            GameMessage::FeastDayStart => {
+            GameOutput::FeastDayStart => {
                 write!(f, "=== 😋 Day 3: Feast Day ===")
             }
-            GameMessage::TributesLeft(tribute_count) => {
+            GameOutput::TributesLeft(tribute_count) => {
                 write!(f, "=== 📌 Tributes alive: {} ===", tribute_count)
             }
-            GameMessage::GameNightStart(day_number) => {
+            GameOutput::GameNightStart(day_number) => {
                 write!(f, "=== 🌙 Night {} begins ===", day_number)
             }
-            GameMessage::DailyDeathAnnouncement(death_count) => {
+            GameOutput::DailyDeathAnnouncement(death_count) => {
                 write!(f, "=== 💀 Tributes dead: {} ===", death_count)
             }
-            GameMessage::DeathAnnouncement(tribute) => {
+            GameOutput::DeathAnnouncement(tribute) => {
                 write!(f, "=== 🪦 {} has died ===", tribute.name)
             }
-            GameMessage::NoOneWins => {
+            GameOutput::NoOneWins => {
                 write!(f, "=== 🎭 No one wins! ===")
             }
-            GameMessage::TributeWins(tribute) => {
+            GameOutput::TributeWins(tribute) => {
                 write!(f, "=== 🏆 The winner is {} ===", tribute.name)
             }
-            GameMessage::TributeRest(tribute) => {
+            GameOutput::TributeRest(tribute) => {
                 write!(f, "😪 {} rests", tribute.name)
             }
-            GameMessage::TributeLongRest(tribute) => {
+            GameOutput::TributeLongRest(tribute) => {
                 write!(f, "💤 {} rests and recovers a little health and sanity", tribute.name)
             }
-            GameMessage::TributeHide(tribute) => {
+            GameOutput::TributeHide(tribute) => {
                 write!(f, "🫥 {} tries to hide", tribute.name)
             }
-            GameMessage::TributeTravel(tribute, area_a, area_b) => {
+            GameOutput::TributeTravel(tribute, area_a, area_b) => {
                 write!(f, "🚶 {} moves from {} to {}", tribute.name, area_a, area_b)
             }
-            GameMessage::TributeTakeItem(tribute, item) => {
+            GameOutput::TributeTakeItem(tribute, item) => {
                 write!(f, "🔨 {} takes a(n) {}", tribute.name, item.name)
             }
-            GameMessage::TributeCannotUseItem(tribute, item) => {
+            GameOutput::TributeCannotUseItem(tribute, item) => {
                 write!(f, "❌ {} cannot use a(n) {}", tribute.name, item.name)
             }
-            GameMessage::TributeUseItem(tribute, item) => {
+            GameOutput::TributeUseItem(tribute, item) => {
                 write!(f, "💊 {} uses a(n) {}, gains {} {}", tribute.name, item.name, item.effect, item.attribute)
             }
-            GameMessage::TributeTravelTooTired(tribute, area) => {
+            GameOutput::TributeTravelTooTired(tribute, area) => {
                 write!(f, "😴 {} is too tired to move from {}, rests instead", tribute.name, area)
             }
-            GameMessage::TributeTravelAlreadyThere(tribute, area) => {
+            GameOutput::TributeTravelAlreadyThere(tribute, area) => {
                 write!(f, "🤔 {} is already in the {}, stays put", tribute.name, area)
             }
-            GameMessage::TributeTravelFollow(tribute, area) => {
+            GameOutput::TributeTravelFollow(tribute, area) => {
                 write!(f, "🫡 {} follows their district mate to {}", tribute.name, area)
             }
-            GameMessage::TributeTravelStay(tribute, area) => {
+            GameOutput::TributeTravelStay(tribute, area) => {
                 write!(f, "🪑 {} stays in {}", tribute.name, area)
             }
-            GameMessage::TributeBleeds(tribute) => {
+            GameOutput::TributeBleeds(tribute) => {
                 write!(f, "🩸 {} bleeds from their wounds.", tribute.name)
             }
-            GameMessage::TributeSick(tribute) => {
+            GameOutput::TributeSick(tribute) => {
                 write!(f, "🤒 {} contracts dysentery, loses strength and speed", tribute.name)
             }
-            GameMessage::TributeElectrocuted(tribute) => {
+            GameOutput::TributeElectrocuted(tribute) => {
                 write!(f, "🌩️ {} is struck by lightning, loses health", tribute.name)
             }
-            GameMessage::TributeFrozen(tribute) => {
+            GameOutput::TributeFrozen(tribute) => {
                 write!(f, "🥶 {} suffers from hypothermia, loses speed.", tribute.name)
             }
-            GameMessage::TributeOverheated(tribute) => {
+            GameOutput::TributeOverheated(tribute) => {
                 write!(f, "🥵 {} suffers from heat stroke, loses speed.", tribute.name)
             }
-            GameMessage::TributeDehydrated(tribute) => {
+            GameOutput::TributeDehydrated(tribute) => {
                 write!(f, "🌵 {} is severely dehydrated, loses strength", tribute.name)
             }
-            GameMessage::TributeStarving(tribute) => {
+            GameOutput::TributeStarving(tribute) => {
                 write!(f, "🍴 {} is ravenously hungry, loses strength", tribute.name)
             }
-            GameMessage::TributePoisoned(tribute) => {
+            GameOutput::TributePoisoned(tribute) => {
                 write!(f, "🧪 {} eats something poisonous, loses sanity", tribute.name)
             }
-            GameMessage::TributeBrokenArm(tribute) => {
+            GameOutput::TributeBrokenArm(tribute) => {
                 write!(f, "🦴 {} injures their arm, loses strength.", tribute.name)
             }
-            GameMessage::TributeBrokenLeg(tribute) => {
+            GameOutput::TributeBrokenLeg(tribute) => {
                 write!(f, "🦴 {} injures their leg, loses speed.", tribute.name)
             }
-            GameMessage::TributeInfected(tribute) => {
+            GameOutput::TributeInfected(tribute) => {
                 write!(f, "🤢 {} gets an infection, loses health and sanity", tribute.name)
             }
-            GameMessage::TributeDrowned(tribute) => {
+            GameOutput::TributeDrowned(tribute) => {
                 write!(f, "🏊 {} partially drowns, loses health and sanity", tribute.name)
             }
-            GameMessage::TributeMauled(tribute, count, animal, damage) => {
+            GameOutput::TributeMauled(tribute, count, animal, damage) => {
                 write!(f, "🐾 {} is attacked by {} {}, takes {} damage!", tribute.name, count, animal.plural(), damage)
             }
-            GameMessage::TributeBurned(tribute) => {
+            GameOutput::TributeBurned(tribute) => {
                 write!(f, "🔥 {} gets burned, loses health", tribute.name)
             }
-            GameMessage::TributeHorrified(tribute, damage) => {
+            GameOutput::TributeHorrified(tribute, damage) => {
                 write!(f, "😱 {} is horrified by the violence, loses {} sanity.", tribute.name, damage)
             }
-            GameMessage::TributeSuffer(tribute) => {
+            GameOutput::TributeSuffer(tribute) => {
                 write!(f, "😭 {} suffers from loneliness and terror.", tribute.name)
             }
-            GameMessage::TributeSelfHarm(tribute) => {
+            GameOutput::TributeSelfHarm(tribute) => {
                 write!(f, "🤦 {} tries to attack themself!", tribute.name)
             }
-            GameMessage::TributeSuicide(tribute) => {
+            GameOutput::TributeSuicide(tribute) => {
                 write!(f, "🪒 {} attempts suicide.", tribute.name)
             }
-            GameMessage::TributeAttackWin(tribute, target) => {
+            GameOutput::TributeAttackWin(tribute, target) => {
                 write!(f, "🔪 {} attacks {}, and wins!", tribute.name, target.name)
             }
-            GameMessage::TributeAttackWinExtra(tribute, target) => {
+            GameOutput::TributeAttackWinExtra(tribute, target) => {
                 write!(f, "🔪 {} attacks {}, and wins decisively!", tribute.name, target.name)
             }
-            GameMessage::TributeAttackWound(tribute, target) => {
+            GameOutput::TributeAttackWound(tribute, target) => {
                 write!(f, "🤕 {} wounds {}", tribute.name, target.name)
             }
-            GameMessage::TributeAttackLose(tribute, target) => {
+            GameOutput::TributeAttackLose(tribute, target) => {
                 write!(f, "🤣 {} attacks {}, but loses!", tribute.name, target.name)
             }
-            GameMessage::TributeAttackLoseExtra(tribute, target) => {
+            GameOutput::TributeAttackLoseExtra(tribute, target) => {
                 write!(f, "🤣 {} attacks {}, but loses decisively!", tribute.name, target.name)
             }
-            GameMessage::TributeAttackMiss(tribute, target) => {
+            GameOutput::TributeAttackMiss(tribute, target) => {
                 write!(f, "😰 {} attacks {}, but misses!", tribute.name, target.name)
             }
-            GameMessage::TributeAttackDied(tribute, target) => {
+            GameOutput::TributeAttackDied(tribute, target) => {
                 write!(f, "☠️ {} is killed by {}", tribute.name, target.name)
             }
-            GameMessage::TributeAttackSuccessKill(tribute, target) => {
+            GameOutput::TributeAttackSuccessKill(tribute, target) => {
                 write!(f, "☠️ {} successfully kills {}", tribute.name, target.name)
             }
-            GameMessage::TributeAttackHidden(tribute, target) => {
+            GameOutput::TributeAttackHidden(tribute, target) => {
                 write!(f, "🤔 {} can't attack {}, they're hidden", tribute.name, target.name)
             }
-            GameMessage::TributeDiesFromStatus(tribute, status) => {
+            GameOutput::TributeDiesFromStatus(tribute, status) => {
                 write!(f, "💀 {} dies from {}", tribute.name, status)
             }
-            GameMessage::TributeDiesFromAreaEvent(tribute, area_event) => {
+            GameOutput::TributeDiesFromAreaEvent(tribute, area_event) => {
                 write!(f, "🪦 {} died in the {}.", tribute.name, area_event)
             }
-            GameMessage::TributeDiesFromTributeEvent(tribute, tribute_event) => {
+            GameOutput::TributeDiesFromTributeEvent(tribute, tribute_event) => {
                 write!(f, "💀 {} dies by {}", tribute.name, tribute_event)
             }
-            GameMessage::TributeAlreadyDead(tribute) => {
+            GameOutput::TributeAlreadyDead(tribute) => {
                 write!(f, "‼️ {} is already dead!", tribute.name)
             }
-            GameMessage::TributeDead(tribute) => {
+            GameOutput::TributeDead(tribute) => {
                 write!(f, "❗️ {} is dead!", tribute.name)
             }
-            GameMessage::WeaponBreak(tribute, weapon) => {
+            GameOutput::WeaponBreak(tribute, weapon) => {
                 write!(f, "🗡️ {} breaks their {}", tribute.name, weapon.name)
             }
-            GameMessage::ShieldBreak(tribute, shield) => {
+            GameOutput::ShieldBreak(tribute, shield) => {
                 write!(f, "🛡️ {} breaks their {}", tribute.name, shield.name)
             }
-            GameMessage::SponsorGift(tribute, item) => {
+            GameOutput::SponsorGift(tribute, item) => {
                 write!(f, "🎁 {} receives a(n) {} ({}x {} +{})", tribute.name, item.name, item.quantity, item.attribute, item.effect)
             }
-            GameMessage::AreaEvent(area_event, area) => {
+            GameOutput::AreaEvent(area_event, area) => {
                 let area_name = area.to_string().replace("The ", "");
                 write!(f, "=== ⚠️ A(n) {} has occurred in the {} ===", area_event, area_name)
             }
-            GameMessage::AreaClose(area) => {
+            GameOutput::AreaClose(area) => {
                 let area_name = area.to_string().replace("The ", "");
                 write!(f, "=== 🔔 The {} is uninhabitable ===", area_name)
             }
-            GameMessage::AreaOpen(area) => {
+            GameOutput::AreaOpen(area) => {
                 let area_name = area.to_string().replace("The ", "");
                 write!(f, "=== 🔔 The {} is habitable again ===", area_name)
             }
-            GameMessage::TrappedInArea(tribute, area) => {
+            GameOutput::TrappedInArea(tribute, area) => {
                 let area_name = area.to_string().replace("The ", "");
                 write!(f, "💥 {} is trapped in the {}.", tribute.name, area_name)
             }
-            GameMessage::DiedInArea(tribute, area) => {
+            GameOutput::DiedInArea(tribute, area) => {
                 let area_name = area.to_string().replace("The ", "");
                 write!(f, "💥 {} died in the {}.", tribute.name, area_name)
             }
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag="type", content="value")]
+pub enum MessageSource {
+    #[serde(rename = "Game")]
+    Game(String), // Game identifier
+    #[serde(rename = "Area")]
+    Area(String), // Area name
+    #[serde(rename = "Tribute")]
+    Tribute(String), // Tribute identifier
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameMessage {
+    pub identifier: String,
+    pub source: MessageSource,
+    pub game_day: u32,
+    pub subject: String,
+    #[serde(with = "chrono::serde::ts_nanoseconds")]
+    pub timestamp: DateTime<Utc>,
+    pub content: String,
+}
+
+pub static GLOBAL_MESSAGES: Lazy<Mutex<VecDeque<GameMessage>>> =
+    Lazy::new(|| Mutex::new(VecDeque::new()));
+
+pub fn add_message(
+    source: MessageSource,
+    game_day: u32,
+    subject: String,
+    content: String,
+) -> Result<(), String> {
+    let message = GameMessage {
+        identifier: Uuid::new_v4().to_string(),
+        source,
+        game_day,
+        subject,
+        timestamp: Utc::now(),
+        content,
+    };
+
+    GLOBAL_MESSAGES
+        .lock()
+        .map_err(|e| e.to_string())?
+        .push_back(message);
+
+    Ok(())
+}
+
+pub fn add_game_message(game_id: &str, content: String) -> Result<(), String> {
+    add_message(
+        MessageSource::Game(game_id.to_string()),
+        0,
+        game_id.to_string(),
+        content,
+    )
+}
+
+pub fn add_area_message(area_name: &str, game_id: &str, content: String) -> Result<(), String> {
+    add_message(
+        MessageSource::Area(area_name.to_string()),
+        0,
+        format!("{game_id}:{area_name}"),
+        content,
+    )
+}
+
+pub fn add_tribute_message(tribute_id: &str, game_id: &str, content: String) -> Result<(), String> {
+    add_message(
+        MessageSource::Tribute(tribute_id.to_string()),
+        0,
+        format!("{game_id}:{tribute_id}"),
+        content,
+    )
+}
+
+pub fn get_all_messages() -> Result<Vec<GameMessage>, String> {
+    Ok(GLOBAL_MESSAGES
+        .lock()
+        .map_err(|e| e.to_string())?
+        .iter()
+        .cloned()
+        .collect())
+}
+
+pub fn get_messages_by_source(source: &MessageSource) -> Result<Vec<GameMessage>, String> {
+    Ok(GLOBAL_MESSAGES
+        .lock()
+        .map_err(|e| e.to_string())?
+        .iter()
+        .filter(|msg| msg.source == *source)
+        .cloned()
+        .collect())
+}
+
+pub fn get_messages_by_day(day: u32) -> Result<Vec<GameMessage>, String> {
+    Ok(GLOBAL_MESSAGES
+        .lock()
+        .map_err(|e| e.to_string())?
+        .iter()
+        .filter(|msg| msg.game_day == day)
+        .cloned()
+        .collect())
+}
+
+pub fn clear_messages() -> Result<(), String> {
+    GLOBAL_MESSAGES
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clear();
+    Ok(())
+}
+

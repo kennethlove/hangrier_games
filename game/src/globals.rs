@@ -1,11 +1,22 @@
+use std::cmp::PartialEq;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct LogMessage {
-    message: String,
-    instant: u128
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub enum LogContext {
+    Game,
+    Area,
+    Tribute
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct LogMessage {
+    pub context: LogContext,
+    pub instant: u128,
+    pub message: String,
+    pub subject: String,
+    // pub day: u32,
 }
 
 pub mod approx_instant {
@@ -33,55 +44,88 @@ pub mod approx_instant {
 }
 
 lazy_static! {
-    // STORY is for game log messages
-    static ref STORY: Mutex<Vec<LogMessage>> = Mutex::new(Vec::new());
+    // HISTORY is for collected log messages
+    static ref HISTORY: Mutex<Vec<LogMessage>> = Mutex::new(Vec::new());
 }
 
-lazy_static! {
-    // LORE is for tribute log messages
-    static ref LORE: Mutex<Vec<LogMessage>> = Mutex::new(Vec::new());
+async fn add_history(log_message: LogMessage) {
+    HISTORY.lock().await.push(log_message);
 }
 
-pub async fn add_to_story(story: String) {
-    STORY.lock().await.push(
-        LogMessage {
+pub async fn add_to_story(story: String, game_identifier: &String) {
+    add_history( LogMessage {
+            context: LogContext::Game,
             message: story,
+            subject: game_identifier.clone(),
             instant: std::time::UNIX_EPOCH.elapsed().unwrap().as_nanos()
         }
-    );
+    ).await;
 }
 
-pub async fn get_story() -> Vec<String> {
-    let mut stories = STORY.lock().await.clone();
+pub async fn get_story() -> Vec<LogMessage> {
+    let mut stories: Vec<LogMessage> = HISTORY.lock().await.clone()
+        .iter()
+        .filter(|s| s.context == LogContext::Game)
+        .cloned()
+        .collect();
     stories.sort_by_key(|s| s.instant );
-    stories.iter()
-        .map( |story| story.message.clone() )
-        .collect()
+    stories
+    // stories.iter()
+    //     .map(|story| story.message.clone())
+    //     .collect()
 }
 
 pub async fn clear_story() -> Result<(), String> {
-    STORY.lock().await.clear();
+    // TODO
     Ok(())
 }
 
-pub async fn add_to_lore(lore: String) {
-    LORE.lock().await.push(
-        LogMessage {
+pub async fn add_to_lore(lore: String, tribute_identifier: &String) {
+    add_history( LogMessage {
+            context: LogContext::Tribute,
             message: lore,
+            subject: tribute_identifier.clone(),
             instant: std::time::UNIX_EPOCH.elapsed().unwrap().as_nanos()
         }
-    );
+    ).await;
 }
 
 pub async fn get_lore() -> Vec<String> {
-    let mut lore = LORE.lock().await.clone();
-    lore.sort_by_key(|s| s.instant );
+    let mut lore: Vec<LogMessage> = HISTORY.lock().await.clone()
+        .iter()
+        .filter(|l| l.context == LogContext::Tribute)
+        .cloned()
+        .collect();
+    lore.sort_by_key(|l| l.instant );
     lore.iter()
         .map( |lore| lore.message.clone() )
         .collect()
 }
 
 pub async fn clear_lore() -> Result<(), String> {
-    LORE.lock().await.clear();
+    // TODO
     Ok(())
 }
+
+pub async fn add_to_guide(message: String, area_identifier: &String) {
+    add_history( LogMessage {
+        context: LogContext::Area,
+        message,
+        subject: area_identifier.clone(),
+        instant: std::time::UNIX_EPOCH.elapsed().unwrap().as_nanos()
+    }
+    ).await;
+}
+
+pub async fn get_guide() -> Vec<String> {
+    let mut guides: Vec<LogMessage> = HISTORY.lock().await.clone()
+        .iter()
+        .filter(|g| g.context == LogContext::Area)
+        .cloned()
+        .collect();
+    guides.sort_by_key(|g| g.instant );
+    guides.iter()
+        .map(|guide| guide.message.clone())
+        .collect()
+}
+

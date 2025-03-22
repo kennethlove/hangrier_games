@@ -8,11 +8,11 @@ use axum::Json;
 use axum::Router;
 use game::areas::{Area, AreaDetails};
 use game::games::{Game, GameStatus};
-use game::globals::{clear_story, get_story};
+use game::globals::{clear_story, get_story, LogMessage};
 use game::items::Item;
 use game::tributes::{Tribute, TributeLogEntry};
 use serde::{Deserialize, Serialize};
-use shared::EditGame;
+use shared::{EditGame, LogEntry};
 use shared::GameArea;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -21,12 +21,14 @@ use strum::IntoEnumIterator;
 use surrealdb::sql::Thing;
 use surrealdb::RecordId;
 use uuid::Uuid;
+use game::messages::{get_all_messages, GameMessage};
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
         .route("/", get(game_list).post(game_create))
         .route("/{game_identifier}", get(game_detail).delete(game_delete).put(game_update))
         .route("/{game_identifier}/areas", get(game_areas))
+        .route("/{game_identifier}/log/{day}", get(game_logs))
         .route("/{game_identifier}/next", put(next_step))
         .route("/{game_identifier}/tributes", get(game_tributes).post(tribute_create))
         .route("/{game_identifier}/tributes/{tribute_identifier}", get(tribute_detail).delete(tribute_delete).put(tribute_update))
@@ -370,15 +372,16 @@ RETURN count(
                     _ => {
                         if let Some(mut game) = get_full_game(&identifier).await {
                             let game = game.run_day_night_cycle().await;
-                            let captured = get_story().await.join("\n");
+                            let captured = get_story().await;
                             clear_story().await.expect("Failed to clear story");
 
-                            let updated_game: Option<Game> = save_game(game).await;
+                            let updated_game: Option<Game> = save_game(game, captured.clone()).await;
 
+                            let output: String = captured.iter().map(|c| c.message.clone()).collect::<Vec<_>>().join("\n");
                             if let Some(game) = updated_game {
-                                (StatusCode::OK, Json(GameResponse { game: Some(game), output: captured })).into_response()
+                                (StatusCode::OK, Json(GameResponse { game: Some(game), output })).into_response()
                             } else {
-                                (StatusCode::NOT_FOUND, Json(GameResponse { game: None, output: captured })).into_response()
+                                (StatusCode::NOT_FOUND, Json(GameResponse { game: None, output })).into_response()
                             }
                         } else {
                             (StatusCode::NOT_FOUND, Json(GameResponse::default())).into_response()
@@ -419,6 +422,7 @@ WHERE identifier = "{identifier}";"#))
 
 }
 
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GameLog {
     pub game_identifier: String,
@@ -427,8 +431,21 @@ pub struct GameLog {
     pub instant: u128
 }
 
-async fn save_game(mut game: Game) -> Option<Game> {
+async fn save_game(mut game: Game, captured: Vec<LogMessage>) -> Option<Game> {
     let game_identifier = RecordId::from(("game", game.identifier.clone()));
+
+
+    if let Ok(logs) = get_all_messages() {
+        for mut log in logs {
+            log.game_day = game.day.unwrap_or_default();
+            DATABASE
+                .upsert::<Option<GameMessage>>(("message", &log.identifier))
+                .content(log.clone())
+                .await
+                .expect(&format!("Failed to save message: {:#?}", log));
+        }
+    }
+
     let areas = game.areas.clone();
     game.areas = vec![];
 
@@ -456,10 +473,10 @@ async fn save_game(mut game: Game) -> Option<Game> {
 
         let _ = save_items(items, id.clone()).await;
 
-        let logs = tribute.log.clone();
-        tribute.log = vec![];
+        // let logs = tribute.log.clone();
+        // tribute.log = vec![];
 
-        let _ = save_tribute_logs(logs).await;
+        // let _ = save_tribute_logs(logs).await;
 
         DATABASE
             .update::<Option<Tribute>>(id)
@@ -467,18 +484,18 @@ async fn save_game(mut game: Game) -> Option<Game> {
             .await.expect("Failed to update area items");
     }
 
-    for log in game.log.iter() {
-        let game_log = GameLog {
-            game_identifier: log.game_identifier.clone(),
-            day: Option::from(log.day),
-            message: log.message.clone(),
-            instant: std::time::UNIX_EPOCH.elapsed().unwrap().as_nanos(),
-        };
-        DATABASE.insert::<Vec<GameLog>>("game_log")
-            .content(game_log)
-            .await.expect("Failed to update game log");
-    }
-    game.log = vec![];
+    // for log in captured {
+    //     let game_log = GameLog {
+    //         game_identifier: log.subject.clone(),
+    //         day: game.day,
+    //         message: log.message.clone(),
+    //         instant: log.instant,
+    //     };
+    //     DATABASE.insert::<Vec<GameLog>>("game_log")
+    //         .content(game_log)
+    //         .await.expect("Failed to update game log");
+    // }
+    // game.log = vec![];
 
     DATABASE
         .update::<Option<Game>>(game_identifier.clone())
@@ -543,14 +560,25 @@ async fn save_tribute_logs(logs: Vec<TributeLogEntry>) {
         let tribute_log_id = RecordId::from(("tribute_log", &log.identifier));
         let tribute_id = RecordId::from(("tribute", &log.tribute_identifier));
 
-        let _: Option<TributeLogEntry> = DATABASE.insert(&tribute_log_id)
-            .content(log.clone())
-            .await.expect("Failed to update game log");
+        match DATABASE.insert::<Option<TributeLogEntry>>(&tribute_log_id)
+            .content(log.clone()).await {
+            Ok(tribute_log) => {
+                if let Some(tribute_log) = tribute_log {
+                    let _ = DATABASE.insert::<Vec<TbLog>>("tb_log")
+                        .relation(TbLog {
+                            tribute: tribute_id,
+                            tribute_log: tribute_log_id
+                        }).await;
+                }
+            }
+            Err(_) => {}
+        }
 
-        let _ = DATABASE.insert::<Vec<TbLog>>("tb_log")
-            .relation(TbLog {
-                tribute: tribute_id,
-                tribute_log: tribute_log_id
-            }).await;
     }
+}
+
+async fn game_logs(Path((game_identifier, day)): Path<(String, String)>) -> Json<Vec<LogEntry>> {
+    tracing::info!(target: "api::game", "{game_identifier}");
+    dbg!(day);
+    Json(vec![])
 }

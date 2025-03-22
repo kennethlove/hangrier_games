@@ -29,3 +29,9 @@ pub struct TributeKey {
     pub district: u32,
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct LogEntry {
+    pub message: String,
+    pub instant: i128
+}
+

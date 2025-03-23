@@ -6,7 +6,7 @@ use game::games::Game;
 use game::messages::GameMessage;
 
 async fn fetch_full_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::Log(identifier, day)) = keys.first() {
+    if let Some(QueryKey::FullGameLog(identifier, day)) = keys.first() {
         let response = reqwest::get(format!("{}/api/games/{}/log/{}", API_HOST.clone(), identifier, day))
             .await
             .unwrap();
@@ -37,7 +37,7 @@ pub fn FullGameLog(day: u32) -> Element {
 
     let log_query = use_get_query(
         [
-            QueryKey::Log(identifier.clone(), day),
+            QueryKey::FullGameLog(identifier.clone(), day),
             QueryKey::Game(identifier.clone()),
             QueryKey::Games
         ],

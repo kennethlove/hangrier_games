@@ -5,6 +5,7 @@ use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::games::Game;
+use game::messages::GameMessage;
 use game::tributes::Tribute;
 
 async fn fetch_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
@@ -18,6 +19,27 @@ async fn fetch_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryErr
                 QueryResult::Ok(QueryValue::Tributes(tributes))
             }
             Err(_) => QueryResult::Err(QueryError::GameNotFound(identifier.to_string())),
+        }
+    } else {
+        QueryResult::Err(QueryError::Unknown)
+    }
+}
+
+async fn fetch_tribute_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
+    if let Some(QueryKey::TributeLog(identifier, day)) = keys.first() {
+        if let Some(QueryKey::Game(game_identifier)) = keys.last() {
+            let response = reqwest::get(format!("{}/api/games/{}/log/{}/{}", API_HOST.clone(), game_identifier, day, identifier))
+                .await
+                .unwrap();
+
+            match response.json::<Vec<GameMessage>>().await {
+                Ok(messages) => {
+                    QueryResult::Ok(QueryValue::Logs(messages))
+                }
+                Err(_) => QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
+            }
+        } else {
+            QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
         }
     } else {
         QueryResult::Err(QueryError::Unknown)
@@ -71,6 +93,22 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
     let game = game_signal.read().clone();
     let game = game.unwrap();
 
+    let identifier = tribute.clone().identifier;
+
+    let tribute_logs_query = use_get_query(
+        [
+            QueryKey::TributeLog(identifier.clone(), game.clone().day.unwrap_or_default()),
+            QueryKey::Tribute(identifier.clone()),
+            QueryKey::Game(game.clone().identifier)
+        ],
+        fetch_tribute_log,
+    );
+
+    let tribute_logs: Vec<GameMessage> = match tribute_logs_query.result().value() {
+        QueryResult::Ok(QueryValue::Logs(logs)) => logs.clone(),
+        _ => Vec::new()
+    };
+
     rsx! {
         li {
             class: "border p-2",
@@ -107,6 +145,11 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
             }
 
             h5 { "Log" }
+            ul {
+                for log in tribute_logs {
+                    li { "{log.content}" }
+                }
+            }
 
         }
     }

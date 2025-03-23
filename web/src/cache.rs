@@ -12,7 +12,8 @@ pub(crate) enum QueryKey {
     Tributes(String),
     Areas(String),
     Tribute(String),
-    Log(String, u32), // Game identifier, day
+    FullGameLog(String, u32), // Game identifier, day
+    TributeLog(String, u32), // Tribute identifier, day
 }
 
 #[derive(PartialEq, Debug)]

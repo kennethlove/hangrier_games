@@ -28,6 +28,7 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
         .route("/{game_identifier}", get(game_detail).delete(game_delete).put(game_update))
         .route("/{game_identifier}/areas", get(game_areas))
         .route("/{game_identifier}/log/{day}", get(game_logs))
+        .route("/{game_identifier}/log/{day}/{tribute_identifier}", get(tribute_logs))
         .route("/{game_identifier}/next", put(next_step))
         .route("/{game_identifier}/tributes", get(game_tributes).post(tribute_create))
         .route("/{game_identifier}/tributes/{tribute_identifier}", get(tribute_detail).delete(tribute_delete).put(tribute_update))
@@ -505,6 +506,26 @@ async fn save_items(items: Vec<Item>, owner: RecordId) {
 
 async fn game_logs(Path((game_identifier, day)): Path<(String, String)>) -> Json<Vec<GameMessage>> {
     match DATABASE.query(format!(r#"SELECT * FROM message WHERE string::starts_with(subject, "{game_identifier}") AND game_day = {day} ORDER BY timestamp;"#)).await {
+        Ok(mut logs) => {
+            let logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
+            Json(logs)
+        }
+        Err(err) => {
+            eprintln!("{err:?}");
+            Json(vec![])
+        }
+    }
+}
+
+async fn tribute_logs(Path((game_identifier, day, tribute_identifier)): Path<(String, String, String)>) -> Json<Vec<GameMessage>> {
+    match DATABASE.query(format!(
+        r#"SELECT *
+        FROM message
+        WHERE string::starts_with(subject, "{game_identifier}")
+        AND game_day = {day}
+        AND source.value = "{tribute_identifier}"
+        ORDER BY timestamp;"#
+    )).await {
         Ok(mut logs) => {
             let logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
             Json(logs)

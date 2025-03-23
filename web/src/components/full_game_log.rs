@@ -3,9 +3,7 @@ use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::games::Game;
-use game::globals::LogMessage;
 use game::messages::GameMessage;
-use shared::LogEntry;
 
 async fn fetch_full_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Log(identifier, day)) = keys.first() {

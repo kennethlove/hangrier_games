@@ -107,12 +107,6 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
             }
 
             h5 { "Log" }
-            ul {
-                class: "p-2",
-                for log in tribute.clone().log {
-                    li { "{log.message}" }
-                }
-            }
 
         }
     }

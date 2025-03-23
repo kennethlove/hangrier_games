@@ -8,13 +8,12 @@ use axum::Json;
 use axum::Router;
 use game::areas::{Area, AreaDetails};
 use game::games::{Game, GameStatus};
-use game::globals::{clear_story, get_story, LogMessage};
 use game::items::Item;
 use game::messages::{get_all_messages, GameMessage};
-use game::tributes::{Tribute, TributeLogEntry};
+use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
+use shared::EditGame;
 use shared::GameArea;
-use shared::{EditGame, LogEntry};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::LazyLock;
@@ -237,23 +236,13 @@ SELECT *, (
     ) AS log
     FROM <-playing_in<-tribute[*]
     ORDER district
-)
-AS tributes, (
+) AS tributes, (
     SELECT *, ->items->item[*] AS items
     FROM ->areas->area
 ) AS areas, (
     RETURN count(SELECT id FROM <-playing_in<-tribute)
 ) AS tribute_count,
-count(<-playing_in<-tribute.id) == 24
-AND
-count(array::distinct(<-playing_in<-tribute.district)) == 12
-AS ready, (
-    SELECT *
-    FROM game_log
-    WHERE game_identifier = "{identifier}"
-    AND day = $parent.day
-    ORDER BY instant
-) AS log
+count(<-playing_in<-tribute.id) == 24 AND count(array::distinct(<-playing_in<-tribute.district)) == 12 AS ready
 FROM game
 WHERE identifier = "{identifier}";"#))
     .await.unwrap();
@@ -314,8 +303,7 @@ pub async fn game_tributes(Path(identifier): Path<String>) -> (StatusCode, Json<
     let response = DATABASE.query(
         format!(r#"
 SELECT (
-    SELECT *, ->owns->item[*] as items,
-    (SELECT * FROM tribute_log WHERE tribute_identifier = $parent.identifier AND day = {game_day} ORDER BY instant) AS log
+    SELECT *, ->owns->item[*] as items
     FROM <-playing_in<-tribute
     ORDER district
 ) AS tributes FROM game WHERE identifier = "{identifier}";
@@ -336,7 +324,6 @@ SELECT (
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct GameResponse {
     game: Option<Game>,
-    output: String
 }
 
 pub async fn next_step(Path(identifier): Path<String>) -> impl IntoResponse {
@@ -372,16 +359,13 @@ RETURN count(
                     _ => {
                         if let Some(mut game) = get_full_game(&identifier).await {
                             let game = game.run_day_night_cycle().await;
-                            let captured = get_story().await;
-                            clear_story().await.expect("Failed to clear story");
 
-                            let updated_game: Option<Game> = save_game(game, captured.clone()).await;
+                            let updated_game: Option<Game> = save_game(game).await;
 
-                            let output: String = captured.iter().map(|c| c.message.clone()).collect::<Vec<_>>().join("\n");
                             if let Some(game) = updated_game {
-                                (StatusCode::OK, Json(GameResponse { game: Some(game), output })).into_response()
+                                (StatusCode::OK, Json(GameResponse { game: Some(game) })).into_response()
                             } else {
-                                (StatusCode::NOT_FOUND, Json(GameResponse { game: None, output })).into_response()
+                                (StatusCode::NOT_FOUND, Json(GameResponse { game: None })).into_response()
                             }
                         } else {
                             (StatusCode::NOT_FOUND, Json(GameResponse::default())).into_response()
@@ -400,7 +384,6 @@ async fn get_full_game(identifier: &str) -> Option<Game> {
     let mut result = DATABASE.query(format!(r#"
 SELECT *, (
     SELECT *, ->owns->item[*] AS items,
-    (SELECT * FROM tribute_log WHERE tribute_identifier = $parent.identifier) as log
     FROM <-playing_in<-tribute[*]
     ORDER district
 )
@@ -410,7 +393,6 @@ AS tributes, (
 ) AS areas, (
     RETURN count(SELECT id FROM <-playing_in<-tribute)
 ) AS tribute_count,
-(SELECT * FROM game_log WHERE game_identifier = $parent.identifier) as log,
 count(<-playing_in<-tribute.id) == 24
 AND
 count(array::distinct(<-playing_in<-tribute.district)) == 12
@@ -423,15 +405,7 @@ WHERE identifier = "{identifier}";"#))
 }
 
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct GameLog {
-    pub game_identifier: String,
-    pub day: Option<u32>,
-    pub message: String,
-    pub instant: u128
-}
-
-async fn save_game(mut game: Game, captured: Vec<LogMessage>) -> Option<Game> {
+async fn save_game(mut game: Game) -> Option<Game> {
     let game_identifier = RecordId::from(("game", game.identifier.clone()));
 
 
@@ -473,29 +447,11 @@ async fn save_game(mut game: Game, captured: Vec<LogMessage>) -> Option<Game> {
 
         let _ = save_items(items, id.clone()).await;
 
-        // let logs = tribute.log.clone();
-        // tribute.log = vec![];
-
-        // let _ = save_tribute_logs(logs).await;
-
         DATABASE
             .update::<Option<Tribute>>(id)
             .content(tribute)
             .await.expect("Failed to update area items");
     }
-
-    // for log in captured {
-    //     let game_log = GameLog {
-    //         game_identifier: log.subject.clone(),
-    //         day: game.day,
-    //         message: log.message.clone(),
-    //         instant: log.instant,
-    //     };
-    //     DATABASE.insert::<Vec<GameLog>>("game_log")
-    //         .content(game_log)
-    //         .await.expect("Failed to update game log");
-    // }
-    // game.log = vec![];
 
     DATABASE
         .update::<Option<Game>>(game_identifier.clone())
@@ -544,36 +500,6 @@ async fn save_items(items: Vec<Item>, owner: RecordId) {
                 ).await.expect("Failed to update Owns relation");
             }
         }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct TbLog {
-    #[serde(rename = "in")]
-    tribute: RecordId,
-    #[serde(rename = "out")]
-    tribute_log: RecordId
-}
-
-async fn save_tribute_logs(logs: Vec<TributeLogEntry>) {
-    for log in logs {
-        let tribute_log_id = RecordId::from(("tribute_log", &log.identifier));
-        let tribute_id = RecordId::from(("tribute", &log.tribute_identifier));
-
-        match DATABASE.insert::<Option<TributeLogEntry>>(&tribute_log_id)
-            .content(log.clone()).await {
-            Ok(tribute_log) => {
-                if let Some(tribute_log) = tribute_log {
-                    let _ = DATABASE.insert::<Vec<TbLog>>("tb_log")
-                        .relation(TbLog {
-                            tribute: tribute_id,
-                            tribute_log: tribute_log_id
-                        }).await;
-                }
-            }
-            Err(_) => {}
-        }
-
     }
 }
 

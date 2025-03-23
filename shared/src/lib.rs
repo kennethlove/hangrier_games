@@ -28,10 +28,3 @@ pub struct TributeKey {
     pub identifier: String,
     pub district: u32,
 }
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct LogEntry {
-    pub message: String,
-    pub instant: chrono::DateTime<chrono::offset::Utc>,
-}
-

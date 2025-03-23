@@ -6,7 +6,6 @@ pub mod statuses;
 use crate::areas::events::AreaEvent;
 use crate::areas::{Area, AreaDetails};
 use crate::games::Game;
-use crate::globals::{clear_lore, get_lore};
 use crate::items::OwnsItems;
 use crate::items::{Attribute, Item};
 use crate::messages::add_tribute_message;
@@ -57,8 +56,6 @@ pub struct Tribute {
     /// Events that have happened to the tribute
     #[serde(default)]
     pub events: Vec<TributeEvent>,
-    #[serde(default)]
-    pub log: Vec<TributeLogEntry>,
 }
 
 impl Default for Tribute {
@@ -107,7 +104,6 @@ impl Tribute {
             statistics,
             items: vec![],
             events: vec![],
-            log: vec![],
         }
     }
 
@@ -604,7 +600,7 @@ impl Tribute {
         day: bool,
         game: &mut Game,
     ) -> Tribute {
-        let _ = clear_lore().await;
+
         // Tribute is already dead, do nothing.
         if !self.is_alive() {
             add_tribute_message(
@@ -790,14 +786,6 @@ impl Tribute {
                 }
             }
         }
-        self.log = get_lore().await.iter()
-            .map(|l| TributeLogEntry {
-                identifier: uuid::Uuid::new_v4().to_string(),
-                tribute_identifier: self.identifier.clone(),
-                day: game.day.unwrap(),
-                message: l.clone(),
-                instant: std::time::UNIX_EPOCH.elapsed().unwrap().as_nanos()
-            }).collect();
         self.clone()
     }
 
@@ -1182,22 +1170,6 @@ impl Attributes {
             luck: rng.gen_range(1..=100),
             is_hidden: false,
         }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct TributeLogEntry {
-    pub tribute_identifier: String,
-    #[serde(default)]
-    pub day: u32,
-    pub message: String,
-    pub instant: u128,
-    pub identifier: String,
-}
-
-impl Display for TributeLogEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Day: {}, {}", self.day, self.message)
     }
 }
 

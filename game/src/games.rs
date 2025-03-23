@@ -17,20 +17,6 @@ use uuid::Uuid;
 
 use crate::output::GameOutput;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct GameLogEntry {
-    pub game_identifier: String,
-    #[serde(default)]
-    pub day: u32,
-    pub message: String,
-}
-
-impl Display for GameLogEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Game {
     pub identifier: String,
@@ -45,8 +31,6 @@ pub struct Game {
     pub tributes: Vec<Tribute>,
     #[serde(default)]
     pub ready: bool,
-    #[serde(default)]
-    pub log: Vec<GameLogEntry>,
 }
 
 impl Default for Game {
@@ -66,7 +50,6 @@ impl Default for Game {
             tribute_count: 0,
             tributes: vec![],
             ready: false,
-            log: vec![],
         }
     }
 }
@@ -203,12 +186,6 @@ impl Game {
             0 | 1 => self.status = GameStatus::Finished,
             _ => self.status = GameStatus::InProgress,
         }
-
-        // self.log = get_story().await.iter().map(|r| GameLogEntry {
-        //     game_identifier: self.identifier.clone(),
-        //     day: self.day.unwrap(),
-        //     message: r.clone()
-        // }).collect();
 
         self.clone()
     }

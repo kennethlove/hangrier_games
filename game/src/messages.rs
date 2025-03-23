@@ -17,7 +17,7 @@ pub enum MessageSource {
     Tribute(String), // Tribute identifier
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GameMessage {
     pub identifier: String,
     pub source: MessageSource,

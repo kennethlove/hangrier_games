@@ -1,10 +1,11 @@
+use crate::cache::{QueryError, QueryKey, QueryValue};
+use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::games::Game;
 use game::globals::LogMessage;
+use game::messages::GameMessage;
 use shared::LogEntry;
-use crate::API_HOST;
-use crate::cache::{QueryError, QueryKey, QueryValue};
 
 async fn fetch_full_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Log(identifier, day)) = keys.first() {
@@ -12,11 +13,16 @@ async fn fetch_full_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryErr
             .await
             .unwrap();
 
-        match response.json::<Vec<LogMessage>>().await {
+        dioxus_logger::tracing::info!("{:?}", response);
+
+        match response.json::<Vec<GameMessage>>().await {
             Ok(logs) => {
                 QueryResult::Ok(QueryValue::Logs(logs))
             }
-            Err(_) => QueryResult::Err(QueryError::GameNotFound(identifier.to_string())),
+            Err(err) => {
+                dioxus_logger::tracing::error!("{:?}", err);
+                QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
+            },
         }
     } else {
         QueryResult::Err(QueryError::Unknown)
@@ -46,7 +52,7 @@ pub fn FullGameLog(day: u32) -> Element {
                 ul {
                     for log in logs {
                         li {
-                            "{log.message}"
+                            "{log.content}"
                         }
                     }
                 }

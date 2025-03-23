@@ -1,5 +1,5 @@
-use std::fmt::Debug;
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateGame {
@@ -32,6 +32,6 @@ pub struct TributeKey {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct LogEntry {
     pub message: String,
-    pub instant: i128
+    pub instant: chrono::DateTime<chrono::offset::Utc>,
 }
 

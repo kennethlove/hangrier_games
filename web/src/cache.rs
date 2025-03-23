@@ -1,8 +1,8 @@
 use game::areas::AreaDetails;
 use game::games::Game;
+use game::messages::GameMessage;
 use game::tributes::Tribute;
 use shared::TributeKey;
-use game::globals::LogMessage;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum QueryKey {
@@ -33,7 +33,7 @@ pub(crate) enum QueryValue {
     Tribute(Box<Tribute>),
     Tributes(Vec<Tribute>),
     GameTributes(Vec<TributeKey>),
-    Logs(Vec<LogMessage>),
+    Logs(Vec<GameMessage>),
 }
 
 #[allow(dead_code)]

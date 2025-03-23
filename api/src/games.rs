@@ -10,10 +10,11 @@ use game::areas::{Area, AreaDetails};
 use game::games::{Game, GameStatus};
 use game::globals::{clear_story, get_story, LogMessage};
 use game::items::Item;
+use game::messages::{get_all_messages, GameMessage};
 use game::tributes::{Tribute, TributeLogEntry};
 use serde::{Deserialize, Serialize};
-use shared::{EditGame, LogEntry};
 use shared::GameArea;
+use shared::{EditGame, LogEntry};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::LazyLock;
@@ -21,7 +22,6 @@ use strum::IntoEnumIterator;
 use surrealdb::sql::Thing;
 use surrealdb::RecordId;
 use uuid::Uuid;
-use game::messages::{get_all_messages, GameMessage};
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
@@ -577,8 +577,15 @@ async fn save_tribute_logs(logs: Vec<TributeLogEntry>) {
     }
 }
 
-async fn game_logs(Path((game_identifier, day)): Path<(String, String)>) -> Json<Vec<LogEntry>> {
-    tracing::info!(target: "api::game", "{game_identifier}");
-    dbg!(day);
-    Json(vec![])
+async fn game_logs(Path((game_identifier, day)): Path<(String, String)>) -> Json<Vec<GameMessage>> {
+    match DATABASE.query(format!(r#"SELECT * FROM message WHERE string::starts_with(subject, "{game_identifier}") AND game_day = {day} ORDER BY timestamp;"#)).await {
+        Ok(mut logs) => {
+            let logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
+            Json(logs)
+        }
+        Err(err) => {
+            eprintln!("{err:?}");
+            Json(vec![])
+        }
+    }
 }

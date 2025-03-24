@@ -4,6 +4,7 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::areas::AreaDetails;
 use game::games::Game;
+use shared::LogEntry;
 
 async fn fetch_areas(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Areas(identifier)) = keys.first() {
@@ -43,17 +44,41 @@ pub fn GameAreaList() -> Element {
         QueryResult::Ok(QueryValue::Areas(areas)) => {
             rsx! {
                 ul {
+                    class: "grid grid-cols-2 gap-4",
+                    li {
+                        img {
+                            src: asset!("assets/map.svg")
+                        }
+                    }
                     for area in areas {
                         li {
-                            "{area.name}, open: {area.open()}",
-                            p { "items" }
-                            ul {
-                                for item in area.clone().items {
-                                    li { "{item.name}" }
+                            class: "border p-2",
+                            div {
+                                class: "flex flex-row gap-2 place-content-between",
+                                h4 {
+                                    "{area.name}"
+                                }
+                                p {
+                                    if area.open() {
+                                        "open"
+                                    } else {
+                                        "closed"
+                                    }
                                 }
                             }
-                            p { "events" }
+
+                            h5 { "items" }
                             ul {
+                                class: "p-2",
+                                for item in area.clone().items {
+                                    li {
+                                        "{item.name}"
+                                    }
+                                }
+                            }
+                            h5 { "events" }
+                            ul {
+                                class: "p-2",
                                 for event in area.clone().events {
                                     li { "{event}" }
                                 }

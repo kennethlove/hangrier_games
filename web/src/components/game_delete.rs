@@ -35,6 +35,7 @@ pub fn GameDelete(game_identifier: String, game_name: String) -> Element {
 
     rsx! {
         button {
+            class: "border px-2 py-1",
             onclick,
             "x"
         }
@@ -75,18 +76,39 @@ pub fn DeleteGameModal() -> Element {
         dialog {
             role: "confirm",
             open: delete_game_signal.read().clone().is_some(),
+            div { class: "fixed inset-0 bg-red-200/25 transition-opacity backdrop-blur-sm backgrop-grayscale" }
             div {
-                h1 { "Delete game" }
-                p { r#"Delete "{name}"?"#}
-                button {
-                    r#type: "button",
-                    onclick: delete,
-                    "Yes"
-                }
-                button {
-                    r#type: "button",
-                    onclick: dismiss,
-                    "No"
+                class: "fixed inset-0 z-10 w-screen h-screen overflow-y-hidden",
+                div {
+                    class: "flex items-center gap-4 min-h-full justify-center",
+                    div {
+                        class: "relative transform overflow-hidden p-2",
+                        div {
+                            class: "mx-auto border p-2",
+                            div {
+                                h1 {
+                                    class: "block",
+                                    "Delete game?"
+                                }
+                                p { r#"Are you sure you want to delete "{name}"?"#}
+                            }
+                            div {
+                                class: "flex justify-end gap-4",
+                                button {
+                                    class: "border",
+                                    r#type: "button",
+                                    onclick: delete,
+                                    "Yes"
+                                }
+                                button {
+                                    class: "border",
+                                    r#type: "button",
+                                    onclick: dismiss,
+                                    "No"
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -1,13 +1,6 @@
-use crate::components::{GamePage, Games, GamesList, TributeDetail};
+use crate::components::{GamePage, Games, GamesList, Home, Navbar, TributeDetail};
 use dioxus::prelude::*;
 
-
-#[component]
-fn Home() -> Element {
-    rsx! {
-        p { "May the odds be ever in your favor!" }
-    }
-}
 
 #[component]
 fn PageNotFound(route: Vec<String>) -> Element {
@@ -18,27 +11,10 @@ fn PageNotFound(route: Vec<String>) -> Element {
     }
 }
 
-#[component]
-fn NavBar() -> Element {
-    rsx! {
-        nav {
-            ul {
-                li {
-                    Link { to: Routes::Home {}, "Home" }
-                }
-                li {
-                    Link { to: Routes::GamesList {}, "Games" }
-                }
-            }
-        }
-        Outlet::<Routes> {}
-    }
-}
-
 #[rustfmt::skip]
 #[derive(Routable, PartialEq, Clone, Debug)]
 pub enum Routes {
-    #[layout(NavBar)]
+    #[layout(Navbar)]
         #[route("/")]
         Home {},
         #[nest("/games")]

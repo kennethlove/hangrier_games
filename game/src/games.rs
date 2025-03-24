@@ -114,6 +114,7 @@ impl Game {
 
     pub async fn run_day_night_cycle(&mut self) -> Game {
         clear_messages().expect("Failed to clear messages for day");
+
         self.day = Some(self.day.unwrap_or(0) + 1);
         let living_tributes = self.living_tributes();
 
@@ -169,7 +170,7 @@ impl Game {
         self.do_a_cycle(true).await;
 
         // Clean up any deaths
-        // self.clean_up_recent_deaths().await;
+        self.clean_up_recent_deaths().await;
 
         add_game_message(
             self.identifier.as_str(),

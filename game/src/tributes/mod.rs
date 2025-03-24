@@ -536,6 +536,11 @@ impl Tribute {
         self.events.clear();
 
         if self.attributes.health == 0 {
+            add_tribute_message(
+                self.identifier.as_str(),
+                self.statistics.game.as_str(),
+                format!("{}", GameOutput::TributeDiesFromStatus(self.clone(), self.status.clone())),
+            ).expect("");
             self.statistics.killed_by = Some(self.status.to_string());
             self.status = TributeStatus::RecentlyDead;
         }

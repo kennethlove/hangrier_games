@@ -12,20 +12,20 @@ use uuid::Uuid;
 #[derive(Clone, Debug, Eq, PartialEq, EnumIter, Hash, Deserialize, Serialize, Ord, PartialOrd)]
 pub enum Area {
     Cornucopia,
-    Northwest,
-    Northeast,
-    Southeast,
-    Southwest,
+    North,
+    East,
+    South,
+    West,
 }
 
 impl Display for Area {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Area::Cornucopia => f.write_str("Cornucopia"),
-            Area::Northwest => f.write_str("Northwest"),
-            Area::Northeast => f.write_str("Northeast"),
-            Area::Southeast => f.write_str("Southeast"),
-            Area::Southwest => f.write_str("Southwest"),
+            Area::North => f.write_str("North"),
+            Area::East => f.write_str("East"),
+            Area::South => f.write_str("South"),
+            Area::West => f.write_str("West"),
         }
     }
 }
@@ -41,10 +41,10 @@ impl FromStr for Area {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "northwest" => Ok(Area::Northwest),
-            "northeast" => Ok(Area::Northeast),
-            "southeast" => Ok(Area::Southeast),
-            "southwest" => Ok(Area::Southwest),
+            "north" => Ok(Area::North),
+            "east" => Ok(Area::East),
+            "south" => Ok(Area::South),
+            "west" => Ok(Area::West),
             _ => Ok(Area::Cornucopia)
         }
     }
@@ -53,11 +53,11 @@ impl FromStr for Area {
 impl Area {
     pub fn neighbors(&self) -> Vec<Area> {
         match self {
-            Area::Southeast => vec![Area::Cornucopia, Area::Northeast, Area::Southwest],
-            Area::Southwest => vec![Area::Cornucopia, Area::Northwest, Area::Southeast],
-            Area::Northeast => vec![Area::Cornucopia, Area::Northwest, Area::Southeast],
-            Area::Northwest => vec![Area::Cornucopia, Area::Northeast, Area::Southwest],
-            Area::Cornucopia => vec![Area::Northwest, Area::Northeast, Area::Southwest, Area::Southeast],
+            Area::North => vec![Area::Cornucopia, Area::East, Area::West],
+            Area::East => vec![Area::Cornucopia, Area::North, Area::South],
+            Area::South => vec![Area::Cornucopia, Area::East, Area::West],
+            Area::West => vec![Area::Cornucopia, Area::North, Area::South],
+            Area::Cornucopia => vec![Area::North, Area::East, Area::South, Area::West]
         }
     }
 }
@@ -132,7 +132,7 @@ mod tests {
 
     #[test]
     fn add_item() {
-        let mut area_details = AreaDetails::new(None, Area::Southeast);
+        let mut area_details = AreaDetails::new(None, Area::South);
         let item = Item::new_random_weapon();
         area_details.add_item(item.clone());
         assert!(area_details.items.contains(&item));
@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn remove_item() {
-        let mut area_details = AreaDetails::new(None, Area::Southeast);
+        let mut area_details = AreaDetails::new(None, Area::South);
         let item = Item::new_random_weapon();
         area_details.add_item(item.clone());
         assert!(area_details.items.contains(&item));
@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn add_event() {
-        let mut area_details = AreaDetails::new(None, Area::Northeast);
+        let mut area_details = AreaDetails::new(None, Area::North);
         let event = AreaEvent::Wildfire;
         area_details.events.push(event.clone());
         assert!(area_details.events.contains(&event));
@@ -158,7 +158,7 @@ mod tests {
 
     #[test]
     fn process_events_closes_area() {
-        let mut area_details = AreaDetails::new(None, Area::Northeast);
+        let mut area_details = AreaDetails::new(None, Area::North);
         assert!(area_details.open());
         let event = AreaEvent::Wildfire;
         area_details.events.push(event.clone());

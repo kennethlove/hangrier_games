@@ -6,6 +6,8 @@ use crate::tributes::events::TributeEvent;
 use crate::tributes::statuses::TributeStatus;
 use crate::tributes::Tribute;
 use std::fmt::{Display, Formatter};
+use indefinite::indefinite;
+use indefinite::indefinite_capitalized;
 
 // Collection on strings to be used as output for the game
 #[allow(dead_code)]
@@ -115,13 +117,16 @@ impl Display for GameOutput {
                 write!(f, "🚶 {} moves from {} to {}", tribute.name, area_a, area_b)
             }
             GameOutput::TributeTakeItem(tribute, item) => {
-                write!(f, "🔨 {} takes a(n) {}", tribute.name, item.name)
+                let object = indefinite(&item.name);
+                write!(f, "🔨 {} takes {}", tribute.name, object)
             }
             GameOutput::TributeCannotUseItem(tribute, item) => {
-                write!(f, "❌ {} cannot use a(n) {}", tribute.name, item.name)
+                let object = indefinite(&item.name);
+                write!(f, "❌ {} cannot use {}", tribute.name, object)
             }
             GameOutput::TributeUseItem(tribute, item) => {
-                write!(f, "💊 {} uses a(n) {}, gains {} {}", tribute.name, item.name, item.effect, item.attribute)
+                let object = indefinite(&item.name);
+                write!(f, "💊 {} uses {}, gains {} {}", tribute.name, object, item.effect, item.attribute)
             }
             GameOutput::TributeTravelTooTired(tribute, area) => {
                 write!(f, "😴 {} is too tired to move from {}, rests instead", tribute.name, area)
@@ -238,11 +243,13 @@ impl Display for GameOutput {
                 write!(f, "🛡️ {} breaks their {}", tribute.name, shield.name)
             }
             GameOutput::SponsorGift(tribute, item) => {
-                write!(f, "🎁 {} receives a(n) {} ({}x {} +{})", tribute.name, item.name, item.quantity, item.attribute, item.effect)
+                let object = indefinite(&item.name);
+                write!(f, "🎁 {} receives {} ({}x {} +{})", tribute.name, object, item.quantity, item.attribute, item.effect)
             }
             GameOutput::AreaEvent(area_event, area) => {
                 let area_name = area.to_string().replace("The ", "");
-                write!(f, "=== ⚠️ A(n) {} has occurred in the {} ===", area_event, area_name)
+                let event = indefinite_capitalized(&area_event.to_string());
+                write!(f, "=== ⚠️ {} has occurred in the {} ===", event, area_name)
             }
             GameOutput::AreaClose(area) => {
                 let area_name = area.to_string().replace("The ", "");

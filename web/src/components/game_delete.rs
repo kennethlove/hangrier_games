@@ -84,7 +84,7 @@ pub fn DeleteGameModal() -> Element {
                     div {
                         class: "relative transform overflow-hidden p-2",
                         div {
-                            class: "mx-auto border p-2",
+                            class: "mx-auto border p-2 bg-red-200",
                             div {
                                 h1 {
                                     class: "block",
@@ -95,13 +95,13 @@ pub fn DeleteGameModal() -> Element {
                             div {
                                 class: "flex justify-end gap-4",
                                 button {
-                                    class: "border",
+                                    class: "border px-2 py-1",
                                     r#type: "button",
                                     onclick: delete,
                                     "Yes"
                                 }
                                 button {
-                                    class: "border",
+                                    class: "border px-2 py-1",
                                     r#type: "button",
                                     onclick: dismiss,
                                     "No"

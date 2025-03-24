@@ -48,8 +48,20 @@ pub fn EditGameModal() -> Element {
         dialog {
             role: "confirm",
             open: edit_game_signal.read().clone().is_some(),
-
-            EditGameForm {}
+            div { class: "fixed inset-0 bg-red-200/25 transition-opacity backdrop-blur-sm backgrop-grayscale" }
+            div {
+                class: "fixed inset-0 z-10 w-screen h-screen overflow-y-hidden",
+                div {
+                    class: "flex items-center gap-4 min-h-full justify-center",
+                    div {
+                        class: "relative transform overflow-hidden p-2",
+                        div {
+                            class: "mx-auto border p-2 bg-red-200",
+                            EditGameForm {}
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -92,23 +104,36 @@ pub fn EditGameForm() -> Element {
     rsx! {
         form {
             onsubmit: save,
-            label {
-                "Name",
+            div {
+                class: "mb-2",
+                h1 {
+                    class: "block",
+                    "Edit game"
+                }
+                label {
+                    "Name",
 
-                input {
-                    r#type: "text",
-                    name: "name",
-                    value: name,
+                    input {
+                        class: "border ml-2 px-2 py-1",
+                        r#type: "text",
+                        name: "name",
+                        value: name,
+                    }
                 }
             }
-            button {
-                r#type: "submit",
-                "Update"
-            }
-            button {
-                r#type: "dialog",
-                onclick: dismiss,
-                "Cancel"
+            div {
+                class: "flex justify-end gap-4",
+                button {
+                    class: "border px-2 py-1",
+                    r#type: "submit",
+                    "Update"
+                }
+                button {
+                    class: "border px-2 py-1",
+                    onclick: dismiss,
+                    r#type: "button",
+                    "Cancel"
+                }
             }
         }
     }

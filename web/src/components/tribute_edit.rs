@@ -1,11 +1,11 @@
-use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use crate::API_HOST;
+use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
+use dioxus_query::prelude::{MutationResult, use_mutation, use_query_client};
 use game::games::Game;
+use game::tributes::Tribute;
 use shared::EditTribute;
 use std::ops::Deref;
-use game::tributes::Tribute;
 
 async fn edit_tribute(args: (EditTribute, String)) -> MutationResult<MutationValue, MutationError> {
     let tribute = args.clone().0;
@@ -13,14 +13,20 @@ async fn edit_tribute(args: (EditTribute, String)) -> MutationResult<MutationVal
     let game_identifier = args.clone().1;
 
     let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}/tributes/{}", API_HOST.clone(), game_identifier, identifier);
+    let url: String = format!(
+        "{}/api/games/{}/tributes/{}",
+        API_HOST.clone(),
+        game_identifier,
+        identifier
+    );
 
-    let response = client
-        .put(url)
-        .json(&tribute.clone())
-        .send().await;
+    let response = client.put(url).json(&tribute.clone()).send().await;
 
-    if response.expect("Failed to update tribute").status().is_success() {
+    if response
+        .expect("Failed to update tribute")
+        .status()
+        .is_success()
+    {
         MutationResult::Ok(MutationValue::TributeUpdated(identifier))
     } else {
         MutationResult::Err(MutationError::Unknown)
@@ -32,7 +38,11 @@ pub fn TributeEdit(identifier: String, district: u32, name: String) -> Element {
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
 
     let onclick = move |_| {
-        edit_tribute_signal.set(Some(EditTribute(identifier.clone(), district, name.clone())));
+        edit_tribute_signal.set(Some(EditTribute(
+            identifier.clone(),
+            district,
+            name.clone(),
+        )));
     };
 
     rsx! {
@@ -53,7 +63,20 @@ pub fn EditTributeModal() -> Element {
             role: "confirm",
             open: edit_tribute_signal.read().clone().is_some(),
 
-            EditTributeForm {}
+            div { class: "fixed inset-0 bg-red-200/25 transition-opacity backdrop-blur-sm backgrop-grayscale" }
+            div {
+                class: "fixed inset-0 z-10 w-screen h-screen overflow-y-hidden",
+                div {
+                    class: "flex items-center gap-4 min-h-full justify-center",
+                    div {
+                        class: "relative transform overflow-hidden p-2",
+                        div {
+                            class: "mx-auto border p-2 bg-red-200",
+                            EditTributeForm {}
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -67,7 +90,7 @@ pub fn EditTributeForm() -> Element {
 
     let game: Signal<Option<Game>> = use_context();
     if game.peek().is_none() {
-        return rsx! {}
+        return rsx! {};
     }
     let game = game.unwrap();
     let game_identifier = game.identifier.clone();
@@ -82,23 +105,31 @@ pub fn EditTributeForm() -> Element {
 
     let save = move |e: Event<FormData>| {
         let game_identifier = game_identifier.clone();
-        let tribute_details = edit_tribute_signal.read().clone().expect("No details provided");
+        let tribute_details = edit_tribute_signal
+            .read()
+            .clone()
+            .expect("No details provided");
         let identifier = tribute_details.0.clone();
 
         let data = e.data().values();
         let name = data.get("name").expect("No name value").0[0].clone();
-        let district: u32 = data.get("district").expect("No district value").0[0].clone().parse().unwrap();
+        let district: u32 = data.get("district").expect("No district value").0[0]
+            .clone()
+            .parse()
+            .unwrap();
 
         if !name.is_empty() && (1..=12u32).contains(&district) {
             let edit_tribute = EditTribute(identifier.clone(), district, name.clone());
             spawn(async move {
-                mutate.manual_mutate((edit_tribute.clone(), game_identifier.clone())).await;
+                mutate
+                    .manual_mutate((edit_tribute.clone(), game_identifier.clone()))
+                    .await;
                 edit_tribute_signal.set(Some(edit_tribute));
 
-                if let MutationResult::Ok(MutationValue::TributeUpdated(_identifier)) = mutate.result().deref() {
-                    client.invalidate_queries(&[
-                        QueryKey::Tributes(game_identifier.clone()),
-                    ]);
+                if let MutationResult::Ok(MutationValue::TributeUpdated(_identifier)) =
+                    mutate.result().deref()
+                {
+                    client.invalidate_queries(&[QueryKey::Tributes(game_identifier.clone())]);
                     edit_tribute_signal.set(None);
                 }
             });
@@ -106,39 +137,54 @@ pub fn EditTributeForm() -> Element {
     };
 
     rsx! {
-        form {
-            onsubmit: save,
+    form {
+        onsubmit: save,
+        div {
+            class: "mb-2",
+            h1 {
+                class: "block",
+                "Edit game"
+            }
             label {
                 "Name",
 
                 input {
+                    class: "border ml-2 px-2 py-1",
                     r#type: "text",
                     name: "name",
                     value: name,
                 }
             }
             label {
+                class: "block mt-2",
                 "District",
 
-                select {
-                    name: "district",
-                    for n in 1..=12u32 {
-                        option {
-                            value: n,
-                            selected: n == district,
-                            "{n}"
+                    select {
+                        class: "border ml-2 px-2 py-1",
+                        name: "district",
+                        for n in 1..=12u32 {
+                            option {
+                                value: n,
+                                selected: n == district,
+                                "{n}"
+                            }
                         }
                     }
                 }
             }
-            button {
-                r#type: "submit",
-                "Update"
-            }
-            button {
-                r#type: "dialog",
-                onclick: dismiss,
-                "Cancel"
+            div {
+                class: "flex justify-end gap-4",
+                button {
+                    class: "border px-2 py-1",
+                    r#type: "submit",
+                    "Update"
+                }
+                button {
+                    class: "border px-2 py-1",
+                    r#type: "dialog",
+                    onclick: dismiss,
+                    "Cancel"
+                }
             }
         }
     }

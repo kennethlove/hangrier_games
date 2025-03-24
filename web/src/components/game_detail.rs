@@ -231,10 +231,10 @@ pub fn GameDetails(game: Game) -> Element {
     rsx! {
         div {
             div {
-                class: "grid grid-cols-2 gap-8",
+                class: "grid grid-cols-2 gap-8 lg:grid-cols-3 2xl:grid-cols-5",
 
                 div {
-                    class: "flex flex-col gap-4",
+                    class: "flex flex-col gap-4 2xl:col-span-2",
                     div {
                         h3 {
                             class: "text-xl mb-2",
@@ -255,6 +255,7 @@ pub fn GameDetails(game: Game) -> Element {
                     }
                 }
                 div {
+                    class: "lg:grid-cols-subgrid lg:col-span-2 2xl:col-span-3 lg:grid-cols-2 2xl:grid-cols-3",
                     h3 {
                         class: "text-xl mb-2",
                         "Tributes"

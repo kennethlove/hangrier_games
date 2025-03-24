@@ -7,7 +7,7 @@ pub fn Navbar() -> Element {
         div {
             class: "flex flex-row place-content-between mb-4",
             h1 {
-                class: "text-3xl",
+                class: "text-3xl cinzel-font",
                 "Hangry Games"
             }
 

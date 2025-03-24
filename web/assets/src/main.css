@@ -4,3 +4,10 @@
 .frame {
     grid-template-rows: min-content auto min-content;
 }
+
+.cinzel-font {
+     font-family: "Cinzel", serif;
+     font-optical-sizing: auto;
+     font-weight: 500;
+     font-style: normal;
+ }

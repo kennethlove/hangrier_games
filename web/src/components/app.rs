@@ -29,6 +29,15 @@ pub fn App() -> Element {
         document::Stylesheet {
             href: asset!("/assets/dist/main.css")
         }
+        document::Link {
+            rel: "preconnect",
+            href: "https://api.fonts.coollabs.io",
+            crossorigin: Some("true".into())
+        }
+        document::Link {
+            href: "https://api.fonts.coollabs.io/css2?family=Cinzel:wght@400..900&display=swap",
+            rel: "stylesheet"
+        }
 
         div {
             class: "grid grid-flow-row min-v-full min-h-screen bg-red-50 p-2 frame",

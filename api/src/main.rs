@@ -1,6 +1,7 @@
 mod games;
 mod tributes;
 pub mod logging;
+pub mod messages;
 
 use axum::error_handling::HandleErrorLayer;
 use axum::http::StatusCode;

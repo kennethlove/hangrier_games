@@ -1,18 +1,35 @@
-DEFINE TABLE OVERWRITE game_log SCHEMAFULL;
+DEFINE TABLE OVERWRITE message;
+DEFINE FIELD OVERWRITE id ON message;
+DEFINE FIELD OVERWRITE source ON message TYPE object;
+DEFINE FIELD OVERWRITE source.type ON message TYPE string;
+DEFINE FIELD OVERWRITE source.value ON message TYPE string;
+DEFINE FIELD OVERWRITE game_day ON message TYPE number;
+DEFINE FIELD OVERWRITE subject ON message TYPE string;
+DEFINE FIELD OVERWRITE timestamp ON message TYPE number;
+DEFINE FIELD OVERWRITE content ON message TYPE string;
 
-DEFINE FIELD OVERWRITE game_identifier ON game_log;
-DEFINE FIELD OVERWRITE day ON game_log;
-DEFINE FIELD OVERWRITE message ON game_log;
-DEFINE FIELD OVERWRITE instant ON game_log;
+-- Define indexes for querying
+DEFINE INDEX OVERWRITE message_timestamp ON message FIELDS timestamp;
+DEFINE INDEX OVERWRITE message_game_day ON message FIELDS game_day;
+DEFINE INDEX OVERWRITE message_source_type ON message FIELDS source.type;
+DEFINE INDEX OVERWRITE message_game_id ON message FIELDS source.value;
 
---
+-- Helper functions for common queries
+DEFINE FUNCTION OVERWRITE fn::get_messages_by_day($day: number) {
+    RETURN SELECT * FROM message
+    WHERE game_day = $day
+    ORDER BY timestamp;
+};
 
-DEFINE TABLE OVERWRITE tribute_log SCHEMAFULL;
+DEFINE FUNCTION OVERWRITE fn::get_messages_by_source_type($source_type: string) {
+    RETURN SELECT * FROM message
+    WHERE source.type = $source_type
+    ORDER BY timestamp;
+};
 
-DEFINE FIELD OVERWRITE identifier ON tribute_log;
-DEFINE FIELD OVERWRITE tribute_identifier ON tribute_log;
-DEFINE FIELD OVERWRITE day ON tribute_log;
-DEFINE FIELD OVERWRITE message ON tribute_log;
-DEFINE FIELD OVERWRITE instant ON tribute_log;
-
-DEFINE TABLE OVERWRITE tb_logs TYPE RELATION IN tribute OUT tribute_log ENFORCED;
+DEFINE FUNCTION OVERWRITE fn::get_messages_by_game_id($game_id: string) {
+    RETURN SELECT * FROM message
+    WHERE source.type = 'Game'
+    AND source.value = $game_id
+    ORDER BY timestamp;
+};

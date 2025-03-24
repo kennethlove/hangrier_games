@@ -1,5 +1,5 @@
-use std::fmt::Debug;
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateGame {
@@ -28,4 +28,3 @@ pub struct TributeKey {
     pub identifier: String,
     pub district: u32,
 }
-

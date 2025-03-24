@@ -2059,6 +2059,7 @@ dependencies = [
  "chrono",
  "fake",
  "getrandom 0.2.15",
+ "indefinite",
  "lazy_static",
  "once_cell",
  "rand 0.8.5",
@@ -2650,6 +2651,15 @@ checksum = "7cab85a7ed0bd5f0e76d93846e0147172bed2e2d3f859bcc33a8d9699cad1a75"
 dependencies = [
  "proc-macro2",
  "quote",
+]
+
+[[package]]
+name = "indefinite"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bca0cfa7653fb6b83d39ffb972d7476cc6cf4317525f2c2f601f4edd43d7b34c"
+dependencies = [
+ "regex",
 ]
 
 [[package]]

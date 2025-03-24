@@ -384,7 +384,7 @@ RETURN count(
 async fn get_full_game(identifier: &str) -> Option<Game> {
     let mut result = DATABASE.query(format!(r#"
 SELECT *, (
-    SELECT *, ->owns->item[*] AS items,
+    SELECT *, ->owns->item[*] AS items
     FROM <-playing_in<-tribute[*]
     ORDER district
 )

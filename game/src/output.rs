@@ -6,6 +6,7 @@ use crate::tributes::events::TributeEvent;
 use crate::tributes::statuses::TributeStatus;
 use crate::tributes::Tribute;
 use std::fmt::{Display, Formatter};
+use indefinite::indefinite;
 
 // Collection on strings to be used as output for the game
 #[allow(dead_code)]
@@ -115,7 +116,8 @@ impl Display for GameOutput {
                 write!(f, "🚶 {} moves from {} to {}", tribute.name, area_a, area_b)
             }
             GameOutput::TributeTakeItem(tribute, item) => {
-                write!(f, "🔨 {} takes a(n) {}", tribute.name, item.name)
+                let object = indefinite(&item.name);
+                write!(f, "🔨 {} takes {}", tribute.name, object)
             }
             GameOutput::TributeCannotUseItem(tribute, item) => {
                 write!(f, "❌ {} cannot use a(n) {}", tribute.name, item.name)

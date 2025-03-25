@@ -26,9 +26,6 @@ pub fn App() -> Element {
     let copyright = "&copy; 2025";
 
     rsx! {
-        document::Stylesheet {
-            href: asset!("/assets/dist/main.css")
-        }
         document::Link {
             rel: "preconnect",
             href: "https://api.fonts.coollabs.io",
@@ -37,6 +34,9 @@ pub fn App() -> Element {
         document::Link {
             href: "https://api.fonts.coollabs.io/css2?family=Cinzel:wght@400..900&display=swap",
             rel: "stylesheet"
+        }
+        document::Stylesheet {
+            href: asset!("/assets/dist/main.css")
         }
 
         div {

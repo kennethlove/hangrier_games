@@ -2,7 +2,7 @@ use crate::areas::events::AreaEvent;
 use crate::areas::{Area, AreaDetails};
 use crate::items::Item;
 use crate::items::OwnsItems;
-use crate::messages::{add_game_message, clear_messages};
+use crate::messages::{add_area_message, add_game_message, clear_messages};
 use crate::tributes::actions::Action;
 use crate::tributes::events::TributeEvent;
 use crate::tributes::statuses::TributeStatus;
@@ -197,11 +197,25 @@ impl Game {
         let day_event_frequency = 1.0 / 4.0;
         let night_event_frequency = 1.0 / 8.0;
 
-        // TODO: Remove this
-        let area = self.random_open_area();
-        if let Some(mut area) = area {
-            area.events.push(AreaEvent::random());
-        } else {
+        for area in &self.areas {
+            if !area.open() {
+                add_area_message(
+                    &area.area,
+                    &self.identifier,
+                    format!("{}", GameOutput::AreaClose(Area::from_str(&area.area).unwrap()))
+                ).expect("");
+
+                for event in &area.events {
+                    add_area_message(
+                        &area.area,
+                        &self.identifier,
+                        format!("{}", GameOutput::AreaEvent(event.clone(), Area::from_str(&area.area).unwrap()))
+                    ).expect("");
+                }
+            }
+        }
+
+        if let None = self.random_open_area() {
             let mut area = self.random_area().expect("No areas?");
             area.events.clear();
         }
@@ -214,6 +228,7 @@ impl Game {
                 } else {
                     night_event_frequency
                 }) {
+                    // TODO: Announce area event?
                     let area_event = AreaEvent::random();
                     area.events.push(area_event);
                 }
@@ -236,6 +251,7 @@ impl Game {
         // more events.
         if self.living_tributes().len() > 1 && self.living_tributes().len() < 8 {
             if let Some(mut area) = self.random_open_area() {
+                // TODO: Announce area event?
                 let event = AreaEvent::random();
                 area.events.push(event);
             }
@@ -243,8 +259,14 @@ impl Game {
             // If the tributes are really unlucky, they get two events.
             if rng.gen_bool(self.living_tributes().len() as f64 / 24.0) {
                 if let Some(mut area) = self.random_open_area() {
+                    // TODO: Announce area event?
                     let event = AreaEvent::random();
-                    area.events.push(event);
+                    area.events.push(event.clone());
+                    add_area_message(
+                        area.area.as_str(),
+                        &self.identifier,
+                    format!("{}", GameOutput::AreaEvent(event.clone(), Area::from_str(&area.area).unwrap()))
+                    ).expect("");
                 }
             }
         }
@@ -253,14 +275,14 @@ impl Game {
         let mut updated_tributes: Vec<Tribute> = vec![];
 
         for mut tribute in self.tributes.clone() {
-            if !rng.gen_bool(tribute.attributes.luck as f64 / 100.0) {
-                tribute.events.push(TributeEvent::random());
-            }
-
             if !tribute.is_alive() {
                 tribute.status = TributeStatus::Dead;
                 updated_tributes.push(tribute);
                 continue;
+            }
+
+            if !rng.gen_bool(tribute.attributes.luck as f64 / 100.0) {
+                tribute.events.push(TributeEvent::random());
             }
 
             match (self.day, day) {

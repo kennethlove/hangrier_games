@@ -1,6 +1,7 @@
 mod cache;
 mod components;
 mod routes;
+mod storage;
 
 use components::App;
 use std::sync::LazyLock;

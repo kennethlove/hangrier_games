@@ -10,6 +10,7 @@ dioxus-query = "0.6.0"
 dotenvy = "0.15.7"
 dotenvy_macro = "0.15.7"
 game = { path = "../game" }
+gloo-storage = "0.3.0"
 serde = { version = "1.0.216", features = ["derive"] }
 shared = { path = "../shared" }
 reqwest = { version = "0.12.9", features = ["json"] }

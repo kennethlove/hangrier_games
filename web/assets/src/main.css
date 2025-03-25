@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "../rpg-awesome.min.css";
 
+@variant dark (&:where(.dark, .dark *));
+
 .frame {
     grid-template-rows: min-content auto min-content;
 }

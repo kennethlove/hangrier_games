@@ -1,3 +1,5 @@
+use dioxus::dioxus_core::AttributeValue;
+use dioxus::document::Script;
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::game_edit::EditGameModal;
 use crate::components::tribute_edit::EditTributeModal;
@@ -6,11 +8,17 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::use_init_query_client;
 use game::games::Game;
 use shared::{DeleteGame, EditGame, EditTribute};
+use crate::storage::{use_persistent, AppState};
 
 #[component]
 pub fn App() -> Element {
     use_init_query_client::<QueryValue, QueryError, QueryKey>();
-    
+
+    let mut storage = use_persistent("hangry-games", || AppState::default());
+
+    let dark_mode_signal: Signal<bool> = use_signal(|| storage.get().dark_mode);
+    use_context_provider(|| dark_mode_signal);
+
     let game_signal: Signal<Option<Game>> = use_signal(|| None);
     use_context_provider(|| game_signal);
 
@@ -40,17 +48,20 @@ pub fn App() -> Element {
         }
 
         div {
-            class: "grid grid-flow-row min-v-full min-h-screen bg-red-50 p-2 frame",
+            class: if *dark_mode_signal.read() { "dark" } else { "" },
+            div {
+                class: "grid grid-flow-row min-v-full min-h-screen bg-gray-50 dark:bg-gray-800 p-2 frame",
 
-            Router::<Routes> {}
+                Router::<Routes> {}
 
-            p {
-                dangerous_inner_html: "{copyright}",
+                p {
+                    dangerous_inner_html: "{copyright}",
+                }
             }
-        }
 
-        EditGameModal {}
-        EditTributeModal {}
+            EditGameModal {}
+            EditTributeModal {}
+        }
     }
 }
 

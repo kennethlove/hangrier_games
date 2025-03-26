@@ -1,4 +1,6 @@
 mod app;
+
+use dioxus::prelude::web;
 pub(crate) use app::App;
 
 mod create_game;
@@ -27,7 +29,7 @@ mod navbar;
 pub(crate) use navbar::Navbar;
 mod home;
 mod full_game_log;
-pub(crate) use full_game_log::FullGameLog;
+pub mod icons;
 
 pub(crate) use home::Home;
 

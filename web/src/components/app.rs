@@ -43,6 +43,11 @@ pub fn App() -> Element {
             href: "https://api.fonts.coollabs.io/css2?family=Cinzel:wght@400..900&display=swap",
             rel: "stylesheet"
         }
+        document::Link {
+            href: "https://api.fonts.coollabs.io/icon?family=Material+Icons",
+            rel: "stylesheet"
+        }
+
         document::Stylesheet {
             href: asset!("/assets/dist/main.css")
         }
@@ -50,7 +55,7 @@ pub fn App() -> Element {
         div {
             class: if *dark_mode_signal.read() { "dark" } else { "" },
             div {
-                class: "grid grid-flow-row min-v-full min-h-screen bg-gray-50 dark:bg-gray-800 p-2 frame",
+                class: "grid grid-flow-row min-v-full min-h-screen bg-green-900 p-2 frame",
 
                 Router::<Routes> {}
 

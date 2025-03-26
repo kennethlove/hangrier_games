@@ -4,6 +4,7 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use shared::EditGame;
 use std::ops::Deref;
+use crate::components::icons::edit::EditIcon;
 
 async fn edit_game(game: EditGame) -> MutationResult<MutationValue, MutationError> {
     let identifier = game.0.clone();
@@ -26,16 +27,23 @@ async fn edit_game(game: EditGame) -> MutationResult<MutationValue, MutationErro
 #[component]
 pub fn GameEdit(identifier: String, name: String) -> Element {
     let mut edit_game_signal: Signal<Option<EditGame>> = use_context();
+    let title = format!("Edit {name}");
 
     let onclick = move |_| {
+        let name = name.clone();
         edit_game_signal.set(Some(EditGame(identifier.clone(), name.clone())));
     };
 
     rsx! {
         button {
-            class: "button border px-2 py-1",
+            class: "button cursor-pointer",
+            title,
             onclick,
-            "edit"
+            label {
+                class: "sr-only",
+                "edit"
+            }
+            EditIcon {}
         }
     }
 }

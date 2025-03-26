@@ -5,6 +5,7 @@ use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
 use game::games::Game;
+use crate::components::game_edit::GameEdit;
 
 async fn fetch_games(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::AllGames) = keys.first() {
@@ -31,7 +32,7 @@ pub fn GamesList() -> Element {
 
     rsx! {
         div {
-            class: "flex flex-row gap-2 place-content-center mb-4",
+            class: "flex flex-row gap-2 place-content-center py-2 mb-4 bg-green-100 dark:bg-green-100/50",
             CreateGameButton {}
             CreateGameForm {}
         }
@@ -86,11 +87,11 @@ pub fn GameListMember(game: Game) -> Element {
     let living_count = game.living_tributes().len();
     rsx! {
         li {
-            class: "block w-full border p-2 mb-4",
+            class: "block w-full border p-2 mb-4 bg-green-100 dark:bg-green-100/50",
             div {
                 class: "flex place-content-between",
                 h2 {
-                    class: "text-xl",
+                    class: "text-xl cinzel-font text-orange-700 dark:text-amber-500",
                     Link {
                         to: Routes::GamePage {
                             identifier: game.identifier.clone()
@@ -98,24 +99,20 @@ pub fn GameListMember(game: Game) -> Element {
                         "{game.name}"
                     }
                 }
-                GameDelete {
-                    game_name: game.name.clone(),
-                    game_identifier: game.identifier.clone()
+                div {
+                    class: "flex flex-row gap-2",
+                    GameEdit { identifier: game.identifier.clone(), name: game.name.clone() }
+                    GameDelete {
+                        game_name: game.name.clone(),
+                        game_identifier: game.identifier.clone()
+                    }
                 }
             }
             div {
                 class: "flex flex-row place-content-between",
                 p { "{living_count} / {game.tribute_count} tributes left" }
                 p { "Day {game.day.unwrap_or_default()}" }
-                p {
-                    if game.ready {
-                        span {
-                            class: "bg-green-500 px-1",
-                            "o"
-                        }
-                    }
-                    "Status: {game.status}"
-                }
+                p { "Status: {game.status}" }
             }
         }
     }

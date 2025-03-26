@@ -19,11 +19,12 @@ pub fn Navbar() -> Element {
         div {
             class: "flex flex-row place-content-between mb-4",
             h1 {
-                class: "text-3xl cinzel-font",
-                "Hangry Games"
+                class: "text-3xl cinzel-font text-amber-500",
+                Link { to: Routes::Home {}, "Hangry Games" }
             }
 
             nav {
+                class: "cinzel-font text-amber-500",
                 ul {
                     class: "flex flex-row gap-2",
                     li {
@@ -35,7 +36,8 @@ pub fn Navbar() -> Element {
                     li {
                         span {
                             i {
-                                class: "ra ra-light-bulb text-gray-800 dark:text-gray-50",
+                                class: "ra ra-light-bulb text-amber-500",
+                                title: "light/dark mode",
                                 onclick: move |_| {
                                     let mut state = storage.get();
                                     state.toggle_dark_mode();

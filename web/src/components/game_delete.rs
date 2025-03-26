@@ -4,6 +4,8 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use shared::DeleteGame;
 use std::ops::Deref;
+use crate::components::icons;
+use crate::components::icons::delete::DeleteIcon;
 
 async fn delete_game(delete_game_info: DeleteGame) -> MutationResult<MutationValue, MutationError> {
     let identifier = delete_game_info.0;
@@ -25,6 +27,7 @@ async fn delete_game(delete_game_info: DeleteGame) -> MutationResult<MutationVal
 #[component]
 pub fn GameDelete(game_identifier: String, game_name: String) -> Element {
     let mut delete_game_signal: Signal<Option<DeleteGame>> = use_context();
+    let title = format!("Delete {game_name}");
 
     let onclick = move |_| {
         let identifier = game_identifier.clone();
@@ -35,9 +38,14 @@ pub fn GameDelete(game_identifier: String, game_name: String) -> Element {
 
     rsx! {
         button {
-            class: "border px-2 py-1",
+            class: "button cursor-pointer",
+            title,
             onclick,
-            "x"
+            DeleteIcon {}
+            label {
+                class: "sr-only",
+                "Delete"
+            }
         }
     }
 }

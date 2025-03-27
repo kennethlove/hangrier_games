@@ -24,7 +24,7 @@ pub fn Navbar() -> Element {
             // class: "flex flex-row place-content-between mb-4",
             class: "flex flex-col flex-wrap items-center",
             h1 {
-                class: "text-5xl cinzel-font text-amber-500",
+                class: "text-6xl cinzel-font text-transparent font-bold bg-clip-text bg-radial from-amber-300 to-orange-500",
                 Link { to: Routes::Home {}, "Hangry Games" }
             }
 
@@ -42,12 +42,41 @@ pub fn Navbar() -> Element {
                     }
                     li {
                         class: "relative group inline-block",
-                        button {
-                            class: "px-2 border border-transparent group-hover:bg-amber-500 theme2:group-hover:text-green-900 theme1:group-hover:text-red-900 theme3:group-hover:text-blue-900",
-                            "Theme"
+                        input {
+                            id: "theme-switcher",
+                            r#type: "checkbox",
+                            class: "peer sr-only"
+                        }
+                        label {
+                            class: r#"px-2
+                                border border-transparent
+                                peer-focus:bg-amber-500
+                                peer-checked:bg-amber-500
+                                group-hover:bg-amber-500
+                                theme1:group-hover:text-red-900
+                                theme2:group-hover:text-green-900
+                                theme3:group-hover:text-blue-900
+                                theme1:peer-focus:text-red-900
+                                theme2:peer-focus:text-green-900
+                                theme3:peer-focus:text-blue-900
+                            "#,
+                            r#for: "theme-switcher",
+                            "Theme",
                         }
                         div {
-                            class: "absolute z-99 opacity-0 open:opacity-100 w-64 invisible group-hover:opacity-100 group-hover:visible bg-amber-500",
+                            class: r#"absolute
+                                z-99
+                                opacity-0
+                                w-64
+                                invisible
+                                group-hover:opacity-100
+                                group-hover:visible
+                                bg-amber-500
+                                peer-checked:opacity-100
+                                peer-checked:visible
+                                peer-focus:opacity-100
+                                peer-focus:visible
+                            "#,
 
                             div {
                                 class: "grid grid-cols-3 place-content-center gap-4 p-4",
@@ -83,13 +112,6 @@ pub fn Navbar() -> Element {
                                 }
                             }
                         }
-                            // onclick: move |_| {
-                            //     let mut state = storage.get();
-                            //     state.toggle_dark_mode();
-                            //     storage.set(state.clone());
-                            //     dark_mode_signal.set(state.dark_mode);
-                            // },
-                        // }
                     }
                 }
             }

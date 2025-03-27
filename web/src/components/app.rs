@@ -8,7 +8,7 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::use_init_query_client;
 use game::games::Game;
 use shared::{DeleteGame, EditGame, EditTribute};
-use crate::storage::{use_persistent, AppState};
+use crate::storage::{use_persistent, AppState, Colorscheme};
 
 #[component]
 pub fn App() -> Element {
@@ -16,8 +16,8 @@ pub fn App() -> Element {
 
     let mut storage = use_persistent("hangry-games", || AppState::default());
 
-    let dark_mode_signal: Signal<bool> = use_signal(|| storage.get().dark_mode);
-    use_context_provider(|| dark_mode_signal);
+    let theme_signal: Signal<Colorscheme> = use_signal(|| storage.get().colorscheme);
+    use_context_provider(|| theme_signal);
 
     let game_signal: Signal<Option<Game>> = use_signal(|| None);
     use_context_provider(|| game_signal);
@@ -31,7 +31,7 @@ pub fn App() -> Element {
     let edit_tribute_signal: Signal<Option<EditTribute>> = use_signal(|| None);
     use_context_provider(|| edit_tribute_signal);
 
-    let copyright = "&copy; 2025";
+    let copyright = "Hangry Games &copy; 2025";
 
     rsx! {
         document::Link {
@@ -53,14 +53,30 @@ pub fn App() -> Element {
         }
 
         div {
-            class: if *dark_mode_signal.read() { "dark" } else { "" },
+            class: "{theme_signal.read()}",
             div {
-                class: "grid grid-flow-row min-v-full min-h-screen bg-green-900 p-2 frame",
+                class: "grid grid-flow-row min-v-full min-h-screen theme2:bg-green-900 theme1:bg-red-900 theme3:bg-blue-900 p-2 frame",
 
                 Router::<Routes> {}
 
-                p {
-                    dangerous_inner_html: "{copyright}",
+                footer {
+                    class: "text-xs text-center",
+                    p { dangerous_inner_html: "{copyright}" }
+                    p {
+                        "three finger salute by Till Teenck from "
+                        a {
+                            href: "https://thenounproject.com/browse/icons/term/three-finger-salute/",
+                            "Noun Project"
+                        },
+                        "(CC BY 3.0)"
+                    }
+                    p {
+                        "Mockingjay icons from "
+                        a {
+                            href: "https://www.vecteezy.com/members/inna-marchenko601727",
+                            "Inna Marchenko"
+                        }
+                    }
                 }
             }
 

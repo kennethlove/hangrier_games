@@ -1,7 +1,9 @@
 @import "tailwindcss";
 @import "../rpg-awesome.min.css";
 
-@variant dark (&:where(.dark, .dark *));
+@variant theme1 (&:where(.theme1, .theme1 *));
+@variant theme2 (&:where(.theme2, .theme2 *));
+@variant theme3 (&:where(.theme3, .theme3 *));
 
 .frame {
     grid-template-rows: min-content auto min-content;
@@ -13,3 +15,4 @@
      font-weight: 500;
      font-style: normal;
  }
+

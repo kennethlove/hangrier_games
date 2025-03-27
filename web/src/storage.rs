@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 use dioxus::prelude::*;
 use gloo_storage::{LocalStorage, Storage};
 use serde::de::DeserializeOwned;
@@ -57,13 +59,50 @@ fn get_saved_state(storage: UsePersistent<AppState>) -> AppState {
     state
 }
 
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub enum Colorscheme {
+    #[default]
+    ThemeOne,
+    ThemeTwo,
+    ThemeThree,
+}
+
+impl Display for Colorscheme {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Colorscheme::ThemeOne => { write!(f, "theme1") }
+            Colorscheme::ThemeTwo => { write!(f, "theme2") }
+            Colorscheme::ThemeThree => { write!(f, "theme3") }
+        }
+    }
+}
+
+impl FromStr for Colorscheme {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "theme1" => Ok(Colorscheme::ThemeOne),
+            "theme2" => Ok(Colorscheme::ThemeTwo),
+            "theme3" => Ok(Colorscheme::ThemeThree),
+            _ => Err("invalid colorscheme".into())
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppState {
-    pub(crate) dark_mode: bool,
+    pub(crate) colorscheme: Colorscheme,
 }
 
 impl AppState {
-    pub(crate) fn toggle_dark_mode(&mut self) {
-        self.dark_mode = !self.dark_mode;
+    pub fn to_theme_one(&mut self) {
+        self.colorscheme = Colorscheme::ThemeOne;
+    }
+    pub fn to_theme_two(&mut self) {
+        self.colorscheme = Colorscheme::ThemeTwo;
+    }
+    pub fn to_theme_three(&mut self) {
+        self.colorscheme = Colorscheme::ThemeThree;
     }
 }

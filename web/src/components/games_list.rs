@@ -32,7 +32,7 @@ pub fn GamesList() -> Element {
 
     rsx! {
         div {
-            class: "flex flex-row gap-2 place-content-center py-2 mb-4 bg-green-100 dark:bg-green-100/50",
+            class: "flex flex-row gap-2 place-content-center py-2 mb-4 theme1:bg-green-100 theme2:bg-green-100/50",
             CreateGameButton {}
             CreateGameForm {}
         }

@@ -16,12 +16,22 @@ pub fn Navbar() -> Element {
         header {
             class: "flex flex-col flex-wrap items-center",
             h1 {
-                class: "text-6xl cinzel-font text-transparent font-bold bg-clip-text bg-radial from-amber-300 to-orange-600",
+                class: r#"
+                text-5xl
+                sm:text-6xl
+                cinzel-font
+                theme1:text-transparent
+                font-bold
+                bg-clip-text
+                bg-radial
+                theme1:from-amber-300
+                theme1:to-red-600
+                "#,
                 Link { to: Routes::Home {}, "Hangry Games" }
             }
 
             nav {
-                class: "cinzel-font text-amber-500 text-xl",
+                class: "cinzel-font text-xl theme1:text-amber-500",
                 ul {
                     class: "flex flex-row gap-16",
                     li {
@@ -42,31 +52,28 @@ pub fn Navbar() -> Element {
                         label {
                             class: r#"px-2
                                 border border-transparent
-                                peer-focus:bg-amber-500
-                                peer-checked:bg-amber-500
-                                group-hover:bg-amber-500
+                                theme1:peer-focus:bg-amber-600
+                                theme1:peer-checked:bg-amber-600
+                                theme1:group-hover:bg-amber-600
                                 theme1:group-hover:text-red-900
-                                theme2:group-hover:text-green-900
-                                theme3:group-hover:text-blue-900
                                 theme1:peer-focus:text-red-900
-                                theme2:peer-focus:text-green-900
-                                theme3:peer-focus:text-blue-900
                             "#,
                             r#for: "theme-switcher",
                             "Theme",
                         }
                         div {
                             class: r#"absolute
+                                right-0
+                                sm:left-0
                                 z-99
                                 opacity-0
                                 w-64
                                 invisible
                                 group-hover:opacity-100
                                 group-hover:visible
-                                bg-amber-500
                                 bg-linear-to-b
-                                from-amber-500
-                                to-amber-700
+                                theme1:from-amber-500
+                                theme1:to-amber-700
                                 peer-checked:opacity-100
                                 peer-checked:visible
                                 peer-focus:opacity-100

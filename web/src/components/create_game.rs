@@ -52,10 +52,21 @@ pub fn CreateGameButton() -> Element {
 
     rsx! {
         button {
-            class: "py-1 px-2 border whitespace-nowrap",
+            class: r#"
+            py-1
+            px-2
+            border
+            whitespace-nowrap
+            cursor-pointer
+            bg-radial
+            theme1:from-amber-300
+            theme1:to-red-600
+            theme1:border-red-600
+            theme1:text-red-900
+            "#,
             r#type: "button",
             onclick,
-            label { "Quickstart" }
+            "Quickstart"
         }
     }
 }
@@ -96,7 +107,17 @@ pub fn CreateGameForm() -> Element {
                 "Game name"
             }
             input {
-                class: "block placeholder-gray-900 focus:outline-none border w-half px-2 py-1 text-gray-900",
+                class: r#"
+                block
+                focus:outline-none
+                border
+                w-half
+                px-2
+                py-1
+                theme1:border-amber-600
+                theme1:text-amber-300
+                theme1:placeholder-amber-600
+                "#,
                 id: "game-name",
                 name: "game-name",
                 r#type: "text",
@@ -107,9 +128,20 @@ pub fn CreateGameForm() -> Element {
                 }
             }
             button {
-                class: "py-1 px-2 border whitespace-nowrap",
+                class: r#"
+                py-1
+                px-2
+                border
+                theme1:border-red-600
+                whitespace-nowrap
+                bg-radial
+                theme1:from-amber-300
+                theme1:to-red-600
+                theme1:text-red-900
+                cursor-pointer
+                "#,
                 r#type: "submit",
-                label { "Create game" }
+                "Create game"
             }
         }
     }

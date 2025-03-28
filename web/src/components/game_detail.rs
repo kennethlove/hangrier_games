@@ -142,7 +142,11 @@ fn GameStatusState() -> Element {
                     }
                     div {
                         class: "flex flex-row gap-2",
-                        GameEdit { identifier: g.identifier, name: g.name }
+                        GameEdit {
+                            identifier: g.identifier,
+                            name: g.name,
+                            icon_class: "fill-red-600"
+                        }
                         button {
                             class: "button border px-2 py-1",
                             onclick: next_step_handler,

@@ -25,7 +25,7 @@ async fn edit_game(game: EditGame) -> MutationResult<MutationValue, MutationErro
 }
 
 #[component]
-pub fn GameEdit(identifier: String, name: String) -> Element {
+pub fn GameEdit(identifier: String, name: String, icon_class: String) -> Element {
     let mut edit_game_signal: Signal<Option<EditGame>> = use_context();
     let title = format!("Edit {name}");
 
@@ -39,11 +39,11 @@ pub fn GameEdit(identifier: String, name: String) -> Element {
             class: "button cursor-pointer",
             title,
             onclick,
+            EditIcon { class: icon_class }
             label {
                 class: "sr-only",
                 "edit"
             }
-            EditIcon {}
         }
     }
 }
@@ -56,18 +56,12 @@ pub fn EditGameModal() -> Element {
         dialog {
             role: "confirm",
             open: edit_game_signal.read().clone().is_some(),
-            div { class: "fixed inset-0 bg-red-200/25 transition-opacity backdrop-blur-sm backgrop-grayscale" }
+            div { class: "fixed inset-0 backdrop-blur-sm backdrop-grayscale" }
             div {
                 class: "fixed inset-0 z-10 w-screen h-screen overflow-y-hidden",
                 div {
-                    class: "flex items-center gap-4 min-h-full justify-center",
-                    div {
-                        class: "relative transform overflow-hidden p-2",
-                        div {
-                            class: "mx-auto border p-2 bg-red-200",
-                            EditGameForm {}
-                        }
-                    }
+                    class: "flex items-center gap-8 min-h-full justify-center",
+                    EditGameForm {}
                 }
             }
         }
@@ -111,26 +105,24 @@ pub fn EditGameForm() -> Element {
 
     rsx! {
         form {
+            class: "mx-auto p-2 bg-stone-200 grid grid-col gap-4",
             onsubmit: save,
-            div {
-                class: "mb-2",
-                h1 {
-                    class: "block",
-                    "Edit game"
-                }
-                label {
-                    "Name",
+            h1 {
+                class: "block theme1:bg-red-900 p-2 text-stone-200 text-lg",
+                "Edit game"
+            }
+            label {
+                "Name",
 
-                    input {
-                        class: "border ml-2 px-2 py-1",
-                        r#type: "text",
-                        name: "name",
-                        value: name,
-                    }
+                input {
+                    class: "border ml-2 px-2 py-1",
+                    r#type: "text",
+                    name: "name",
+                    value: name,
                 }
             }
             div {
-                class: "flex justify-end gap-4",
+                class: "flex justify-end gap-2",
                 button {
                     class: "border px-2 py-1",
                     r#type: "submit",

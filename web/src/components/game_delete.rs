@@ -25,7 +25,7 @@ async fn delete_game(delete_game_info: DeleteGame) -> MutationResult<MutationVal
 }
 
 #[component]
-pub fn GameDelete(game_identifier: String, game_name: String) -> Element {
+pub fn GameDelete(game_identifier: String, game_name: String, icon_class: String) -> Element {
     let mut delete_game_signal: Signal<Option<DeleteGame>> = use_context();
     let title = format!("Delete {game_name}");
 
@@ -41,7 +41,7 @@ pub fn GameDelete(game_identifier: String, game_name: String) -> Element {
             class: "button cursor-pointer",
             title,
             onclick,
-            DeleteIcon {}
+            DeleteIcon { class: icon_class }
             label {
                 class: "sr-only",
                 "Delete"
@@ -84,36 +84,36 @@ pub fn DeleteGameModal() -> Element {
         dialog {
             role: "confirm",
             open: delete_game_signal.read().clone().is_some(),
-            div { class: "fixed inset-0 bg-red-200/25 transition-opacity backdrop-blur-sm backgrop-grayscale" }
+            div { class: "fixed inset-0 backdrop-blur-sm backdrop-grayscale" }
             div {
                 class: "fixed inset-0 z-10 w-screen h-screen overflow-y-hidden",
                 div {
-                    class: "flex items-center gap-4 min-h-full justify-center",
+                    class: "flex items-center gap-8 min-h-full justify-center",
                     div {
-                        class: "relative transform overflow-hidden p-2",
+                        class: "mx-auto p-2 bg-stone-200 grid grid-col gap-4",
+                        h1 {
+                            class: "block theme1:bg-red-900 p-2 text-stone-200 text-lg",
+                            "Delete game?"
+                        }
+                        p {
+                            class: "text-md",
+                            "Are you sure you want to delete ",
+                            br {},
+                            r#""{name}"?"#
+                        }
                         div {
-                            class: "mx-auto border p-2 bg-red-200",
-                            div {
-                                h1 {
-                                    class: "block",
-                                    "Delete game?"
-                                }
-                                p { r#"Are you sure you want to delete "{name}"?"#}
+                            class: "flex justify-end gap-2",
+                            button {
+                                class: "border px-2 py-1",
+                                r#type: "button",
+                                onclick: delete,
+                                "Yes"
                             }
-                            div {
-                                class: "flex justify-end gap-4",
-                                button {
-                                    class: "border px-2 py-1",
-                                    r#type: "button",
-                                    onclick: delete,
-                                    "Yes"
-                                }
-                                button {
-                                    class: "border px-2 py-1",
-                                    r#type: "button",
-                                    onclick: dismiss,
-                                    "No"
-                                }
+                            button {
+                                class: "border px-2 py-1",
+                                r#type: "button",
+                                onclick: dismiss,
+                                "No"
                             }
                         }
                     }

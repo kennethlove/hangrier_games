@@ -32,7 +32,19 @@ pub fn GamesList() -> Element {
 
     rsx! {
         div {
-            class: "flex flex-row gap-2 place-content-center py-2 mb-4 theme1:bg-green-100 theme2:bg-green-100/50",
+            class: r#"
+            flex
+            flex-col
+            flex-col-reverse
+            sm:flex-row
+            flex-wrap
+            sm:flex-nowrap
+            gap-2
+            place-content-center
+            py-2
+            mb-4
+            theme1:bg-transparent
+            "#,
             CreateGameButton {}
             CreateGameForm {}
         }
@@ -74,10 +86,13 @@ fn RefreshButton() -> Element {
     };
 
     rsx! {
-        button {
-            class: "border px-2 py-1",
-            onclick: onclick,
-            "Refresh"
+        div {
+            class: "text-center",
+            button {
+                class: "border px-2 py-1 cursor-pointer",
+                onclick: onclick,
+                "Refresh"
+            }
         }
     }
 }
@@ -87,29 +102,35 @@ pub fn GameListMember(game: Game) -> Element {
     let living_count = game.living_tributes().len();
     rsx! {
         li {
-            class: "block w-full border p-2 mb-4 bg-green-100 dark:bg-green-100/50",
+            class: "block w-full border p-2 mb-4 theme1:border-red-600",
             div {
                 class: "flex place-content-between",
                 h2 {
-                    class: "text-xl cinzel-font text-orange-700 dark:text-amber-500",
+                    class: "text-xl cinzel-font theme1:text-amber-300",
                     Link {
                         to: Routes::GamePage {
                             identifier: game.identifier.clone()
                         },
+                        title: r#"Play "{game.name}""#,
                         "{game.name}"
                     }
                 }
                 div {
                     class: "flex flex-row gap-2",
-                    GameEdit { identifier: game.identifier.clone(), name: game.name.clone() }
+                    GameEdit {
+                        identifier: game.identifier.clone(),
+                        name: game.name.clone(),
+                        icon_class: "theme1:fill-amber-600 size-4",
+                    }
                     GameDelete {
                         game_name: game.name.clone(),
-                        game_identifier: game.identifier.clone()
+                        game_identifier: game.identifier.clone(),
+                        icon_class: "theme1:fill-amber-600 size-4",
                     }
                 }
             }
             div {
-                class: "flex flex-row place-content-between",
+                class: "flex flex-row place-content-between text-xs theme1:text-stone-200",
                 p { "{living_count} / {game.tribute_count} tributes left" }
                 p { "Day {game.day.unwrap_or_default()}" }
                 p { "Status: {game.status}" }

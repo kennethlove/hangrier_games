@@ -55,20 +55,31 @@ pub fn App() -> Element {
         div {
             class: "{theme_signal.read()}",
             div {
-                class: "grid grid-flow-row min-v-full min-h-screen theme2:bg-green-900 theme1:bg-red-900 theme3:bg-blue-900 p-2 frame",
+                class: r#"
+                grid
+                grid-flow-row
+                min-v-full min-h-screen
+                theme1:bg-red-900
+                theme2:bg-green-900
+                theme3:bg-blue-900
+                transition
+                duration-250
+                p-2
+                frame
+                "#,
 
                 Router::<Routes> {}
 
                 footer {
-                    class: "text-xs text-center",
+                    class: "text-xs text-center theme1:text-stone-950",
                     p { dangerous_inner_html: "{copyright}" }
                     p {
-                        "three finger salute by Till Teenck from "
+                        "Three finger salute icon by "
                         a {
                             href: "https://thenounproject.com/browse/icons/term/three-finger-salute/",
-                            "Noun Project"
+                            "Till Teenck"
                         },
-                        "(CC BY 3.0)"
+                        " (CC BY 3.0)"
                     }
                     p {
                         "Mockingjay icons from "

@@ -284,7 +284,7 @@ pub fn GameDetails(game: Game) -> Element {
                         "Areas",
                     }
                     span {
-                        class: "sm:invisible transition group-open:rotate-180",
+                        class: "transition group-open:rotate-180",
                         svg {
                             class: "h-5 w-5 fill-none stroke-current theme1:group-open:stroke-amber-600",
                             view_box: "0 0 24 24",
@@ -323,7 +323,7 @@ pub fn GameDetails(game: Game) -> Element {
                         "Tributes"
                     }
                     span {
-                        class: "sm:invisible transition group-open:rotate-180",
+                        class: "transition group-open:rotate-180",
                         svg {
                             class: "h-5 w-5 fill-none stroke-current theme1:group-open:stroke-amber-600",
                             view_box: "0 0 24 24",
@@ -350,7 +350,6 @@ pub fn GameDetails(game: Game) -> Element {
                 theme1:to-red-200
                 theme1:from-red-900
                 "#,
-                open: true,
                 summary {
                     class: r#"
                     p-4
@@ -365,7 +364,7 @@ pub fn GameDetails(game: Game) -> Element {
                         "Day log"
                     }
                     span {
-                        class: "sm:invisible transition group-open:rotate-180",
+                        class: "transition group-open:rotate-180",
                         svg {
                             class: "h-5 w-5 fill-none stroke-current theme1:group-open:stroke-amber-600",
                             view_box: "0 0 24 24",

@@ -52,11 +52,12 @@ pub fn Navbar() -> Element {
                         label {
                             class: r#"px-2
                                 border border-transparent
-                                theme1:peer-focus:bg-amber-600
-                                theme1:peer-checked:bg-amber-600
-                                theme1:group-hover:bg-amber-600
+                                theme1:peer-focus:bg-amber-500
+                                theme1:peer-checked:bg-amber-500
+                                theme1:group-hover:bg-amber-500
                                 theme1:group-hover:text-red-900
                                 theme1:peer-focus:text-red-900
+                                theme1:peer-checked:text-red-900
                             "#,
                             r#for: "theme-switcher",
                             "Theme",

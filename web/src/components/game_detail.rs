@@ -260,6 +260,7 @@ pub fn GameDetails(game: Game) -> Element {
             gap-8
             lg:grid-cols-3
             2xl:grid-cols-5
+            pr-2
             "#,
             details {
                 class: r#"
@@ -273,14 +274,13 @@ pub fn GameDetails(game: Game) -> Element {
                 "#,
                 summary {
                     class: r#"
-                    p-4
                     flex
                     items-center
                     justify-between
                     cursor-pointer
                     "#,
                     h3 {
-                        class: "block text-xl mb-2 transition theme1:group-open:text-amber-600",
+                        class: "cinzel-font text-xl mb-2 transition theme1:group-open:text-amber-600",
                         "Areas",
                     }
                     span {
@@ -312,14 +312,13 @@ pub fn GameDetails(game: Game) -> Element {
                 "#,
                 summary {
                     class: r#"
-                    p-4
                     flex
                     items-center
                     justify-between
                     cursor-pointer
                     "#,
                     h3 {
-                        class: "block text-xl mb-2 transition theme1:group-open:text-amber-600",
+                        class: "cinzel-font text-xl mb-2 transition theme1:group-open:text-amber-600",
                         "Tributes"
                     }
                     span {
@@ -352,14 +351,13 @@ pub fn GameDetails(game: Game) -> Element {
                 "#,
                 summary {
                     class: r#"
-                    p-4
                     flex
                     items-center
                     justify-between
                     cursor-pointer
                     "#,
                     h3 {
-                        class: "block text-xl mb-2 transition theme1:group-open:text-amber-600",
+                        class: "cinzel-font text-xl mb-2 transition theme1:group-open:text-amber-600",
                         class: "text-xl mb-2",
                         "Day log"
                     }

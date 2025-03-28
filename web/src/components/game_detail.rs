@@ -178,7 +178,7 @@ fn GameStatusState() -> Element {
                 }
 
                 div {
-                    class: "flex flex-row place-content-between",
+                    class: "flex flex-row place-content-between pr-2",
                     p {
                         class: "theme1:text-stone-200",
                         span {

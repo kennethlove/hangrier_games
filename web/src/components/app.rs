@@ -60,7 +60,7 @@ pub fn App() -> Element {
                 grid-flow-row
                 min-v-full min-h-screen
                 theme1:bg-red-900
-                theme2:bg-green-900
+                theme2:bg-green-200
                 theme3:bg-blue-900
                 transition
                 duration-250
@@ -71,7 +71,7 @@ pub fn App() -> Element {
                 Router::<Routes> {}
 
                 footer {
-                    class: "text-xs text-center theme1:text-stone-950",
+                    class: "text-xs text-center theme1:text-stone-950 theme2:text-green-900",
                     p { dangerous_inner_html: "{copyright}" }
                     p {
                         "Three finger salute icon by "

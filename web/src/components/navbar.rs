@@ -20,26 +20,32 @@ pub fn Navbar() -> Element {
                 text-5xl
                 sm:text-6xl
                 cinzel-font
-                theme1:text-transparent
                 font-bold
                 bg-clip-text
-                bg-radial
+
+                theme1:bg-radial
+                theme1:text-transparent
                 theme1:from-amber-300
                 theme1:to-red-600
+
+                theme2:text-transparent
+                theme2:bg-linear-to-b
+                theme2:from-teal-500
+                theme2:to-green-400
                 "#,
                 Link { to: Routes::Home {}, "Hangry Games" }
             }
 
             nav {
-                class: "cinzel-font text-xl theme1:text-amber-500",
+                class: "cinzel-font text-xl theme1:text-amber-500 theme2:text-green-800",
                 ul {
                     class: "flex flex-row gap-16",
                     li {
-                        class: "px-2 hover:bg-amber-500 theme2:hover:text-green-900 theme1:hover:text-red-900 theme3:hover:text-blue-900",
+                        class: "px-2",
                         Link { to: Routes::Home {}, "Home" }
                     }
                     li {
-                        class: "px-2 hover:bg-amber-500 theme2:hover:text-green-900 theme1:hover:text-red-900 theme3:hover:text-blue-900",
+                        class: "px-2",
                         Link { to: Routes::GamesList {}, "Games" }
                     }
                     li {
@@ -47,17 +53,26 @@ pub fn Navbar() -> Element {
                         input {
                             id: "theme-switcher",
                             r#type: "checkbox",
-                            class: "peer sr-only"
+                            class: "peer sr-only",
                         }
                         label {
-                            class: r#"px-2
-                                border border-transparent
-                                theme1:peer-focus:bg-amber-500
-                                theme1:peer-checked:bg-amber-500
-                                theme1:group-hover:bg-amber-500
-                                theme1:group-hover:text-red-900
-                                theme1:peer-focus:text-red-900
-                                theme1:peer-checked:text-red-900
+                            class: r#"
+                            px-2
+                            cursor-pointer
+
+                            theme1:peer-focus:bg-amber-500
+                            theme1:peer-checked:bg-amber-500
+                            theme1:group-hover:bg-amber-500
+                            theme1:group-hover:text-red-900
+                            theme1:peer-focus:text-red-900
+                            theme1:peer-checked:text-red-900
+
+                            theme2:group-hover:bg-teal-500
+                            theme2:group-hover:text-green-200
+                            theme2:peer-focus:bg-teal-500
+                            theme2:peer-focus:text-green-200
+                            theme2:peer-checked:bg-teal-500
+                            theme2:peer-checked:text-green-200
                             "#,
                             r#for: "theme-switcher",
                             "Theme",
@@ -72,13 +87,14 @@ pub fn Navbar() -> Element {
                                 invisible
                                 group-hover:opacity-100
                                 group-hover:visible
-                                bg-linear-to-b
-                                theme1:from-amber-500
-                                theme1:to-amber-700
                                 peer-checked:opacity-100
                                 peer-checked:visible
                                 peer-focus:opacity-100
                                 peer-focus:visible
+                                theme1:bg-linear-to-b
+                                theme1:from-amber-500
+                                theme1:to-amber-700
+                                theme2:bg-teal-500
                             "#,
 
                             div {

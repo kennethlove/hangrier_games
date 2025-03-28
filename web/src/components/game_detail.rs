@@ -144,12 +144,12 @@ fn GameStatusState() -> Element {
                             GameEdit {
                                 identifier: g.identifier,
                                 name: g.name,
-                                icon_class: "fill-amber-600 size-4"
+                                icon_class: "theme1:fill-amber-600 size-4"
                             }
                         }
                     }
                     div {
-                        class: "flex flex-row gap-2 place-content-center sm:place-content-end flex-grow",
+                        class: "flex flex-row flex-grow gap-2 place-content-center sm:place-content-end",
                         button {
                             class: r#"
                             py-1

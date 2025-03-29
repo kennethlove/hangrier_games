@@ -21,6 +21,8 @@ pub fn Home() -> Element {
             theme2:bg-linear-to-b
             theme2:from-teal-600
             theme2:to-green-400
+
+            theme3:text-slate-300
             "#,
             "May the odds be ever in your favor!"
         }

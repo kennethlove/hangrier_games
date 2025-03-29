@@ -21,32 +21,44 @@ pub fn Navbar() -> Element {
                 sm:text-6xl
                 cinzel-font
                 font-bold
-                bg-clip-text
 
                 theme1:bg-radial
+                theme1:bg-clip-text
                 theme1:text-transparent
                 theme1:from-amber-300
                 theme1:to-red-600
 
                 theme2:text-transparent
                 theme2:bg-linear-to-b
+                theme2:bg-clip-text
                 theme2:from-teal-500
                 theme2:to-green-400
+
+                theme3:text-slate-950
+                theme3:drop-shadow-lg
                 "#,
                 Link { to: Routes::Home {}, "Hangry Games" }
             }
 
             nav {
-                class: "cinzel-font text-xl theme1:text-amber-500 theme2:text-green-800",
+                class: "cinzel-font text-xl theme1:text-amber-500 theme2:text-green-800 theme3:text-slate-800",
                 ul {
                     class: "flex flex-row gap-16",
                     li {
                         class: "px-2",
-                        Link { to: Routes::Home {}, "Home" }
+                        Link {
+                            class: "theme3:hover:border-b-1",
+                            to: Routes::Home {},
+                            "Home"
+                        }
                     }
                     li {
                         class: "px-2",
-                        Link { to: Routes::GamesList {}, "Games" }
+                        Link {
+                            class: "theme3:hover:border-b-1",
+                            to: Routes::GamesList {},
+                            "Games"
+                        }
                     }
                     li {
                         class: "relative group inline-block",
@@ -73,6 +85,10 @@ pub fn Navbar() -> Element {
                             theme2:peer-focus:text-green-200
                             theme2:peer-checked:bg-teal-500
                             theme2:peer-checked:text-green-200
+
+                            theme3:group-hover:border-b-1
+                            theme3:peer-focus:border-b-1
+                            theme3:peer-checked:border-b-1
                             "#,
                             r#for: "theme-switcher",
                             "Theme",
@@ -95,6 +111,8 @@ pub fn Navbar() -> Element {
                                 theme1:from-amber-500
                                 theme1:to-amber-700
                                 theme2:bg-teal-500
+                                theme3:bg-slate-600
+                                theme3:border
                             "#,
 
                             div {

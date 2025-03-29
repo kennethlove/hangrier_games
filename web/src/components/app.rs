@@ -58,20 +58,21 @@ pub fn App() -> Element {
                 class: r#"
                 grid
                 grid-flow-row
-                min-v-full min-h-screen
-                theme1:bg-red-900
-                theme2:bg-green-200
-                theme3:bg-blue-900
+                min-v-full
+                min-h-screen
+                frame
                 transition
                 duration-250
                 p-2
-                frame
+                theme1:bg-red-900
+                theme2:bg-green-200
+                theme3:bg-slate-600
                 "#,
 
                 Router::<Routes> {}
 
                 footer {
-                    class: "text-xs text-center theme1:text-stone-950 theme2:text-green-900",
+                    class: "text-xs text-center theme1:text-stone-950 theme2:text-green-900 theme3:text-slate-800",
                     p { dangerous_inner_html: "{copyright}" }
                     p {
                         "Three finger salute icon by "

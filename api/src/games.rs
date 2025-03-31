@@ -11,6 +11,8 @@ use game::games::{Game, GameStatus};
 use game::items::Item;
 use game::messages::{get_all_messages, GameMessage};
 use game::tributes::Tribute;
+use ollama_rs::generation::completion::request::GenerationRequest;
+use ollama_rs::Ollama;
 use serde::{Deserialize, Serialize};
 use shared::EditGame;
 use shared::GameArea;
@@ -27,6 +29,7 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
         .route("/", get(game_list).post(game_create))
         .route("/{game_identifier}", get(game_detail).delete(game_delete).put(game_update))
         .route("/{game_identifier}/areas", get(game_areas))
+        .route("/{game_identifier}/summarize", get(game_summary))
         .route("/{game_identifier}/log/{day}", get(game_logs))
         .route("/{game_identifier}/log/{day}/{tribute_identifier}", get(tribute_logs))
         .route("/{game_identifier}/next", put(next_step))
@@ -298,7 +301,7 @@ SELECT (
 pub async fn game_tributes(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
     let mut game_day = DATABASE.query(format!("SELECT day FROM game WHERE identifier = '{identifier}'")).await.unwrap();
     let game_day: Option<i64> = game_day.take("day").unwrap();
-    let game_day: i64 = game_day.unwrap_or(0);
+    let _game_day: i64 = game_day.unwrap_or(0);
 
 
     let response = DATABASE.query(
@@ -359,15 +362,15 @@ RETURN count(
                     }
                     _ => {
                         if let Some(mut game) = get_full_game(&identifier).await {
-                            let game = game.run_day_night_cycle().await;
+                            // Run day
+                            let mut game = game.run_day_night_cycle(true).await;
+                            save_game(&game).await;
 
-                            let updated_game: Option<Game> = save_game(game).await;
+                            // Run night
+                            let game = game.run_day_night_cycle(false).await;
+                            save_game(&game).await;
 
-                            if let Some(game) = updated_game {
-                                (StatusCode::OK, Json(GameResponse { game: Some(game) })).into_response()
-                            } else {
-                                (StatusCode::NOT_FOUND, Json(GameResponse { game: None })).into_response()
-                            }
+                            (StatusCode::OK, Json(GameResponse { game: Some(game) })).into_response()
                         } else {
                             (StatusCode::NOT_FOUND, Json(GameResponse::default())).into_response()
                         }
@@ -406,8 +409,9 @@ WHERE identifier = "{identifier}";"#))
 }
 
 
-async fn save_game(mut game: Game) -> Option<Game> {
+async fn save_game(game: &Game) -> Option<Game> {
     let game_identifier = RecordId::from(("game", game.identifier.clone()));
+    let mut saved_game = game.clone();
 
 
     if let Ok(logs) = get_all_messages() {
@@ -422,7 +426,7 @@ async fn save_game(mut game: Game) -> Option<Game> {
     }
 
     let areas = game.areas.clone();
-    game.areas = vec![];
+    saved_game.areas = vec![];
 
     for mut area in areas {
         let id = RecordId::from(("area", area.identifier.clone()));
@@ -438,7 +442,7 @@ async fn save_game(mut game: Game) -> Option<Game> {
     }
 
     let tributes = game.tributes.clone();
-    game.tributes = vec![];
+    saved_game.tributes = vec![];
 
     for mut tribute in tributes {
         let id = RecordId::from(("tribute", tribute.identifier.clone()));
@@ -456,7 +460,7 @@ async fn save_game(mut game: Game) -> Option<Game> {
 
     DATABASE
         .update::<Option<Game>>(game_identifier.clone())
-        .content(game)
+        .content(saved_game)
         .await.expect("Failed to update game")
 }
 
@@ -533,6 +537,39 @@ async fn tribute_logs(Path((game_identifier, day, tribute_identifier)): Path<(St
         Err(err) => {
             eprintln!("{err:?}");
             Json(vec![])
+        }
+    }
+}
+
+async fn game_summary(Path(game_identifier): Path<String>) -> Json<String> {
+    match DATABASE.query(
+        format!(r#"
+        SELECT *
+        FROM message
+        WHERE string::starts_with(subject, "{game_identifier}")
+        ORDER BY timestamp;
+        "#)
+    ).await {
+        Ok(mut logs) => {
+            let _logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
+            println!("Logs");
+            let ollama = Ollama::new("http://127.0.0.1".to_string(), 11434);
+            println!("ollama");
+            let model = "gemma3:1b".to_string();
+            let prompt = "Why is the sky blue?".to_string();
+
+            let res = ollama.generate(GenerationRequest::new(model, prompt)).await;
+            println!("response");
+
+            if let Ok(res) = res {
+                Json(String::from(res.response))
+            } else {
+                Json(String::new())
+            }
+        }
+        Err(err) => {
+            eprintln!("{err:?}");
+            Json(String::new())
         }
     }
 }

@@ -1,5 +1,5 @@
 [workspace]
-members = [ "game", "shared", "web", "api"]
+members = [ "game", "shared", "web", "api", "announcers"]
 resolver = "2"
 
 [profile]

@@ -1,11 +1,11 @@
-use dioxus::dioxus_core::AttributeValue;
-use dioxus::prelude::*;
 use crate::components::icons::mockingjay::Mockingjay;
 use crate::components::icons::mockingjay_arrow::MockingjayArrow;
 use crate::components::icons::mockingjay_flight::MockingjayFlight;
 use crate::components::icons::three_finger_salute::ThreeFingerSalute;
 use crate::routes::Routes;
 use crate::storage::{use_persistent, AppState, Colorscheme};
+use dioxus::dioxus_core::AttributeValue;
+use dioxus::prelude::*;
 
 #[component]
 pub fn Navbar() -> Element {
@@ -153,7 +153,10 @@ pub fn Navbar() -> Element {
                 }
             }
         }
-        Outlet::<Routes> {}
+        div {
+            class: "mx-auto min-w-full max-w-full sm:max-w-3/4",
+            Outlet::<Routes> {}
+        }
     }
 }
 

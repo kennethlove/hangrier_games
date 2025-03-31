@@ -1,14 +1,14 @@
-use dioxus::dioxus_core::AttributeValue;
-use dioxus::document::Script;
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::game_edit::EditGameModal;
 use crate::components::tribute_edit::EditTributeModal;
 use crate::routes::Routes;
+use crate::storage::{use_persistent, AppState, Colorscheme};
+use dioxus::dioxus_core::AttributeValue;
+use dioxus::document::Script;
 use dioxus::prelude::*;
 use dioxus_query::prelude::use_init_query_client;
 use game::games::Game;
 use shared::{DeleteGame, EditGame, EditTribute};
-use crate::storage::{use_persistent, AppState, Colorscheme};
 
 #[component]
 pub fn App() -> Element {
@@ -57,7 +57,6 @@ pub fn App() -> Element {
             div {
                 class: r#"
                 grid
-                grid-flow-row
                 min-v-full
                 min-h-screen
                 frame

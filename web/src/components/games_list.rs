@@ -1,11 +1,11 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
+use crate::components::game_edit::GameEdit;
 use crate::components::{CreateGameButton, CreateGameForm, DeleteGameModal, GameDelete};
 use crate::routes::Routes;
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
 use game::games::Game;
-use crate::components::game_edit::GameEdit;
 
 async fn fetch_games(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::AllGames) = keys.first() {
@@ -54,7 +54,7 @@ pub fn GamesList() -> Element {
                 rsx! {
                     if games.is_empty() {
                         p {
-                            class: "pb-4",
+                            class: "pb-4 text-center",
                             "No games yet"
                         }
                     } else {

@@ -1,5 +1,6 @@
 use crate::tributes::{tribute_create, tribute_delete, tribute_detail, tribute_record_create, tribute_update, TributeOwns};
 use crate::DATABASE;
+use announcers::summarize;
 use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
@@ -11,8 +12,6 @@ use game::games::{Game, GameStatus};
 use game::items::Item;
 use game::messages::{get_all_messages, GameMessage};
 use game::tributes::Tribute;
-use ollama_rs::generation::completion::request::GenerationRequest;
-use ollama_rs::Ollama;
 use serde::{Deserialize, Serialize};
 use shared::EditGame;
 use shared::GameArea;
@@ -30,6 +29,7 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
         .route("/{game_identifier}", get(game_detail).delete(game_delete).put(game_update))
         .route("/{game_identifier}/areas", get(game_areas))
         .route("/{game_identifier}/summarize", get(game_summary))
+        .route("/{game_identifier}/summarize/{day}", get(game_day_summary))
         .route("/{game_identifier}/log/{day}", get(game_logs))
         .route("/{game_identifier}/log/{day}/{tribute_identifier}", get(tribute_logs))
         .route("/{game_identifier}/next", put(next_step))
@@ -551,24 +551,52 @@ async fn game_summary(Path(game_identifier): Path<String>) -> Json<String> {
         "#)
     ).await {
         Ok(mut logs) => {
-            let _logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
-            println!("Logs");
-            let ollama = Ollama::new("http://127.0.0.1".to_string(), 11434);
-            println!("ollama");
-            let model = "gemma3:1b".to_string();
-            let prompt = "Why is the sky blue?".to_string();
+            let logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
+            let logs = logs.into_iter().map(|l| l.content).collect::<Vec<String>>().join("\n");
+            if !logs.is_empty() {
+                let res = summarize(&logs).await;
 
-            let res = ollama.generate(GenerationRequest::new(model, prompt)).await;
-            println!("response");
-
-            if let Ok(res) = res {
-                Json(String::from(res.response))
+                if let Ok(res) = res {
+                    Json(res)
+                } else {
+                    Json(String::new())
+                }
             } else {
                 Json(String::new())
             }
         }
         Err(err) => {
-            eprintln!("{err:?}");
+            Json(String::new())
+        }
+    }
+}
+
+async fn game_day_summary(Path((game_identifier, day)): Path<(String, String)>) -> Json<String> {
+    match DATABASE.query(
+        format!(r#"
+        SELECT *
+        FROM message
+        WHERE string::starts_with(subject, "{game_identifier}")
+        AND game_day = {day}
+        ORDER BY timestamp;
+        "#)
+    ).await {
+        Ok(mut logs) => {
+            let logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
+            let logs = logs.into_iter().map(|l| l.content).collect::<Vec<String>>().join("\n");
+            if !logs.is_empty() {
+                let res = summarize(&logs).await;
+
+                if let Ok(res) = res {
+                    Json(res)
+                } else {
+                    Json(String::new())
+                }
+            } else {
+                Json(String::new())
+            }
+        }
+        Err(err) => {
             Json(String::new())
         }
     }

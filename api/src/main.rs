@@ -117,7 +117,7 @@ async fn main() {
                         ))
                     }
                 }))
-                .timeout(Duration::from_secs(10))
+                .timeout(Duration::from_secs(30))
                 .layer(TraceLayer::new_for_http())
                 .layer(cors_layer)
                 .into_inner()

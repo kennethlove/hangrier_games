@@ -27,7 +27,7 @@ pub fn App() -> Element {
 
     let edit_game_signal: Signal<Option<EditGame>> = use_signal(|| None);
     use_context_provider(|| edit_game_signal);
-    
+
     let edit_tribute_signal: Signal<Option<EditTribute>> = use_signal(|| None);
     use_context_provider(|| edit_tribute_signal);
 
@@ -66,6 +66,10 @@ pub fn App() -> Element {
                 theme1:bg-red-900
                 theme2:bg-green-200
                 theme3:bg-slate-600
+                theme2:bg-[url('/assets/waves.svg')]
+                theme2:bg-no-repeat
+                theme2:bg-origin-border
+                theme2:bg-bottom
                 "#,
 
                 Router::<Routes> {}
@@ -96,4 +100,3 @@ pub fn App() -> Element {
         }
     }
 }
-

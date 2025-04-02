@@ -4,7 +4,7 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use shared::DeleteGame;
 use std::ops::Deref;
-use crate::components::icons;
+use crate::components::Button;
 use crate::components::icons::delete::DeleteIcon;
 
 async fn delete_game(delete_game_info: DeleteGame) -> MutationResult<MutationValue, MutationError> {
@@ -37,8 +37,8 @@ pub fn GameDelete(game_identifier: String, game_name: String, icon_class: String
     };
 
     rsx! {
-        button {
-            class: "button cursor-pointer",
+        Button {
+            extra_classes: Some("border-none".to_string()),
             title,
             onclick,
             DeleteIcon { class: icon_class }
@@ -55,7 +55,7 @@ pub fn DeleteGameModal() -> Element {
     let mut delete_game_signal: Signal<Option<DeleteGame>> = use_context();
     let delete_game_info = delete_game_signal.read().clone();
     let mutate = use_mutation(delete_game);
-    
+
     let name = {
         if let Some(details) = delete_game_info.clone() {
             details.1
@@ -79,7 +79,7 @@ pub fn DeleteGameModal() -> Element {
             });
         }
     };
-    
+
     rsx! {
         dialog {
             role: "confirm",
@@ -90,9 +90,28 @@ pub fn DeleteGameModal() -> Element {
                 div {
                     class: "flex items-center gap-8 min-h-full justify-center",
                     div {
-                        class: "mx-auto p-2 bg-stone-200 grid grid-col gap-4",
+                        class: r#"
+                        mx-auto
+                        p-2
+                        grid
+                        grid-col
+                        gap-4
+                        theme1:bg-stone-200
+                        theme1:text-stone-900
+                        theme2:bg-green-200
+                        theme1:text-green-900
+                        "#,
+
                         h1 {
-                            class: "block theme1:bg-red-900 p-2 text-stone-200 text-lg",
+                            class: r#"
+                            block
+                            p-2
+                            text-lg
+                            theme1:bg-red-900
+                            theme1:text-stone-200
+                            theme2:bg-green-800
+                            theme2:text-green-200
+                            "#,
                             "Delete game?"
                         }
                         p {
@@ -103,15 +122,11 @@ pub fn DeleteGameModal() -> Element {
                         }
                         div {
                             class: "flex justify-end gap-2",
-                            button {
-                                class: "border px-2 py-1",
-                                r#type: "button",
+                            Button {
                                 onclick: delete,
                                 "Yes"
                             }
-                            button {
-                                class: "border px-2 py-1",
-                                r#type: "button",
+                            Button {
                                 onclick: dismiss,
                                 "No"
                             }

@@ -1,6 +1,5 @@
 use crate::API_HOST;
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
-use crate::components::full_game_log::FullGameLog;
 use crate::components::full_game_log::GameDayLog;
 use crate::components::game_areas::GameAreaList;
 use crate::components::game_day_summary::GameDaySummary;
@@ -378,7 +377,46 @@ pub fn GameDetails(game: Game) -> Element {
                         }
                     }
                 }
-                FullGameLog { day: game.day.unwrap_or_default() }
+                GameDayLog { day: game.day.unwrap_or_default() }
+            }
+
+            details {
+                class: r#"
+                px-2
+                group
+                transition
+                duration-500
+                theme1:bg-red-900
+                theme1:to-red-200
+                theme1:from-red-900
+                "#,
+                summary {
+                    class: r#"
+                    flex
+                    items-center
+                    justify-between
+                    cursor-pointer
+                    "#,
+                    h3 {
+                        class: "cinzel-font text-xl mb-2 transition theme1:group-open:text-amber-600",
+                        class: "text-xl mb-2",
+                        "Day summary"
+                    }
+                    span {
+                        class: "transition group-open:rotate-180",
+                        svg {
+                            class: "h-5 w-5 fill-none stroke-current theme1:group-open:stroke-amber-600",
+                            view_box: "0 0 24 24",
+                            path {
+                                stroke_linecap: "round",
+                                stroke_linejoin: "round",
+                                stroke_width: "2",
+                                d: "M19 9l-7 7-7-7"
+                            }
+                        }
+                    }
+                }
+                GameDaySummary { day: game.day.unwrap_or_default() }
             }
         }
     }

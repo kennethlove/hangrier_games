@@ -5,6 +5,7 @@ use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use shared::EditGame;
 use std::ops::Deref;
 use crate::components::icons::edit::EditIcon;
+use crate::components::Button;
 
 async fn edit_game(game: EditGame) -> MutationResult<MutationValue, MutationError> {
     let identifier = game.0.clone();
@@ -35,8 +36,8 @@ pub fn GameEdit(identifier: String, name: String, icon_class: String) -> Element
     };
 
     rsx! {
-        button {
-            class: "button cursor-pointer",
+        Button {
+            extra_classes: "border-none",
             title,
             onclick,
             EditIcon { class: icon_class }
@@ -96,7 +97,7 @@ pub fn EditGameForm() -> Element {
                 edit_game_signal.set(Some(edit_game.clone()));
 
                 if let MutationResult::Ok(MutationValue::GameUpdated(identifier)) = mutate.result().deref() {
-                    client.invalidate_queries(&[QueryKey::Game(identifier.clone())]);
+                    client.invalidate_queries(&[QueryKey::Game(identifier.clone()), QueryKey::Games]);
                     edit_game_signal.set(None);
                 }
             });
@@ -105,10 +106,28 @@ pub fn EditGameForm() -> Element {
 
     rsx! {
         form {
-            class: "mx-auto p-2 bg-stone-200 grid grid-col gap-4",
+            class: r#"
+            mx-auto
+            p-2
+            grid
+            grid-col
+            gap-4
+            theme1:bg-stone-200
+            theme1:text-stone-900
+            theme2:bg-green-200
+            theme1:text-green-900
+            "#,
             onsubmit: save,
             h1 {
-                class: "block theme1:bg-red-900 p-2 text-stone-200 text-lg",
+                class: r#"
+                block
+                p-2
+                text-lg
+                theme1:bg-red-900
+                theme1:text-stone-200
+                theme2:bg-green-800
+                theme2:text-green-200
+                "#,
                 "Edit game"
             }
             label {
@@ -123,15 +142,12 @@ pub fn EditGameForm() -> Element {
             }
             div {
                 class: "flex justify-end gap-2",
-                button {
-                    class: "border px-2 py-1",
+                Button {
                     r#type: "submit",
                     "Update"
                 }
-                button {
-                    class: "border px-2 py-1",
+                Button {
                     onclick: dismiss,
-                    r#type: "button",
                     "Cancel"
                 }
             }

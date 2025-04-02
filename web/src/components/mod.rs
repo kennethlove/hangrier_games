@@ -38,3 +38,6 @@ pub(crate) use tribute_detail::TributeDetail;
 
 mod game_day_summary;
 pub(crate) use game_day_summary::GameDaySummary;
+
+mod button;
+pub(crate) use button::Button;

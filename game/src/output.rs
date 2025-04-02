@@ -13,10 +13,12 @@ use indefinite::indefinite_capitalized;
 #[allow(dead_code)]
 pub enum GameOutput {
     GameDayStart(u32),
+    GameDayEnd(u32),
     FirstDayStart,
     FeastDayStart,
     TributesLeft(u32),
     GameNightStart(u32),
+    GameNightEnd(u32),
     DailyDeathAnnouncement(u32),
     DeathAnnouncement(Tribute),
     NoOneWins,
@@ -80,6 +82,9 @@ impl Display for GameOutput {
             GameOutput::GameDayStart(day_number) => {
                 write!(f, "=== ☀️ Day {} begins! ===", day_number)
             }
+            GameOutput::GameDayEnd(day_number) => {
+                write!(f, "=== ☀️ Day {} ends! ===", day_number)
+            }
             GameOutput::FirstDayStart => {
                 write!(f, "=== 🎉 The Hunger Games begin! 🎉 ===")
             }
@@ -91,6 +96,9 @@ impl Display for GameOutput {
             }
             GameOutput::GameNightStart(day_number) => {
                 write!(f, "=== 🌙 Night {} begins ===", day_number)
+            }
+            GameOutput::GameNightEnd(day_number) => {
+                write!(f, "=== 🌙 Night {} ends ===", day_number)
             }
             GameOutput::DailyDeathAnnouncement(death_count) => {
                 write!(f, "=== 💀 Tributes dead: {} ===", death_count)

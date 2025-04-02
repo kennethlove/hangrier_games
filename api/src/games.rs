@@ -1,11 +1,11 @@
 use crate::tributes::{tribute_create, tribute_delete, tribute_detail, tribute_record_create, tribute_update, TributeOwns};
 use crate::DATABASE;
-use announcers::summarize;
+use announcers::{summarize, summarize_stream};
 use axum::extract::Path;
 use axum::http::StatusCode;
-use axum::response::IntoResponse;
+use axum::response::{IntoResponse, Sse};
 use axum::routing::{get, put};
-use axum::Json;
+use axum::{BoxError, Json};
 use axum::Router;
 use game::areas::{Area, AreaDetails};
 use game::games::{Game, GameStatus};
@@ -16,20 +16,25 @@ use serde::{Deserialize, Serialize};
 use shared::EditGame;
 use shared::GameArea;
 use std::collections::HashMap;
+use std::convert::Infallible;
+use std::fmt::Result;
 use std::str::FromStr;
 use std::sync::LazyLock;
+use axum::response::sse::Event;
 use strum::IntoEnumIterator;
 use surrealdb::sql::Thing;
 use surrealdb::RecordId;
 use uuid::Uuid;
+use futures::stream::BoxStream;
+use futures::StreamExt;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
         .route("/", get(game_list).post(game_create))
         .route("/{game_identifier}", get(game_detail).delete(game_delete).put(game_update))
         .route("/{game_identifier}/areas", get(game_areas))
-        .route("/{game_identifier}/summarize", get(game_summary))
         .route("/{game_identifier}/summarize/{day}", get(game_day_summary))
+        .route("/{game_identifier}/summarize", get(game_summary))
         .route("/{game_identifier}/log/{day}", get(game_logs))
         .route("/{game_identifier}/log/{day}/{tribute_identifier}", get(tribute_logs))
         .route("/{game_identifier}/next", put(next_step))
@@ -408,7 +413,6 @@ WHERE identifier = "{identifier}";"#))
 
 }
 
-
 async fn save_game(game: &Game) -> Option<Game> {
     let game_identifier = RecordId::from(("game", game.identifier.clone()));
     let mut saved_game = game.clone();
@@ -541,36 +545,6 @@ async fn tribute_logs(Path((game_identifier, day, tribute_identifier)): Path<(St
     }
 }
 
-async fn game_summary(Path(game_identifier): Path<String>) -> Json<String> {
-    match DATABASE.query(
-        format!(r#"
-        SELECT *
-        FROM message
-        WHERE string::starts_with(subject, "{game_identifier}")
-        ORDER BY timestamp;
-        "#)
-    ).await {
-        Ok(mut logs) => {
-            let logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
-            let logs = logs.into_iter().map(|l| l.content).collect::<Vec<String>>().join("\n");
-            if !logs.is_empty() {
-                let res = summarize(&logs).await;
-
-                if let Ok(res) = res {
-                    Json(res)
-                } else {
-                    Json(String::new())
-                }
-            } else {
-                Json(String::new())
-            }
-        }
-        Err(err) => {
-            Json(String::new())
-        }
-    }
-}
-
 async fn game_day_summary(Path((game_identifier, day)): Path<(String, String)>) -> Json<String> {
     match DATABASE.query(
         format!(r#"
@@ -600,4 +574,63 @@ async fn game_day_summary(Path((game_identifier, day)): Path<(String, String)>) 
             Json(String::new())
         }
     }
+}
+
+async fn game_summary(Path(game_identifier): Path<String>) -> impl IntoResponse {
+    let result = DATABASE.query(
+        format!(r#"
+        SELECT *
+        FROM message
+        WHERE string::starts_with(subject, "{game_identifier}")
+        ORDER BY timestamp;
+        "#)
+    ).await;
+
+    let stream = match result {
+        Ok(mut result) => {
+            let logs: Vec<GameMessage> = match result.take(0) {
+                Ok(logs) => logs,
+                Err(e) => {
+                    eprintln!("Error taking logs: {}", e);
+                    return Sse::new(async_stream::stream! {
+                        yield Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "Error taking logs")) as BoxError);
+                    }.boxed());
+                }
+            };
+
+            let logs = logs.into_iter()
+                .map(|l| l.content)
+                .collect::<Vec<String>>()
+                .join("\n");
+
+            if !logs.is_empty() {
+                let text_stream = summarize_stream(&logs).await;
+
+                // Create a new stream that converts String results to Event objects
+                let event_stream = async_stream::stream! {
+                    let mut stream = text_stream;
+                    while let Some(result) = stream.next().await {
+                        match result {
+                            Ok(text) => yield Ok(Event::default().data(text)),
+                            Err(e) => yield Ok(Event::default().data(format!("Error: {}", e)))
+                        }
+                    }
+                };
+
+                event_stream.boxed()
+            } else {
+                async_stream::stream! {
+                    yield Ok(Event::default().data("No logs found"));
+                }.boxed()
+            }
+        }
+        Err(e) => {
+            eprintln!("Error querying logs: {}", e);
+            async_stream::stream! {
+                yield Ok(Event::default().data(format!("Error querying logs: {}", e)));
+            }.boxed()
+        }
+    };
+
+    Sse::new(stream)
 }

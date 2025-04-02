@@ -154,13 +154,12 @@ impl Game {
                         format!("{}", GameOutput::FeastDayStart),
                     ).expect("");
                 },
-                _ => {
-                    add_game_message(
-                        self.identifier.as_str(),
-                        format!("{}", GameOutput::GameDayStart(self.clone().day.unwrap())),
-                    ).expect("");
-                }
+                _ => {}
             }
+            add_game_message(
+                self.identifier.as_str(),
+                format!("{}", GameOutput::GameDayStart(self.clone().day.unwrap())),
+            ).expect("");
         } else {
             add_game_message(
                 self.identifier.as_str(),
@@ -188,6 +187,18 @@ impl Game {
             self.identifier.as_str(),
             format!("{}", GameOutput::TributesLeft(self.living_tributes().len() as u32)),
         ).expect("");
+
+        if day {
+            add_game_message(
+                self.identifier.as_str(),
+                format!("{}", GameOutput::GameDayEnd(self.clone().day.unwrap())),
+            ).expect("");
+        } else {
+            add_game_message(
+                self.identifier.as_str(),
+                format!("{}", GameOutput::GameNightEnd(self.clone().day.unwrap())),
+            ).expect("");
+        }
 
         self.clone()
     }

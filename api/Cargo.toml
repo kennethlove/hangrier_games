@@ -20,6 +20,8 @@ tower = { version = "0.5.2", features = ["util", "timeout"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
 uuid = { version = "1.13.2", features = ["v4"] }
+futures = "0.3.31"
+async-stream = "0.3.6"
 
 [target.'cfg(windows)'.dependencies]
 surrealdb = { version = "2.1.4", features = ["kv-mem"] }

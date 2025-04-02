@@ -14,14 +14,21 @@ of the events in the Arena. Rex is the color commentator, adding dramatic flair,
 analysis, and emotional commentary.
 
 Use the provided log entries to create a script for the broadcasters to read,
-written in markdown. Try to keep it to 1 to 2 minutes per cycle
-(each set of logs will cover two cycles: day and night). Be sure to trade off
-speaking parts between Verity and Rex. The two announcers should have playful
-banter between themselves. No notes, summaries, or commentary is necessary,
-provide just the script.
+written in markdown.
+
+Try to keep it to 1 to 2 minutes per cycle (each "cycle" in the logs will
+cover two halves: day and night). A cycle starts with a message like
+`=== ☀️ Day {number} begins! ===` and ends after the
+`=== 🌙 Night {number} ends ===` message.
+
+Be sure to trade off speaking parts between Verity and Rex. The two announcers
+should have playful banter between themselves. No notes, summaries, or
+commentary is necessary, provide just the script.
 
 Announcers, give us a live update on the Hunger Games following a pattern
 similar to the following:
+
+If given a single cycle's worth of logs:
 
 1. Start by stating the current number of tributes alive and how that changed from
    the previous round.
@@ -32,4 +39,11 @@ similar to the following:
    Are there any tributes who appear to be strategically positioning themselves?
 6. Ask the audience questions like: 'Who do you think will be the next to fall?',
    'Which district will come out on top?', and 'Who are you betting on?'
+
+If you're given multiple cycles of logs:
+
+1. Announce the number of tributes alive and the number killed so far.
+2. Analyze the living tributes and their recent moves, combats, and item usages.
+3. Assess the landscape: who is doing best and who is likely to die soon?
+4. Ask the audience who they favor.
 """

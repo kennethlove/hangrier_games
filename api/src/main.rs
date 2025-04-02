@@ -117,7 +117,7 @@ async fn main() {
                         ))
                     }
                 }))
-                .timeout(Duration::from_secs(30))
+                .timeout(Duration::from_secs(10))
                 .layer(TraceLayer::new_for_http())
                 .layer(cors_layer)
                 .into_inner()
@@ -127,4 +127,3 @@ async fn main() {
     tracing::info!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, router).await.unwrap();
 }
-

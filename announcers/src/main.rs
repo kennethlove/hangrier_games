@@ -1,12 +1,7 @@
-use ollama_rs::generation::completion::request::GenerationRequest;
-use ollama_rs::Ollama;
-
-use announcers::{prompt, summarize, MODEL};
+use announcers::{summarize, summarize_stream};
 
 #[tokio::main]
 async fn main() {
-    let model = MODEL.to_string();
-
     let log = r#"
 === ☀️ Day 2 begins! ===
 === 📌 Tributes alive: 23 ===
@@ -82,5 +77,5 @@ async fn main() {
 === 📌 Tributes alive: 23 ===
 "#;
 
-    println!("{}", summarize(log).await.unwrap());
+    println!("{:?}", summarize_stream(log).await);
 }

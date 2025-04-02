@@ -112,10 +112,8 @@ impl Game {
             .cloned()
     }
 
-    pub async fn run_day_night_cycle(&mut self) -> Game {
+    pub async fn run_day_night_cycle(&mut self, day: bool) -> Game {
         clear_messages().expect("Failed to clear messages for day");
-
-        self.day = Some(self.day.unwrap_or(0) + 1);
         let living_tributes = self.living_tributes();
 
         if let Some(winner) = self.winner() {
@@ -134,26 +132,39 @@ impl Game {
             return self.clone();
         }
 
-        // Make any announcements for the day
-        match self.day {
-            Some(1) => {
-                add_game_message(
-                    self.identifier.as_str(),
-                    format!("{}", GameOutput::FirstDayStart)
-                ).expect("");
+        // Clear all events from the previous cycle
+        for area in self.areas.iter_mut() {
+            area.events.clear();
+        }
+
+        if day {
+            self.day = Some(self.day.unwrap_or(0) + 1);
+
+            // Make any announcements for the day
+            match self.day {
+                Some(1) => {
+                    add_game_message(
+                        self.identifier.as_str(),
+                        format!("{}", GameOutput::FirstDayStart),
+                    ).expect("");
+                }
+                Some(3) => {
+                    add_game_message(
+                        self.identifier.as_str(),
+                        format!("{}", GameOutput::FeastDayStart),
+                    ).expect("");
+                },
+                _ => {}
             }
-            Some(3) => {
-                add_game_message(
-                    self.identifier.as_str(),
-                    format!("{}", GameOutput::FeastDayStart)
-                ).expect("");
-            },
-            _ => {
-                add_game_message(
-                    self.identifier.as_str(),
-                    format!("{}", GameOutput::GameDayStart(self.clone().day.unwrap()))
-                ).expect("");
-            }
+            add_game_message(
+                self.identifier.as_str(),
+                format!("{}", GameOutput::GameDayStart(self.clone().day.unwrap())),
+            ).expect("");
+        } else {
+            add_game_message(
+                self.identifier.as_str(),
+                format!("{}", GameOutput::GameNightStart(self.day.unwrap())),
+            ).expect("");
         }
 
         add_game_message(
@@ -161,38 +172,38 @@ impl Game {
             format!("{}", GameOutput::TributesLeft(living_tributes.len() as u32))
         ).expect("");
 
-        // Clear all events from the previous cycle
-        for area in self.areas.iter_mut() {
-            area.events.clear();
-        }
-
         // Run the day
-        self.do_a_cycle(true).await;
+        self.do_a_cycle(day).await;
 
         // Clean up any deaths
         self.clean_up_recent_deaths().await;
+
+        // match self.living_tributes().len() {
+        //     0 | 1 => self.status = GameStatus::Finished,
+        //     _ => self.status = GameStatus::InProgress,
+        // }
 
         add_game_message(
             self.identifier.as_str(),
-            format!("{}", GameOutput::GameNightStart(self.day.unwrap()))
+            format!("{}", GameOutput::TributesLeft(self.living_tributes().len() as u32)),
         ).expect("");
 
-        // Run the night
-        self.do_a_cycle(false).await;
-
-        // Clean up any deaths
-        self.clean_up_recent_deaths().await;
-
-        match self.tributes.len() {
-            0 | 1 => self.status = GameStatus::Finished,
-            _ => self.status = GameStatus::InProgress,
+        if day {
+            add_game_message(
+                self.identifier.as_str(),
+                format!("{}", GameOutput::GameDayEnd(self.clone().day.unwrap())),
+            ).expect("");
+        } else {
+            add_game_message(
+                self.identifier.as_str(),
+                format!("{}", GameOutput::GameNightEnd(self.clone().day.unwrap())),
+            ).expect("");
         }
 
         self.clone()
     }
 
     async fn do_a_cycle(&mut self, day: bool) {
-        // let mut rng = rand::thread_rng();
         let mut rng = rand::rngs::SmallRng::from_entropy();
         let day_event_frequency = 1.0 / 4.0;
         let night_event_frequency = 1.0 / 8.0;
@@ -235,6 +246,7 @@ impl Game {
             }
         }
 
+        // Feast day, refill the Cornucopia
         if self.day == Some(3) && day {
             let area = self.areas.iter_mut()
                 .find(|a| a.area == *"Cornucopia")

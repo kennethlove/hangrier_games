@@ -27,9 +27,15 @@ DEFINE FUNCTION OVERWRITE fn::get_messages_by_source_type($source_type: string) 
     ORDER BY timestamp;
 };
 
-DEFINE FUNCTION OVERWRITE fn::get_messages_by_game_id($game_id: string) {
+DEFINE FUNCTION OVERWRITE fn::get_game_messages_by_game_id($game_id: string) {
     RETURN SELECT * FROM message
     WHERE source.type = 'Game'
     AND source.value = $game_id
+    ORDER BY timestamp;
+};
+
+DEFINE FUNCTION OVERWRITE fn::get_messages_by_game_id($game_id: string) {
+    RETURN SELECT * FROM message
+    WHERE string::starts_with(subject, $game_id)
     ORDER BY timestamp;
 };

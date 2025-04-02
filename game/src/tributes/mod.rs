@@ -21,7 +21,6 @@ use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use statuses::TributeStatus;
 use std::cmp::{Ordering, PartialEq};
-use std::fmt::Display;
 use std::str::FromStr;
 use tracing::info;
 use uuid::Uuid;

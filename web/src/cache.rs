@@ -12,8 +12,11 @@ pub(crate) enum QueryKey {
     Tributes(String),
     Areas(String),
     Tribute(String),
-    FullGameLog(String, u32), // Game identifier, day
-    TributeLog(String, u32), // Tribute identifier, day
+    GameLog(String), // Game identifier
+    GameDayLog(String, u32), // Game identifier, day
+    TributeDayLog(String, u32), // Tribute identifier, day
+    GameSummary(String),
+    GameDaySummary(String, u32), // Game identifier, day
 }
 
 #[derive(PartialEq, Debug)]
@@ -35,6 +38,7 @@ pub(crate) enum QueryValue {
     Tributes(Vec<Tribute>),
     GameTributes(Vec<TributeKey>),
     Logs(Vec<GameMessage>),
+    Summary(String),
 }
 
 #[allow(dead_code)]

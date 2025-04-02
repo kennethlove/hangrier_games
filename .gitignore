@@ -6,3 +6,4 @@
 web/assets/node_modules
 web/assets/dist
 .DS_Store
+/.vscode

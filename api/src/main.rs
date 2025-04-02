@@ -127,4 +127,3 @@ async fn main() {
     tracing::info!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, router).await.unwrap();
 }
-

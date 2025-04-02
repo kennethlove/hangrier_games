@@ -1,8 +1,7 @@
 use chrono::{DateTime, Utc};
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use std::fmt::Display;
 use std::sync::Mutex;
 use uuid::Uuid;
 

@@ -28,9 +28,25 @@ pub fn Home() -> Element {
                 theme2:from-teal-600
                 theme2:to-green-400
 
-                theme3:text-slate-300
+                theme3:text-slate-700
                 "#,
                 "May the odds be ever in your favor!"
+            }
+
+            img {
+                class: "mx-auto invisible theme3:hidden theme2:hidden theme1:visible",
+                src: asset!("/assets/images/red.png"),
+                alt: "Hunger Games"
+            }
+            img {
+                class: "mx-auto invisible theme2:visible theme1:hidden theme3:hidden",
+                src: asset!("/assets/images/green.png"),
+                alt: "Hunger Games"
+            }
+            img {
+                class: "mx-auto invisible theme3:visible theme1:hidden theme2:hidden",
+                src: asset!("/assets/images/blue.png"),
+                alt: "Hunger Games"
             }
         }
     }

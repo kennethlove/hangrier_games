@@ -63,13 +63,20 @@ pub fn App() -> Element {
                 transition
                 duration-250
                 p-2
-                theme1:bg-red-900
+
+                theme1:bg-linear-155
+                theme1:from-red-900/70
+                theme1:to-red-900/100
+
                 theme2:bg-green-200
-                theme3:bg-slate-600
-                theme2:bg-[url('/assets/waves.svg')]
+                theme2:bg-[url('/assets/images/waves.svg')]
                 theme2:bg-no-repeat
                 theme2:bg-origin-border
                 theme2:bg-bottom
+
+                theme3:bg-linear-to-b
+                theme3:from-slate-50/80
+                theme3:to-slate-700/80
                 "#,
 
                 Router::<Routes> {}

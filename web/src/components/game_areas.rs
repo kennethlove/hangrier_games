@@ -46,7 +46,7 @@ pub fn GameAreaList() -> Element {
                     class: "grid grid-cols-2 gap-4",
                     li {
                         img {
-                            src: asset!("assets/map.svg")
+                            src: asset!("assets/images/map.svg")
                         }
                     }
                     for area in areas {
@@ -97,4 +97,3 @@ pub fn GameAreaList() -> Element {
         _ => { rsx! {} }
     }
 }
-

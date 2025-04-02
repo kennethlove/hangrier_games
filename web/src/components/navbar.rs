@@ -42,8 +42,7 @@ pub fn Navbar() -> Element {
                 theme2:to-green-400
                 theme2:drop-shado-md
 
-                theme3:text-slate-950
-                theme3:drop-shadow-md
+                theme3:text-slate-400
                 "#,
                 "Hangry Games"
             }
@@ -55,7 +54,7 @@ pub fn Navbar() -> Element {
                     li {
                         class: "px-2",
                         Link {
-                            class: "theme3:hover:border-b-1",
+                            class: "theme3:hover:text-teal-500 theme3:hover:border-b-1",
                             to: Routes::Home {},
                             "Home"
                         }
@@ -63,7 +62,7 @@ pub fn Navbar() -> Element {
                     li {
                         class: "px-2",
                         Link {
-                            class: "theme3:hover:border-b-1",
+                            class: "theme3:hover:text-teal-500 theme3:hover:border-b-1",
                             to: Routes::GamesList {},
                             "Games"
                         }
@@ -94,6 +93,7 @@ pub fn Navbar() -> Element {
                             theme2:peer-checked:bg-teal-500
                             theme2:peer-checked:text-green-200
 
+                            theme3:group-hover:text-teal-500
                             theme3:group-hover:border-b-1
                             theme3:peer-focus:border-b-1
                             theme3:peer-checked:border-b-1
@@ -115,11 +115,14 @@ pub fn Navbar() -> Element {
                                 peer-checked:visible
                                 peer-focus:opacity-100
                                 peer-focus:visible
+
                                 theme1:bg-linear-to-b
                                 theme1:from-amber-500
                                 theme1:to-amber-700
+
                                 theme2:bg-teal-500
-                                theme3:bg-slate-600
+
+                                theme3:bg-slate-200
                                 theme3:border
                             "#,
 

@@ -300,13 +300,13 @@ pub fn GameDetails(game: Game) -> Element {
     rsx! {
         div {
             class: r#"
+            pr-2
             grid
+            gap-8
             grid-cols-none
             sm:grid-cols-2
-            gap-8
             lg:grid-cols-3
             2xl:grid-cols-5
-            pr-2
             "#,
             InfoDetail {
                 title: "Areas",

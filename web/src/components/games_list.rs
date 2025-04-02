@@ -1,6 +1,6 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::game_edit::GameEdit;
-use crate::components::{CreateGameButton, CreateGameForm, DeleteGameModal, GameDelete};
+use crate::components::{Button, CreateGameButton, CreateGameForm, DeleteGameModal, GameDelete};
 use crate::routes::Routes;
 use crate::API_HOST;
 use dioxus::prelude::*;
@@ -88,9 +88,8 @@ fn RefreshButton() -> Element {
     rsx! {
         div {
             class: "text-center",
-            button {
-                class: "border px-2 py-1 cursor-pointer",
-                onclick: onclick,
+            Button {
+                onclick,
                 "Refresh"
             }
         }

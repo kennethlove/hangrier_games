@@ -1,4 +1,5 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
+use crate::components::Button;
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
@@ -51,20 +52,14 @@ pub fn CreateGameButton() -> Element {
     };
 
     rsx! {
-        button {
-            class: r#"
-            py-1
-            px-2
-            border
-            whitespace-nowrap
-            cursor-pointer
-            bg-radial
+        Button {
+            extra_classes: Some(r#"
+            theme1:bg-radial
             theme1:from-amber-300
             theme1:to-red-600
             theme1:border-red-600
             theme1:text-red-900
-            "#,
-            r#type: "button",
+            "#.into()),
             onclick,
             "Quickstart"
         }
@@ -127,19 +122,14 @@ pub fn CreateGameForm() -> Element {
                     game_name_signal.set(e.value().clone());
                 }
             }
-            button {
-                class: r#"
-                py-1
-                px-2
-                border
-                theme1:border-red-600
-                whitespace-nowrap
-                bg-radial
+            Button {
+                extra_classes: Some(r#"
+                theme1:bg-radial
                 theme1:from-amber-300
                 theme1:to-red-600
+                theme1:border-red-600
                 theme1:text-red-900
-                cursor-pointer
-                "#,
+                "#.into()),
                 r#type: "submit",
                 "Create game"
             }

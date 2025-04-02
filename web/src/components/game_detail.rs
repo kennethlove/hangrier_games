@@ -7,10 +7,12 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, use_mutation, use_query_client, MutationResult, QueryResult};
 use game::games::Game;
 use game::games::GameStatus;
+use game::messages::GameMessage;
 use game::tributes::Tribute;
 use reqwest::StatusCode;
 use std::ops::Deref;
-use crate::components::full_game_log::FullGameLog;
+use crate::components::full_game_log::GameDayLog;
+use crate::components::game_day_summary::GameDaySummary;
 
 async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(identifier)) = keys.first() {
@@ -60,7 +62,7 @@ async fn next_step(identifier: String) -> MutationResult<MutationValue, Mutation
 fn GameStatusState() -> Element {
     let game_signal: Signal<Option<Game>> = use_context();
     let game = game_signal.read();
-    
+
     if let Some(game) = game.clone() {
         let game_next_step: String;
 
@@ -249,9 +251,17 @@ pub fn GameDetails(game: Game) -> Element {
                     div {
                         h3 {
                             class: "text-xl mb-2",
+                            "Day summary",
+                        }
+                        GameDaySummary { day: game.day.unwrap_or_default() }
+                    }
+
+                    div {
+                        h3 {
+                            class: "text-xl mb-2",
                             "Day log"
                         }
-                        FullGameLog { day: game.day.unwrap_or_default() }
+                        GameDayLog { day: game.day.unwrap_or_default() }
                     }
                 }
                 div {

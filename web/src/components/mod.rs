@@ -27,15 +27,11 @@ mod navbar;
 pub(crate) use navbar::Navbar;
 mod home;
 mod full_game_log;
-pub(crate) use full_game_log::FullGameLog;
+pub(crate) use full_game_log::GameDayLog;
 
 pub(crate) use home::Home;
 
 pub(crate) use tribute_detail::TributeDetail;
 
-
-
-
-
-
-
+mod game_day_summary;
+pub(crate) use game_day_summary::GameDaySummary;

@@ -1,10 +1,11 @@
 use crate::tributes::{tribute_create, tribute_delete, tribute_detail, tribute_record_create, tribute_update, TributeOwns};
 use crate::DATABASE;
+use announcers::{summarize, summarize_stream};
 use axum::extract::Path;
 use axum::http::StatusCode;
-use axum::response::IntoResponse;
+use axum::response::{IntoResponse, Sse};
 use axum::routing::{get, put};
-use axum::Json;
+use axum::{BoxError, Json};
 use axum::Router;
 use game::areas::{Area, AreaDetails};
 use game::games::{Game, GameStatus};
@@ -15,18 +16,25 @@ use serde::{Deserialize, Serialize};
 use shared::EditGame;
 use shared::GameArea;
 use std::collections::HashMap;
+use std::convert::Infallible;
+use std::fmt::Result;
 use std::str::FromStr;
 use std::sync::LazyLock;
+use axum::response::sse::Event;
 use strum::IntoEnumIterator;
 use surrealdb::sql::Thing;
 use surrealdb::RecordId;
 use uuid::Uuid;
+use futures::stream::BoxStream;
+use futures::StreamExt;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
         .route("/", get(game_list).post(game_create))
         .route("/{game_identifier}", get(game_detail).delete(game_delete).put(game_update))
         .route("/{game_identifier}/areas", get(game_areas))
+        .route("/{game_identifier}/summarize/{day}", get(game_day_summary))
+        .route("/{game_identifier}/summarize", get(game_summary))
         .route("/{game_identifier}/log/{day}", get(game_logs))
         .route("/{game_identifier}/log/{day}/{tribute_identifier}", get(tribute_logs))
         .route("/{game_identifier}/next", put(next_step))
@@ -298,7 +306,7 @@ SELECT (
 pub async fn game_tributes(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
     let mut game_day = DATABASE.query(format!("SELECT day FROM game WHERE identifier = '{identifier}'")).await.unwrap();
     let game_day: Option<i64> = game_day.take("day").unwrap();
-    let game_day: i64 = game_day.unwrap_or(0);
+    let _game_day: i64 = game_day.unwrap_or(0);
 
 
     let response = DATABASE.query(
@@ -359,15 +367,15 @@ RETURN count(
                     }
                     _ => {
                         if let Some(mut game) = get_full_game(&identifier).await {
-                            let game = game.run_day_night_cycle().await;
+                            // Run day
+                            let mut game = game.run_day_night_cycle(true).await;
+                            save_game(&game).await;
 
-                            let updated_game: Option<Game> = save_game(game).await;
+                            // Run night
+                            let game = game.run_day_night_cycle(false).await;
+                            save_game(&game).await;
 
-                            if let Some(game) = updated_game {
-                                (StatusCode::OK, Json(GameResponse { game: Some(game) })).into_response()
-                            } else {
-                                (StatusCode::NOT_FOUND, Json(GameResponse { game: None })).into_response()
-                            }
+                            (StatusCode::OK, Json(GameResponse { game: Some(game) })).into_response()
                         } else {
                             (StatusCode::NOT_FOUND, Json(GameResponse::default())).into_response()
                         }
@@ -405,9 +413,9 @@ WHERE identifier = "{identifier}";"#))
 
 }
 
-
-async fn save_game(mut game: Game) -> Option<Game> {
+async fn save_game(game: &Game) -> Option<Game> {
     let game_identifier = RecordId::from(("game", game.identifier.clone()));
+    let mut saved_game = game.clone();
 
 
     if let Ok(logs) = get_all_messages() {
@@ -422,7 +430,7 @@ async fn save_game(mut game: Game) -> Option<Game> {
     }
 
     let areas = game.areas.clone();
-    game.areas = vec![];
+    saved_game.areas = vec![];
 
     for mut area in areas {
         let id = RecordId::from(("area", area.identifier.clone()));
@@ -438,7 +446,7 @@ async fn save_game(mut game: Game) -> Option<Game> {
     }
 
     let tributes = game.tributes.clone();
-    game.tributes = vec![];
+    saved_game.tributes = vec![];
 
     for mut tribute in tributes {
         let id = RecordId::from(("tribute", tribute.identifier.clone()));
@@ -456,7 +464,7 @@ async fn save_game(mut game: Game) -> Option<Game> {
 
     DATABASE
         .update::<Option<Game>>(game_identifier.clone())
-        .content(game)
+        .content(saved_game)
         .await.expect("Failed to update game")
 }
 
@@ -535,4 +543,94 @@ async fn tribute_logs(Path((game_identifier, day, tribute_identifier)): Path<(St
             Json(vec![])
         }
     }
+}
+
+async fn game_day_summary(Path((game_identifier, day)): Path<(String, String)>) -> Json<String> {
+    match DATABASE.query(
+        format!(r#"
+        SELECT *
+        FROM message
+        WHERE string::starts_with(subject, "{game_identifier}")
+        AND game_day = {day}
+        ORDER BY timestamp;
+        "#)
+    ).await {
+        Ok(mut logs) => {
+            let logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
+            let logs = logs.into_iter().map(|l| l.content).collect::<Vec<String>>().join("\n");
+            if !logs.is_empty() {
+                let res = summarize(&logs).await;
+
+                if let Ok(res) = res {
+                    Json(res)
+                } else {
+                    Json(String::new())
+                }
+            } else {
+                Json(String::new())
+            }
+        }
+        Err(err) => {
+            Json(String::new())
+        }
+    }
+}
+
+async fn game_summary(Path(game_identifier): Path<String>) -> impl IntoResponse {
+    let result = DATABASE.query(
+        format!(r#"
+        SELECT *
+        FROM message
+        WHERE string::starts_with(subject, "{game_identifier}")
+        ORDER BY timestamp;
+        "#)
+    ).await;
+
+    let stream = match result {
+        Ok(mut result) => {
+            let logs: Vec<GameMessage> = match result.take(0) {
+                Ok(logs) => logs,
+                Err(e) => {
+                    eprintln!("Error taking logs: {}", e);
+                    return Sse::new(async_stream::stream! {
+                        yield Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "Error taking logs")) as BoxError);
+                    }.boxed());
+                }
+            };
+
+            let logs = logs.into_iter()
+                .map(|l| l.content)
+                .collect::<Vec<String>>()
+                .join("\n");
+
+            if !logs.is_empty() {
+                let text_stream = summarize_stream(&logs).await;
+
+                // Create a new stream that converts String results to Event objects
+                let event_stream = async_stream::stream! {
+                    let mut stream = text_stream;
+                    while let Some(result) = stream.next().await {
+                        match result {
+                            Ok(text) => yield Ok(Event::default().data(text)),
+                            Err(e) => yield Ok(Event::default().data(format!("Error: {}", e)))
+                        }
+                    }
+                };
+
+                event_stream.boxed()
+            } else {
+                async_stream::stream! {
+                    yield Ok(Event::default().data("No logs found"));
+                }.boxed()
+            }
+        }
+        Err(e) => {
+            eprintln!("Error querying logs: {}", e);
+            async_stream::stream! {
+                yield Ok(Event::default().data(format!("Error querying logs: {}", e)));
+            }.boxed()
+        }
+    };
+
+    Sse::new(stream)
 }

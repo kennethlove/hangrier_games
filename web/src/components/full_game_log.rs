@@ -5,20 +5,17 @@ use dioxus_query::prelude::*;
 use game::games::Game;
 use game::messages::GameMessage;
 
-async fn fetch_full_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::FullGameLog(identifier, day)) = keys.first() {
+async fn fetch_game_day_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
+    if let Some(QueryKey::GameDayLog(identifier, day)) = keys.first() {
         let response = reqwest::get(format!("{}/api/games/{}/log/{}", API_HOST.clone(), identifier, day))
             .await
             .unwrap();
-
-        dioxus_logger::tracing::info!("{:?}", response);
 
         match response.json::<Vec<GameMessage>>().await {
             Ok(logs) => {
                 QueryResult::Ok(QueryValue::Logs(logs))
             }
             Err(err) => {
-                dioxus_logger::tracing::error!("{:?}", err);
                 QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
             },
         }
@@ -28,7 +25,7 @@ async fn fetch_full_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryErr
 }
 
 #[component]
-pub fn FullGameLog(day: u32) -> Element {
+pub fn GameDayLog(day: u32) -> Element {
     let game_signal: Signal<Option<Game>> = use_context();
 
     let game = game_signal.read().clone();
@@ -37,11 +34,11 @@ pub fn FullGameLog(day: u32) -> Element {
 
     let log_query = use_get_query(
         [
-            QueryKey::FullGameLog(identifier.clone(), day),
+            QueryKey::GameDayLog(identifier.clone(), day),
             QueryKey::Game(identifier.clone()),
             QueryKey::Games
         ],
-        fetch_full_log,
+        fetch_game_day_log,
     );
 
     match log_query.result().value() {

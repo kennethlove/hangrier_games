@@ -26,7 +26,7 @@ async fn fetch_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryErr
 }
 
 async fn fetch_tribute_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::TributeLog(identifier, day)) = keys.first() {
+    if let Some(QueryKey::TributeDayLog(identifier, day)) = keys.first() {
         if let Some(QueryKey::Game(game_identifier)) = keys.last() {
             let response = reqwest::get(format!("{}/api/games/{}/log/{}/{}", API_HOST.clone(), game_identifier, day, identifier))
                 .await
@@ -97,7 +97,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
 
     let tribute_logs_query = use_get_query(
         [
-            QueryKey::TributeLog(identifier.clone(), game.clone().day.unwrap_or_default()),
+            QueryKey::TributeDayLog(identifier.clone(), game.clone().day.unwrap_or_default()),
             QueryKey::Tribute(identifier.clone()),
             QueryKey::Game(game.clone().identifier)
         ],

@@ -16,6 +16,7 @@ pub fn Home() -> Element {
                 text-center
                 font-bold
                 bg-clip-text
+                drop-shadow-md
 
                 theme1:bg-radial
                 theme1:text-transparent
@@ -34,4 +35,3 @@ pub fn Home() -> Element {
         }
     }
 }
-

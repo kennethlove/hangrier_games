@@ -14,7 +14,13 @@ pub fn Navbar() -> Element {
 
     rsx! {
         header {
-            class: "flex flex-col flex-wrap items-center",
+            class: r#"
+            flex
+            flex-col
+            flex-wrap
+            items-center
+            "#,
+
             h1 {
                 class: r#"
                 text-5xl
@@ -33,11 +39,12 @@ pub fn Navbar() -> Element {
                 theme2:bg-clip-text
                 theme2:from-teal-500
                 theme2:to-green-400
+                theme2:drop-shado-md
 
                 theme3:text-slate-950
-                theme3:drop-shadow-lg
+                theme3:drop-shadow-md
                 "#,
-                Link { to: Routes::Home {}, "Hangry Games" }
+                "Hangry Games"
             }
 
             nav {
@@ -159,4 +166,3 @@ pub fn Navbar() -> Element {
         }
     }
 }
-

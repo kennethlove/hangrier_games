@@ -1,3 +1,4 @@
+use crate::components::Button;
 use crate::API_HOST;
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use crate::components::full_game_log::GameDayLog;
@@ -11,7 +12,6 @@ use dioxus_query::prelude::{
 };
 use game::games::Game;
 use game::games::GameStatus;
-use game::messages::GameMessage;
 use game::tributes::Tribute;
 use reqwest::StatusCode;
 use std::ops::Deref;
@@ -152,19 +152,14 @@ fn GameStatusState() -> Element {
                     }
                     div {
                         class: "flex flex-row flex-grow gap-2 place-content-center sm:place-content-end",
-                        button {
-                            class: r#"
-                            py-1
-                            px-2
-                            border
-                            whitespace-nowrap
-                            cursor-pointer
-                            bg-radial
+                        Button {
+                            extra_classes: Some(r#"
+                            theme1:bg-radial
                             theme1:from-amber-300
                             theme1:to-red-600
                             theme1:border-red-600
                             theme1:text-red-900
-                            "#,
+                            "#.into()),
                             onclick: next_step_handler,
                             disabled: game_finished,
                             "{game_next_step}"

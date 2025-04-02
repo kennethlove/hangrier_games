@@ -1,9 +1,9 @@
+use crate::components::Button;
 use crate::API_HOST;
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use dioxus::prelude::*;
 use dioxus_query::prelude::{MutationResult, use_mutation, use_query_client};
 use game::games::Game;
-use game::tributes::Tribute;
 use shared::EditTribute;
 use std::ops::Deref;
 
@@ -46,8 +46,7 @@ pub fn TributeEdit(identifier: String, district: u32, name: String) -> Element {
     };
 
     rsx! {
-        button {
-            class: "button border px-2 py-1",
+        Button {
             onclick,
             "edit"
         }
@@ -63,18 +62,12 @@ pub fn EditTributeModal() -> Element {
             role: "confirm",
             open: edit_tribute_signal.read().clone().is_some(),
 
-            div { class: "fixed inset-0 bg-red-200/25 transition-opacity backdrop-blur-sm backgrop-grayscale" }
+            div { class: "fixed inset-0 backdrop-blur-sm backdrop-grayscale" }
             div {
                 class: "fixed inset-0 z-10 w-screen h-screen overflow-y-hidden",
                 div {
-                    class: "flex items-center gap-4 min-h-full justify-center",
-                    div {
-                        class: "relative transform overflow-hidden p-2",
-                        div {
-                            class: "mx-auto border p-2 bg-red-200",
-                            EditTributeForm {}
-                        }
-                    }
+                    class: "flex items-center gap-8 min-h-full justify-center",
+                    EditTributeForm {}
                 }
             }
         }
@@ -138,13 +131,32 @@ pub fn EditTributeForm() -> Element {
 
     rsx! {
     form {
+        class: r#"
+        mx-auto
+        p-2
+        grid
+        grid-col
+        gap-4
+        theme1:bg-stone-200
+        theme1:text-stone-900
+        theme2:bg-green-200
+        theme1:text-green-900
+        "#,
         onsubmit: save,
+
+        h1 {
+            class: r#"
+            block
+            p-2
+            text-lg
+            theme1:bg-red-900
+            theme1:text-stone-200
+            theme2:bg-green-800
+            theme2:text-green-200
+            "#,
+            "Edit tribute"
+        }
         div {
-            class: "mb-2",
-            h1 {
-                class: "block",
-                "Edit game"
-            }
             label {
                 "Name",
 
@@ -173,14 +185,12 @@ pub fn EditTributeForm() -> Element {
                 }
             }
             div {
-                class: "flex justify-end gap-4",
-                button {
-                    class: "border px-2 py-1",
+                class: "flex justify-end gap-2",
+                Button {
                     r#type: "submit",
                     "Update"
                 }
-                button {
-                    class: "border px-2 py-1",
+                Button {
                     r#type: "dialog",
                     onclick: dismiss,
                     "Cancel"

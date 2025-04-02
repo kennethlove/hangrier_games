@@ -8,6 +8,7 @@ pub struct ButtonProps {
     pub onclick: Option<EventHandler<Rc<MouseData>>>,
     pub children: Option<Element>,
     pub r#type: Option<String>,
+    pub disabled: Option<bool>
 }
 
 #[component]
@@ -22,6 +23,11 @@ pub fn Button(props: ButtonProps) -> Element {
             r#type,
             onclick: move |event| { onclick.call(event.data()) },
             title: props.title.unwrap_or_default(),
+            if props.disabled.unwrap_or(false) {
+                "disabled"
+            } else {
+                ""
+            },
             {props.children}
         }
     }

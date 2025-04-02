@@ -2,6 +2,7 @@ use crate::components::icons::mockingjay::Mockingjay;
 use crate::components::icons::mockingjay_arrow::MockingjayArrow;
 use crate::components::icons::mockingjay_flight::MockingjayFlight;
 use crate::components::icons::three_finger_salute::ThreeFingerSalute;
+use crate::components::Button;
 use crate::routes::Routes;
 use crate::storage::{use_persistent, AppState, Colorscheme};
 use dioxus::dioxus_core::AttributeValue;
@@ -123,9 +124,9 @@ pub fn Navbar() -> Element {
                             "#,
 
                             div {
-                                class: "grid grid-cols-3 place-content-center gap-4 p-4",
-                                button {
-                                    class: "button size-16 cursor-pointer",
+                                class: "grid grid-cols-3 place-content-center gap-2 pr-4",
+                                Button {
+                                    extra_classes: "size-24 border-none",
                                     onclick: move |_| {
                                         let mut state = storage.get();
                                         state.to_theme_one();
@@ -134,8 +135,8 @@ pub fn Navbar() -> Element {
                                     },
                                     MockingjayArrow { class: "fill-red-900 theme1:stroke-amber-200 hover:stroke-red-200 stroke-50" }
                                 }
-                                button {
-                                    class: "button size-16 cursor-pointer",
+                                Button {
+                                    extra_classes: "size-24 border-none",
                                     onclick: move |_| {
                                         let mut state = storage.get();
                                         state.to_theme_two();
@@ -144,8 +145,8 @@ pub fn Navbar() -> Element {
                                     },
                                     Mockingjay { class: "fill-green-900 theme2:stroke-amber-200 hover:stroke-green-200 stroke-50" }
                                 }
-                                button {
-                                    class: "button size-16 cursor-pointer",
+                                Button {
+                                    extra_classes: "size-24 border-none",
                                     onclick: move |_| {
                                         let mut state = storage.get();
                                         state.to_theme_three();

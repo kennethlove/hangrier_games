@@ -115,6 +115,10 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
             class: r#"
             border
             p-2
+            theme1:data-[alive=true]:border-green-500
+            theme1:data-[alive=false]:border-red-500
+            theme1:text-stone-200
+
             theme2:data-[alive=true]:border-green-200
             theme2:data-[alive=false]:border-red-200
             theme2:text-green-200
@@ -131,8 +135,11 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
 
                 h4 {
                     class: r#"
-                    text-lg
                     mb-2
+
+                    theme1:font-[Cinzel]
+                    theme1:text-lg
+
                     theme2:font-[Forum]
                     theme2:text-xl
                     theme2:text-green-200
@@ -195,6 +202,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
             h5 {
                 class: r#"
                 mt-2
+                theme1:text-amber-200
                 theme2:text-green-200
                 theme2:bg-green-800
                 theme2:px-2
@@ -219,6 +227,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
             h5 {
                 class: r#"
                 mt-2
+                theme1:text-amber-200
                 theme2:text-green-200
                 theme2:bg-green-800
                 theme2:px-2

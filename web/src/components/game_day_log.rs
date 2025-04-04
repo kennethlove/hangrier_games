@@ -45,7 +45,10 @@ pub fn GameDayLog(day: u32) -> Element {
         QueryResult::Ok(QueryValue::Logs(logs)) => {
             rsx! {
                 ul {
-                    class: "theme2:text-green-200",
+                    class: r#"
+                    theme1:text-stone-200
+                    theme2:text-green-200
+                    "#,
                     for log in logs {
                         li {
                             "{log.content}"
@@ -55,10 +58,10 @@ pub fn GameDayLog(day: u32) -> Element {
             }
         }
         QueryResult::Err(_) => {
-            rsx! { p { "Failed to load." } }
+            rsx! { p { class: "theme1:text-green-200 theme2:text-green-200", "Failed to load." } }
         }
         QueryResult::Loading(_) => {
-            rsx! { p { "Loading..." } }
+            rsx! { p { class: "theme1:text-green-200 theme2:text-green-200", "Loading..." } }
         }
         _ => { rsx! {} }
     }

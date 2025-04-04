@@ -48,10 +48,16 @@ pub fn TributeEdit(identifier: String, district: u32, name: String) -> Element {
 
     rsx! {
         Button {
-            extra_classes: "theme2:border-none",
+            extra_classes: r#"
+            theme1:border-none
+            theme2:border-none
+            "#,
             onclick,
             EditIcon {
                 class: r#"
+                theme1:size-4
+                theme1:fill-stone-200/50
+                theme1:hover:fill-stone-200
                 theme2:size-4
                 theme2:fill-green-200/50
                 theme2:hover:fill-green-200
@@ -148,7 +154,7 @@ pub fn EditTributeForm() -> Element {
         theme1:bg-stone-200
         theme1:text-stone-900
         theme2:bg-green-200
-        theme1:text-green-900
+        theme2:text-green-900
         "#,
         onsubmit: save,
 

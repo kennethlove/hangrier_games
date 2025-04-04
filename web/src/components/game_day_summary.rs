@@ -54,17 +54,20 @@ pub fn GameDaySummary(day: u32) -> Element {
             rsx! {
                 for p in summary.split("\n") {
                     p {
-                        class: "theme2:text-green-200",
+                        class: r#"
+                        theme1:text-green-200
+                        theme2:text-green-200
+                        "#,
                         "{p}"
                     }
                 }
             }
         }
         QueryResult::Err(_) => {
-            rsx! { p { class: "theme2:text-green-200", "Failed to load." } }
+            rsx! { p { class: "theme1:text-green-200 theme2:text-green-200", "Failed to load." } }
         }
         QueryResult::Loading(_) => {
-            rsx! { p { class: "theme2:text-green-200", "Loading..." } }
+            rsx! { p { class: "theme1:text-green-200 theme2:text-green-200", "Loading..." } }
         }
         _ => {
             rsx! {}

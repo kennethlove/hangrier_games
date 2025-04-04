@@ -57,6 +57,9 @@ pub fn GameAreaList() -> Element {
                             class: r#"
                             border
                             p-2
+                            theme1:data-[open=true]:border-green-500
+                            theme1:data-[open=false]:border-red-500
+                            theme1:text-stone-200
                             theme2:data-[open=true]:bg-green-200
                             theme2:data-[open=false]:bg-red-200
                             "#,
@@ -65,19 +68,18 @@ pub fn GameAreaList() -> Element {
                                 class: "flex flex-row gap-2 place-content-between",
                                 h4 {
                                     class: r#"
+                                    theme1:text-amber-300
                                     theme2:text-green-800
                                     "#,
 
                                     "{area.name}"
                                 }
-                                p {
-                                    class: r#"
-                                    theme2:text-green-900
-                                    "#,
+                                div {
                                     if area.open() {
                                         LockOpenIcon {
                                             class: r#"
                                             size-4
+                                            theme1:fill-amber-300
                                             theme2:fill-green-900
                                             "#,
                                         }
@@ -85,6 +87,7 @@ pub fn GameAreaList() -> Element {
                                         LockClosedIcon {
                                             class: r#"
                                             size-4
+                                            theme1:fill-amber-300
                                             theme2:fill-green-900
                                             "#,
                                         }
@@ -94,6 +97,7 @@ pub fn GameAreaList() -> Element {
 
                             h5 {
                                 class: r#"
+                                theme1:text-amber-200
                                 theme2:text-green-200
                                 theme2:bg-green-800
                                 theme2:px-2
@@ -119,6 +123,7 @@ pub fn GameAreaList() -> Element {
 
                             h5 {
                                 class: r#"
+                                theme1:text-amber-200
                                 theme2:text-green-200
                                 theme2:bg-green-800
                                 theme2:px-2

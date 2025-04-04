@@ -162,7 +162,8 @@ fn GameStatusState() -> Element {
                                 icon_class: r#"
                                 size-4
 
-                                theme1:fill-amber-600
+                                theme1:fill-amber-500
+                                theme1:hover:fill-amber-200
 
                                 theme2:fill-green-200/50
                                 theme2:hover:fill-green-200
@@ -176,9 +177,12 @@ fn GameStatusState() -> Element {
                             extra_classes: Some(r#"
                             theme1:bg-radial
                             theme1:from-amber-300
-                            theme1:to-red-600
-                            theme1:border-red-600
+                            theme1:to-red-500
+                            theme1:border-red-500
                             theme1:text-red-900
+                            theme1:hover:text-stone-200
+                            theme1:hover:from-amber-500
+                            theme1:hover:to-red-700
 
                             theme2:bg-linear-to-b
                             theme2:from-green-400
@@ -208,7 +212,7 @@ fn GameStatusState() -> Element {
 
                     p {
                         class: r#"
-                        theme1:text-stone-200
+                        theme1:text-amber-300
                         theme2:text-green-200
                         "#,
 
@@ -216,7 +220,7 @@ fn GameStatusState() -> Element {
                             class: r#"
                             block
                             text-sm
-                            theme1:text-stone-800
+                            theme1:text-amber-500
                             theme1:font-semibold
                             theme2:text-teal-500
                             "#,
@@ -227,7 +231,7 @@ fn GameStatusState() -> Element {
                     }
                     p {
                         class: r#"
-                        theme1:text-stone-200
+                        theme1:text-amber-300
                         theme2:text-green-200
                         "#,
 
@@ -235,7 +239,7 @@ fn GameStatusState() -> Element {
                             class: r#"
                             block
                             text-sm
-                            theme1:text-stone-800
+                            theme1:text-amber-500
                             theme1:font-semibold
                             theme2:text-teal-500
                             "#,
@@ -246,7 +250,7 @@ fn GameStatusState() -> Element {
                     }
                     p {
                         class: r#"
-                        theme1:text-stone-200
+                        theme1:text-amber-300
                         theme2:text-green-200
                         "#,
 
@@ -254,7 +258,7 @@ fn GameStatusState() -> Element {
                             class: r#"
                             block
                             text-sm
-                            theme1:text-stone-800
+                            theme1:text-amber-500
                             theme1:font-semibold
                             theme2:text-teal-500
                             "#,
@@ -326,9 +330,11 @@ pub fn InfoDetail(props: InfoDetailProps) -> Element {
             group
             transition
             duration-500
-            theme1:bg-red-900
-            theme1:to-red-200
-            theme1:from-red-900
+
+            theme1:bg-stone-800/50
+            theme1:hover:bg-stone-800
+            theme1:open:bg-stone-800/50
+
             theme2:bg-green-900
             theme2:rounded-md
             theme2:border
@@ -344,13 +350,18 @@ pub fn InfoDetail(props: InfoDetailProps) -> Element {
                 justify-between
                 cursor-pointer
                 "#,
+
                 h3 {
                     class: r#"
                     mb-2
                     transition
+
                     theme1:text-xl
                     theme1:font-[Cinzel]
-                    theme1:group-open:text-amber-600
+                    theme1:text-amber-300/75
+                    theme1:group-open:text-amber-300
+                    theme1:hover:text-amber-300
+
                     theme2:font-[Forum]
                     theme2:text-2xl
                     theme2:text-green-200
@@ -363,11 +374,12 @@ pub fn InfoDetail(props: InfoDetailProps) -> Element {
                     class: "transition group-open:rotate-180",
                     svg {
                         class: r#"
-                        h-5
-                        w-5
+                        size-4
                         fill-none
                         stroke-current
-                        theme1:group-open:stroke-amber-600
+                        theme1:stroke-amber-300
+                        theme1:hover:stroke-amber-300
+                        theme1:group-open:stroke-amber-300
                         theme2:group-open:stroke-green-400
                         theme2:stroke-green-200
                         theme2:hover:stroke-green-400

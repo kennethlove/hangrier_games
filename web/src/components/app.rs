@@ -65,9 +65,8 @@ pub fn App() -> Element {
                 p-2
                 font-[Work_Sans]
 
-                theme1:bg-linear-155
-                theme1:from-red-900/70
-                theme1:to-red-900/100
+                theme1:bg-[url('/assets/images/noise.svg')]
+                theme1:bg-red-800
 
                 theme2:bg-green-800/85
                 theme2:bg-[url('/assets/images/waves.svg')]
@@ -83,7 +82,14 @@ pub fn App() -> Element {
                 Router::<Routes> {}
 
                 footer {
-                    class: "text-xs text-center theme1:text-stone-950 theme2:text-green-900 theme3:text-slate-800",
+                    class: r#"
+                    text-xs
+                    text-center
+                    theme1:text-amber-300
+                    theme2:text-green-900
+                    theme3:text-slate-800
+                    "#,
+
                     p { dangerous_inner_html: "{copyright}" }
                     p {
                         "Three finger salute icon by "

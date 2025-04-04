@@ -107,8 +107,11 @@ pub fn GameListMember(game: Game) -> Element {
             border
             p-2
             mb-4
+            transition
 
-            theme1:border-red-600
+            theme1:border-stone-950
+            theme1:bg-stone-800/65
+            theme1:hover:bg-stone-800/75
 
             theme2:border-none
             theme2:bg-green-900
@@ -120,6 +123,7 @@ pub fn GameListMember(game: Game) -> Element {
                     text-xl
                     theme1:font-[Cinzel]
                     theme1:text-amber-300
+                    theme1:hover:underline
 
                     theme2:text-green-200
                     theme2:hover:underline
@@ -143,6 +147,7 @@ pub fn GameListMember(game: Game) -> Element {
                         icon_class: r#"
                         size-4
                         theme1:fill-amber-600
+                        theme1:hover:fill-amber-500
 
                         theme2:fill-green-200/50
                         theme2:hover:fill-green-200
@@ -154,6 +159,7 @@ pub fn GameListMember(game: Game) -> Element {
                         icon_class: r#"
                         size-4
                         theme1:fill-amber-600
+                        theme1:hover:fill-amber-500
 
                         theme2:fill-green-200/50
                         theme2:hover:fill-green-200
@@ -167,7 +173,7 @@ pub fn GameListMember(game: Game) -> Element {
                 flex-row
                 place-content-between
                 text-xs
-                theme1:text-stone-200
+                theme1:text-stone-200/75
                 theme2:text-green-200/50
                 "#,
                 p { "{living_count} / {game.tribute_count} tributes left" }

@@ -33,7 +33,8 @@ pub fn Navbar() -> Element {
                 theme1:bg-clip-text
                 theme1:text-transparent
                 theme1:from-amber-300
-                theme1:to-red-600
+                theme1:to-red-500
+                theme1:text-4xl
 
                 theme2:font-[Forum]
                 theme2:font-bold
@@ -57,7 +58,6 @@ pub fn Navbar() -> Element {
                 sm:text-xl
 
                 theme1:font-[Cinzel]
-                theme1:text-amber-500
 
                 theme2:text-md
                 theme2:uppercase
@@ -68,10 +68,13 @@ pub fn Navbar() -> Element {
                 ul {
                     class: "flex flex-row gap-16",
                     li {
-                        class: "px-2",
                         Link {
                             class: r#"
-                            theme1:hover:border-b-1
+                            theme1:hover:bg-amber-500
+                            theme1:text-amber-500
+                            theme1:hover:text-amber-900
+                            theme1:font-semibold
+                            theme1:px-2
 
                             theme2:text-green-200/50
                             theme2:hover:text-green-200
@@ -88,10 +91,13 @@ pub fn Navbar() -> Element {
                         }
                     }
                     li {
-                        class: "px-2",
                         Link {
                             class: r#"
-                            theme1:hover:border-b-1
+                            theme1:hover:bg-amber-500
+                            theme1:text-amber-500
+                            theme1:hover:text-amber-900
+                            theme1:font-semibold
+                            theme1:px-2
 
                             theme2:text-green-200/50
                             theme2:hover:text-green-200
@@ -119,9 +125,9 @@ pub fn Navbar() -> Element {
                             px-2
                             cursor-pointer
 
-                            theme2:text-green-200/50
-                            theme2:hover:text-green-900
-
+                            theme1:font-semibold
+                            theme1:text-xl
+                            theme1:text-amber-500
                             theme1:group-hover:bg-amber-500
                             theme1:group-hover:text-red-900
                             theme1:group-hover:border-b-2
@@ -135,6 +141,8 @@ pub fn Navbar() -> Element {
                             theme1:peer-checked:border-b-2
                             theme1:peer-checked:border-amber-500
 
+                            theme2:text-green-200/50
+                            theme2:hover:text-green-900
                             theme2:group-hover:bg-green-200
                             theme2:group-hover:text-green-900
                             theme2:group-hover:rounded-t-sm

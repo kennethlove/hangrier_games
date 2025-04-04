@@ -56,9 +56,12 @@ pub fn CreateGameButton() -> Element {
             extra_classes: Some(r#"
             theme1:bg-radial
             theme1:from-amber-300
-            theme1:to-red-600
-            theme1:border-red-600
+            theme1:to-red-500
+            theme1:border-red-500
             theme1:text-red-900
+            theme1:hover:text-stone-200
+            theme1:hover:from-amber-500
+            theme1:hover:to-red-700
 
             theme2:text-green-800
             theme2:bg-linear-to-b
@@ -113,14 +116,18 @@ pub fn CreateGameForm() -> Element {
             input {
                 class: r#"
                 block
-                focus:outline-none
                 border
                 w-half
                 px-2
                 py-1
+                transition
+
                 theme1:border-amber-600
-                theme1:text-amber-300
-                theme1:placeholder-amber-600
+                theme1:text-amber-200
+                theme1:placeholder-amber-200/50
+                theme1:bg-stone-800/65
+                theme1:hover:bg-stone-800/75
+                theme1:focus:bg-stone-800/75
 
                 theme2:border-green-400
                 theme2:text-green-200
@@ -140,9 +147,12 @@ pub fn CreateGameForm() -> Element {
                 extra_classes: Some(r#"
                 theme1:bg-radial
                 theme1:from-amber-300
-                theme1:to-red-600
-                theme1:border-red-600
+                theme1:to-red-500
+                theme1:border-red-500
                 theme1:text-red-900
+                theme1:hover:text-stone-200
+                theme1:hover:from-amber-500
+                theme1:hover:to-red-700
 
                 theme2:text-green-800
                 theme2:bg-linear-to-b

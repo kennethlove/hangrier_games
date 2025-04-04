@@ -60,6 +60,7 @@ pub fn CreateGameButton() -> Element {
             theme1:border-red-600
             theme1:text-red-900
 
+            theme2:text-green-800
             theme2:bg-linear-to-b
             theme2:from-green-400
             theme2:to-teal-500
@@ -143,6 +144,7 @@ pub fn CreateGameForm() -> Element {
                 theme1:border-red-600
                 theme1:text-red-900
 
+                theme2:text-green-800
                 theme2:bg-linear-to-b
                 theme2:from-green-400
                 theme2:to-teal-500

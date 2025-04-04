@@ -59,8 +59,6 @@ pub fn Navbar() -> Element {
                 theme1:font-[Cinzel]
                 theme1:text-amber-500
 
-                theme2:text-green-200
-                theme2:font-[Work_Sans]
                 theme2:text-md
                 theme2:uppercase
 
@@ -75,6 +73,8 @@ pub fn Navbar() -> Element {
                             class: r#"
                             theme1:hover:border-b-1
 
+                            theme2:text-green-200/50
+                            theme2:hover:text-green-200
                             theme2:hover:underline
                             theme2:hover:decoration-wavy
                             theme2:hover:decoration-2
@@ -93,6 +93,8 @@ pub fn Navbar() -> Element {
                             class: r#"
                             theme1:hover:border-b-1
 
+                            theme2:text-green-200/50
+                            theme2:hover:text-green-200
                             theme2:hover:underline
                             theme2:hover:decoration-wavy
                             theme2:hover:decoration-2
@@ -116,6 +118,9 @@ pub fn Navbar() -> Element {
                             class: r#"
                             px-2
                             cursor-pointer
+
+                            theme2:text-green-200/50
+                            theme2:hover:text-green-900
 
                             theme1:group-hover:bg-amber-500
                             theme1:group-hover:text-red-900

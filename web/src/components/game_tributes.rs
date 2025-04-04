@@ -115,7 +115,6 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
             class: r#"
             border
             p-2
-            font-[Work_Sans]
             theme2:data-[alive=true]:border-green-200
             theme2:data-[alive=false]:border-red-200
             theme2:text-green-200

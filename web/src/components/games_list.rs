@@ -121,7 +121,6 @@ pub fn GameListMember(game: Game) -> Element {
                     theme1:font-[Cinzel]
                     theme1:text-amber-300
 
-                    theme2:font-[Work_Sans]
                     theme2:text-green-200
                     theme2:hover:underline
                     theme2:hover:decoration-wavy

@@ -63,12 +63,13 @@ pub fn App() -> Element {
                 transition
                 duration-250
                 p-2
+                font-[Work_Sans]
 
                 theme1:bg-linear-155
                 theme1:from-red-900/70
                 theme1:to-red-900/100
 
-                theme2:bg-green-800
+                theme2:bg-green-800/85
                 theme2:bg-[url('/assets/images/waves.svg')]
                 theme2:bg-no-repeat
                 theme2:bg-origin-border

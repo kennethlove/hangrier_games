@@ -57,7 +57,6 @@ pub fn GameAreaList() -> Element {
                             class: r#"
                             border
                             p-2
-                            theme2:font-[Work_Sans]
                             theme2:data-[open=true]:bg-green-200
                             theme2:data-[open=false]:bg-red-200
                             "#,

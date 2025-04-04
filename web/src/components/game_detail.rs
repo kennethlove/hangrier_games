@@ -204,7 +204,7 @@ fn GameStatusState() -> Element {
                 }
 
                 div {
-                    class: "flex flex-row place-content-between pr-2 font-[Work_Sans]",
+                    class: "flex flex-row place-content-between pr-2",
 
                     p {
                         class: r#"

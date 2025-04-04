@@ -45,6 +45,7 @@ pub fn GameDayLog(day: u32) -> Element {
         QueryResult::Ok(QueryValue::Logs(logs)) => {
             rsx! {
                 ul {
+                    class: "theme2:text-green-200",
                     for log in logs {
                         li {
                             "{log.content}"

@@ -1,7 +1,7 @@
 use crate::components::Button;
 use crate::API_HOST;
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
-use crate::components::full_game_log::GameDayLog;
+use crate::components::game_day_log::GameDayLog;
 use crate::components::game_areas::GameAreaList;
 use crate::components::game_day_summary::GameDaySummary;
 use crate::components::game_edit::GameEdit;

@@ -27,10 +27,10 @@ mod navbar;
 mod tribute_detail;
 mod tribute_edit;
 pub(crate) use navbar::Navbar;
-mod full_game_log;
+mod game_day_log;
 mod home;
 pub mod icons;
-pub(crate) use full_game_log::GameDayLog;
+pub(crate) use game_day_log::GameDayLog;
 
 pub(crate) use home::Home;
 

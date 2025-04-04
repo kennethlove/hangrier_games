@@ -59,6 +59,14 @@ pub fn CreateGameButton() -> Element {
             theme1:to-red-600
             theme1:border-red-600
             theme1:text-red-900
+
+            theme2:bg-linear-to-b
+            theme2:from-green-400
+            theme2:to-teal-500
+            theme2:border-none
+            theme2:hover:text-green-200
+            theme2:hover:from-green-500
+            theme2:hover:to-teal-600
             "#.into()),
             onclick,
             "Quickstart"
@@ -112,6 +120,11 @@ pub fn CreateGameForm() -> Element {
                 theme1:border-amber-600
                 theme1:text-amber-300
                 theme1:placeholder-amber-600
+
+                theme2:border-green-400
+                theme2:text-green-200
+                theme2:placeholder-green-200/50
+
                 "#,
                 id: "game-name",
                 name: "game-name",
@@ -129,6 +142,14 @@ pub fn CreateGameForm() -> Element {
                 theme1:to-red-600
                 theme1:border-red-600
                 theme1:text-red-900
+
+                theme2:bg-linear-to-b
+                theme2:from-green-400
+                theme2:to-teal-500
+                theme2:border-none
+                theme2:hover:text-green-200
+                theme2:hover:from-green-500
+                theme2:hover:to-teal-600
                 "#.into()),
                 r#type: "submit",
                 "Create game"

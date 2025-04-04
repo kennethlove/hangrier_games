@@ -139,14 +139,34 @@ fn GameStatusState() -> Element {
                 div {
                     class: "flex flex-row flex-wrap gap-2 place-content-between",
                     h2 {
-                        class: "text-2xl cinzel-font theme1:text-amber-300",
+                        class: r#"
+                        flex
+                        flex-row
+
+                        theme1:text-2xl
+                        theme1:font-[Cinzel]
+                        theme1:text-amber-300
+
+                        theme2:font-[Forum]
+                        theme2:text-3xl
+                        theme2:text-green-200
+                        "#,
+
                         "{game_name}"
+
                         span {
                             class: "pl-2",
                             GameEdit {
                                 identifier: g.identifier,
                                 name: g.name,
-                                icon_class: "theme1:fill-amber-600 size-4"
+                                icon_class: r#"
+                                size-4
+
+                                theme1:fill-amber-600
+
+                                theme2:fill-green-200/50
+                                theme2:hover:fill-green-200
+                                "#
                             }
                         }
                     }
@@ -159,7 +179,16 @@ fn GameStatusState() -> Element {
                             theme1:to-red-600
                             theme1:border-red-600
                             theme1:text-red-900
+
+                            theme2:bg-linear-to-b
+                            theme2:from-green-400
+                            theme2:to-teal-500
+                            theme2:border-none
+                            theme2:hover:text-green-200
+                            theme2:hover:from-green-500
+                            theme2:hover:to-teal-600
                             "#.into()),
+
                             onclick: next_step_handler,
                             disabled: game_finished,
                             "{game_next_step}"
@@ -175,27 +204,61 @@ fn GameStatusState() -> Element {
                 }
 
                 div {
-                    class: "flex flex-row place-content-between pr-2",
+                    class: "flex flex-row place-content-between pr-2 font-[Work_Sans]",
+
                     p {
-                        class: "theme1:text-stone-200",
+                        class: r#"
+                        theme1:text-stone-200
+                        theme2:text-green-200
+                        "#,
+
                         span {
-                            class: "block text-sm theme1:text-stone-800 font-semibold",
+                            class: r#"
+                            block
+                            text-sm
+                            theme1:text-stone-800
+                            theme1:font-semibold
+                            theme2:text-teal-500
+                            "#,
+
                             "status"
                         }
                         "{game_status}"
                     }
                     p {
-                        class: "theme1:text-stone-200",
+                        class: r#"
+                        theme1:text-stone-200
+                        theme2:text-green-200
+                        "#,
+
                         span {
-                            class: "block text-sm theme1:text-stone-800 font-semibold",
+                            class: r#"
+                            block
+                            text-sm
+                            theme1:text-stone-800
+                            theme1:font-semibold
+                            theme2:text-teal-500
+                            "#,
+
                             "day"
                         }
                         "{game_day}"
                     }
                     p {
-                        class: "theme1:text-stone-200",
+                        class: r#"
+                        theme1:text-stone-200
+                        theme2:text-green-200
+                        "#,
+
                         span {
-                            class: "block text-sm theme1:text-stone-800 font-semibold",
+                            class: r#"
+                            block
+                            text-sm
+                            theme1:text-stone-800
+                            theme1:font-semibold
+                            theme2:text-teal-500
+                            "#,
+
                             "tributes alive"
                         }
                         "{tribute_count}"
@@ -265,6 +328,7 @@ pub fn InfoDetail(props: InfoDetailProps) -> Element {
             theme1:to-red-200
             theme1:from-red-900
             "#,
+
             summary {
                 class: r#"
                 flex
@@ -273,7 +337,14 @@ pub fn InfoDetail(props: InfoDetailProps) -> Element {
                 cursor-pointer
                 "#,
                 h3 {
-                    class: "cinzel-font text-xl mb-2 transition theme1:group-open:text-amber-600",
+                    class: r#"
+                    mb-2
+                    transition
+                    theme1:text-xl
+                    theme1:font-[Cinzel]
+                    theme1:group-open:text-amber-600
+                    "#,
+
                     "{props.title}",
                 }
                 span {
@@ -306,8 +377,9 @@ pub fn GameDetails(game: Game) -> Element {
             grid-cols-none
             sm:grid-cols-2
             lg:grid-cols-3
-            2xl:grid-cols-5
+            2xl:grid-cols-4
             "#,
+
             InfoDetail {
                 title: "Areas",
                 GameAreaList { }
@@ -318,14 +390,16 @@ pub fn GameDetails(game: Game) -> Element {
                 GameTributes { }
             }
 
-            InfoDetail {
-                title: "Day log",
-                GameDayLog { day: game.day.unwrap_or_default() }
-            }
+            if game.day.unwrap_or(0) > 0 {
+                InfoDetail {
+                    title: "Day log",
+                    GameDayLog { day: game.day.unwrap_or_default() }
+                }
 
-            InfoDetail {
-                title: "Day summary",
-                GameDaySummary { day: game.day.unwrap_or_default() }
+                InfoDetail {
+                    title: "Day summary",
+                    GameDaySummary { day: game.day.unwrap_or_default() }
+                }
             }
         }
     }

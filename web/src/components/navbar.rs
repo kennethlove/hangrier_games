@@ -24,23 +24,27 @@ pub fn Navbar() -> Element {
 
             h1 {
                 class: r#"
-                text-5xl
+                text-4xl
                 sm:text-6xl
-                cinzel-font
-                font-bold
 
+                theme1:font-[Cinzel]
+                theme1:font-bold
                 theme1:bg-radial
                 theme1:bg-clip-text
                 theme1:text-transparent
                 theme1:from-amber-300
                 theme1:to-red-600
 
+                theme2:font-[Forum]
+                theme2:font-bold
+                theme2:text-5xl
                 theme2:text-transparent
                 theme2:bg-linear-to-b
                 theme2:bg-clip-text
                 theme2:from-teal-500
                 theme2:to-green-400
-                theme2:drop-shado-md
+                theme2:drop-shadow-md
+                theme2:pb-2
 
                 theme3:text-slate-400
                 "#,
@@ -48,13 +52,37 @@ pub fn Navbar() -> Element {
             }
 
             nav {
-                class: "cinzel-font text-xl theme1:text-amber-500 theme2:text-green-800 theme3:text-slate-800",
+                class: r#"
+                text-lg
+                sm:text-xl
+
+                theme1:font-[Cinzel]
+                theme1:text-amber-500
+
+                theme2:text-green-200
+                theme2:font-[Work_Sans]
+                theme2:text-md
+                theme2:uppercase
+
+                theme3:text-slate-800
+                "#,
+
                 ul {
                     class: "flex flex-row gap-16",
                     li {
                         class: "px-2",
                         Link {
-                            class: "theme3:hover:text-teal-500 theme3:hover:border-b-1",
+                            class: r#"
+                            theme1:hover:border-b-1
+
+                            theme2:hover:underline
+                            theme2:hover:decoration-wavy
+                            theme2:hover:decoration-2
+
+                            theme3:hover:text-teal-500
+                            theme3:hover:border-b-1
+                            "#,
+
                             to: Routes::Home {},
                             "Home"
                         }
@@ -62,7 +90,17 @@ pub fn Navbar() -> Element {
                     li {
                         class: "px-2",
                         Link {
-                            class: "theme3:hover:text-teal-500 theme3:hover:border-b-1",
+                            class: r#"
+                            theme1:hover:border-b-1
+
+                            theme2:hover:underline
+                            theme2:hover:decoration-wavy
+                            theme2:hover:decoration-2
+
+                            theme3:hover:text-teal-500
+                            theme3:hover:border-b-1
+                            "#,
+
                             to: Routes::GamesList {},
                             "Games"
                         }
@@ -79,19 +117,34 @@ pub fn Navbar() -> Element {
                             px-2
                             cursor-pointer
 
-                            theme1:peer-focus:bg-amber-500
-                            theme1:peer-checked:bg-amber-500
                             theme1:group-hover:bg-amber-500
                             theme1:group-hover:text-red-900
+                            theme1:group-hover:border-b-2
+                            theme1:group-hover:border-amber-500
+                            theme1:peer-focus:bg-amber-500
                             theme1:peer-focus:text-red-900
+                            theme1:peer-focus:border-b-2
+                            theme1:peer-focus:border-amber-500
+                            theme1:peer-checked:bg-amber-500
                             theme1:peer-checked:text-red-900
+                            theme1:peer-checked:border-b-2
+                            theme1:peer-checked:border-amber-500
 
-                            theme2:group-hover:bg-teal-500
-                            theme2:group-hover:text-green-200
-                            theme2:peer-focus:bg-teal-500
-                            theme2:peer-focus:text-green-200
-                            theme2:peer-checked:bg-teal-500
-                            theme2:peer-checked:text-green-200
+                            theme2:group-hover:bg-green-200
+                            theme2:group-hover:text-green-900
+                            theme2:group-hover:rounded-t-sm
+                            theme2:group-hover:border-b-3
+                            theme2:group-hover:border-green-200
+                            theme2:peer-focus:bg-green-200
+                            theme2:peer-focus:text-green-900
+                            theme2:peer-focus:rounded-t-sm
+                            theme2:peer-focus:border-b-3
+                            theme2:peer-focus:border-green-200
+                            theme2:peer-checked:bg-green-200
+                            theme2:peer-checked:text-green-900
+                            theme2:peer-checked:rounded-t-sm
+                            theme2:peer-checked:border-b-3
+                            theme2:peer-checked:border-green-200
 
                             theme3:group-hover:text-teal-500
                             theme3:group-hover:border-b-1
@@ -120,7 +173,9 @@ pub fn Navbar() -> Element {
                                 theme1:from-amber-500
                                 theme1:to-amber-700
 
-                                theme2:bg-teal-500
+                                theme2:bg-green-200
+                                theme2:rounded-sm
+                                theme2:rounded-tr-none
 
                                 theme3:bg-slate-200
                                 theme3:border
@@ -129,34 +184,56 @@ pub fn Navbar() -> Element {
                             div {
                                 class: "grid grid-cols-3 place-content-center gap-2 pr-4",
                                 Button {
-                                    extra_classes: "size-24 border-none",
+                                    title: "Switch to theme 1",
+                                    extra_classes: "size-24 border-none theme1:hover:cursor-not-allowed",
                                     onclick: move |_| {
                                         let mut state = storage.get();
                                         state.to_theme_one();
                                         storage.set(state.clone());
                                         theme_signal.set(state.colorscheme)
                                     },
-                                    MockingjayArrow { class: "fill-red-900 theme1:stroke-amber-200 hover:stroke-red-200 stroke-50" }
+                                    MockingjayArrow { class: r#"
+                                    stroke-50
+                                    fill-red-700
+                                    stroke-red-900
+                                    hover:stroke-red-500
+                                    theme1:hover:stroke-red-900
+                                    "# }
                                 }
                                 Button {
-                                    extra_classes: "size-24 border-none",
+                                    title: "Switch to theme 2",
+                                    extra_classes: "size-24 border-none theme2:hover:cursor-not-allowed",
                                     onclick: move |_| {
                                         let mut state = storage.get();
                                         state.to_theme_two();
                                         storage.set(state.clone());
                                         theme_signal.set(state.colorscheme)
                                     },
-                                    Mockingjay { class: "fill-green-900 theme2:stroke-amber-200 hover:stroke-green-200 stroke-50" }
+                                    Mockingjay { class: r#"
+                                    stroke-50
+                                    fill-green-700
+                                    stroke-green-900
+                                    hover:stroke-green-200
+                                    theme2:hover:stroke-green-900
+                                    "# }
                                 }
                                 Button {
-                                    extra_classes: "size-24 border-none",
+                                    title: "Switch to theme 3",
+                                    extra_classes: "size-24 border-none theme3:hover:cursor-not-allowed",
                                     onclick: move |_| {
                                         let mut state = storage.get();
                                         state.to_theme_three();
                                         storage.set(state.clone());
                                         theme_signal.set(state.colorscheme)
                                     },
-                                    MockingjayFlight {class: "fill-blue-900 theme3:stroke-amber-200 hover:stroke-blue-200 stroke-50" }
+                                    MockingjayFlight {class: r#"
+                                    stroke-50
+                                    fill-blue-700
+                                    stroke-blue-900
+                                    hover:stroke-blue-200
+                                    theme3:stroke-blue-900
+                                    theme3:hover:stroke-blue-900
+                                    "# }
                                 }
                             }
                         }

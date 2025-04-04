@@ -11,22 +11,26 @@ pub fn Home() -> Element {
 
             h1 {
                 class: r#"
-                cinzel-font
                 text-6xl
                 text-center
                 font-bold
                 bg-clip-text
                 drop-shadow-md
+                sm:w-1/2
+                mx-auto
 
+                theme1:font-[Cinzel]
                 theme1:bg-radial
                 theme1:text-transparent
                 theme1:from-amber-300
                 theme1:to-red-600
 
+                theme2:font-[Forum]
                 theme2:text-transparent
                 theme2:bg-linear-to-b
-                theme2:from-teal-600
-                theme2:to-green-400
+                theme2:to-teal-500
+                theme2:from-green-400
+                theme2:pb-2
 
                 theme3:text-slate-700
                 "#,
@@ -39,7 +43,7 @@ pub fn Home() -> Element {
                 alt: "Hunger Games"
             }
             img {
-                class: "mx-auto invisible theme2:visible theme1:hidden theme3:hidden",
+                class: "mx-auto invisible theme2:visible theme1:hidden theme3:hidden theme2:hidden",
                 src: asset!("/assets/images/green.png"),
                 alt: "Hunger Games"
             }

@@ -36,15 +36,15 @@ pub fn App() -> Element {
     rsx! {
         document::Link {
             rel: "preconnect",
-            href: "https://api.fonts.coollabs.io",
-            crossorigin: Some("true".into())
+            href: "https://fonts.googleapis.com",
         }
         document::Link {
-            href: "https://api.fonts.coollabs.io/css2?family=Cinzel:wght@400..900&display=swap",
-            rel: "stylesheet"
+            rel: "preconnect",
+            href: "https://fonts.gstatic.com",
+            crossorigin: "anonymous"
         }
         document::Link {
-            href: "https://api.fonts.coollabs.io/icon?family=Material+Icons",
+            href: "https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&family=Forum&family=Work+Sans:ital,wght@0,100..900;1,100..900&display=swap",
             rel: "stylesheet"
         }
 
@@ -68,7 +68,7 @@ pub fn App() -> Element {
                 theme1:from-red-900/70
                 theme1:to-red-900/100
 
-                theme2:bg-green-200
+                theme2:bg-green-800
                 theme2:bg-[url('/assets/images/waves.svg')]
                 theme2:bg-no-repeat
                 theme2:bg-origin-border

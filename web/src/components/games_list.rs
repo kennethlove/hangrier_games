@@ -101,11 +101,33 @@ pub fn GameListMember(game: Game) -> Element {
     let living_count = game.living_tributes().len();
     rsx! {
         li {
-            class: "block w-full border p-2 mb-4 theme1:border-red-600",
+            class: r#"
+            block
+            w-full
+            border
+            p-2
+            mb-4
+
+            theme1:border-red-600
+
+            theme2:border-none
+            theme2:bg-green-900
+            "#,
             div {
                 class: "flex place-content-between",
                 h2 {
-                    class: "text-xl cinzel-font theme1:text-amber-300",
+                    class: r#"
+                    text-xl
+                    theme1:font-[Cinzel]
+                    theme1:text-amber-300
+
+                    theme2:font-[Work_Sans]
+                    theme2:text-green-200
+                    theme2:hover:underline
+                    theme2:hover:decoration-wavy
+                    theme2:hover:decoration-2
+                    theme2:mb-2
+                    "#,
                     Link {
                         to: Routes::GamePage {
                             identifier: game.identifier.clone()
@@ -119,17 +141,36 @@ pub fn GameListMember(game: Game) -> Element {
                     GameEdit {
                         identifier: game.identifier.clone(),
                         name: game.name.clone(),
-                        icon_class: "theme1:fill-amber-600 size-4",
+                        icon_class: r#"
+                        size-4
+                        theme1:fill-amber-600
+
+                        theme2:fill-green-200/50
+                        theme2:hover:fill-green-200
+                        "#,
                     }
                     GameDelete {
                         game_name: game.name.clone(),
                         game_identifier: game.identifier.clone(),
-                        icon_class: "theme1:fill-amber-600 size-4",
+                        icon_class: r#"
+                        size-4
+                        theme1:fill-amber-600
+
+                        theme2:fill-green-200/50
+                        theme2:hover:fill-green-200
+                        "#,
                     }
                 }
             }
             div {
-                class: "flex flex-row place-content-between text-xs theme1:text-stone-200",
+                class: r#"
+                flex
+                flex-row
+                place-content-between
+                text-xs
+                theme1:text-stone-200
+                theme2:text-green-200/50
+                "#,
                 p { "{living_count} / {game.tribute_count} tributes left" }
                 p { "Day {game.day.unwrap_or_default()}" }
                 p { "Status: {game.status}" }

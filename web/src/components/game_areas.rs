@@ -4,6 +4,8 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::areas::AreaDetails;
 use game::games::Game;
+use crate::components::icons::lock_closed::LockClosedIcon;
+use crate::components::icons::lock_open::LockOpenIcon;
 
 async fn fetch_areas(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Areas(identifier)) = keys.first() {
@@ -51,35 +53,91 @@ pub fn GameAreaList() -> Element {
                     }
                     for area in areas {
                         li {
-                            class: "border p-2",
+                            "data-open": area.open(),
+                            class: r#"
+                            border
+                            p-2
+                            theme2:font-[Work_Sans]
+                            theme2:data-[open=true]:bg-green-200
+                            theme2:data-[open=false]:bg-red-200
+                            "#,
+
                             div {
                                 class: "flex flex-row gap-2 place-content-between",
                                 h4 {
+                                    class: r#"
+                                    theme2:text-green-800
+                                    "#,
+
                                     "{area.name}"
                                 }
                                 p {
+                                    class: r#"
+                                    theme2:text-green-900
+                                    "#,
                                     if area.open() {
-                                        "open"
+                                        LockOpenIcon {
+                                            class: r#"
+                                            size-4
+                                            theme2:fill-green-900
+                                            "#,
+                                        }
                                     } else {
-                                        "closed"
+                                        LockClosedIcon {
+                                            class: r#"
+                                            size-4
+                                            theme2:fill-green-900
+                                            "#,
+                                        }
                                     }
                                 }
                             }
 
-                            h5 { "items" }
-                            ul {
-                                class: "p-2",
-                                for item in area.clone().items {
-                                    li {
-                                        "{item.name}"
+                            h5 {
+                                class: r#"
+                                theme2:text-green-200
+                                theme2:bg-green-800
+                                theme2:px-2
+                                "#,
+
+                                "Items"
+                            }
+                            if area.clone().items.is_empty() {
+                                p {
+                                    class: "p-2",
+                                    "No items"
+                                }
+                            } else {
+                                ul {
+                                    class: "p-2",
+                                    for item in area.clone().items {
+                                        li {
+                                            "{item.name}"
+                                        }
                                     }
                                 }
                             }
-                            h5 { "events" }
-                            ul {
-                                class: "p-2",
-                                for event in area.clone().events {
-                                    li { "{event}" }
+
+                            h5 {
+                                class: r#"
+                                theme2:text-green-200
+                                theme2:bg-green-800
+                                theme2:px-2
+                                "#,
+
+                                "Events"
+                            }
+                            if area.clone().events.is_empty() {
+                                p {
+                                    class: "p-2",
+                                    "No events"
+                                }
+                            } else {
+                                ul {
+                                    class: "p-2",
+                                    for event in area.clone().events {
+                                        li { "{event}" }
+                                    }
                                 }
                             }
                         }

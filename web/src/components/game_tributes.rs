@@ -111,10 +111,37 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
 
     rsx! {
         li {
-            class: "border p-2",
+            "data-alive": tribute.is_alive(),
+            class: r#"
+            border
+            p-2
+            font-[Work_Sans]
+            theme2:data-[alive=true]:border-green-200
+            theme2:data-[alive=false]:border-red-200
+            theme2:text-green-200
+            theme2:rounded-md
+            "#,
+
             div {
-                class: "flex flex-row gap-2 place-content-between",
+                class: r#"
+                flex
+                flex-row
+                gap-2
+                place-content-between
+                "#,
+
                 h4 {
+                    class: r#"
+                    text-lg
+                    mb-2
+                    theme2:font-[Forum]
+                    theme2:text-xl
+                    theme2:text-green-200
+                    theme2:hover:underline
+                    theme2:hover:decoration-2
+                    theme2:hover:decoration-wavy
+                    "#,
+
                     Link {
                         to: Routes::TributeDetail {
                             game_identifier: game.identifier.clone(),
@@ -130,24 +157,90 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 }
             }
 
-            p { "{tribute.district}" }
-            p { "{tribute.area}"}
-
-            p { "HP: {tribute.attributes.health}" }
-            p { "Status: {tribute.status}" }
-
-            h5 { "Items" }
-            ul {
-                class: "p-2",
-                for item in tribute.clone().items {
-                    li { "{item.name}" }
+            dl {
+                class: "text-sm grid grid-cols-2 gap-2",
+                dt {
+                    class: "text-sm",
+                    "District",
+                }
+                dd {
+                    class: "font-bold",
+                    "{tribute.district}"
+                }
+                dt {
+                    class: "text-sm",
+                    "In the",
+                }
+                dd {
+                    class: "font-bold",
+                    "{tribute.area}"
+                }
+                dt {
+                    class: "text-sm",
+                    "Status",
+                }
+                dd {
+                    class: "font-bold",
+                    "{tribute.status}"
+                }
+                dt {
+                    class: "text-sm",
+                    "Health",
+                }
+                dd {
+                    class: "font-bold",
+                    "{tribute.attributes.health}"
                 }
             }
 
-            h5 { "Log" }
-            ul {
-                for log in tribute_logs {
-                    li { "{log.content}" }
+            h5 {
+                class: r#"
+                mt-2
+                theme2:text-green-200
+                theme2:bg-green-800
+                theme2:px-2
+                "#,
+
+                "Items"
+            }
+            if tribute.clone().items.is_empty() {
+                p {
+                    class: "text-sm",
+                    "No items"
+                }
+            } else {
+                ul {
+                    class: "text-sm",
+                    for item in tribute.clone().items {
+                        li { "{item.name}" }
+                    }
+                }
+            }
+
+            h5 {
+                class: r#"
+                mt-2
+                theme2:text-green-200
+                theme2:bg-green-800
+                theme2:px-2
+                "#,
+
+                "Log"
+            }
+            if tribute_logs.is_empty() {
+                p {
+                    class: "text-sm",
+                    "No logs"
+                }
+            } else {
+                ul {
+                    class: "text-sm mt-2",
+                    for log in tribute_logs {
+                        li {
+                            class: "mb-2",
+                            "{log.content}"
+                        }
+                    }
                 }
             }
 

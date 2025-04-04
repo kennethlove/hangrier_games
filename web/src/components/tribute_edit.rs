@@ -6,6 +6,7 @@ use dioxus_query::prelude::{MutationResult, use_mutation, use_query_client};
 use game::games::Game;
 use shared::EditTribute;
 use std::ops::Deref;
+use crate::components::icons::edit::EditIcon;
 
 async fn edit_tribute(args: (EditTribute, String)) -> MutationResult<MutationValue, MutationError> {
     let tribute = args.clone().0;
@@ -47,8 +48,15 @@ pub fn TributeEdit(identifier: String, district: u32, name: String) -> Element {
 
     rsx! {
         Button {
+            extra_classes: "theme2:border-none",
             onclick,
-            "edit"
+            EditIcon {
+                class: r#"
+                theme2:size-4
+                theme2:fill-green-200/50
+                theme2:hover:fill-green-200
+                "#,
+            }
         }
     }
 }

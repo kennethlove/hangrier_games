@@ -321,12 +321,20 @@ pub fn InfoDetail(props: InfoDetailProps) -> Element {
         details {
             class: r#"
             px-2
+            pt-1
+            open:pb-2
             group
             transition
             duration-500
             theme1:bg-red-900
             theme1:to-red-200
             theme1:from-red-900
+            theme2:bg-green-900
+            theme2:rounded-md
+            theme2:border
+            theme2:border-green-800
+            theme2:hover:border-green-400
+            theme2:open:border-green-400
             "#,
 
             summary {
@@ -343,6 +351,10 @@ pub fn InfoDetail(props: InfoDetailProps) -> Element {
                     theme1:text-xl
                     theme1:font-[Cinzel]
                     theme1:group-open:text-amber-600
+                    theme2:font-[Forum]
+                    theme2:text-2xl
+                    theme2:text-green-200
+                    theme2:group-open:text-green-400
                     "#,
 
                     "{props.title}",
@@ -350,7 +362,16 @@ pub fn InfoDetail(props: InfoDetailProps) -> Element {
                 span {
                     class: "transition group-open:rotate-180",
                     svg {
-                        class: "h-5 w-5 fill-none stroke-current theme1:group-open:stroke-amber-600",
+                        class: r#"
+                        h-5
+                        w-5
+                        fill-none
+                        stroke-current
+                        theme1:group-open:stroke-amber-600
+                        theme2:group-open:stroke-green-400
+                        theme2:stroke-green-200
+                        theme2:hover:stroke-green-400
+                        "#,
                         view_box: "0 0 24 24",
                         path {
                             stroke_linecap: "round",

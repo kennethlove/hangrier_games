@@ -12,12 +12,13 @@ pub fn Home() -> Element {
             h1 {
                 class: r#"
                 text-6xl
+
                 text-center
                 font-bold
                 bg-clip-text
-                drop-shadow-md
                 sm:w-1/2
                 mx-auto
+                drop-shadow-md
 
                 theme1:font-[Cinzel]
                 theme1:bg-radial
@@ -32,15 +33,14 @@ pub fn Home() -> Element {
                 theme2:from-green-400
                 theme2:pb-2
 
-                theme3:text-slate-700
+                theme3:font-[Orbitron]
+                theme3:text-transparent
+                theme3:bg-gold-rich
+                theme3:leading-[1.24]
+                theme3:drop-shadow-sm
                 "#,
-                "May the odds be ever in your favor!"
-            }
 
-            img {
-                class: "mx-auto invisible theme3:visible theme1:hidden theme2:hidden",
-                src: asset!("/assets/images/blue.png"),
-                alt: "Hunger Games"
+                "May the odds be ever in your favor!"
             }
         }
     }

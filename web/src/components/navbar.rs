@@ -47,8 +47,15 @@ pub fn Navbar() -> Element {
                 theme2:drop-shadow-md
                 theme2:pb-2
 
-                theme3:text-slate-400
+                theme3:bg-clip-text
+                theme3:text-transparent
+                theme3:bg-gold-rich
+                theme3:font-[Orbitron]
+                theme3:font-semibold
+                theme3:drop-shadow-sm
+                theme3:pb-2
                 "#,
+
                 "Hangry Games"
             }
 
@@ -63,6 +70,8 @@ pub fn Navbar() -> Element {
                 theme2:uppercase
 
                 theme3:text-slate-800
+                theme3:uppercase
+                theme3:mt-2
                 "#,
 
                 ul {
@@ -82,8 +91,15 @@ pub fn Navbar() -> Element {
                             theme2:hover:decoration-wavy
                             theme2:hover:decoration-2
 
-                            theme3:hover:text-teal-500
-                            theme3:hover:border-b-1
+                            theme3:transform
+                            theme3:duration-500
+                            theme3:text-yellow-600
+                            theme3:border-b-5
+                            theme3:border-transparent
+                            theme3:border-double
+                            theme3:hover:border-b-5
+                            theme3:hover:border-yellow-500
+                            theme3:hover:text-yellow-500
                             "#,
 
                             to: Routes::Home {},
@@ -105,8 +121,15 @@ pub fn Navbar() -> Element {
                             theme2:hover:decoration-wavy
                             theme2:hover:decoration-2
 
-                            theme3:hover:text-teal-500
-                            theme3:hover:border-b-1
+                            theme3:transform
+                            theme3:duration-500
+                            theme3:text-yellow-600
+                            theme3:border-b-5
+                            theme3:border-transparent
+                            theme3:border-double
+                            theme3:hover:border-b-5
+                            theme3:hover:border-yellow-500
+                            theme3:hover:text-yellow-500
                             "#,
 
                             to: Routes::GamesList {},
@@ -159,10 +182,11 @@ pub fn Navbar() -> Element {
                             theme2:peer-checked:border-b-3
                             theme2:peer-checked:border-green-200
 
-                            theme3:group-hover:text-teal-500
-                            theme3:group-hover:border-b-1
-                            theme3:peer-focus:border-b-1
-                            theme3:peer-checked:border-b-1
+                            theme3:transform
+                            theme3:text-yellow-600
+                            theme3:group-hover:text-yellow-500
+                            theme3:peer-focus:text-yellow-500
+                            theme3:peer-checked:text-yellow-500
                             "#,
                             r#for: "theme-switcher",
                             "Theme",
@@ -174,6 +198,8 @@ pub fn Navbar() -> Element {
                                 z-99
                                 opacity-0
                                 w-64
+                                transform
+                                duration-500
                                 invisible
                                 group-hover:opacity-100
                                 group-hover:visible
@@ -190,8 +216,12 @@ pub fn Navbar() -> Element {
                                 theme2:rounded-sm
                                 theme2:rounded-tr-none
 
-                                theme3:bg-slate-200
+                                theme3:bg-slate-200/50
                                 theme3:border
+                                theme3:border-double
+                                theme3:border-5
+                                theme3:border-gold-rich
+                                theme3:box-decoration-clone
                             "#,
 
                             div {

@@ -44,7 +44,7 @@ pub fn App() -> Element {
             crossorigin: "anonymous"
         }
         document::Link {
-            href: "https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&family=Forum&family=Work+Sans:ital,wght@0,100..900;1,100..900&display=swap",
+            href: "https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&family=Forum&family=Work+Sans:ital,wght@0,100..900;1,100..900&family=Orbitron:wght@400..900&display=swap",
             rel: "stylesheet"
         }
 
@@ -75,8 +75,8 @@ pub fn App() -> Element {
                 theme2:bg-bottom
 
                 theme3:bg-linear-to-b
-                theme3:from-slate-50/80
-                theme3:to-slate-700/80
+                theme3:from-stone-50/80
+                theme3:to-stone-900/95
                 "#,
 
                 Router::<Routes> {}
@@ -87,7 +87,7 @@ pub fn App() -> Element {
                     text-center
                     theme1:text-amber-300
                     theme2:text-green-900
-                    theme3:text-slate-800
+                    theme3:text-stone-400
                     "#,
 
                     p { dangerous_inner_html: "{copyright}" }

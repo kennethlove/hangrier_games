@@ -5,6 +5,14 @@
 @variant theme2 (&:where(.theme2, .theme2 *));
 @variant theme3 (&:where(.theme3, .theme3 *));
 
+@utility bg-gold-rich {
+    background-image: linear-gradient(45deg, #462523 0%, #cb9b51 22%, #f6e27a 45%, #f6f2c0 50%, #f6e27a 55%, #cb9b51 78%, #462523 100%);
+}
+
+@utility border-gold-rich {
+    border-image: linear-gradient(45deg, #462523 0%, #cb9b51 22%, #f6e27a 45%, #f6f2c0 50%, #f6e27a 55%, #cb9b51 78%, #462523 100%) 1;
+}
+
 .frame {
     grid-template-rows: min-content auto min-content;
 }

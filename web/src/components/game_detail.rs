@@ -355,6 +355,7 @@ pub fn InfoDetail(props: InfoDetailProps) -> Element {
             group
             transition
             duration-500
+            self-start
 
             theme1:bg-stone-800/50
             theme1:hover:bg-stone-800

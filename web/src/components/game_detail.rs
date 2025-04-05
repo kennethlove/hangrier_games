@@ -328,11 +328,27 @@ pub fn GameDetailPage(identifier: String) -> Element {
         }
         QueryResult::Err(e) => {
             dioxus_logger::tracing::error!("{:?}", e);
-            rsx! { "Failed to load" }
+            rsx! {
+                p {
+                    class: r#"
+                    text-center
+
+                    theme2:text-green-200
+                    "#,
+                    "Failed to load"
+                }
+            }
         }
         _ => {
             rsx! {
-                p { "Loading..." }
+                p {
+                    class: r#"
+                    text-center
+
+                    theme2:text-green-200
+                    "#,
+                    "Loading..."
+                }
             }
         }
     }

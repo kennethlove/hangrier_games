@@ -60,8 +60,10 @@ pub fn GameAreaList() -> Element {
                             theme1:data-[open=false]:border-red-500
                             theme1:text-stone-200
 
-                            theme2:data-[open=true]:bg-green-200
-                            theme2:data-[open=false]:bg-red-200
+                            theme2:border-3
+                            theme2:bg-green-200
+                            theme2:data-[open=true]:border-green-500
+                            theme2:data-[open=false]:border-red-400
 
                             theme3:border-2
                             theme3:data-[open=true]:border-green-600

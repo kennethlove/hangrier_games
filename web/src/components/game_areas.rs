@@ -1,6 +1,7 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::icons::lock_closed::LockClosedIcon;
 use crate::components::icons::lock_open::LockOpenIcon;
+use crate::components::map::Map;
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
@@ -47,9 +48,7 @@ pub fn GameAreaList() -> Element {
                 ul {
                     class: "grid grid-cols-2 gap-4",
                     li {
-                        img {
-                            src: asset!("assets/images/map.svg")
-                        }
+                        Map { areas: areas.clone() }
                     }
                     for area in areas {
                         li {

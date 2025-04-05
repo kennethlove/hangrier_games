@@ -1,4 +1,7 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
+use crate::components::icons::lock_closed::LockClosedIcon;
+use crate::components::icons::lock_open::LockOpenIcon;
+use crate::components::map::Map;
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
@@ -45,41 +48,118 @@ pub fn GameAreaList() -> Element {
                 ul {
                     class: "grid grid-cols-2 gap-4",
                     li {
-                        img {
-                            src: asset!("assets/map.svg")
-                        }
+                        Map { areas: areas.clone() }
                     }
                     for area in areas {
                         li {
-                            class: "border p-2",
+                            "data-open": area.open(),
+                            class: r#"
+                            border
+                            p-2
+                            theme1:data-[open=true]:border-green-500
+                            theme1:data-[open=false]:border-red-500
+                            theme1:text-stone-200
+
+                            theme2:border-3
+                            theme2:bg-green-200
+                            theme2:data-[open=true]:border-green-500
+                            theme2:data-[open=false]:border-red-400
+
+                            theme3:border-2
+                            theme3:data-[open=true]:border-green-600
+                            theme3:data-[open=false]:border-red-500
+                            "#,
+
                             div {
                                 class: "flex flex-row gap-2 place-content-between",
                                 h4 {
+                                    class: r#"
+                                    flex-grow
+                                    theme1:text-amber-300
+                                    theme2:text-green-800
+                                    theme3:font-semibold
+                                    "#,
+
                                     "{area.name}"
                                 }
-                                p {
+                                div {
                                     if area.open() {
-                                        "open"
+                                        LockOpenIcon {
+                                            class: r#"
+                                            size-4
+                                            theme1:fill-amber-300
+                                            theme2:fill-green-900
+                                            "#,
+                                        }
                                     } else {
-                                        "closed"
+                                        LockClosedIcon {
+                                            class: r#"
+                                            size-4
+                                            theme1:fill-amber-300
+                                            theme2:fill-green-900
+                                            "#,
+                                        }
                                     }
                                 }
                             }
 
-                            h5 { "items" }
-                            ul {
-                                class: "p-2",
-                                for item in area.clone().items {
-                                    li {
-                                        "{item.name}"
+                            h5 {
+                                class: r#"
+                                theme1:text-amber-200
+
+                                theme2:text-green-200
+                                theme2:bg-green-800
+                                theme2:px-2
+
+                                theme3:border-gold-rich
+                                theme3:border-0
+                                theme3:border-b-2
+                                "#,
+
+                                "Items"
+                            }
+                            if area.clone().items.is_empty() {
+                                p {
+                                    class: "p-2",
+                                    "No items"
+                                }
+                            } else {
+                                ul {
+                                    class: "p-2",
+                                    for item in area.clone().items {
+                                        li {
+                                            "{item.name}"
+                                        }
                                     }
                                 }
                             }
-                            h5 { "events" }
-                            ul {
-                                class: "p-2",
-                                for event in area.clone().events {
-                                    li { "{event}" }
+
+                            h5 {
+                                class: r#"
+                                theme1:text-amber-200
+
+                                theme2:text-green-200
+                                theme2:bg-green-800
+                                theme2:px-2
+
+                                theme3:border-gold-rich
+                                theme3:border-0
+                                theme3:border-b-2
+                                "#,
+
+                                "Events"
+                            }
+                            if area.clone().events.is_empty() {
+                                p {
+                                    class: "p-2",
+                                    "No events"
+                                }
+                            } else {
+                                ul {
+                                    class: "p-2",
+                                    for event in area.clone().events {
+                                        li { "{event}" }
+                                    }
                                 }
                             }
                         }
@@ -97,4 +177,3 @@ pub fn GameAreaList() -> Element {
         _ => { rsx! {} }
     }
 }
-

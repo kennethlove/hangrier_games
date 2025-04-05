@@ -4,6 +4,8 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use shared::DeleteGame;
 use std::ops::Deref;
+use crate::components::Button;
+use crate::components::icons::delete::DeleteIcon;
 
 async fn delete_game(delete_game_info: DeleteGame) -> MutationResult<MutationValue, MutationError> {
     let identifier = delete_game_info.0;
@@ -23,8 +25,9 @@ async fn delete_game(delete_game_info: DeleteGame) -> MutationResult<MutationVal
 }
 
 #[component]
-pub fn GameDelete(game_identifier: String, game_name: String) -> Element {
+pub fn GameDelete(game_identifier: String, game_name: String, icon_class: String) -> Element {
     let mut delete_game_signal: Signal<Option<DeleteGame>> = use_context();
+    let title = format!("Delete {game_name}");
 
     let onclick = move |_| {
         let identifier = game_identifier.clone();
@@ -34,10 +37,15 @@ pub fn GameDelete(game_identifier: String, game_name: String) -> Element {
     };
 
     rsx! {
-        button {
-            class: "border px-2 py-1",
+        Button {
+            extra_classes: Some("border-none".to_string()),
+            title,
             onclick,
-            "x"
+            DeleteIcon { class: icon_class }
+            label {
+                class: "sr-only",
+                "Delete"
+            }
         }
     }
 }
@@ -47,7 +55,7 @@ pub fn DeleteGameModal() -> Element {
     let mut delete_game_signal: Signal<Option<DeleteGame>> = use_context();
     let delete_game_info = delete_game_signal.read().clone();
     let mutate = use_mutation(delete_game);
-    
+
     let name = {
         if let Some(details) = delete_game_info.clone() {
             details.1
@@ -71,41 +79,56 @@ pub fn DeleteGameModal() -> Element {
             });
         }
     };
-    
+
     rsx! {
         dialog {
             role: "confirm",
             open: delete_game_signal.read().clone().is_some(),
-            div { class: "fixed inset-0 bg-red-200/25 transition-opacity backdrop-blur-sm backgrop-grayscale" }
+            div { class: "fixed inset-0 backdrop-blur-sm backdrop-grayscale" }
             div {
                 class: "fixed inset-0 z-10 w-screen h-screen overflow-y-hidden",
                 div {
-                    class: "flex items-center gap-4 min-h-full justify-center",
+                    class: "flex items-center gap-8 min-h-full justify-center",
                     div {
-                        class: "relative transform overflow-hidden p-2",
+                        class: r#"
+                        mx-auto
+                        p-2
+                        grid
+                        grid-col
+                        gap-4
+                        theme1:bg-stone-200
+                        theme1:text-stone-900
+                        theme2:bg-green-200
+                        theme1:text-green-900
+                        "#,
+
+                        h1 {
+                            class: r#"
+                            block
+                            p-2
+                            text-lg
+                            theme1:bg-red-900
+                            theme1:text-stone-200
+                            theme2:bg-green-800
+                            theme2:text-green-200
+                            "#,
+                            "Delete game?"
+                        }
+                        p {
+                            class: "text-md",
+                            "Are you sure you want to delete ",
+                            br {},
+                            r#""{name}"?"#
+                        }
                         div {
-                            class: "mx-auto border p-2",
-                            div {
-                                h1 {
-                                    class: "block",
-                                    "Delete game?"
-                                }
-                                p { r#"Are you sure you want to delete "{name}"?"#}
+                            class: "flex justify-end gap-2",
+                            Button {
+                                onclick: delete,
+                                "Yes"
                             }
-                            div {
-                                class: "flex justify-end gap-4",
-                                button {
-                                    class: "border",
-                                    r#type: "button",
-                                    onclick: delete,
-                                    "Yes"
-                                }
-                                button {
-                                    class: "border",
-                                    r#type: "button",
-                                    onclick: dismiss,
-                                    "No"
-                                }
+                            Button {
+                                onclick: dismiss,
+                                "No"
                             }
                         }
                     }

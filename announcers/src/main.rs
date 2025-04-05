@@ -1,5 +1,3 @@
-use announcers::{summarize, summarize_stream};
-
 #[tokio::main]
 async fn main() {
     let log = r#"
@@ -77,5 +75,6 @@ async fn main() {
 === 📌 Tributes alive: 23 ===
 "#;
 
-    println!("{:?}", summarize_stream(log).await);
+    // println!("{:?}", summarize_stream(log).await);
+    todo!();
 }

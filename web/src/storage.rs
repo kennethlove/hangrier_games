@@ -1,0 +1,108 @@
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
+use dioxus::prelude::*;
+use gloo_storage::{LocalStorage, Storage};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+
+/// A persistent storage hook that can be used to store data across application reloads.
+pub fn use_persistent<T: Serialize + DeserializeOwned + Default + 'static>(
+    // A unique key for the storage entry
+    key: impl ToString,
+    // A function that returns the initial value if the storage entry is empty
+    init: impl FnOnce() -> T,
+) -> UsePersistent<T> {
+    let state = use_signal(move || {
+        let key = key.to_string();
+        let value = LocalStorage::get(key.as_str()).ok().unwrap_or_else(init);
+        StorageEntry { key, value }
+    });
+
+    // Wrap the state in a new struct
+    UsePersistent { inner: state }
+}
+
+struct StorageEntry<T> {
+    key: String,
+    value: T,
+}
+
+/// Storage that persists across application reloads
+pub struct UsePersistent<T: 'static> {
+    inner: Signal<StorageEntry<T>>,
+}
+
+impl<T> Clone for UsePersistent<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl <T> Copy for UsePersistent<T> {}
+
+impl <T: Serialize + DeserializeOwned + Clone + 'static> UsePersistent<T> {
+    /// Returns a reference to the value
+    pub fn get(&self) -> T {
+        self.inner.read().value.clone()
+    }
+
+    /// Sets the value
+    pub fn set(&mut self, value: T) {
+        let mut inner = self.inner.write();
+        LocalStorage::set(inner.key.as_str(), &value).expect("Unable to write to LocalStorage");
+        inner.value = value;
+    }
+}
+
+fn get_saved_state(storage: UsePersistent<AppState>) -> AppState {
+    let mut state = AppState::default();
+    state
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub enum Colorscheme {
+    #[default]
+    ThemeOne,
+    ThemeTwo,
+    ThemeThree,
+}
+
+impl Display for Colorscheme {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Colorscheme::ThemeOne => { write!(f, "theme1") }
+            Colorscheme::ThemeTwo => { write!(f, "theme2") }
+            Colorscheme::ThemeThree => { write!(f, "theme3") }
+        }
+    }
+}
+
+impl FromStr for Colorscheme {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "theme1" => Ok(Colorscheme::ThemeOne),
+            "theme2" => Ok(Colorscheme::ThemeTwo),
+            "theme3" => Ok(Colorscheme::ThemeThree),
+            _ => Err("invalid colorscheme".into())
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AppState {
+    pub(crate) colorscheme: Colorscheme,
+}
+
+impl AppState {
+    pub fn to_theme_one(&mut self) {
+        self.colorscheme = Colorscheme::ThemeOne;
+    }
+    pub fn to_theme_two(&mut self) {
+        self.colorscheme = Colorscheme::ThemeTwo;
+    }
+    pub fn to_theme_three(&mut self) {
+        self.colorscheme = Colorscheme::ThemeThree;
+    }
+}

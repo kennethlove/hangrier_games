@@ -93,14 +93,6 @@ pub fn App() -> Element {
 
                     p { dangerous_inner_html: "{copyright}" }
                     p {
-                        "Three finger salute icon by "
-                        a {
-                            href: "https://thenounproject.com/browse/icons/term/three-finger-salute/",
-                            "Till Teenck"
-                        },
-                        " (CC BY 3.0)"
-                    }
-                    p {
                         "Mockingjay icons from "
                         a {
                             href: "https://www.vecteezy.com/members/inna-marchenko601727",

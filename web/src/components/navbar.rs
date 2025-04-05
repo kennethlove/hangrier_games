@@ -1,7 +1,6 @@
 use crate::components::icons::mockingjay::Mockingjay;
 use crate::components::icons::mockingjay_arrow::MockingjayArrow;
 use crate::components::icons::mockingjay_flight::MockingjayFlight;
-use crate::components::icons::three_finger_salute::ThreeFingerSalute;
 use crate::components::Button;
 use crate::routes::Routes;
 use crate::storage::{use_persistent, AppState, Colorscheme};

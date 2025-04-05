@@ -189,8 +189,8 @@ pub fn GameListMember(game: Game) -> Element {
                 theme2:text-green-200/50
                 theme3:text-stone-700
                 "#,
-                p { "{living_count} / {game.tribute_count} tributes left" }
-                p { "Day {game.day.unwrap_or_default()}" }
+                p { class: "flex-grow", "{living_count} / {game.tribute_count} tributes" }
+                p { class: "flex-grow", "Day {game.day.unwrap_or_default()}" }
                 p { "Status: {game.status}" }
             }
         }

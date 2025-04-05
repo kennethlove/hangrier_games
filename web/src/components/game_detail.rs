@@ -1,14 +1,14 @@
-use crate::components::Button;
-use crate::API_HOST;
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
-use crate::components::game_day_log::GameDayLog;
 use crate::components::game_areas::GameAreaList;
+use crate::components::game_day_log::GameDayLog;
 use crate::components::game_day_summary::GameDaySummary;
 use crate::components::game_edit::GameEdit;
 use crate::components::game_tributes::GameTributes;
+use crate::components::Button;
+use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{
-    MutationResult, QueryResult, use_get_query, use_mutation, use_query_client,
+    use_get_query, use_mutation, use_query_client, MutationResult, QueryResult,
 };
 use game::games::Game;
 use game::games::GameStatus;
@@ -150,6 +150,10 @@ fn GameStatusState() -> Element {
                         theme2:font-[Forum]
                         theme2:text-3xl
                         theme2:text-green-200
+
+                        theme3:font-[Orbitron]
+                        theme3:text-2xl
+                        theme3:text-stone-700
                         "#,
 
                         "{game_name}"
@@ -167,6 +171,9 @@ fn GameStatusState() -> Element {
 
                                 theme2:fill-green-200/50
                                 theme2:hover:fill-green-200
+
+                                theme3:fill-amber-600/50
+                                theme3:hover:fill-amber-600
                                 "#
                             }
                         }
@@ -191,6 +198,12 @@ fn GameStatusState() -> Element {
                             theme2:hover:text-green-200
                             theme2:hover:from-green-500
                             theme2:hover:to-teal-600
+
+                            theme3:border-none
+                            theme3:bg-gold-rich
+                            theme3:hover:bg-gold-rich-reverse
+                            theme3:text-stone-700
+                            theme3:hover:text-stone-50
                             "#.into()),
 
                             onclick: next_step_handler,
@@ -212,8 +225,11 @@ fn GameStatusState() -> Element {
 
                     p {
                         class: r#"
+                        flex-grow
                         theme1:text-amber-300
                         theme2:text-green-200
+
+                        theme3:text-stone-700
                         "#,
 
                         span {
@@ -223,6 +239,8 @@ fn GameStatusState() -> Element {
                             theme1:text-amber-500
                             theme1:font-semibold
                             theme2:text-teal-500
+                            theme3:text-yellow-600
+                            theme3:font-semibold
                             "#,
 
                             "status"
@@ -231,8 +249,10 @@ fn GameStatusState() -> Element {
                     }
                     p {
                         class: r#"
+                        flex-grow
                         theme1:text-amber-300
                         theme2:text-green-200
+                        theme3:text-stone-700
                         "#,
 
                         span {
@@ -242,6 +262,8 @@ fn GameStatusState() -> Element {
                             theme1:text-amber-500
                             theme1:font-semibold
                             theme2:text-teal-500
+                            theme3:text-yellow-600
+                            theme3:font-semibold
                             "#,
 
                             "day"
@@ -252,6 +274,7 @@ fn GameStatusState() -> Element {
                         class: r#"
                         theme1:text-amber-300
                         theme2:text-green-200
+                        theme3:text-stone-700
                         "#,
 
                         span {
@@ -261,6 +284,8 @@ fn GameStatusState() -> Element {
                             theme1:text-amber-500
                             theme1:font-semibold
                             theme2:text-teal-500
+                            theme3:text-yellow-600
+                            theme3:font-semibold
                             "#,
 
                             "tributes alive"
@@ -341,6 +366,10 @@ pub fn InfoDetail(props: InfoDetailProps) -> Element {
             theme2:border-green-800
             theme2:hover:border-green-400
             theme2:open:border-green-400
+
+            theme3:bg-stone-50/80
+            theme3:border-4
+            theme3:border-gold-rich
             "#,
 
             summary {
@@ -366,6 +395,9 @@ pub fn InfoDetail(props: InfoDetailProps) -> Element {
                     theme2:text-2xl
                     theme2:text-green-200
                     theme2:group-open:text-green-400
+
+                    theme3:font-[Orbitron]
+                    theme3:tracking-wider
                     "#,
 
                     "{props.title}",
@@ -377,9 +409,11 @@ pub fn InfoDetail(props: InfoDetailProps) -> Element {
                         size-4
                         fill-none
                         stroke-current
+
                         theme1:stroke-amber-300
                         theme1:hover:stroke-amber-300
                         theme1:group-open:stroke-amber-300
+
                         theme2:group-open:stroke-green-400
                         theme2:stroke-green-200
                         theme2:hover:stroke-green-400

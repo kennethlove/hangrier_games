@@ -1,11 +1,11 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
+use crate::components::icons::edit::EditIcon;
+use crate::components::Button;
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use shared::EditGame;
 use std::ops::Deref;
-use crate::components::icons::edit::EditIcon;
-use crate::components::Button;
 
 async fn edit_game(game: EditGame) -> MutationResult<MutationValue, MutationError> {
     let identifier = game.0.clone();
@@ -112,10 +112,16 @@ pub fn EditGameForm() -> Element {
             grid
             grid-col
             gap-4
+
             theme1:bg-stone-200
             theme1:text-stone-900
+
+            theme2:text-green-900
             theme2:bg-green-200
-            theme1:text-green-900
+
+            theme3:bg-stone-50
+            theme3:border-3
+            theme3:border-gold-rich
             "#,
             onsubmit: save,
             h1 {
@@ -125,8 +131,11 @@ pub fn EditGameForm() -> Element {
                 text-lg
                 theme1:bg-red-900
                 theme1:text-stone-200
+
                 theme2:bg-green-800
                 theme2:text-green-200
+
+                theme3:font-[Orbitron]
                 "#,
                 "Edit game"
             }

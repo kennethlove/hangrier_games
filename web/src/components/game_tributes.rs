@@ -123,6 +123,10 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
             theme2:data-[alive=false]:border-red-200
             theme2:text-green-200
             theme2:rounded-md
+
+            theme3:data-[alive=true]:border-green-600
+            theme3:data-[alive=false]:border-red-600
+            theme3:border-2
             "#,
 
             div {
@@ -136,6 +140,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 h4 {
                     class: r#"
                     mb-2
+                    flex-grow
 
                     theme1:font-[Cinzel]
                     theme1:text-lg
@@ -146,6 +151,8 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                     theme2:hover:underline
                     theme2:hover:decoration-2
                     theme2:hover:decoration-wavy
+
+                    theme3:font-semibold
                     "#,
 
                     Link {
@@ -203,9 +210,14 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 class: r#"
                 mt-2
                 theme1:text-amber-200
+
                 theme2:text-green-200
                 theme2:bg-green-800
                 theme2:px-2
+
+                theme3:border-0
+                theme3:border-b-2
+                theme3:border-gold-rich
                 "#,
 
                 "Items"
@@ -228,9 +240,14 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 class: r#"
                 mt-2
                 theme1:text-amber-200
+
                 theme2:text-green-200
                 theme2:bg-green-800
                 theme2:px-2
+
+                theme3:border-0
+                theme3:border-b-2
+                theme3:border-gold-rich
                 "#,
 
                 "Log"

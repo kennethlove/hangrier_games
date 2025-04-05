@@ -35,6 +35,7 @@ pub fn Navbar() -> Element {
                 theme1:from-amber-300
                 theme1:to-red-500
                 theme1:text-4xl
+                theme1:sm:text-6xl
 
                 theme2:font-[Forum]
                 theme2:font-bold

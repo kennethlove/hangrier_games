@@ -1,12 +1,12 @@
+use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
+use crate::components::icons::edit::EditIcon;
 use crate::components::Button;
 use crate::API_HOST;
-use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{MutationResult, use_mutation, use_query_client};
+use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use game::games::Game;
 use shared::EditTribute;
 use std::ops::Deref;
-use crate::components::icons::edit::EditIcon;
 
 async fn edit_tribute(args: (EditTribute, String)) -> MutationResult<MutationValue, MutationError> {
     let tribute = args.clone().0;
@@ -49,18 +49,20 @@ pub fn TributeEdit(identifier: String, district: u32, name: String) -> Element {
     rsx! {
         Button {
             extra_classes: r#"
-            theme1:border-none
-            theme2:border-none
+            border-none
             "#,
             onclick,
             EditIcon {
                 class: r#"
-                theme1:size-4
+                size-4
                 theme1:fill-stone-200/50
                 theme1:hover:fill-stone-200
-                theme2:size-4
+
                 theme2:fill-green-200/50
                 theme2:hover:fill-green-200
+
+                theme3:fill-stone-700/50
+                theme3:hover:fill-stone-800
                 "#,
             }
         }
@@ -151,10 +153,16 @@ pub fn EditTributeForm() -> Element {
         grid
         grid-col
         gap-4
+
         theme1:bg-stone-200
         theme1:text-stone-900
+
         theme2:bg-green-200
         theme2:text-green-900
+
+        theme3:bg-stone-50
+        theme3:border-gold-rich
+        theme3:border-3
         "#,
         onsubmit: save,
 
@@ -165,9 +173,13 @@ pub fn EditTributeForm() -> Element {
             text-lg
             theme1:bg-red-900
             theme1:text-stone-200
+
             theme2:bg-green-800
             theme2:text-green-200
+
+            theme3:font-[Orbitron]
             "#,
+
             "Edit tribute"
         }
         div {

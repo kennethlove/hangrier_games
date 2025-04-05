@@ -1,11 +1,11 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
+use crate::components::icons::lock_closed::LockClosedIcon;
+use crate::components::icons::lock_open::LockOpenIcon;
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::areas::AreaDetails;
 use game::games::Game;
-use crate::components::icons::lock_closed::LockClosedIcon;
-use crate::components::icons::lock_open::LockOpenIcon;
 
 async fn fetch_areas(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Areas(identifier)) = keys.first() {
@@ -60,16 +60,23 @@ pub fn GameAreaList() -> Element {
                             theme1:data-[open=true]:border-green-500
                             theme1:data-[open=false]:border-red-500
                             theme1:text-stone-200
+
                             theme2:data-[open=true]:bg-green-200
                             theme2:data-[open=false]:bg-red-200
+
+                            theme3:border-2
+                            theme3:data-[open=true]:border-green-600
+                            theme3:data-[open=false]:border-red-500
                             "#,
 
                             div {
                                 class: "flex flex-row gap-2 place-content-between",
                                 h4 {
                                     class: r#"
+                                    flex-grow
                                     theme1:text-amber-300
                                     theme2:text-green-800
+                                    theme3:font-semibold
                                     "#,
 
                                     "{area.name}"
@@ -98,9 +105,14 @@ pub fn GameAreaList() -> Element {
                             h5 {
                                 class: r#"
                                 theme1:text-amber-200
+
                                 theme2:text-green-200
                                 theme2:bg-green-800
                                 theme2:px-2
+
+                                theme3:border-gold-rich
+                                theme3:border-0
+                                theme3:border-b-2
                                 "#,
 
                                 "Items"
@@ -124,9 +136,14 @@ pub fn GameAreaList() -> Element {
                             h5 {
                                 class: r#"
                                 theme1:text-amber-200
+
                                 theme2:text-green-200
                                 theme2:bg-green-800
                                 theme2:px-2
+
+                                theme3:border-gold-rich
+                                theme3:border-0
+                                theme3:border-b-2
                                 "#,
 
                                 "Events"

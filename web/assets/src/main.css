@@ -8,6 +8,18 @@
 @utility bg-gold-rich {
     background-image: linear-gradient(45deg, #462523 0%, #cb9b51 22%, #f6e27a 45%, #f6f2c0 50%, #f6e27a 55%, #cb9b51 78%, #462523 100%);
 }
+@utility bg-gold-rich-reverse {
+    background-image: linear-gradient(
+        45deg,
+        #462523 0%,
+        #cb9b51 22%,
+        #f6e27a 42%,    /* more shift */
+        #f6f2c0 47%,    /* more shift */
+        #f6e27a 52%,    /* more shift */
+        #cb9b51 78%,
+        #462523 100%
+    );
+}
 
 @utility border-gold-rich {
     border-image: linear-gradient(45deg, #462523 0%, #cb9b51 22%, #f6e27a 45%, #f6f2c0 50%, #f6e27a 55%, #cb9b51 78%, #462523 100%) 1;

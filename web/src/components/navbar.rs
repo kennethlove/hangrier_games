@@ -216,9 +216,8 @@ pub fn Navbar() -> Element {
                                 theme2:rounded-sm
                                 theme2:rounded-tr-none
 
-                                theme3:bg-slate-200/50
+                                theme3:bg-stone-50
                                 theme3:border
-                                theme3:border-double
                                 theme3:border-5
                                 theme3:border-gold-rich
                                 theme3:box-decoration-clone

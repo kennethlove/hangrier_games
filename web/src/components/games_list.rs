@@ -115,6 +115,10 @@ pub fn GameListMember(game: Game) -> Element {
 
             theme2:border-none
             theme2:bg-green-900
+
+            theme3:border-3
+            theme3:border-gold-rich
+            theme3:bg-stone-50/50
             "#,
             div {
                 class: "flex place-content-between",
@@ -130,6 +134,8 @@ pub fn GameListMember(game: Game) -> Element {
                     theme2:hover:decoration-wavy
                     theme2:hover:decoration-2
                     theme2:mb-2
+
+                    theme3:text-yellow-600
                     "#,
                     Link {
                         to: Routes::GamePage {
@@ -151,6 +157,9 @@ pub fn GameListMember(game: Game) -> Element {
 
                         theme2:fill-green-200/50
                         theme2:hover:fill-green-200
+
+                        theme3:fill-yellow-600
+                        theme3:hover:fill-amber-500
                         "#,
                     }
                     GameDelete {
@@ -163,6 +172,9 @@ pub fn GameListMember(game: Game) -> Element {
 
                         theme2:fill-green-200/50
                         theme2:hover:fill-green-200
+
+                        theme3:fill-yellow-600
+                        theme3:hover:fill-amber-500
                         "#,
                     }
                 }
@@ -175,6 +187,7 @@ pub fn GameListMember(game: Game) -> Element {
                 text-xs
                 theme1:text-stone-200/75
                 theme2:text-green-200/50
+                theme3:text-stone-700
                 "#,
                 p { "{living_count} / {game.tribute_count} tributes left" }
                 p { "Day {game.day.unwrap_or_default()}" }

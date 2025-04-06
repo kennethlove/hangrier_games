@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "../rpg-awesome.min.css";
+@import "rpg-awesome.min.css";
 
 @variant theme1 (&:where(.theme1, .theme1 *));
 @variant theme2 (&:where(.theme2, .theme2 *));

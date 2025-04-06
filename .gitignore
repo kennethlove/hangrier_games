@@ -1,7 +1,6 @@
 /target
 /dist
 /.idea
-.env
 .aider*
 web/assets/node_modules
 web/assets/dist

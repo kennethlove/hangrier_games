@@ -1,0 +1,47 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: api.Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - surrealdb
+    environment:
+      - SURREAL_HOST=ws://surrealdb:8000
+      - SURREAL_USER=root
+      - SURREAL_PASS=root
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/games"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    command: start --user root --pass root
+    ports:
+      - "8000:8000"
+    volumes:
+      - surrealdb_data:/data
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8000"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+        start_period: 5s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    environment:
+      - API_HOST=http://backend:3000
+
+volumes:
+  surrealdb_data:

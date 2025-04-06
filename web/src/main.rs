@@ -7,11 +7,10 @@ use components::App;
 use std::sync::LazyLock;
 
 use dioxus::prelude::*;
-use dotenvy_macro::dotenv;
 
 static API_HOST: LazyLock<String> = LazyLock::new(|| {
     dotenvy::dotenv().ok();
-    dotenv!("API_HOST").parse().unwrap_or(String::from("http://localhost"))
+    std::env::var("API_HOST").unwrap_or("http://localhost:3000".to_string())
 });
 
 fn main() {

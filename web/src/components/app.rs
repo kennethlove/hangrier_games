@@ -48,6 +48,10 @@ pub fn App() -> Element {
             rel: "stylesheet"
         }
 
+        document::Script {
+           src: "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"
+        }
+
         document::Stylesheet {
             href: asset!("/assets/dist/main.css")
         }
@@ -65,11 +69,11 @@ pub fn App() -> Element {
                 p-2
                 font-[Work_Sans]
 
-                theme1:bg-[url('/assets/images/noise.svg')]
+                theme1:bg-[url("../assets/images/noise.svg")]
                 theme1:bg-red-800
 
                 theme2:bg-green-800/85
-                theme2:bg-[url('/assets/images/waves.svg')]
+                theme2:bg-[url("../assets/images/waves.svg")]
                 theme2:bg-no-repeat
                 theme2:bg-origin-border
                 theme2:bg-bottom

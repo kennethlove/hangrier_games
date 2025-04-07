@@ -47,7 +47,7 @@ services:
       - backend
     environment:
       - SERVICE_FQDN_HANGRY_GAMES_80
-      - API_HOST=http://backend:3000
+      - API_HOST=${SERVICE_FQDN_API_3000}
     labels:
       - "coolify.managed=true"
 

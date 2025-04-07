@@ -41,13 +41,14 @@ services:
     build:
       context: .
       dockerfile: frontend.Dockerfile
+      args:
+        - API_HOST=${SERVICE_FQDN_API_3000:-http://localhost:3000}
     ports:
       - "${SERVICE_PORT_FRONTEND:-7575}:80"
     depends_on:
       - backend
     environment:
       - SERVICE_FQDN_HANGRY_GAMES_80
-      - API_HOST=${SERVICE_FQDN_API_3000}
     labels:
       - "coolify.managed=true"
 

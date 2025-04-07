@@ -8,10 +8,7 @@ use std::sync::LazyLock;
 
 use dioxus::prelude::*;
 
-static API_HOST: LazyLock<String> = LazyLock::new(|| {
-    dotenvy::dotenv().ok();
-    std::env::var("API_HOST").unwrap_or("http://localhost:3000".to_string())
-});
+static API_HOST: &str = env!("API_HOST");
 
 fn main() {
     launch(App);

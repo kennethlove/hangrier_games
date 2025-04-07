@@ -1,5 +1,5 @@
 ARG RUST_VERSION=1.86.0
-ARG API_HOST
+ARG API_HOST=http://localhost:3000
 
 # Build stage for Tailwind
 FROM node:23-slim AS css-builder

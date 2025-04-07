@@ -8,7 +8,7 @@ services:
     depends_on:
       - surrealdb
     environment:
-      - SERVICE_FQDN_API_3000=${SERVICE_FQDN_API_3000}
+      - SERVICE_FQDN_API_3000
       - SURREAL_HOST=ws://surrealdb:8000
       - SURREAL_USER=${SURREAL_USER:-root}
       - SURREAL_PASS=${SURREAL_PASS:-root}
@@ -25,17 +25,17 @@ services:
     image: surrealdb/surrealdb:latest
     command: start --user ${SURREAL_USER:-root} --pass ${SURREAL_PASS:-root}
     environment:
-      - SERVICE_FQDN_SURREALDB_8000=${SERVICE_FQDN_SURREALDB_8000}
+      - SERVICE_FQDN_SURREALDB_8000
     volumes:
       - surrealdb_data:/data
     labels:
       - "coolify.managed=true"
     healthcheck:
-        test: ["CMD", "curl", "-f", "http://localhost:8000"]
-        interval: 30s
-        timeout: 10s
-        retries: 5
-        start_period: 5s
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 5s
 
   frontend:
     build:
@@ -46,8 +46,8 @@ services:
     depends_on:
       - backend
     environment:
-        - SERVICE_FQDN_HANGRY_GAMES_80=${SERVICE_FQDN_HANGRY_GAMES_80}
-        - API_HOST=http://backend:3000
+      - SERVICE_FQDN_HANGRY_GAMES_80
+      - API_HOST=http://backend:3000
     labels:
       - "coolify.managed=true"
 

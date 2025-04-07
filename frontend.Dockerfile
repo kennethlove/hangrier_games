@@ -1,4 +1,5 @@
 ARG RUST_VERSION=1.86.0
+ARG API_HOST
 
 # Build stage for Tailwind
 FROM node:23-slim AS css-builder
@@ -37,6 +38,8 @@ COPY web/assets/images/ ./web/assets/images/
 COPY shared/ ./shared/
 COPY game ./game/
 COPY --from=css-builder /app/assets/dist/ ./web/assets/dist/
+
+ENV API_HOST=${API_HOST}
 
 WORKDIR /app/web
 RUN dx build --release

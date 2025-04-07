@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: api.Dockerfile
     ports:
-      - "${SERVICE_PORT_API:-300}:3000"
+      - "${SERVICE_PORT_API:-3000}:3000"
     depends_on:
       - surrealdb
     environment:

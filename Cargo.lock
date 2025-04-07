@@ -178,7 +178,6 @@ dependencies = [
  "announcers",
  "async-stream",
  "axum",
- "dotenvy",
  "futures",
  "game",
  "getrandom 0.2.15",

@@ -4,8 +4,8 @@ services:
       context: .
       dockerfile: api.Dockerfile
       cache_from:
-        - backend:latest
-    image: backend:latest
+        - hg_backend:latest
+    image: hg_backend:latest
     ports:
       - "${SERVICE_PORT_API:-3000}:3000"
     depends_on:
@@ -47,8 +47,8 @@ services:
       args:
         - API_HOST=${SERVICE_FQDN_API_3000:-http://localhost:3000}
       cache_from:
-        - frontend:latest
-    image: frontend:latest
+        - hg_frontend:latest
+    image: hg_frontend:latest
     ports:
       - "${SERVICE_PORT_FRONTEND:-7575}:80"
     depends_on:

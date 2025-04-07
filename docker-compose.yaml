@@ -4,14 +4,16 @@ services:
       context: .
       dockerfile: api.Dockerfile
     ports:
-      - "3000:3000"
+      - "${SERVICE_PORT_API:-300}:3000"
     depends_on:
       - surrealdb
     environment:
-      - SERVICE_FQDN_API_3000
+      - SERVICE_FQDN_API_3000=${SERVICE_FQDN_API_3000}
       - SURREAL_HOST=ws://surrealdb:8000
-      - SURREAL_USER=root
-      - SURREAL_PASS=root
+      - SURREAL_USER=${SURREAL_USER:-root}
+      - SURREAL_PASS=${SURREAL_PASS:-root}
+    labels:
+      coolify.managed: "true"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/games"]
       interval: 30s
@@ -21,13 +23,13 @@ services:
 
   surrealdb:
     image: surrealdb/surrealdb:latest
-    command: start --user root --pass root
+    command: start --user ${SURREAL_USER:-root} --pass ${SURREAL_PASS:-root}
     environment:
-      - SERVICE_FQDN_SURREALDB_8000
-    ports:
-      - "8000:8000"
+      - SERVICE_FQDN_SURREALDB_8000=${SERVICE_FQDN_SURREALDB_8000}
     volumes:
       - surrealdb_data:/data
+    labels:
+      coolify.managed: "true"
     healthcheck:
         test: ["CMD", "curl", "-f", "http://localhost:8000"]
         interval: 30s
@@ -40,12 +42,17 @@ services:
       context: .
       dockerfile: frontend.Dockerfile
     ports:
-      - "80:80"
+      - "${SERVICE_PORT_FRONTEND:-80}:80"
     depends_on:
       - backend
     environment:
-        - SERVICE_FQDN_HANGRY_GAMES_80
+        - SERVICE_FQDN_HANGRY_GAMES_80=${SERVICE_FQDN_HANGRY_GAMES_80}
         - API_HOST=http://backend:3000
+    labels:
+      coolify.managed: "true"
 
 volumes:
   surrealdb_data:
+    name: "${COMPOSE_PROJECT_NAME:-app}_surrealdb_data"
+    labels:
+      coolify.managed: "true"

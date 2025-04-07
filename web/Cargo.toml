@@ -7,8 +7,6 @@ edition = "2024"
 dioxus = { version = "0.6.3", features = ["web", "router"] }
 dioxus-logger = "0.6.2"
 dioxus-query = "0.6.0"
-dotenvy = "0.15.7"
-dotenvy_macro = "0.15.7"
 game = { path = "../game" }
 gloo-storage = "0.3.0"
 serde = { version = "1.0.216", features = ["derive"] }

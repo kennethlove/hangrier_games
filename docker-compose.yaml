@@ -13,7 +13,7 @@ services:
       - SURREAL_USER=${SURREAL_USER:-root}
       - SURREAL_PASS=${SURREAL_PASS:-root}
     labels:
-      coolify.managed: "true"
+      "coolify.managed": "true"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/games"]
       interval: 30s
@@ -29,7 +29,7 @@ services:
     volumes:
       - surrealdb_data:/data
     labels:
-      coolify.managed: "true"
+      "coolify.managed": "true"
     healthcheck:
         test: ["CMD", "curl", "-f", "http://localhost:8000"]
         interval: 30s
@@ -49,10 +49,10 @@ services:
         - SERVICE_FQDN_HANGRY_GAMES_80=${SERVICE_FQDN_HANGRY_GAMES_80}
         - API_HOST=http://backend:3000
     labels:
-      coolify.managed: "true"
+      "coolify.managed": "true"
 
 volumes:
   surrealdb_data:
     name: "${COMPOSE_PROJECT_NAME:-app}_surrealdb_data"
     labels:
-      coolify.managed: "true"
+      "coolify.managed": "true"

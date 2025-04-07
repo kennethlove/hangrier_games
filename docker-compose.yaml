@@ -22,6 +22,8 @@ services:
   surrealdb:
     image: surrealdb/surrealdb:latest
     command: start --user root --pass root
+    environment:
+      - SERVICE_FQDN_SURREALDB_8000
     ports:
       - "8000:8000"
     volumes:

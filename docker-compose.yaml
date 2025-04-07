@@ -42,7 +42,7 @@ services:
       context: .
       dockerfile: frontend.Dockerfile
     ports:
-      - "${SERVICE_PORT_FRONTEND:-80}:80"
+      - "${SERVICE_PORT_FRONTEND:-8080}:80"
     depends_on:
       - backend
     environment:

@@ -21,7 +21,6 @@ COPY game/ game/
 COPY migrations/ migrations/
 COPY schemas/ schemas/
 COPY shared/ shared/
-COPY .env .env
 
 RUN --mount=type=cache,target=/app/target/ \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
@@ -53,8 +52,8 @@ RUN chown -R api_user /usr/local/bin/hg_api && \
 USER api_user
 WORKDIR /opt/api
 
-COPY ./schemas /opt/api/schemas
-COPY --from=builder /app/.env /opt/api/.env
+COPY --from=builder /app/schemas /opt/api/schemas
+COPY --from=builder /app/migrations /opt/api/migrations
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl --fail http://localhost:3000/api/games/ || exit 1

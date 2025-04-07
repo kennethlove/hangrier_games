@@ -1,16 +1,17 @@
 ARG RUST_VERSION=1.86.0
-ARG API_HOST=http://localhost:3000
 
 # Build stage for Tailwind
 FROM node:23-slim AS css-builder
 WORKDIR /app
 
-COPY web/src/ ./src/
-COPY web/assets/src/ ./assets/src/
+# Install packages
 COPY web/tailwind.config.js ./tailwind.config.js
 COPY web/assets/package*.json ./
-
 RUN npm install tailwindcss @tailwindcss/cli
+
+# Build Tailwind CSS
+COPY web/src/ ./src/
+COPY web/assets/src/ ./assets/src/
 RUN npx @tailwindcss/cli -i ./assets/src/main.css -o ./assets/dist/main.css
 
 # Build stage for Dioxus
@@ -31,14 +32,23 @@ RUN apt-get update && \
 
 RUN cargo install dioxus-cli --locked
 
+# Build a dummy app with real dependencies
 COPY web/Cargo.toml ./web/Cargo.toml
 COPY web/Dioxus.toml ./web/Dioxus.toml
-COPY web/src/ ./web/src/
-COPY web/assets/images/ ./web/assets/images/
 COPY shared/ ./shared/
 COPY game ./game/
-COPY --from=css-builder /app/assets/dist/ ./web/assets/dist/
+RUN mkdir -p web/src && \
+    echo "fn main() {}" > web/src/main.rs && \
+    cd web && \
+    cargo build --release && \
+    rm -f target/release/deps/web*
 
+# Build real app with cached dependencies
+COPY web/src/ ./web/src/
+COPY --from=css-builder /app/assets/dist/ ./web/assets/dist/
+COPY web/assets/images/ ./web/assets/images/
+
+ARG API_HOST=http://localhost:3000
 ENV API_HOST=${API_HOST}
 
 WORKDIR /app/web

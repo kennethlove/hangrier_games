@@ -1,9 +1,10 @@
 ARG RUST_VERSION=1.86.0
 
 # Build stage for Tailwind
-FROM node:18-slim AS css-builder
+FROM node:23-slim AS css-builder
 WORKDIR /app
 
+COPY web/src/ ./src/
 COPY web/assets/src/ ./assets/src/
 COPY web/tailwind.config.js ./tailwind.config.js
 COPY web/assets/package*.json ./

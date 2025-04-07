@@ -48,9 +48,9 @@ pub fn App() -> Element {
             rel: "stylesheet"
         }
 
-        document::Script {
-           src: "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"
-        }
+        // Script {
+        //    src: "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"
+        // }
 
         document::Stylesheet {
             href: asset!("/assets/dist/main.css")

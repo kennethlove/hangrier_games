@@ -8,6 +8,7 @@ services:
     depends_on:
       - surrealdb
     environment:
+      - SERVICE_FQDN_API_3000
       - SURREAL_HOST=ws://surrealdb:8000
       - SURREAL_USER=root
       - SURREAL_PASS=root
@@ -41,7 +42,8 @@ services:
     depends_on:
       - backend
     environment:
-      - API_HOST=http://backend:3000
+        - SERVICE_FQDN_HANGRY_GAMES_80
+        - API_HOST=http://backend:3000
 
 volumes:
   surrealdb_data:

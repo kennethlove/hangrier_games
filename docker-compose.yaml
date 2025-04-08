@@ -37,6 +37,8 @@ services:
       - surrealdb_data:/data
     labels:
       - "coolify.managed=true"
+    ports:
+      - "${SERVICE_PORT_DATABASE:-8000}:8000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000"]
       interval: 30s

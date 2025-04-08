@@ -16,8 +16,8 @@ services:
     depends_on:
       - surrealdb
     environment:
-      - SERVICE_FQDN_BACKEND_3000=${SERVICE_FQDN_BACKEND_3000:-http://backend:3000}
-      - SURREAL_HOST=${SERVICE_FQDN_SURREALDB_8000:-ws://surrealdb:8000}
+      - SERVICE_FQDN_BACKEND_3000=${SERVICE_FQDN_BACKEND:-http://backend:3000}
+      - SURREAL_HOST=${SERVICE_FQDN_SURREALDB:-ws://surrealdb:8000}
       - SURREAL_USER=${SURREAL_USER:-root}
       - SURREAL_PASS=${SURREAL_PASS:-root}
     labels:
@@ -36,7 +36,7 @@ services:
       - internal
     command: start --user ${SURREAL_USER:-root} --pass ${SURREAL_PASS:-root}
     environment:
-      - SERVICE_FQDN_SURREALDB_8000=${SERVICE_FQDN_SURREALDB_8000}
+      - SERVICE_FQDN_SURREALDB=${SERVICE_FQDN_SURREALDB}
     volumes:
       - surrealdb_data:/data
     labels:
@@ -53,7 +53,7 @@ services:
       context: .
       dockerfile: frontend.Dockerfile
       args:
-        - API_HOST=${SERVICE_FQDN_BACKEND_3000:-http://backend:3000}
+        - API_HOST=${SERVICE_FQDN_BACKEND:-http://backend:3000}
       cache_from:
         - ${REGISTRY_URL:-localhost}/hg_frontend:latest
     image: ${REGISTRY_URL:-localhost}/hg_frontend:latest
@@ -65,8 +65,8 @@ services:
     depends_on:
       - backend
     environment:
-      - SERVICE_FQDN_FRONTEND_80=${SERVICE_FQDN_FRONTEND_80}
-      - API_HOST=${SERVICE_FQDN_BACKEND_3000:-http://backend:3000}
+      - SERVICE_FQDN_FRONTEND=${SERVICE_FQDN_FRONTEND}
+      - API_HOST=${SERVICE_FQDN_BACKEND:-http://backend:3000}
     labels:
       - "coolify.managed=true"
 

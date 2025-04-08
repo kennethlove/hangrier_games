@@ -16,13 +16,14 @@ services:
     depends_on:
       - surrealdb
     environment:
+      - SERVICE_FQDN_BACKEND_3000=${SERVICE_FQDN_BACKEND_3000:-http://backend:3000}
       - SURREAL_HOST=ws://${SERVICE_FQDN_SURREALDB_8000:-surrealdb:8000}
       - SURREAL_USER=${SURREAL_USER:-root}
       - SURREAL_PASS=${SURREAL_PASS:-root}
     labels:
       - "coolify.managed=true"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/games"]
+      test: ["CMD", "curl", "-f", "http://backend:3000/api/games"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -65,7 +66,7 @@ services:
       - backend
     environment:
       - SERVICE_FQDN_FRONTEND_80=${SERVICE_FQDN_FRONTEND_80}
-      - API_URL=${SERVICE_FQDN_BACKEND_3000:-http://backend:3000}
+      - API_HOST=${SERVICE_FQDN_BACKEND_3000:-http://backend:3000}
     labels:
       - "coolify.managed=true"
 

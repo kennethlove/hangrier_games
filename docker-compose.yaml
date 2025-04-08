@@ -1,17 +1,22 @@
+version: "3.8"
+
 services:
   backend:
     build:
       context: .
       dockerfile: api.Dockerfile
       cache_from:
-        - hg_backend:latest
-    image: hg_backend:latest
+        - ${REGISTRY_URL:-localhost}/hg_backend:latest
+    image: ${REGISTRY_URL:-localhost}/hg_backend:latest
+    restart: unless-stopped
+    networks:
+      - internal
     ports:
-      - "${SERVICE_PORT_API:-3000}:3000"
+      - "${SERVICE_PORT_BACKEND:-3000}:3000"
     depends_on:
       - surrealdb
     environment:
-      - SERVICE_FQDN_BACKEND_3000
+      - SERVICE_FQDN_BACKEND_3000=${SERVICE_FQDN_BACKEND_3000}
       - SURREAL_HOST=ws://surrealdb:8000
       - SURREAL_USER=${SURREAL_USER:-root}
       - SURREAL_PASS=${SURREAL_PASS:-root}
@@ -26,9 +31,12 @@ services:
 
   surrealdb:
     image: surrealdb/surrealdb:latest
+    restart: unless-stopped
+    networks:
+      - internal
     command: start --user ${SURREAL_USER:-root} --pass ${SURREAL_PASS:-root}
     environment:
-      - SERVICE_FQDN_SURREALDB_8000
+      - SERVICE_FQDN_SURREALDB_8000=${SERVICE_FQDN_SURREALDB_8000}
     volumes:
       - surrealdb_data:/data
     labels:
@@ -47,14 +55,17 @@ services:
       args:
         - API_HOST=${SERVICE_FQDN_BACKEND_3000:-http://localhost:3000}
       cache_from:
-        - hg_frontend:latest
-    image: hg_frontend:latest
+        - ${REGISTRY_URL:-localhost}/hg_frontend:latest
+    image: ${REGISTRY_URL:-localhost}/hg_frontend:latest
+    restart: unless-stopped
+    networks:
+      - internal
     ports:
       - "${SERVICE_PORT_FRONTEND:-7575}:80"
     depends_on:
       - backend
     environment:
-      - SERVICE_FQDN_HANGRY_GAMES_80
+      - SERVICE_FQDN_FRONTEND_80=${SERVICE_FQDN_FRONTEND_80}
     labels:
       - "coolify.managed=true"
 
@@ -63,3 +74,10 @@ volumes:
     name: "${COMPOSE_PROJECT_NAME:-app}_surrealdb_data"
     labels:
       - "coolify.managed=true"
+
+networks:
+    internal:
+        name: "${COMPOSE_PROJECT_NAME:-app}_internal"
+        labels:
+        - "coolify.managed=true"
+        driver: bridge

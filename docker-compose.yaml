@@ -16,8 +16,7 @@ services:
     depends_on:
       - surrealdb
     environment:
-      - SERVICE_FQDN_BACKEND_3000=${SERVICE_FQDN_BACKEND_3000}
-      - SURREAL_HOST=ws://surrealdb:8000
+      - SURREAL_HOST=ws://${SERVICE_FQDN_SURREALDB_8000:-surrealdb:8000}
       - SURREAL_USER=${SURREAL_USER:-root}
       - SURREAL_PASS=${SURREAL_PASS:-root}
     labels:
@@ -66,6 +65,7 @@ services:
       - backend
     environment:
       - SERVICE_FQDN_FRONTEND_80=${SERVICE_FQDN_FRONTEND_80}
+      - API_URL=${SERVICE_FQDN_BACKEND_3000:-http://backend:3000}
     labels:
       - "coolify.managed=true"
 

@@ -53,7 +53,6 @@ USER api_user
 WORKDIR /opt/api
 
 COPY --from=builder /app/schemas /opt/api/schemas
-#COPY --from=builder /app/migrations /opt/api/migrations
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl --fail http://localhost:3000/api/games/ || exit 1

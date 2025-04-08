@@ -53,7 +53,7 @@ services:
       context: .
       dockerfile: frontend.Dockerfile
       args:
-        - API_HOST=${SERVICE_FQDN_BACKEND_3000:-http://localhost:3000}
+        - API_HOST=${SERVICE_FQDN_BACKEND_3000:-http://backend:3000}
       cache_from:
         - ${REGISTRY_URL:-localhost}/hg_frontend:latest
     image: ${REGISTRY_URL:-localhost}/hg_frontend:latest

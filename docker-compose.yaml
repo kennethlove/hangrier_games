@@ -46,12 +46,6 @@ services:
     labels:
       - "coolify.managed=true"
 
-volumes:
-  surrealdb_data:
-    name: "${COMPOSE_PROJECT_NAME:-app}_surrealdb_data"
-    labels:
-      - "coolify.managed=true"
-
 networks:
     internal:
         name: "${COMPOSE_PROJECT_NAME:-app}_internal"

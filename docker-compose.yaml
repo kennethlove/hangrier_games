@@ -16,7 +16,7 @@ services:
     environment:
       - SERVICE_FQDN_BACKEND_3000
       - 'SERVICE_FQDN_BACKEND=${SERVICE_FQDN_BACKEND:-http://backend:3000}'
-      - 'SURREAL_HOST=${SERVICE_FQDN_SURREALDB:-ws://surrealdb:8888}'
+      - 'SURREAL_HOST=${SURREAL_HOST:-surrealdb}'
       - 'SURREAL_USER=${SURREAL_USER:-root}'
       - 'SURREAL_PASS=${SURREAL_PASS:-root}'
     labels:

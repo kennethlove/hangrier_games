@@ -11,8 +11,6 @@ services:
     restart: unless-stopped
     ports:
       - "${SERVICE_PORT_BACKEND:-3000}:3000"
-    depends_on:
-      - surrealdb
     environment:
       - SERVICE_FQDN_BACKEND_3000
       - 'SERVICE_FQDN_BACKEND=${SERVICE_FQDN_BACKEND:-http://backend:3000}'

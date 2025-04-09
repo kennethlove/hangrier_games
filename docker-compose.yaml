@@ -41,8 +41,9 @@ services:
     depends_on:
       - backend
     environment:
+      - SERVICE_FQDN_FRONTEND_80
       - 'SERVICE_FQDN_FRONTEND=${SERVICE_FQDN_FRONTEND}'
-      - 'API_HOST=${SERVICE_FQDN_BACKEND:-http://backend:3000}'
+      - 'API_HOST=${API_HOST:-http://backend:3000}'
     labels:
       - "coolify.managed=true"
 

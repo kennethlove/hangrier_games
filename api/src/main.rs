@@ -68,8 +68,6 @@ fn initialize_logging() {
 
 #[tokio::main]
 async fn main() {
-    dotenvy::dotenv().expect("Failed to load .env file");
-
     initialize_logging();
 
     DATABASE.connect(env::var("SURREAL_HOST").unwrap()).await.expect("Failed to connect to database");

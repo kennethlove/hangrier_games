@@ -3,10 +3,13 @@ use crate::DATABASE;
 use announcers::{summarize, summarize_stream};
 use axum::extract::Path;
 use axum::http::StatusCode;
+use axum::response::sse::Event;
 use axum::response::{IntoResponse, Sse};
 use axum::routing::{get, put};
-use axum::{BoxError, Json};
 use axum::Router;
+use axum::{BoxError, Json};
+use futures::stream::BoxStream;
+use futures::StreamExt;
 use game::areas::{Area, AreaDetails};
 use game::games::{Game, GameStatus};
 use game::items::Item;
@@ -20,13 +23,10 @@ use std::convert::Infallible;
 use std::fmt::Result;
 use std::str::FromStr;
 use std::sync::LazyLock;
-use axum::response::sse::Event;
 use strum::IntoEnumIterator;
 use surrealdb::sql::Thing;
 use surrealdb::RecordId;
 use uuid::Uuid;
-use futures::stream::BoxStream;
-use futures::StreamExt;
 
 pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
@@ -545,33 +545,57 @@ async fn tribute_logs(Path((game_identifier, day, tribute_identifier)): Path<(St
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GameSummary {
+    pub day: i64,
+    pub summary: String,
+}
+
 async fn game_day_summary(Path((game_identifier, day)): Path<(String, String)>) -> Json<String> {
     match DATABASE.query(
-        format!(r#"
+        format!(r#"SELECT * FROM summary WHERE <-game->game.identifier = "{game_identifier}" AND day = {day};"#)
+    ).await {
+        Ok(mut logs) => {
+            let log: Option<GameSummary> = logs.take(0).expect("log is empty");
+            if log.is_some() {
+                let log = log.unwrap();
+                let summary = log.summary;
+                return Json(summary);
+            } else {
+                match DATABASE.query(
+                    format!(r#"
         SELECT *
         FROM message
         WHERE string::starts_with(subject, "{game_identifier}")
         AND game_day = {day}
         ORDER BY timestamp;
         "#)
-    ).await {
-        Ok(mut logs) => {
-            let logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
-            let logs = logs.into_iter().map(|l| l.content).collect::<Vec<String>>().join("\n");
-            if !logs.is_empty() {
-                let res = summarize(&logs).await;
+                ).await {
+                    Ok(mut logs) => {
+                        let logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
+                        let logs = logs.into_iter().map(|l| l.content).collect::<Vec<String>>().join("\n");
+                        if !logs.is_empty() {
+                            let res = summarize(&logs).await;
 
-                if let Ok(res) = res {
-                    Json(res)
-                } else {
-                    Json(String::new())
+                            if let Ok(res) = res {
+                                // TODO: Save summary to database
+                                Json(res)
+                            } else {
+                                Json(String::new())
+                            }
+                        } else {
+                            Json(String::new())
+                        }
+                    }
+                    Err(err) => {
+                        Json(String::new())
+                    }
                 }
-            } else {
-                Json(String::new())
             }
         }
         Err(err) => {
-            Json(String::new())
+            eprintln!("{err:?}");
+            return Json(String::new());
         }
     }
 }

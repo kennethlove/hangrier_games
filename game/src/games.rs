@@ -356,7 +356,9 @@ impl FromStr for GameStatus {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "not started" => Ok(GameStatus::NotStarted),
+            "notstarted" => Ok(GameStatus::NotStarted),
             "in progress" => Ok(GameStatus::InProgress),
+            "inprogress" => Ok(GameStatus::InProgress),
             "finished" => Ok(GameStatus::Finished),
             _ => Err(()),
         }

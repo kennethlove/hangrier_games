@@ -4,12 +4,11 @@ use crate::components::icons::mockingjay_flight::MockingjayFlight;
 use crate::components::Button;
 use crate::routes::Routes;
 use crate::storage::{use_persistent, AppState, Colorscheme};
-use dioxus::dioxus_core::AttributeValue;
 use dioxus::prelude::*;
 
 #[component]
 pub fn Navbar() -> Element {
-    let mut storage = use_persistent("hangry-games", || AppState::default());
+    let mut storage = use_persistent("hangry-games", AppState::default);
     let mut theme_signal: Signal<Colorscheme> = use_context();
 
     rsx! {
@@ -230,7 +229,7 @@ pub fn Navbar() -> Element {
                                     extra_classes: "size-24 border-none theme1:hover:cursor-not-allowed",
                                     onclick: move |_| {
                                         let mut state = storage.get();
-                                        state.to_theme_one();
+                                        state.switch_to_theme_one();
                                         storage.set(state.clone());
                                         theme_signal.set(state.colorscheme)
                                     },
@@ -247,7 +246,7 @@ pub fn Navbar() -> Element {
                                     extra_classes: "size-24 border-none theme2:hover:cursor-not-allowed",
                                     onclick: move |_| {
                                         let mut state = storage.get();
-                                        state.to_theme_two();
+                                        state.switch_to_theme_two();
                                         storage.set(state.clone());
                                         theme_signal.set(state.colorscheme)
                                     },
@@ -264,7 +263,7 @@ pub fn Navbar() -> Element {
                                     extra_classes: "size-24 border-none theme3:hover:cursor-not-allowed",
                                     onclick: move |_| {
                                         let mut state = storage.get();
-                                        state.to_theme_three();
+                                        state.switch_to_theme_three();
                                         storage.set(state.clone());
                                         theme_signal.set(state.colorscheme)
                                     },

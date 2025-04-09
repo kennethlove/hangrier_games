@@ -3,8 +3,6 @@ use crate::components::game_edit::EditGameModal;
 use crate::components::tribute_edit::EditTributeModal;
 use crate::routes::Routes;
 use crate::storage::{use_persistent, AppState, Colorscheme};
-use dioxus::dioxus_core::AttributeValue;
-use dioxus::document::Script;
 use dioxus::prelude::*;
 use dioxus_query::prelude::use_init_query_client;
 use game::games::Game;
@@ -14,7 +12,7 @@ use shared::{DeleteGame, EditGame, EditTribute};
 pub fn App() -> Element {
     use_init_query_client::<QueryValue, QueryError, QueryKey>();
 
-    let mut storage = use_persistent("hangry-games", || AppState::default());
+    let storage = use_persistent("hangry-games", AppState::default);
 
     let theme_signal: Signal<Colorscheme> = use_signal(|| storage.get().colorscheme);
     use_context_provider(|| theme_signal);
@@ -47,10 +45,6 @@ pub fn App() -> Element {
             href: "https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&family=Forum&family=Work+Sans:ital,wght@0,100..900;1,100..900&family=Orbitron:wght@400..900&display=swap",
             rel: "stylesheet"
         }
-
-        // Script {
-        //    src: "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"
-        // }
 
         document::Stylesheet {
             href: asset!("/assets/dist/main.css")

@@ -1,8 +1,7 @@
 use futures::StreamExt;
-use futures::stream::{BoxStream, Stream};
+use futures::stream::Stream;
 use ollama_rs::Ollama;
 use ollama_rs::generation::completion::request::GenerationRequest;
-use std::convert::Infallible;
 use std::pin::Pin;
 use thiserror::Error;
 

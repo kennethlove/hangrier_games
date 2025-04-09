@@ -4,7 +4,6 @@ mod routes;
 mod storage;
 
 use components::App;
-use std::sync::LazyLock;
 
 use dioxus::prelude::*;
 

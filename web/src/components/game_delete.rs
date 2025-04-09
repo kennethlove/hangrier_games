@@ -11,7 +11,7 @@ async fn delete_game(delete_game_info: DeleteGame) -> MutationResult<MutationVal
     let identifier = delete_game_info.0;
     let name = delete_game_info.1;
     let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}", API_HOST.clone(), identifier);
+    let url: String = format!("{}/api/games/{}", API_HOST, identifier);
 
     let response = client
         .delete(url)

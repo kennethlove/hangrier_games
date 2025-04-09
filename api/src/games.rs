@@ -8,7 +8,6 @@ use axum::response::{IntoResponse, Sse};
 use axum::routing::{get, put};
 use axum::Router;
 use axum::{BoxError, Json};
-use futures::stream::BoxStream;
 use futures::StreamExt;
 use game::areas::{Area, AreaDetails};
 use game::games::{Game, GameStatus};
@@ -19,8 +18,6 @@ use serde::{Deserialize, Serialize};
 use shared::EditGame;
 use shared::GameArea;
 use std::collections::HashMap;
-use std::convert::Infallible;
-use std::fmt::Result;
 use std::str::FromStr;
 use std::sync::LazyLock;
 use strum::IntoEnumIterator;
@@ -425,7 +422,7 @@ async fn save_game(game: &Game) -> Option<Game> {
                 .upsert::<Option<GameMessage>>(("message", &log.identifier))
                 .content(log.clone())
                 .await
-                .expect(&format!("Failed to save message: {:#?}", log));
+                .unwrap_or_else(|_| panic!("Failed to save message: {:#?}", log));
         }
     }
 
@@ -560,7 +557,7 @@ async fn game_day_summary(Path((game_identifier, day)): Path<(String, String)>) 
             if log.is_some() {
                 let log = log.unwrap();
                 let summary = log.summary;
-                return Json(summary);
+                Json(summary)
             } else {
                 match DATABASE.query(
                     format!(r#"
@@ -587,7 +584,7 @@ async fn game_day_summary(Path((game_identifier, day)): Path<(String, String)>) 
                             Json(String::new())
                         }
                     }
-                    Err(err) => {
+                    Err(_err) => {
                         Json(String::new())
                     }
                 }
@@ -595,7 +592,7 @@ async fn game_day_summary(Path((game_identifier, day)): Path<(String, String)>) 
         }
         Err(err) => {
             eprintln!("{err:?}");
-            return Json(String::new());
+            Json(String::new())
         }
     }
 }

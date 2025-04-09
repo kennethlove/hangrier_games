@@ -10,7 +10,7 @@ use game::games::Game;
 
 async fn fetch_areas(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Areas(identifier)) = keys.first() {
-        let response = reqwest::get(format!("{}/api/games/{}/areas", API_HOST.clone(), identifier))
+        let response = reqwest::get(format!("{}/api/games/{}/areas", API_HOST, identifier))
             .await
             .unwrap();
 

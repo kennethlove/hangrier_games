@@ -10,7 +10,7 @@ use game::tributes::Tribute;
 
 async fn fetch_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tributes(identifier)) = keys.first() {
-        let response = reqwest::get(format!("{}/api/games/{}/tributes", API_HOST.clone(), identifier))
+        let response = reqwest::get(format!("{}/api/games/{}/tributes", API_HOST, identifier))
             .await
             .unwrap();
 
@@ -28,7 +28,7 @@ async fn fetch_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryErr
 async fn fetch_tribute_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::TributeDayLog(identifier, day)) = keys.first() {
         if let Some(QueryKey::Game(game_identifier)) = keys.last() {
-            let response = reqwest::get(format!("{}/api/games/{}/log/{}/{}", API_HOST.clone(), game_identifier, day, identifier))
+            let response = reqwest::get(format!("{}/api/games/{}/log/{}/{}", API_HOST, game_identifier, day, identifier))
                 .await
                 .unwrap();
 

@@ -18,7 +18,7 @@ use std::ops::Deref;
 
 async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(identifier)) = keys.first() {
-        let response = reqwest::get(format!("{}/api/games/{}", API_HOST.clone(), identifier))
+        let response = reqwest::get(format!("{}/api/games/{}", API_HOST, identifier))
             .await
             .expect("Failed to fetch game details");
 
@@ -36,7 +36,7 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
 
 async fn next_step(identifier: String) -> MutationResult<MutationValue, MutationError> {
     let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}/next", API_HOST.clone(), identifier);
+    let url: String = format!("{}/api/games/{}/next", API_HOST, identifier);
 
     let response = client
         .put(url)

@@ -1,17 +1,14 @@
-use std::time::Duration;
-
 use crate::API_HOST;
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::games::Game;
-use game::messages::GameMessage;
 
 async fn fetch_game_day_summary(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::GameDaySummary(identifier, day)) = keys.first() {
         let response = reqwest::get(format!(
             "{}/api/games/{}/summarize/{}",
-            API_HOST.clone(),
+            API_HOST,
             identifier,
             day
         ))

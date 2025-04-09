@@ -1,6 +1,6 @@
 #[tokio::main]
 async fn main() {
-    let log = r#"
+    let _log = r#"
 === ☀️ Day 2 begins! ===
 === 📌 Tributes alive: 23 ===
 🔪 Mandy Leannon attacks Gayle Doyle, and wins decisively!

@@ -59,7 +59,7 @@ where
 
 struct JsonVisitor<'a>(&'a mut BTreeMap<String, serde_json::Value>);
 
-impl <'a> tracing::field::Visit for JsonVisitor<'a> {
+impl tracing::field::Visit for JsonVisitor<'_> {
     fn record_f64(&mut self, field: &Field, value: f64) {
         self.0.insert(field.name().to_owned(), serde_json::json!(value));
     }

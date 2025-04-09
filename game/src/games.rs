@@ -226,7 +226,7 @@ impl Game {
             }
         }
 
-        if let None = self.random_open_area() {
+        if self.random_open_area().is_none() {
             let mut area = self.random_area().expect("No areas?");
             area.events.clear();
         }

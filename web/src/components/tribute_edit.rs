@@ -16,7 +16,7 @@ async fn edit_tribute(args: (EditTribute, String)) -> MutationResult<MutationVal
     let client = reqwest::Client::new();
     let url: String = format!(
         "{}/api/games/{}/tributes/{}",
-        API_HOST.clone(),
+        API_HOST,
         game_identifier,
         identifier
     );

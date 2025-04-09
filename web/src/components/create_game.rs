@@ -13,7 +13,7 @@ async fn create_game(name: Option<String>) -> MutationResult<MutationValue, Muta
         None => Game::default()
     };
 
-    let response = client.post(format!("{}/api/games", API_HOST.clone()))
+    let response = client.post(format!("{}/api/games", API_HOST))
         .json(&json_body)
         .send().await;
 

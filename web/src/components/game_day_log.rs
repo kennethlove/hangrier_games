@@ -7,7 +7,7 @@ use game::messages::GameMessage;
 
 async fn fetch_game_day_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::GameDayLog(identifier, day)) = keys.first() {
-        let response = reqwest::get(format!("{}/api/games/{}/log/{}", API_HOST.clone(), identifier, day))
+        let response = reqwest::get(format!("{}/api/games/{}/log/{}", API_HOST, identifier, day))
             .await
             .unwrap();
 
@@ -15,7 +15,7 @@ async fn fetch_game_day_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, Quer
             Ok(logs) => {
                 QueryResult::Ok(QueryValue::Logs(logs))
             }
-            Err(err) => {
+            Err(_err) => {
                 QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
             },
         }

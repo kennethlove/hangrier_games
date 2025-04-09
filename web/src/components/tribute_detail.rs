@@ -12,7 +12,7 @@ async fn fetch_tribute(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryErro
             let response = reqwest::get(
                 format!(
                     "{}/api/games/{}/tributes/{}",
-                    API_HOST.clone(),
+                    API_HOST,
                     game_identifier,
                     identifier
                 ))

@@ -54,25 +54,20 @@ impl <T: Serialize + DeserializeOwned + Clone + 'static> UsePersistent<T> {
     }
 }
 
-fn get_saved_state(storage: UsePersistent<AppState>) -> AppState {
-    let mut state = AppState::default();
-    state
-}
-
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub enum Colorscheme {
     #[default]
-    ThemeOne,
-    ThemeTwo,
-    ThemeThree,
+    One,
+    Two,
+    Three,
 }
 
 impl Display for Colorscheme {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Colorscheme::ThemeOne => { write!(f, "theme1") }
-            Colorscheme::ThemeTwo => { write!(f, "theme2") }
-            Colorscheme::ThemeThree => { write!(f, "theme3") }
+            Colorscheme::One => { write!(f, "theme1") }
+            Colorscheme::Two => { write!(f, "theme2") }
+            Colorscheme::Three => { write!(f, "theme3") }
         }
     }
 }
@@ -82,9 +77,9 @@ impl FromStr for Colorscheme {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "theme1" => Ok(Colorscheme::ThemeOne),
-            "theme2" => Ok(Colorscheme::ThemeTwo),
-            "theme3" => Ok(Colorscheme::ThemeThree),
+            "theme1" => Ok(Colorscheme::One),
+            "theme2" => Ok(Colorscheme::Two),
+            "theme3" => Ok(Colorscheme::Three),
             _ => Err("invalid colorscheme".into())
         }
     }
@@ -96,13 +91,13 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn to_theme_one(&mut self) {
-        self.colorscheme = Colorscheme::ThemeOne;
+    pub fn switch_to_theme_one(&mut self) {
+        self.colorscheme = Colorscheme::One;
     }
-    pub fn to_theme_two(&mut self) {
-        self.colorscheme = Colorscheme::ThemeTwo;
+    pub fn switch_to_theme_two(&mut self) {
+        self.colorscheme = Colorscheme::Two;
     }
-    pub fn to_theme_three(&mut self) {
-        self.colorscheme = Colorscheme::ThemeThree;
+    pub fn switch_to_theme_three(&mut self) {
+        self.colorscheme = Colorscheme::Three;
     }
 }

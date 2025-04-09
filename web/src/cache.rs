@@ -12,10 +12,10 @@ pub(crate) enum QueryKey {
     Tributes(String),
     Areas(String),
     Tribute(String),
-    GameLog(String), // Game identifier
+    _GameLog(String), // Game identifier
     GameDayLog(String, u32), // Game identifier, day
     TributeDayLog(String, u32), // Tribute identifier, day
-    GameSummary(String),
+    _GameSummary(String),
     GameDaySummary(String, u32), // Game identifier, day
 }
 

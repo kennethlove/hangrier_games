@@ -9,7 +9,7 @@ use game::games::Game;
 
 async fn fetch_games(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::AllGames) = keys.first() {
-        match reqwest::get(format!("{}/api/games", API_HOST.clone())).await {
+        match reqwest::get(format!("{}/api/games", API_HOST)).await {
             Ok(request) => {
                 if let Ok(response) = request.json::<Vec<Game>>().await {
                     QueryResult::Ok(QueryValue::Games(response))

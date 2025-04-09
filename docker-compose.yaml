@@ -12,13 +12,15 @@ services:
     ports:
       - "${SERVICE_PORT_BACKEND:-3000}:3000"
     environment:
-      - SERVICE_FQDN_BACKEND_3000
-      - 'SERVICE_FQDN_BACKEND=${SERVICE_FQDN_BACKEND:-http://backend:3000}'
+      - COOLIFY_PUBLIC_URL=${COOLIFY_BACKEND_URL:-http://localhost:3000}
       - 'SURREAL_HOST=${SURREAL_HOST:-surrealdb}'
       - 'SURREAL_USER=${SURREAL_USER:-root}'
       - 'SURREAL_PASS=${SURREAL_PASS:-root}'
+    networks:
+      - internal
     labels:
       - "coolify.managed=true"
+      - "coolify.service.name=backend"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://backend:3000/api/games"]
       interval: 30s
@@ -41,11 +43,17 @@ services:
     depends_on:
       - backend
     environment:
-      - SERVICE_FQDN_FRONTEND_80
-      - 'SERVICE_FQDN_FRONTEND=${SERVICE_FQDN_FRONTEND}'
+      - COOLIFY_PUBLIC_URL=${COOLIFY_FRONTEND_URL:-http://localhost:7575}
       - 'API_HOST=${API_HOST:-http://backend:3000}'
     labels:
       - "coolify.managed=true"
+      - "coolify.service.name=frontend"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://frontend"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 5s
 
 networks:
     internal:

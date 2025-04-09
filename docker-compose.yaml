@@ -14,10 +14,11 @@ services:
     depends_on:
       - surrealdb
     environment:
-      - SERVICE_FQDN_BACKEND=${SERVICE_FQDN_BACKEND:-http://backend:3000}
-      - SURREAL_HOST=${SERVICE_FQDN_SURREALDB:-ws://surrealdb:8000}
-      - SURREAL_USER=${SURREAL_USER:-root}
-      - SURREAL_PASS=${SURREAL_PASS:-root}
+      - SERVICE_FQDN_BACKEND_3000
+      - 'SERVICE_FQDN_BACKEND=${SERVICE_FQDN_BACKEND:-http://backend:3000}'
+      - 'SURREAL_HOST=${SERVICE_FQDN_SURREALDB:-ws://surrealdb:8888}'
+      - 'SURREAL_USER=${SURREAL_USER:-root}'
+      - 'SURREAL_PASS=${SURREAL_PASS:-root}'
     labels:
       - "coolify.managed=true"
     healthcheck:
@@ -26,25 +27,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 10s
-
-  surrealdb:
-    image: surrealdb/surrealdb:latest
-    restart: unless-stopped
-    command: start --user ${SURREAL_USER:-root} --pass ${SURREAL_PASS:-root}
-    environment:
-      - SERVICE_FQDN_SURREALDB=${SERVICE_FQDN_SURREALDB}
-    volumes:
-      - surrealdb_data:/data
-    labels:
-      - "coolify.managed=true"
-    ports:
-      - "${SERVICE_PORT_DATABASE:-8888}:8000"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 5s
 
   frontend:
     build:
@@ -61,8 +43,8 @@ services:
     depends_on:
       - backend
     environment:
-      - SERVICE_FQDN_FRONTEND=${SERVICE_FQDN_FRONTEND}
-      - API_HOST=${SERVICE_FQDN_BACKEND:-http://backend:3000}
+      - 'SERVICE_FQDN_FRONTEND=${SERVICE_FQDN_FRONTEND}'
+      - 'API_HOST=${SERVICE_FQDN_BACKEND:-http://backend:3000}'
     labels:
       - "coolify.managed=true"
 

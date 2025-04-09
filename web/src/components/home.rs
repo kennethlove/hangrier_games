@@ -40,7 +40,7 @@ pub fn Home() -> Element {
                 theme3:drop-shadow-sm
                 "#,
 
-                "May the odds be ever in your favor!"
+                "May the odds be ever in your flavor!"
             }
         }
     }

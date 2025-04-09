@@ -343,8 +343,8 @@ pub enum GameStatus {
 impl Display for GameStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GameStatus::NotStarted => write!(f, "NotStarted"),
-            GameStatus::InProgress => write!(f, "InProgress"),
+            GameStatus::NotStarted => write!(f, "Not Started"),
+            GameStatus::InProgress => write!(f, "In Progress"),
             GameStatus::Finished => write!(f, "Finished"),
         }
     }
@@ -355,8 +355,8 @@ impl FromStr for GameStatus {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "notstarted" => Ok(GameStatus::NotStarted),
-            "inprogress" => Ok(GameStatus::InProgress),
+            "not started" => Ok(GameStatus::NotStarted),
+            "in progress" => Ok(GameStatus::InProgress),
             "finished" => Ok(GameStatus::Finished),
             _ => Err(()),
         }

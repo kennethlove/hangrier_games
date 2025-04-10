@@ -48,6 +48,7 @@ pub fn GameDayLog(day: u32) -> Element {
                     class: r#"
                     theme1:text-stone-200
                     theme2:text-green-200
+                    theme3:text-stone-800
                     "#,
                     for log in logs {
                         li {

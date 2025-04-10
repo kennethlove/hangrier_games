@@ -63,8 +63,10 @@ pub fn App() -> Element {
                 p-2
                 font-[Work_Sans]
 
-                theme1:bg-[url("../assets/images/noise.svg")]
-                theme1:bg-red-800
+                theme1:bg-[url("../assets/images/noise2.svg")]
+                theme1:bg-size-[700px_700px]
+                theme1:bg-repeat
+                theme1:bg-red-900
 
                 theme2:bg-green-800/85
                 theme2:bg-[url("../assets/images/waves.svg")]

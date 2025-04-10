@@ -59,7 +59,7 @@ pub fn App() -> Element {
                 min-h-screen
                 frame
                 transition
-                duration-250
+                duration-500
                 p-2
                 font-[Work_Sans]
 

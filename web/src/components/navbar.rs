@@ -174,9 +174,16 @@ pub fn Navbar() -> Element {
                             theme2:focus-within:border-green-200
 
                             theme3:transform
+                            theme3:duration-500
                             theme3:text-yellow-600
-                            theme3:peer-focus:text-yellow-500
-                            theme3:focus-within:text-yellow-500
+                            theme3:border-b-5
+                            theme3:border-transparent
+                            theme3:border-double
+                            theme3:hover:border-b-5
+                            theme3:hover:border-yellow-500
+                            theme3:hover:text-yellow-500
+                            c:theme3:peer-focus:text-yellow-500
+                            c:theme3:focus-within:text-yellow-500
                             "#,
                             r#for: "theme-switcher",
                             "Theme",

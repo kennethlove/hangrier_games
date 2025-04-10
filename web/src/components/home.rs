@@ -18,7 +18,7 @@ pub fn Home() -> Element {
                 bg-clip-text
                 sm:w-1/2
                 mx-auto
-                drop-shadow-md
+                drop-shadow-md/25
 
                 theme1:font-[Cinzel]
                 theme1:bg-radial
@@ -37,7 +37,6 @@ pub fn Home() -> Element {
                 theme3:text-transparent
                 theme3:bg-gold-rich
                 theme3:leading-[1.24]
-                theme3:drop-shadow-sm
                 "#,
 
                 "May the odds be ever in your flavor!"

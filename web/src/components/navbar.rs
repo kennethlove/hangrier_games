@@ -155,10 +155,6 @@ pub fn Navbar() -> Element {
                             theme1:group-focus:text-red-900
                             theme1:group-focus:border-b-2
                             theme1:group-focus:border-amber-500
-                            theme1:peer-checked:bg-amber-500
-                            theme1:peer-checked:text-red-900
-                            theme1:peer-checked:border-b-2
-                            theme1:peer-checked:border-amber-500
                             theme1:focus-within:bg-amber-500
                             theme1:focus-within:text-red-900
                             theme1:focus-within:border-b-2
@@ -171,11 +167,6 @@ pub fn Navbar() -> Element {
                             theme2:peer-focus:rounded-t-sm
                             theme2:peer-focus:border-b-3
                             theme2:peer-focus:border-green-200
-                            theme2:peer-checked:bg-green-200
-                            theme2:peer-checked:text-green-900
-                            theme2:peer-checked:rounded-t-sm
-                            theme2:peer-checked:border-b-3
-                            theme2:peer-checked:border-green-200
                             theme2:focus-within:bg-green-200
                             theme2:focus-within:text-green-900
                             theme2:focus-within:rounded-t-sm
@@ -185,7 +176,6 @@ pub fn Navbar() -> Element {
                             theme3:transform
                             theme3:text-yellow-600
                             theme3:peer-focus:text-yellow-500
-                            theme3:peer-checked:text-yellow-500
                             theme3:focus-within:text-yellow-500
                             "#,
                             r#for: "theme-switcher",
@@ -201,8 +191,6 @@ pub fn Navbar() -> Element {
                                 transform
                                 duration-500
                                 invisible
-                                c:peer-checked:opacity-100
-                                c:peer-checked:visible
                                 peer-focus:opacity-100
                                 peer-focus:visible
                                 focus-within:opacity-100

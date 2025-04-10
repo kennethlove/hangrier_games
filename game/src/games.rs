@@ -343,8 +343,8 @@ pub enum GameStatus {
 impl Display for GameStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GameStatus::NotStarted => write!(f, "Not Started"),
-            GameStatus::InProgress => write!(f, "In Progress"),
+            GameStatus::NotStarted => write!(f, "NotStarted"),
+            GameStatus::InProgress => write!(f, "InProgress"),
             GameStatus::Finished => write!(f, "Finished"),
         }
     }

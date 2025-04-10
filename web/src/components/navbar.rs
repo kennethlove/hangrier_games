@@ -33,7 +33,7 @@ pub fn Navbar() -> Element {
                 theme1:from-amber-300
                 theme1:to-red-500
                 theme1:text-4xl
-                theme1:sm:text-6xl
+                theme1:drop-shadow-sm/25
 
                 theme2:font-[Forum]
                 theme2:font-bold
@@ -43,7 +43,7 @@ pub fn Navbar() -> Element {
                 theme2:bg-clip-text
                 theme2:from-teal-500
                 theme2:to-green-400
-                theme2:drop-shadow-md
+                theme2:drop-shadow-sm/25
                 theme2:pb-2
 
                 theme3:bg-clip-text
@@ -51,7 +51,7 @@ pub fn Navbar() -> Element {
                 theme3:bg-gold-rich
                 theme3:font-[Orbitron]
                 theme3:font-semibold
-                theme3:drop-shadow-sm
+                theme3:drop-shadow-sm/25
                 theme3:pb-2
                 "#,
 
@@ -59,6 +59,7 @@ pub fn Navbar() -> Element {
             }
 
             nav {
+                aria_label: "Main navigation",
                 class: r#"
                 text-lg
                 sm:text-xl
@@ -150,26 +151,21 @@ pub fn Navbar() -> Element {
                             theme1:font-semibold
                             theme1:text-xl
                             theme1:text-amber-500
-                            theme1:group-hover:bg-amber-500
-                            theme1:group-hover:text-red-900
-                            theme1:group-hover:border-b-2
-                            theme1:group-hover:border-amber-500
-                            theme1:peer-focus:bg-amber-500
-                            theme1:peer-focus:text-red-900
-                            theme1:peer-focus:border-b-2
-                            theme1:peer-focus:border-amber-500
+                            theme1:group-focus:bg-amber-500
+                            theme1:group-focus:text-red-900
+                            theme1:group-focus:border-b-2
+                            theme1:group-focus:border-amber-500
                             theme1:peer-checked:bg-amber-500
                             theme1:peer-checked:text-red-900
                             theme1:peer-checked:border-b-2
                             theme1:peer-checked:border-amber-500
+                            theme1:focus-within:bg-amber-500
+                            theme1:focus-within:text-red-900
+                            theme1:focus-within:border-b-2
+                            theme1:focus-within:border-amber-500
 
                             theme2:text-green-200/50
                             theme2:hover:text-green-900
-                            theme2:group-hover:bg-green-200
-                            theme2:group-hover:text-green-900
-                            theme2:group-hover:rounded-t-sm
-                            theme2:group-hover:border-b-3
-                            theme2:group-hover:border-green-200
                             theme2:peer-focus:bg-green-200
                             theme2:peer-focus:text-green-900
                             theme2:peer-focus:rounded-t-sm
@@ -180,12 +176,17 @@ pub fn Navbar() -> Element {
                             theme2:peer-checked:rounded-t-sm
                             theme2:peer-checked:border-b-3
                             theme2:peer-checked:border-green-200
+                            theme2:focus-within:bg-green-200
+                            theme2:focus-within:text-green-900
+                            theme2:focus-within:rounded-t-sm
+                            theme2:focus-within:border-b-3
+                            theme2:focus-within:border-green-200
 
                             theme3:transform
                             theme3:text-yellow-600
-                            theme3:group-hover:text-yellow-500
                             theme3:peer-focus:text-yellow-500
                             theme3:peer-checked:text-yellow-500
+                            theme3:focus-within:text-yellow-500
                             "#,
                             r#for: "theme-switcher",
                             "Theme",
@@ -200,12 +201,12 @@ pub fn Navbar() -> Element {
                                 transform
                                 duration-500
                                 invisible
-                                group-hover:opacity-100
-                                group-hover:visible
-                                peer-checked:opacity-100
-                                peer-checked:visible
+                                c:peer-checked:opacity-100
+                                c:peer-checked:visible
                                 peer-focus:opacity-100
                                 peer-focus:visible
+                                focus-within:opacity-100
+                                focus-within:visible
 
                                 theme1:bg-linear-to-b
                                 theme1:from-amber-500
@@ -224,54 +225,83 @@ pub fn Navbar() -> Element {
 
                             div {
                                 class: "grid grid-cols-3 place-content-center gap-2 pr-4",
-                                Button {
+                                label {
                                     title: "Switch to theme 1",
-                                    extra_classes: "size-24 border-none theme1:hover:cursor-not-allowed",
+                                    class: "px-2 py-1 cursor-pointer size-24 border-none theme1:hover:cursor-not-allowed",
                                     onclick: move |_| {
                                         let mut state = storage.get();
                                         state.switch_to_theme_one();
                                         storage.set(state.clone());
                                         theme_signal.set(state.colorscheme)
                                     },
+                                    input {
+                                        class: "sr-only peer",
+                                        r#type: "radio",
+                                        name: "theme",
+                                        value: "theme1",
+                                        checked: storage.get().colorscheme == Colorscheme::One,
+                                    }
                                     MockingjayArrow { class: r#"
                                     stroke-50
                                     fill-red-700
                                     stroke-red-900
                                     hover:stroke-red-500
                                     theme1:hover:stroke-red-900
+                                    theme1:stroke-red-900
+                                    peer-checked:stroke-red-500
+                                    peer-focus:stroke-red-500
                                     "# }
                                 }
-                                Button {
+                                label {
                                     title: "Switch to theme 2",
-                                    extra_classes: "size-24 border-none theme2:hover:cursor-not-allowed",
+                                    class: "px-2 py-1 cursor-pointer size-24 border-none theme2:hover:cursor-not-allowed",
                                     onclick: move |_| {
                                         let mut state = storage.get();
                                         state.switch_to_theme_two();
                                         storage.set(state.clone());
                                         theme_signal.set(state.colorscheme)
                                     },
+                                    input {
+                                        class: "sr-only peer",
+                                        r#type: "radio",
+                                        name: "theme",
+                                        value: "theme2",
+                                        checked: storage.get().colorscheme == Colorscheme::Two,
+                                    }
                                     Mockingjay { class: r#"
                                     stroke-50
                                     fill-green-700
                                     stroke-green-900
                                     hover:stroke-green-200
                                     theme2:hover:stroke-green-900
+                                    theme2:stroke-green-900
+                                    peer-checked:stroke-green-200
+                                    peer-focus:stroke-green-200
                                     "# }
                                 }
-                                Button {
+                                label {
                                     title: "Switch to theme 3",
-                                    extra_classes: "size-24 border-none theme3:hover:cursor-not-allowed",
+                                    class: "px-2 py-1 cursor-pointer size-24 theme3:hover:cursor-not-allowed",
                                     onclick: move |_| {
                                         let mut state = storage.get();
                                         state.switch_to_theme_three();
                                         storage.set(state.clone());
                                         theme_signal.set(state.colorscheme)
                                     },
+                                    input {
+                                        class: "peer sr-only",
+                                        r#type: "radio",
+                                        name: "theme",
+                                        value: "theme3",
+                                        checked: storage.get().colorscheme == Colorscheme::Three,
+                                    }
                                     MockingjayFlight {class: r#"
                                     stroke-50
                                     fill-blue-700
                                     stroke-blue-900
                                     hover:stroke-blue-200
+                                    peer-checked:stroke-blue-200
+                                    peer-focus:stroke-blue-200
                                     theme3:stroke-blue-900
                                     theme3:hover:stroke-blue-900
                                     "# }

@@ -4,6 +4,10 @@ services:
   backend:
     build:
       context: .
+      args:
+        - 'SURREAL_HOST=${SURREAL_HOST:-surrealdb}'
+        - 'SURREAL_USER=${SURREAL_USER:-root}'
+        - 'SURREAL_PASS=${SURREAL_PASS:-root}'
       dockerfile: api.Dockerfile
       cache_from:
         - ${REGISTRY_URL:-localhost}/hg_backend:latest

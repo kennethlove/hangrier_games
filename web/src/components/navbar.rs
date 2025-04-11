@@ -143,7 +143,7 @@ pub fn Navbar() -> Element {
                             r#type: "checkbox",
                             class: "peer sr-only",
                         }
-                        label {
+                        button {
                             class: r#"
                             px-2
                             cursor-pointer
@@ -185,19 +185,31 @@ pub fn Navbar() -> Element {
                             c:theme3:peer-focus:text-yellow-500
                             c:theme3:focus-within:text-yellow-500
                             "#,
-                            r#for: "theme-switcher",
+                            // r#for: "theme-switcher",
+                            popovertarget: "theme-switcher-popover",
+                            style: "anchor-name: --theme-switcher",
                             "Theme",
                         }
                         div {
-                            class: r#"absolute
+                            popover: "auto",
+                            id: "theme-switcher-popover",
+                            style: r#"
+                                right: anchor(--theme-switcher right);
+                                top: anchor(--theme-switcher bottom);
+                            "#,
+
+                            class: r#"
+                                inset-auto
+                                absolute
                                 right-0
-                                sm:left-0
+                                justify-start
                                 z-99
-                                opacity-0
-                                w-64
+                                opacity-00
+                                min-w-64
                                 transform
                                 duration-500
                                 invisible
+                                open:visible
                                 peer-focus:opacity-100
                                 peer-focus:visible
                                 focus-within:opacity-100
@@ -219,10 +231,10 @@ pub fn Navbar() -> Element {
                             "#,
 
                             div {
-                                class: "grid grid-cols-3 place-content-center gap-2 pr-4",
+                                class: "grid grid-cols-3 place-content-center gap-2",
                                 label {
                                     title: "Switch to theme 1",
-                                    class: "px-2 py-1 cursor-pointer size-24 border-none theme1:hover:cursor-not-allowed",
+                                    class: "cursor-pointer size-22 border-none theme1:hover:cursor-not-allowed",
                                     onclick: move |_| {
                                         let mut state = storage.get();
                                         state.switch_to_theme_one();
@@ -249,7 +261,7 @@ pub fn Navbar() -> Element {
                                 }
                                 label {
                                     title: "Switch to theme 2",
-                                    class: "px-2 py-1 cursor-pointer size-24 border-none theme2:hover:cursor-not-allowed",
+                                    class: "cursor-pointer size-22 border-none theme2:hover:cursor-not-allowed",
                                     onclick: move |_| {
                                         let mut state = storage.get();
                                         state.switch_to_theme_two();
@@ -276,7 +288,7 @@ pub fn Navbar() -> Element {
                                 }
                                 label {
                                     title: "Switch to theme 3",
-                                    class: "px-2 py-1 cursor-pointer size-24 theme3:hover:cursor-not-allowed",
+                                    class: "cursor-pointer size-22 theme3:hover:cursor-not-allowed",
                                     onclick: move |_| {
                                         let mut state = storage.get();
                                         state.switch_to_theme_three();

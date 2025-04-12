@@ -357,6 +357,7 @@ pub fn GameDetailPage(identifier: String) -> Element {
 #[derive(Clone, Debug, PartialEq, Props)]
 pub struct InfoDetailProps {
     pub title: String,
+    pub open: bool,
     pub children: Element
 }
 
@@ -364,6 +365,7 @@ pub struct InfoDetailProps {
 pub fn InfoDetail(props: InfoDetailProps) -> Element {
     rsx! {
         details {
+            open: props.open,
             class: r#"
             px-2
             pt-1
@@ -466,22 +468,26 @@ pub fn GameDetails(game: Game) -> Element {
 
             InfoDetail {
                 title: "Areas",
+                open: false,
                 GameAreaList { }
             }
 
             InfoDetail {
                 title: "Tributes",
+                open: false,
                 GameTributes { }
             }
 
             if game.day.unwrap_or(0) > 0 {
                 InfoDetail {
                     title: "Day log",
+                    open: false,
                     GameDayLog { day: game.day.unwrap_or_default() }
                 }
 
                 InfoDetail {
                     title: "Day summary",
+                    open: false,
                     GameDaySummary { day: game.day.unwrap_or_default() }
                 }
             }

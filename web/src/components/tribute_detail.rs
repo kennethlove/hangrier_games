@@ -1,12 +1,15 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::game_detail::InfoDetail;
-use crate::components::tribute_edit::TributeEdit;
+use crate::components::icons::uturn::UTurnIcon;
+use crate::components::tribute_edit::{EditTributeModal, TributeEdit};
+use crate::routes::Routes;
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::games::Game;
 use game::messages::GameMessage;
 use game::tributes::{Attributes, Tribute};
+use shared::EditTribute;
 use std::collections::HashMap;
 
 async fn fetch_tribute(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
@@ -70,94 +73,45 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
     match tribute_query.result().value() {
         QueryResult::Ok(QueryValue::Tribute(tribute)) => {
             rsx! {
-                h2 {
-                    class: r#"
-                    flex
-                    flex-row
-                    mb-4
-
-                    theme1:text-2xl
-                    theme1:font-[Cinzel]
-                    theme1:text-amber-300
-
-                    theme2:font-[Forum]
-                    theme2:text-3xl
-                    theme2:text-green-200
-
-                    theme3:font-[Orbitron]
-                    theme3:text-2xl
-                    theme3:text-stone-700
-                    "#,
-
-                    "{tribute.name}"
-
-                    if tribute.editable {
-                        span {
-                            class: "pl-2",
-                            TributeEdit {
-                                identifier: tribute.clone().identifier,
-                                district: tribute.district,
-                                name: tribute.clone().name,
-                            }
-                        }
-                    }
-                }
-
-
                 div {
-                    class: r#"
-                    px-2
-                    pt-1
-                    mb-4
-
-                    theme1:bg-stone-800/50
-                    theme1:hover:bg-stone-800
-                    theme1:open:bg-stone-800/50
-
-                    theme2:bg-green-900
-                    theme2:rounded-md
-                    theme2:border
-                    theme2:border-green-800
-                    theme2:hover:border-green-400
-                    theme2:open:border-green-400
-
-                    theme3:bg-stone-50/80
-                    theme3:border-4
-                    theme3:border-gold-rich
-                    "#,
-
-                    h3 {
+                    class: "flex flex-row gap-2 place-content-between mb-4",
+                    h2 {
                         class: r#"
-                        mb-2
-                        transition
-
-                        theme1:text-xl
+                        theme1:text-2xl
                         theme1:font-[Cinzel]
-                        theme1:text-amber-300/75
-                        theme1:group-open:text-amber-300
-                        theme1:hover:text-amber-300
+                        theme1:text-amber-300
 
                         theme2:font-[Forum]
-                        theme2:text-2xl
+                        theme2:text-3xl
                         theme2:text-green-200
-                        theme2:group-open:text-green-400
 
                         theme3:font-[Orbitron]
-                        theme3:tracking-wider
+                        theme3:text-2xl
+                        theme3:text-stone-700
                         "#,
 
-                        "Overview"
+                        "{tribute.name}"
                     }
-                    dl {
-                        class: "grid grid-cols-2 gap-4",
-                        dt { "District" }
-                        dd { "{tribute.district}" }
-                        dt { "Current location" }
-                        dd { "{tribute.area}" }
-                        dt { "Status" }
-                        dd { "{tribute.status}" }
-                        dt { "Outlook" }
-                        dd { "Rosy" }
+
+                    span {
+                        Link {
+                            to: Routes::GamePage {
+                                identifier: game_identifier.clone()
+                            },
+                            UTurnIcon {
+                                class: r#"
+                                size-4
+                                theme1:fill-amber-500
+                                theme1:hover:fill-amber-200
+
+                                theme2:fill-green-200/50
+                                theme2:hover:fill-green-200
+
+                                theme3:fill-amber-600/50
+                                theme3:hover:fill-amber-600
+                                "#,
+                            }
+                        }
                     }
                 }
 
@@ -170,28 +124,52 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                     sm:grid-cols-2
                     lg:grid-cols-3
                     2xl:grid-cols-4
+
+                    theme1:text-stone-200
+                    theme2:text-green-200
                     "#,
 
                     InfoDetail {
+                        title: "Overview",
+                        open: true,
+                        dl {
+                            class: "grid grid-cols-2 gap-4",
+                            dt { "District" }
+                            dd { "{tribute.district}" }
+                            dt { "Current location" }
+                            dd { "{tribute.area}" }
+                            dt { "Status" }
+                            dd { "{tribute.status}" }
+                            dt { "Outlook" }
+                            dd { "Rosy" }
+                        }
+                    }
+
+                    InfoDetail {
                         title: "Inventory",
+                        open: false,
                         ul {
                             for item in tribute.clone().items {
                                 li {
-                                    onclick: move |_| {},
-                                    "{item.name}" }
+                                    "{item.name}"
+                                }
                             }
                         }
                     }
 
                     InfoDetail {
                         title: "Attributes",
+                        open: false,
                         TributeAttributes { attributes: tribute.attributes.clone() }
                     }
 
-                    InfoDetail {
-                        title: "Log",
-                        TributeLog {
-                            identifier: tribute.clone().identifier,
+                    if !tribute.clone().editable {
+                        InfoDetail {
+                            title: "Log",
+                            open: false,
+                            TributeLog {
+                                identifier: tribute.clone().identifier,
+                            }
                         }
                     }
                 }

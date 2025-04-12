@@ -1,5 +1,5 @@
-use crate::API_HOST;
 use crate::cache::{QueryError, QueryKey, QueryValue};
+use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::games::Game;
@@ -14,8 +14,6 @@ async fn fetch_game_day_summary(keys: Vec<QueryKey>) -> QueryResult<QueryValue, 
         ))
         .await
         .unwrap();
-
-        dioxus_logger::tracing::info!("{:?}", response);
 
         match response.json::<String>().await {
             Ok(summary) => QueryResult::Ok(QueryValue::Summary(summary)),

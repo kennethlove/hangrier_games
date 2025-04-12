@@ -4,7 +4,7 @@ use crate::routes::Routes;
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
-use game::games::Game;
+use game::games::{Game, GameStatus};
 use game::messages::GameMessage;
 use game::tributes::Tribute;
 
@@ -163,10 +163,13 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                         "{tribute.name}"
                     }
                 }
-                TributeEdit {
-                    identifier: tribute.clone().identifier,
-                    district: tribute.district,
-                    name: tribute.clone().name,
+
+                if game.status == GameStatus::NotStarted {
+                    TributeEdit {
+                        identifier: tribute.clone().identifier,
+                        district: tribute.district,
+                        name: tribute.clone().name,
+                    }
                 }
             }
 

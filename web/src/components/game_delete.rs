@@ -1,11 +1,11 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
+use crate::components::icons::delete::DeleteIcon;
+use crate::components::Button;
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use shared::DeleteGame;
 use std::ops::Deref;
-use crate::components::Button;
-use crate::components::icons::delete::DeleteIcon;
 
 async fn delete_game(delete_game_info: DeleteGame) -> MutationResult<MutationValue, MutationError> {
     let identifier = delete_game_info.0;
@@ -96,10 +96,16 @@ pub fn DeleteGameModal() -> Element {
                         grid
                         grid-col
                         gap-4
+
                         theme1:bg-stone-200
                         theme1:text-stone-900
+
                         theme2:bg-green-200
-                        theme1:text-green-900
+                        theme2:text-green-900
+
+                        theme3:bg-stone-50
+                        theme3:border-3
+                        theme3:border-gold-rich
                         "#,
 
                         h1 {
@@ -107,11 +113,16 @@ pub fn DeleteGameModal() -> Element {
                             block
                             p-2
                             text-lg
+
                             theme1:bg-red-900
                             theme1:text-stone-200
+
                             theme2:bg-green-800
                             theme2:text-green-200
+
+                            theme3:font-[Orbitron]
                             "#,
+
                             "Delete game?"
                         }
                         p {

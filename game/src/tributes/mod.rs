@@ -21,6 +21,7 @@ use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use statuses::TributeStatus;
 use std::cmp::{Ordering, PartialEq};
+use std::collections::HashMap;
 use std::str::FromStr;
 use tracing::info;
 use uuid::Uuid;
@@ -55,6 +56,8 @@ pub struct Tribute {
     /// Events that have happened to the tribute
     #[serde(default)]
     pub events: Vec<TributeEvent>,
+    #[serde(default)]
+    pub editable: bool,
 }
 
 impl Default for Tribute {
@@ -103,6 +106,7 @@ impl Tribute {
             statistics,
             items: vec![],
             events: vec![],
+            editable: true,
         }
     }
 
@@ -1174,6 +1178,15 @@ impl Attributes {
             luck: rng.gen_range(1..=100),
             is_hidden: false,
         }
+    }
+
+    pub fn as_map(&self) -> HashMap<String, String> {
+        let json = serde_json::to_value(self).unwrap();
+        let map: HashMap<String, serde_json::Value> = serde_json::from_value(json).unwrap();
+
+        map.into_iter()
+            .map(|(k, v)| (k, v.to_string().trim_matches('"').to_string()))
+            .collect()
     }
 }
 

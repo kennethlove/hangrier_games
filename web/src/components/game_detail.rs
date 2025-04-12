@@ -16,7 +16,7 @@ use game::tributes::Tribute;
 use reqwest::StatusCode;
 use std::ops::Deref;
 
-async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
+pub(crate) async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(identifier)) = keys.first() {
         let response = reqwest::get(format!("{}/api/games/{}", API_HOST, identifier))
             .await

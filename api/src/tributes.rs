@@ -2,13 +2,22 @@ use crate::DATABASE;
 use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::Json;
+use axum::routing::get;
+use axum::{Json, Router};
 use game::items::Item;
+use game::messages::GameMessage;
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use shared::EditTribute;
+use std::sync::LazyLock;
 use surrealdb::RecordId;
+
+
+pub static TRIBUTES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
+    Router::new()
+        .route("/{identifier}/log", get(tribute_log))
+});
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct TributeOwns {
@@ -105,7 +114,8 @@ pub async fn tribute_update(Path((_game_identifier, _tribute_identifier)): Path<
 pub async fn tribute_detail(Path((_game_identifier, tribute_identifier)): Path<(String, String)>) -> (StatusCode, Json<Option<Tribute>>) {
     let mut result = DATABASE.query(format!(r#"
 SELECT *, ->owns->item[*] AS items,
-(SELECT * FROM tribute_log WHERE tribute_identifier = "{tribute_identifier}" ORDER BY day) AS log
+(SELECT * FROM fn::get_messages_by_tribute_id("{tribute_identifier}")) AS log,
+(->playing_in->game.status)[0] == "NotStarted" AS editable
 FROM tribute
 WHERE identifier = "{tribute_identifier}"
 "#)).await.expect("Failed to find tribute");
@@ -116,5 +126,18 @@ WHERE identifier = "{tribute_identifier}"
         (StatusCode::OK, Json::<Option<Tribute>>(Some(tribute)))
     } else {
         (StatusCode::NOT_FOUND, Json(None))
+    }
+}
+
+pub async fn tribute_log(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<GameMessage>>) {
+    let mut result = DATABASE.query(format!(r#"
+        SELECT * FROM fn::get_messages_by_tribute_id("{identifier}")
+    "#)).await.expect("Failed to find log");
+
+    let logs: Vec<GameMessage> = result.take(0).unwrap();
+    if logs.is_empty() {
+        (StatusCode::NOT_FOUND, Json(vec![]))
+    } else {
+        (StatusCode::OK, Json(logs))
     }
 }

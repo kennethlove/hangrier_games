@@ -14,6 +14,7 @@ pub(crate) enum QueryKey {
     Tribute(String),
     _GameLog(String), // Game identifier
     GameDayLog(String, u32), // Game identifier, day
+    TributeLog(String), // Tribute identifier
     TributeDayLog(String, u32), // Tribute identifier, day
     _GameSummary(String),
     GameDaySummary(String, u32), // Game identifier, day

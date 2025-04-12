@@ -3,12 +3,13 @@ mod tributes;
 pub mod logging;
 pub mod messages;
 
+use crate::tributes::TRIBUTES_ROUTER;
 use axum::error_handling::HandleErrorLayer;
 use axum::http::StatusCode;
 use axum::{BoxError, Router};
 use games::GAMES_ROUTER;
 use std::env;
-use std::sync::{LazyLock};
+use std::sync::LazyLock;
 use std::time::Duration;
 use surrealdb::engine::any::Any;
 use surrealdb::opt::auth::Root;
@@ -99,7 +100,8 @@ async fn main() {
         ]);
 
     let api_routes = Router::new()
-        .nest("/games", GAMES_ROUTER.clone());
+        .nest("/games", GAMES_ROUTER.clone())
+        .nest("/tributes", TRIBUTES_ROUTER.clone());
 
     let router = Router::new()
         .nest("/api", api_routes)

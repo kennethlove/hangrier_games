@@ -156,6 +156,21 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                     "#,
 
                     Link {
+                        class: r#"
+                        theme1:font-semibold
+                        theme1:text-xl
+                        theme1:text-amber-500
+                        theme1:hover:text-amber-200
+                        theme1:hover:border-b-2
+                        theme1:hover:border-amber-500
+
+                        theme2:text-green-200/50
+                        theme2:hover:text-green-200
+
+                        theme3:hover:border-b-2
+                        theme3:hover:border-yellow-500
+                        theme3:hover:text-yellow-500
+                        "#,
                         to: Routes::TributeDetail {
                             game_identifier: game.identifier.clone(),
                             tribute_identifier: tribute.identifier.clone()

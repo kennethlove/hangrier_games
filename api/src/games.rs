@@ -1,4 +1,4 @@
-use crate::tributes::{tribute_create, tribute_delete, tribute_detail, tribute_record_create, tribute_update, TributeOwns};
+use crate::tributes::{tribute_create, tribute_delete, tribute_detail, tribute_log, tribute_record_create, tribute_update, TributeOwns};
 use crate::DATABASE;
 use announcers::{summarize, summarize_stream};
 use axum::extract::Path;
@@ -37,6 +37,7 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
         .route("/{game_identifier}/next", put(next_step))
         .route("/{game_identifier}/tributes", get(game_tributes).post(tribute_create))
         .route("/{game_identifier}/tributes/{tribute_identifier}", get(tribute_detail).delete(tribute_delete).put(tribute_update))
+        .route("/{game_identifier}/tributes/{tribute_identifier}/log", get(tribute_log))
 });
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

@@ -484,12 +484,6 @@ pub fn GameDetails(game: Game) -> Element {
                     open: false,
                     GameDayLog { day: game.day.unwrap_or_default() }
                 }
-
-                InfoDetail {
-                    title: "Day summary",
-                    open: false,
-                    GameDaySummary { day: game.day.unwrap_or_default() }
-                }
             }
         }
     }

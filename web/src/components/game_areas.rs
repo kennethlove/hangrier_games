@@ -128,7 +128,12 @@ pub fn GameAreaList() -> Element {
                                     class: "p-2",
                                     for item in area.clone().items {
                                         li {
-                                            "{item.name}"
+                                            img {
+                                                src: format!("/assets/icons/{}", item.as_icon()),
+                                                alt: "{item.name} icon",
+                                                title: "{item.name}",
+                                                class: "size-12",
+                                            }
                                         }
                                     }
                                 }

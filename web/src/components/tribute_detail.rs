@@ -139,7 +139,12 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                             dt { "Current location" }
                             dd { "{tribute.area}" }
                             dt { "Status" }
-                            dd { "{tribute.status}" }
+                            dd { img {
+                                src: format!("/assets/icons/{}", tribute.status.as_icon()),
+                                alt: "{tribute.status} icon",
+                                title: "{tribute.status}",
+                                class: "size-8",
+                            }}
                             dt { "Outlook" }
                             dd { "Rosy" }
                         }
@@ -151,7 +156,12 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                         ul {
                             for item in tribute.clone().items {
                                 li {
-                                    "{item.name}"
+                                    img {
+                                        src: format!("/assets/icons/{}", item.as_icon()),
+                                        alt: "{item.name} icon",
+                                        title: "{item.name}",
+                                        class: "size-16",
+                                    }
                                 }
                             }
                         }

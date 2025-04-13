@@ -86,6 +86,30 @@ impl Display for TributeStatus {
     }
 }
 
+impl TributeStatus {
+    pub fn as_icon(&self) -> String {
+        match self {
+            TributeStatus::Healthy => "health-normal.svg".to_string(),
+            TributeStatus::Wounded => "wounded.svg".to_string(),
+            TributeStatus::Starving => "starving.svg".to_string(),
+            TributeStatus::Dehydrated => "dehydrated.svg".to_string(),
+            TributeStatus::Sick => "vomiting.svg".to_string(),
+            TributeStatus::Poisoned => "poison-bottle.svg".to_string(),
+            TributeStatus::RecentlyDead => "recently-dead.svg".to_string(),
+            TributeStatus::Dead => "dead.svg".to_string(),
+            TributeStatus::Electrocuted => "electrocuted.svg".to_string(),
+            TributeStatus::Frozen => "frozen-body.svg".to_string(),
+            TributeStatus::Overheated => "heat-haze.svg".to_string(),
+            TributeStatus::Broken => "broken-bone.svg".to_string(),
+            TributeStatus::Infected => "infection.svg".to_string(),
+            TributeStatus::Drowned => "drowning.svg".to_string(),
+            TributeStatus::Burned => "burned.svg".to_string(),
+            TributeStatus::Buried => "falling-rocks.svg".to_string(),
+            TributeStatus::Mauled(animal) => "mauled.svg".to_string(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

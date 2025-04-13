@@ -24,6 +24,53 @@ pub struct Item {
     pub effect: i32,
 }
 
+impl Item {
+    pub fn as_icon(&self) -> String {
+        match self.item_type {
+            ItemType::Consumable => {
+                match &self.attribute {
+                    // restores health
+                    Attribute::Health => { "health-potion.svg".to_string() }
+                    // restores sanity
+                    Attribute::Sanity => { "spinning-top.svg".to_string() }
+                    // move further
+                    Attribute::Movement => { "trail-mix.svg".to_string() }
+                    // sure, you can win that fight
+                    Attribute::Bravery => { "powder.svg".to_string() }
+                    // move faster
+                    Attribute::Speed => { "fizzing-flask.svg".to_string() }
+                    // hit harder
+                    Attribute::Strength => { "hypodermic-test.svg".to_string() }
+                    // take hits better
+                    Attribute::Defense => { "spray.svg".to_string() }
+                }
+            },
+            ItemType::Weapon => {
+                match &self.attribute {
+                    // hit harder
+                    Attribute::Strength => {
+                        let name = self.name.to_lowercase();
+                        let name = name.rsplit_once(' ').unwrap().1;
+                        match name {
+                            "sword" => "pointy-sword.svg".to_string(),
+                            "spear" => "spear-hook.svg".to_string(),
+                            "dagger" => "plain-dagger.svg".to_string(),
+                            "knife" => "switchblade.svg".to_string(),
+                            "net" => "fishing-net.svg".to_string(),
+                            "trident" => "harpoon-trident.svg".to_string(),
+                            "bow" => "high-shot.svg".to_string(),
+                            "mace" => "spiked-mace.svg".to_string(),
+                            _ => "fist.svg".to_string(),
+                        }
+                    }
+                    // take hits better
+                    _ => { "shield.svg".to_string() }
+                }
+            }
+        }
+    }
+}
+
 impl Display for Item {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name)

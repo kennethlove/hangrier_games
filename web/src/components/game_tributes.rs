@@ -249,7 +249,14 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 ul {
                     class: "text-sm",
                     for item in tribute.clone().items {
-                        li { "{item.name}" }
+                        li {
+                            img {
+                                src: format!("/assets/icons/{}", item.as_icon()),
+                                alt: "{item.name} icon",
+                                title: "{item.name}",
+                                class: "size-12",
+                            }
+                        }
                     }
                 }
             }

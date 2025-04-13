@@ -38,5 +38,7 @@ mod game_day_summary;
 
 mod button;
 mod map;
+mod credits;
+pub(crate) use credits::Credits;
 
 pub(crate) use button::Button;

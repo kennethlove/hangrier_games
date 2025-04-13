@@ -29,8 +29,6 @@ pub fn App() -> Element {
     let edit_tribute_signal: Signal<Option<EditTribute>> = use_signal(|| None);
     use_context_provider(|| edit_tribute_signal);
 
-    let copyright = "Hangry Games &copy; 2025";
-
     rsx! {
         document::Link {
             rel: "preconnect",
@@ -86,18 +84,26 @@ pub fn App() -> Element {
                     mt-4
                     text-xs
                     text-center
-                    theme1:text-amber-300
+                    theme1:text-stone-200
                     theme2:text-green-900
                     theme3:text-stone-400
                     "#,
 
-                    p { dangerous_inner_html: "{copyright}" }
                     p {
-                        "Mockingjay icons from "
                         a {
-                            href: "https://www.vecteezy.com/members/inna-marchenko601727",
-                            "Inna Marchenko"
+                            class: "theme1:text-amber-300",
+                            href: "/credits",
+                            "Credits"
                         }
+                    }
+                    p {
+                        "Made with 💜 by ",
+                        a {
+                            class: "theme1:text-amber-300",
+                            href: "https://thekennethlove.com",
+                            "klove"
+                        },
+                        ".",
                     }
                 }
             }

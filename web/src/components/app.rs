@@ -91,7 +91,7 @@ pub fn App() -> Element {
 
                     p {
                         a {
-                            class: "theme1:text-amber-300",
+                            class: "theme1:text-amber-300 theme2:text-green-200 theme3:text-yellow-600",
                             href: "/credits",
                             "Credits"
                         }
@@ -99,7 +99,7 @@ pub fn App() -> Element {
                     p {
                         "Made with 💜 by ",
                         a {
-                            class: "theme1:text-amber-300",
+                            class: "theme1:text-amber-300 theme2:text-green-200 theme3:text-yellow-600",
                             href: "https://thekennethlove.com",
                             "klove"
                         },

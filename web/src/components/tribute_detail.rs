@@ -11,7 +11,6 @@ use game::messages::GameMessage;
 use game::tributes::{Attributes, Tribute};
 use shared::EditTribute;
 use std::collections::HashMap;
-use crate::components::icons::game_icons_net::HeartsIcon;
 use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_status_icon::TributeStatusIcon;
 

@@ -11,6 +11,7 @@ use game::messages::GameMessage;
 use game::tributes::{Attributes, Tribute};
 use shared::EditTribute;
 use std::collections::HashMap;
+use crate::components::icons::game_icons_net::HeartsIcon;
 
 async fn fetch_tribute(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tribute(identifier)) = keys.first() {
@@ -145,8 +146,13 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                                 title: "{tribute.status}",
                                 class: "size-8",
                             }}
+                            dd {
+                                HeartsIcon {
+                                    class: "size-8 fill-red-500"
+                                }
+                            }
                             dt { "Outlook" }
-                            dd { "Rosy" }
+                            dd { "TODO" }
                         }
                     }
 

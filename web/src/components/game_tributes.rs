@@ -226,7 +226,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
 
             h5 {
                 class: r#"
-                mt-2
+                my-2
                 theme1:text-amber-200
 
                 theme2:text-green-200
@@ -263,7 +263,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
 
             h5 {
                 class: r#"
-                mt-2
+                my-2
                 theme1:text-amber-200
 
                 theme2:text-green-200
@@ -284,7 +284,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 }
             } else {
                 ul {
-                    class: "text-sm mt-2",
+                    class: "text-sm",
                     for log in tribute_logs {
                         li {
                             class: "mb-2",

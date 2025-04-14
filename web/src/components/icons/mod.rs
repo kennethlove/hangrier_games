@@ -8,3 +8,5 @@ pub mod mockingjay_arrow;
 pub mod mockingjay_flight;
 
 pub mod uturn;
+
+pub mod game_icons_net;

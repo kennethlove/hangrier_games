@@ -178,44 +178,41 @@ fn GameStatusState() -> Element {
                             }
                         }
                     }
-                    div {
-                        class: "flex flex-row flex-grow gap-2 place-content-center sm:place-content-end",
-                        Button {
-                            extra_classes: Some(r#"
-                            theme1:bg-radial
-                            theme1:from-amber-300
-                            theme1:to-red-500
-                            theme1:border-red-500
-                            theme1:text-red-900
-                            theme1:hover:text-stone-200
-                            theme1:hover:from-amber-500
-                            theme1:hover:to-red-700
+                    Button {
+                        extra_classes: Some(r#"
+                        theme1:bg-radial
+                        theme1:from-amber-300
+                        theme1:to-red-500
+                        theme1:border-red-500
+                        theme1:text-red-900
+                        theme1:hover:text-stone-200
+                        theme1:hover:from-amber-500
+                        theme1:hover:to-red-700
 
-                            theme2:bg-linear-to-b
-                            theme2:from-green-400
-                            theme2:to-teal-500
-                            theme2:border-none
-                            theme2:hover:text-green-200
-                            theme2:hover:from-green-500
-                            theme2:hover:to-teal-600
+                        theme2:bg-linear-to-b
+                        theme2:from-green-400
+                        theme2:to-teal-500
+                        theme2:border-none
+                        theme2:hover:text-green-200
+                        theme2:hover:from-green-500
+                        theme2:hover:to-teal-600
 
-                            theme3:border-none
-                            theme3:bg-gold-rich
-                            theme3:hover:bg-gold-rich-reverse
-                            theme3:text-stone-700
-                            theme3:hover:text-stone-50
-                            "#.into()),
+                        theme3:border-none
+                        theme3:bg-gold-rich
+                        theme3:hover:bg-gold-rich-reverse
+                        theme3:text-stone-700
+                        theme3:hover:text-stone-50
+                        "#.into()),
 
-                            onclick: next_step_handler,
-                            disabled: game_finished,
-                            "{game_next_step}"
-                        }
+                        onclick: next_step_handler,
+                        disabled: game_finished,
+                        "{game_next_step}"
                     }
                 }
 
                 if !winner_name.is_empty() {
                     h1 {
-                        class: "text-xl",
+                        class: "block text-3xl",
                         "Winner: {winner_name}!"
                     }
                 }

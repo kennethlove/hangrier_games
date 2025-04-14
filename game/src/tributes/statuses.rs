@@ -89,7 +89,7 @@ impl Display for TributeStatus {
 impl TributeStatus {
     pub fn as_icon(&self) -> String {
         match self {
-            TributeStatus::Healthy => "health-normal.svg".to_string(),
+            TributeStatus::Healthy => "hearts.svg".to_string(),
             TributeStatus::Wounded => "wounded.svg".to_string(),
             TributeStatus::Starving => "starving.svg".to_string(),
             TributeStatus::Dehydrated => "dehydrated.svg".to_string(),

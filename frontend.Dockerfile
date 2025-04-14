@@ -48,6 +48,7 @@ COPY web/src/ ./web/src/
 COPY --from=css-builder /app/assets/dist/ ./web/assets/dist/
 COPY web/assets/images/ ./web/assets/images/
 COPY web/assets/icons/ ./web/assets/icons/
+COPY web/assets/favicons/ ./web/assets/favicons/
 
 ARG API_HOST=http://localhost:3000
 ENV API_HOST=${API_HOST}

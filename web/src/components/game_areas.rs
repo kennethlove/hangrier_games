@@ -76,6 +76,7 @@ pub fn GameAreaList() -> Element {
                                 h4 {
                                     class: r#"
                                     flex-grow
+                                    text-xl
                                     theme1:text-amber-300
                                     theme2:text-green-800
                                     theme3:font-semibold
@@ -129,7 +130,7 @@ pub fn GameAreaList() -> Element {
                                     class: "p-2",
                                     for item in area.clone().items {
                                         li {
-                                            class: "flex flex-row gap-2 items-center",
+                                            class: "flex flex-row gap-2 items-center pb-1",
                                             ItemIcon {
                                                 item: item.clone(),
                                                 css_class: r#"

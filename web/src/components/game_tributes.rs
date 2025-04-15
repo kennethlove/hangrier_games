@@ -137,12 +137,12 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 flex-row
                 gap-2
                 place-content-between
+                relative
                 "#,
 
                 h4 {
                     class: r#"
                     mb-2
-                    flex-grow
 
                     theme1:font-[Cinzel]
                     theme1:text-lg
@@ -181,6 +181,39 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                     }
                 }
 
+                div {
+                    class: r#"
+                    absolute
+                    right-0
+                    theme1:text-amber-200/20
+                    theme1:text-9xl
+                    theme1:font-[Cinzel]
+                    theme2:text-green-200/20
+                    theme2:text-9xl
+                    theme2:font-[Forum]
+                    theme3:text-stone-500/25
+                    theme3:text-9xl
+                    theme3:font-[Orbitron]
+                    z-0
+                    "#,
+                    span {
+                        class: r#"
+                        inline-block
+                        text-sm
+                        theme2:text-base
+                        transform
+                        -rotate-90
+                        translate-x-1/3
+                        -translate-y-[1.25rem]
+                        theme1:translate-x-1/2
+                        theme1:-translate-y-[2rem]
+                        theme1:tracking-widest
+                        "#,
+                        "district"
+                    },
+                    "{tribute.district}",
+                }
+
                 if game.status == GameStatus::NotStarted {
                     TributeEdit {
                         identifier: tribute.clone().identifier,
@@ -193,15 +226,6 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
             dl {
                 class: "text-sm grid grid-cols-2 gap-2",
                 dt {
-                    class: "text-sm",
-                    "District",
-                }
-                dd {
-                    class: "font-bold",
-                    "{tribute.district}"
-                }
-                dt {
-                    class: "text-sm",
                     "In the",
                 }
                 dd {
@@ -209,19 +233,15 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                     "{tribute.area}"
                 }
                 dt {
-                    class: "text-sm",
                     "Status",
                 }
                 dd {
-                    class: "font-bold",
                     TributeStatusIcon {
                         status: tribute.status.clone(),
                         css_class: "size-4"
                     },
-                    "{tribute.status}"
                 }
                 dt {
-                    class: "text-sm",
                     "Health",
                 }
                 dd {

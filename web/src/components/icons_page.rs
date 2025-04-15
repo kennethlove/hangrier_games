@@ -1,4 +1,3 @@
-use dioxus::html::a::class;
 use dioxus::prelude::*;
 use crate::components::icons::game_icons_net::*;
 

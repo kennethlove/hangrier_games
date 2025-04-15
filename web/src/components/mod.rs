@@ -28,7 +28,6 @@ mod tribute_edit;
 pub(crate) use navbar::Navbar;
 mod game_day_log;
 mod home;
-pub mod icons;
 
 pub(crate) use home::Home;
 
@@ -39,6 +38,10 @@ mod game_day_summary;
 mod button;
 mod map;
 mod credits;
+pub mod icons;
+mod icons_page;
+pub(crate) use icons_page::IconsPage;
+
 pub(crate) use credits::Credits;
 
 pub(crate) use button::Button;

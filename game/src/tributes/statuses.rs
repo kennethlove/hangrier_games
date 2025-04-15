@@ -105,7 +105,7 @@ impl TributeStatus {
             TributeStatus::Drowned => "drowning.svg".to_string(),
             TributeStatus::Burned => "burned.svg".to_string(),
             TributeStatus::Buried => "falling-rocks.svg".to_string(),
-            TributeStatus::Mauled(animal) => "mauled.svg".to_string(),
+            TributeStatus::Mauled(_) => "mauled.svg".to_string(),
         }
     }
 }

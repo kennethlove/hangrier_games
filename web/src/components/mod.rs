@@ -40,6 +40,8 @@ mod map;
 mod credits;
 pub mod icons;
 mod icons_page;
+mod tribute_status_icon;
+
 pub(crate) use icons_page::IconsPage;
 
 pub(crate) use credits::Credits;

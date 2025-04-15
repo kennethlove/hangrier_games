@@ -126,12 +126,22 @@ pub fn GameAreaList() -> Element {
                                 }
                             } else {
                                 ul {
-                                    class: "p-2 flex flex-row gap-2 flex-wrap",
+                                    class: "p-2",
                                     for item in area.clone().items {
                                         li {
+                                            class: "flex flex-row gap-2 items-center",
                                             ItemIcon {
                                                 item: item.clone(),
-                                                css_class: "size-12",
+                                                css_class: r#"
+                                                size-8
+                                                theme1:fill-amber-500
+                                                theme2:fill-green-800
+                                                "#,
+                                            }
+                                            span {
+                                                class: "text-sm",
+                                                title: item.to_string(),
+                                                "{item.to_string()}"
                                             }
                                         }
                                     }

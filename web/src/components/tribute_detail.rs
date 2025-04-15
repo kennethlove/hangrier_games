@@ -12,6 +12,7 @@ use game::tributes::{Attributes, Tribute};
 use shared::EditTribute;
 use std::collections::HashMap;
 use crate::components::icons::game_icons_net::HeartsIcon;
+use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_status_icon::TributeStatusIcon;
 
 async fn fetch_tribute(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
@@ -156,13 +157,12 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                         title: "Inventory",
                         open: false,
                         ul {
+                            class: "flex flex-row gap-2 flew-wrap",
                             for item in tribute.clone().items {
                                 li {
-                                    img {
-                                        src: format!("/assets/icons/{}", item.as_icon()),
-                                        alt: "{item.name} icon",
-                                        title: "{item.name}",
-                                        class: "size-16",
+                                    ItemIcon {
+                                        item: item.clone(),
+                                        css_class: "size-12",
                                     }
                                 }
                             }

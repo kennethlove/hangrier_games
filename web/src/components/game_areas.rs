@@ -7,6 +7,7 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::areas::AreaDetails;
 use game::games::Game;
+use crate::components::item_icon::ItemIcon;
 
 async fn fetch_areas(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Areas(identifier)) = keys.first() {
@@ -125,14 +126,12 @@ pub fn GameAreaList() -> Element {
                                 }
                             } else {
                                 ul {
-                                    class: "p-2",
+                                    class: "p-2 flex flex-row gap-2 flex-wrap",
                                     for item in area.clone().items {
                                         li {
-                                            img {
-                                                src: format!("/assets/icons/{}", item.as_icon()),
-                                                alt: "{item.name} icon",
-                                                title: "{item.name}",
-                                                class: "size-12",
+                                            ItemIcon {
+                                                item: item.clone(),
+                                                css_class: "size-12",
                                             }
                                         }
                                     }

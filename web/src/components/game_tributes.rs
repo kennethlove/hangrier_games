@@ -166,7 +166,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                         theme1:hover:border-b-2
                         theme1:hover:border-amber-500
 
-                        theme2:text-green-200/50
+                        theme2:text-green-200
                         theme2:hover:text-green-200
 
                         theme3:hover:border-b-2
@@ -238,7 +238,11 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 dd {
                     TributeStatusIcon {
                         status: tribute.status.clone(),
-                        css_class: "size-4"
+                        css_class: r#"
+                        size-5
+                        theme1:fill-stone-200
+                        theme2:fill-green-200
+                        "#
                     },
                 }
                 dt {
@@ -276,9 +280,19 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                     class: "flex flex-row gap-2 flex-wrap",
                     for item in tribute.clone().items {
                         li {
+                            class: "flex flex-row gap-2 items-center",
                             ItemIcon {
                                 item: item.clone(),
-                                css_class: "size-8",
+                                css_class: r#"
+                                size-8
+                                theme1:fill-amber-500
+                                theme2:fill-green-200
+                                "#,
+                            }
+                            span {
+                                class: "text-sm",
+                                title: item.to_string(),
+                                "{item.to_string()}"
                             }
                         }
                     }

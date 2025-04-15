@@ -3,7 +3,7 @@ use game::tributes::statuses::TributeStatus;
 use crate::components::icons::game_icons_net::*;
 
 #[component]
-pub fn TributeStatusIcon(status: TributeStatus, css_class: String) -> Element {
+fn StatusIcon(status: TributeStatus, css_class: String) -> Element {
     match status {
         TributeStatus::Broken => rsx!(BrokenBoneIcon { class: css_class }),
         TributeStatus::Buried => rsx!(FallingRocksIcon { class: css_class }),
@@ -22,5 +22,15 @@ pub fn TributeStatusIcon(status: TributeStatus, css_class: String) -> Element {
         TributeStatus::Starving => rsx!(StarvingIcon { class: css_class }),
         TributeStatus::Sick => rsx!(VomitingIcon { class: css_class }),
         TributeStatus::Wounded => rsx!(WoundedIcon { class: css_class }),
+    }
+}
+
+#[component]
+pub fn TributeStatusIcon(status: TributeStatus, css_class: String) -> Element {
+    rsx! {
+        span {
+            title: status.to_string(),
+            StatusIcon { status: status.clone(), css_class }
+        }
     }
 }

@@ -1,4 +1,4 @@
-use crate::components::{Credits, GamePage, Games, GamesList, Home, Navbar, TributeDetail};
+use crate::components::{Credits, GamePage, Games, GamesList, Home, IconsPage, Navbar, TributeDetail};
 use dioxus::prelude::*;
 
 
@@ -29,6 +29,8 @@ pub enum Routes {
         #[end_nest]
         #[route("/credits")]
         Credits {},
+        #[route("/icons")]
+        IconsPage {},
     #[end_layout]
     #[route("/:..route")]
     PageNotFound { route: Vec<String> },

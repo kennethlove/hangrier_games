@@ -597,18 +597,6 @@ pub fn Credits() -> Element {
                                                 theme2:decoration-wavy
                                                 theme3:text-yellow-600
                                                 "#,
-                                                href: "https://game-icons.net/1x1/sbed/health-normal.html",
-                                                "Health Normal"
-                                            }
-                                        }
-                                        li {
-                                            a {
-                                                class: r#"
-                                                theme1:text-amber-300
-                                                theme2:underline
-                                                theme2:decoration-wavy
-                                                theme3:text-yellow-600
-                                                "#,
                                                 href: "https://game-icons.net/1x1/sbed/shield.html",
                                                 "Shield"
                                             }
@@ -624,6 +612,18 @@ pub fn Credits() -> Element {
                                 td {
                                     class: "border",
                                     ul {
+                                        li {
+                                            a {
+                                                class: r#"
+                                                theme1:text-amber-300
+                                                theme2:underline
+                                                theme2:decoration-wavy
+                                                theme3:text-yellow-600
+                                                "#,
+                                                href: "https://game-icons.net/1x1/skoll/hearts.html",
+                                                "Hearts"
+                                            }
+                                        }
                                         li {
                                             a {
                                                 class: r#"

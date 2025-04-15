@@ -1,5 +1,6 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::tribute_edit::TributeEdit;
+use crate::components::tribute_status_icon::TributeStatusIcon;
 use crate::routes::Routes;
 use crate::API_HOST;
 use dioxus::prelude::*;
@@ -7,6 +8,7 @@ use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::games::{Game, GameStatus};
 use game::messages::GameMessage;
 use game::tributes::Tribute;
+use crate::components::item_icon::ItemIcon;
 
 async fn fetch_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tributes(identifier)) = keys.first() {
@@ -212,6 +214,10 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 }
                 dd {
                     class: "font-bold",
+                    TributeStatusIcon {
+                        status: tribute.status.clone(),
+                        css_class: "size-4"
+                    },
                     "{tribute.status}"
                 }
                 dt {
@@ -226,7 +232,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
 
             h5 {
                 class: r#"
-                mt-2
+                my-2
                 theme1:text-amber-200
 
                 theme2:text-green-200
@@ -247,14 +253,12 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 }
             } else {
                 ul {
-                    class: "text-sm",
+                    class: "flex flex-row gap-2 flex-wrap",
                     for item in tribute.clone().items {
                         li {
-                            img {
-                                src: format!("/assets/icons/{}", item.as_icon()),
-                                alt: "{item.name} icon",
-                                title: "{item.name}",
-                                class: "size-12",
+                            ItemIcon {
+                                item: item.clone(),
+                                css_class: "size-8",
                             }
                         }
                     }
@@ -263,7 +267,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
 
             h5 {
                 class: r#"
-                mt-2
+                my-2
                 theme1:text-amber-200
 
                 theme2:text-green-200
@@ -284,7 +288,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 }
             } else {
                 ul {
-                    class: "text-sm mt-2",
+                    class: "text-sm",
                     for log in tribute_logs {
                         li {
                             class: "mb-2",

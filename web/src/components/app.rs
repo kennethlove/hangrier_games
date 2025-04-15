@@ -29,7 +29,7 @@ pub fn App() -> Element {
     let edit_tribute_signal: Signal<Option<EditTribute>> = use_signal(|| None);
     use_context_provider(|| edit_tribute_signal);
 
-    let mut favicon = match *theme_signal.read() {
+    let favicon = match *theme_signal.read() {
         Colorscheme::One => asset!("/assets/favicons/theme1.png"),
         Colorscheme::Two => asset!("/assets/favicons/theme2.png"),
         Colorscheme::Three => asset!("/assets/favicons/theme3.png"),

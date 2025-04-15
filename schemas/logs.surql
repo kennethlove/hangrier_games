@@ -39,3 +39,9 @@ DEFINE FUNCTION OVERWRITE fn::get_messages_by_game_id($game_id: string) {
     WHERE string::starts_with(subject, $game_id)
     ORDER BY timestamp;
 };
+
+DEFINE FUNCTION OVERWRITE fn::get_messages_by_tribute_id($tribute_id: string) {
+    RETURN SELECT * FROM message
+    WHERE string::contains(subject, $tribute_id)
+    ORDER BY timestamp;
+};

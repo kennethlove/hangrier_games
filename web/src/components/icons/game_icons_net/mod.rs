@@ -31,6 +31,7 @@ mod starving;
 mod switchblade;
 mod trail_mix;
 mod vomiting;
+mod wood_axe;
 mod wounded;
 
 pub use broken_bone::BrokenBoneIcon;
@@ -66,4 +67,5 @@ pub use starving::*;
 pub use switchblade::*;
 pub use trail_mix::*;
 pub use vomiting::*;
+pub use wood_axe::*;
 pub use wounded::*;

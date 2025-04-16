@@ -107,6 +107,9 @@ pub fn IconsPage() -> Element {
                 VomitingIcon {
                     class: "fill-black",
                 }
+                WoodAxeIcon {
+                    class: "fill-black",
+                }
                 WoundedIcon {
                     class: "fill-black",
                 }

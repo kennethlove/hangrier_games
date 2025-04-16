@@ -143,6 +143,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 h4 {
                     class: r#"
                     mb-2
+                    z-1
 
                     theme1:font-[Cinzel]
                     theme1:text-lg
@@ -185,6 +186,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                     class: r#"
                     absolute
                     right-0
+                    z-0
                     theme1:text-amber-200/20
                     theme1:text-9xl
                     theme1:font-[Cinzel]
@@ -214,10 +216,13 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 }
 
                 if game.status == GameStatus::NotStarted {
-                    TributeEdit {
-                        identifier: tribute.clone().identifier,
-                        district: tribute.district,
-                        name: tribute.clone().name,
+                    div {
+                        class: "z-1",
+                        TributeEdit {
+                            identifier: tribute.clone().identifier,
+                            district: tribute.district,
+                            name: tribute.clone().name,
+                        }
                     }
                 }
             }

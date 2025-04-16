@@ -496,6 +496,18 @@ pub fn Credits() -> Element {
                                                 "Vomiting"
                                             }
                                         }
+                                        li {
+                                            a {
+                                                class: r#"
+                                                theme1:text-amber-300
+                                                theme2:underline
+                                                theme2:decoration-wavy
+                                                theme3:text-yellow-600
+                                                "#,
+                                                href: "https://game-icons.net/1x1/lorc/wood-axe.html",
+                                                "Wood Axe"
+                                            }
+                                        }
                                     }
                                 }
                             }

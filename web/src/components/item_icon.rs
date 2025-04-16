@@ -32,6 +32,7 @@ fn Icon(item: Item, css_class: String) -> Element {
                         "trident" => rsx!(HarpoonTridentIcon { class: css_class }),
                         "bow" => rsx!(HighShotIcon { class: css_class }),
                         "mace" => rsx!(SpikedMaceIcon { class: css_class }),
+                        "axe" => rsx!(WoodAxeIcon { class: css_class }),
                         _ => rsx!(FistIcon { class: css_class }),
                     }
 

@@ -2,6 +2,7 @@ mod games;
 mod tributes;
 pub mod logging;
 pub mod messages;
+mod users;
 
 use crate::tributes::TRIBUTES_ROUTER;
 use axum::error_handling::HandleErrorLayer;
@@ -20,6 +21,7 @@ use tower_http::cors::{Any as CorsAny, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use crate::users::USERS_ROUTER;
 
 pub static DATABASE: LazyLock<Surreal<Any>> = LazyLock::new(Surreal::init);
 
@@ -101,7 +103,8 @@ async fn main() {
 
     let api_routes = Router::new()
         .nest("/games", GAMES_ROUTER.clone())
-        .nest("/tributes", TRIBUTES_ROUTER.clone());
+        .nest("/tributes", TRIBUTES_ROUTER.clone())
+        .nest("/users", USERS_ROUTER.clone());
 
     let router = Router::new()
         .nest("/api", api_routes)

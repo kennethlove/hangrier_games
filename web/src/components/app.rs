@@ -74,7 +74,7 @@ pub fn App() -> Element {
 
                 theme1:bg-size-[700px_700px]
                 theme1:bg-repeat
-                theme1:bg-red-900/75
+                theme1:bg-red-900/85
 
                 theme2:bg-green-800/85
                 theme2:bg-[url("../assets/images/waves.svg")]
@@ -88,7 +88,7 @@ pub fn App() -> Element {
                 "#,
 
                 main {
-                    class: "p-4 mx-auto container",
+                    class: "py-4 px-2 mx-auto container",
                     Router::<Routes> {}
                 }
 

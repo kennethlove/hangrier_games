@@ -67,7 +67,12 @@ pub fn GamesList() -> Element {
                 }
             },
             QueryResult::Loading(_) => rsx! { p { "Loading..." } },
-            QueryResult::Err(QueryError::NoGames) => rsx! { p { "No games yet" } },
+            QueryResult::Err(QueryError::NoGames) => rsx! {
+                p {
+                    class: "pb-4 text-center",
+                    "No games yet"
+                }
+            },
             _ => rsx! { p { "Something went wrong" } },
         }
 

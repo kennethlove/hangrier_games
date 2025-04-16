@@ -192,9 +192,8 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                     theme2:text-9xl
                     theme2:font-[Forum]
                     theme3:text-stone-500/25
-                    theme3:text-9xl
+                    theme3:text-8xl
                     theme3:font-[Orbitron]
-                    z-0
                     "#,
                     span {
                         class: r#"

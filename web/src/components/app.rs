@@ -70,13 +70,11 @@ pub fn App() -> Element {
                 frame
                 transition
                 duration-500
-                p-2
                 font-[Work_Sans]
 
-                theme1:bg-[url("../assets/images/noise2.svg")]
                 theme1:bg-size-[700px_700px]
                 theme1:bg-repeat
-                theme1:bg-red-900
+                theme1:bg-red-900/75
 
                 theme2:bg-green-800/85
                 theme2:bg-[url("../assets/images/waves.svg")]
@@ -89,7 +87,10 @@ pub fn App() -> Element {
                 theme3:to-stone-900/95
                 "#,
 
-                Router::<Routes> {}
+                main {
+                    class: "p-4 mx-auto container",
+                    Router::<Routes> {}
+                }
 
                 footer {
                     class: r#"

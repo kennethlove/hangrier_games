@@ -137,12 +137,12 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 flex-row
                 gap-2
                 place-content-between
+                relative
                 "#,
 
                 h4 {
                     class: r#"
                     mb-2
-                    flex-grow
 
                     theme1:font-[Cinzel]
                     theme1:text-lg
@@ -166,7 +166,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                         theme1:hover:border-b-2
                         theme1:hover:border-amber-500
 
-                        theme2:text-green-200/50
+                        theme2:text-green-200
                         theme2:hover:text-green-200
 
                         theme3:hover:border-b-2
@@ -181,6 +181,38 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                     }
                 }
 
+                div {
+                    class: r#"
+                    absolute
+                    right-0
+                    theme1:text-amber-200/20
+                    theme1:text-9xl
+                    theme1:font-[Cinzel]
+                    theme2:text-green-200/20
+                    theme2:text-9xl
+                    theme2:font-[Forum]
+                    theme3:text-stone-500/25
+                    theme3:text-8xl
+                    theme3:font-[Orbitron]
+                    "#,
+                    span {
+                        class: r#"
+                        inline-block
+                        text-sm
+                        theme2:text-base
+                        transform
+                        -rotate-90
+                        translate-x-1/3
+                        -translate-y-[1.25rem]
+                        theme1:translate-x-1/2
+                        theme1:-translate-y-[2rem]
+                        theme1:tracking-widest
+                        "#,
+                        "district"
+                    },
+                    "{tribute.district}",
+                }
+
                 if game.status == GameStatus::NotStarted {
                     TributeEdit {
                         identifier: tribute.clone().identifier,
@@ -193,15 +225,6 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
             dl {
                 class: "text-sm grid grid-cols-2 gap-2",
                 dt {
-                    class: "text-sm",
-                    "District",
-                }
-                dd {
-                    class: "font-bold",
-                    "{tribute.district}"
-                }
-                dt {
-                    class: "text-sm",
                     "In the",
                 }
                 dd {
@@ -209,19 +232,19 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                     "{tribute.area}"
                 }
                 dt {
-                    class: "text-sm",
                     "Status",
                 }
                 dd {
-                    class: "font-bold",
                     TributeStatusIcon {
                         status: tribute.status.clone(),
-                        css_class: "size-4"
+                        css_class: r#"
+                        size-5
+                        theme1:fill-stone-200
+                        theme2:fill-green-200
+                        "#
                     },
-                    "{tribute.status}"
                 }
                 dt {
-                    class: "text-sm",
                     "Health",
                 }
                 dd {
@@ -256,9 +279,19 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                     class: "flex flex-row gap-2 flex-wrap",
                     for item in tribute.clone().items {
                         li {
+                            class: "flex flex-row gap-2 items-center",
                             ItemIcon {
                                 item: item.clone(),
-                                css_class: "size-8",
+                                css_class: r#"
+                                size-8
+                                theme1:fill-amber-500
+                                theme2:fill-green-200
+                                "#,
+                            }
+                            span {
+                                class: "text-sm",
+                                title: item.to_string(),
+                                "{item.to_string()}"
                             }
                         }
                     }

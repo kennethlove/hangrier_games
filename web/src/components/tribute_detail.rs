@@ -11,7 +11,6 @@ use game::messages::GameMessage;
 use game::tributes::{Attributes, Tribute};
 use shared::EditTribute;
 use std::collections::HashMap;
-use crate::components::icons::game_icons_net::HeartsIcon;
 use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_status_icon::TributeStatusIcon;
 
@@ -77,7 +76,7 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
         QueryResult::Ok(QueryValue::Tribute(tribute)) => {
             rsx! {
                 div {
-                    class: "flex flex-row gap-2 place-content-between mb-4",
+                    class: "flex flex-row gap-4 mb-4 place-items-center place-content-between",
                     h2 {
                         class: r#"
                         theme1:text-2xl
@@ -97,13 +96,14 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                     }
 
                     span {
+                        class: "pr-4 sm:pr-0",
                         Link {
                             to: Routes::GamePage {
                                 identifier: game_identifier.clone()
                             },
                             UTurnIcon {
                                 class: r#"
-                                size-4
+                                size-5
                                 theme1:fill-amber-500
                                 theme1:hover:fill-amber-200
 
@@ -120,13 +120,16 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
 
                 div {
                     class: r#"
-                    pr-2
+                    pr-4
+                    sm:pr-0
                     grid
-                    gap-8
+                    gap-2
                     grid-cols-none
                     sm:grid-cols-2
+                    sm:gap-4
                     lg:grid-cols-3
-                    2xl:grid-cols-4
+                    lg:gap-8
+                    xl:grid-cols-4
 
                     theme1:text-stone-200
                     theme2:text-green-200
@@ -139,13 +142,22 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                             class: "grid grid-cols-2 gap-4",
                             dt { "District" }
                             dd { "{tribute.district}" }
-                            dt { "Current location" }
+                            dt { "Location" }
                             dd { "{tribute.area}" }
                             dt { "Status" }
                             dd {
+                                class: "flex flex-row gap-2 flex-wrap",
                                 TributeStatusIcon {
                                     status: tribute.status.clone(),
-                                    css_class: "size-8",
+                                    css_class: r#"
+                                    size-5
+                                    theme1:fill-stone-200
+                                    theme2:fill-green-200
+                                    "#
+                                }
+                                span {
+                                    class: "text-sm",
+                                    "{tribute.status.to_string()}"
                                 }
                             }
                             dt { "Outlook" }
@@ -160,9 +172,18 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                             class: "flex flex-row gap-2 flew-wrap",
                             for item in tribute.clone().items {
                                 li {
+                                    class: "flex flex-row gap-2 items-center",
                                     ItemIcon {
                                         item: item.clone(),
-                                        css_class: "size-12",
+                                        css_class: r#"
+                                        size-8
+                                        theme1:fill-amber-500
+                                        theme2:fill-green-200
+                                        "#,
+                                    }
+                                    span {
+                                        class: "text-sm",
+                                        "{item.to_string()}"
                                     }
                                 }
                             }

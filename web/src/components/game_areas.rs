@@ -76,6 +76,7 @@ pub fn GameAreaList() -> Element {
                                 h4 {
                                     class: r#"
                                     flex-grow
+                                    text-xl
                                     theme1:text-amber-300
                                     theme2:text-green-800
                                     theme3:font-semibold
@@ -126,12 +127,22 @@ pub fn GameAreaList() -> Element {
                                 }
                             } else {
                                 ul {
-                                    class: "p-2 flex flex-row gap-2 flex-wrap",
+                                    class: "p-2",
                                     for item in area.clone().items {
                                         li {
+                                            class: "flex flex-row gap-2 items-center pb-1",
                                             ItemIcon {
                                                 item: item.clone(),
-                                                css_class: "size-12",
+                                                css_class: r#"
+                                                size-8
+                                                theme1:fill-amber-500
+                                                theme2:fill-green-800
+                                                "#,
+                                            }
+                                            span {
+                                                class: "text-sm",
+                                                title: item.to_string(),
+                                                "{item.to_string()}"
                                             }
                                         }
                                     }

@@ -209,7 +209,7 @@ pub fn Navbar() -> Element {
 
                                 theme2:bg-green-200
                                 theme2:rounded-sm
-                                theme2:rounded-tr-none
+                                theme2:rounded-tl-none
 
                                 theme3:bg-stone-50
                                 theme3:border

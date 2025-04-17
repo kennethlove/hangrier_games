@@ -87,8 +87,13 @@ pub fn App() -> Element {
                 theme3:to-stone-900/95
                 "#,
 
-                main {
-                    class: "py-4 px-2 mx-auto container",
+                div {
+                    class: r#"
+                    py-4
+                    px-2
+                    mx-auto
+                    container
+                    "#,
                     Router::<Routes> {}
                 }
 

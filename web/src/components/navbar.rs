@@ -307,8 +307,15 @@ pub fn Navbar() -> Element {
                 }
             }
         }
-        div {
-            class: "mx-auto min-w-full max-w-full sm:max-w-3/4",
+        main {
+            class: r#"
+            flex
+            mx-auto
+            min-w-full
+            max-w-full
+            sm:max-w-3/4
+            min-h-full
+            "#,
             Outlet::<Routes> {}
         }
     }

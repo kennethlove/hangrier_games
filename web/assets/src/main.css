@@ -25,7 +25,7 @@
 }
 
 .frame {
-    grid-template-rows: min-content auto min-content;
+    grid-template-rows: auto min-content;
 }
 
 .theme1 {

@@ -5,6 +5,7 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use game::games::Game;
 use std::ops::Deref;
+use dioxus::html::link::disabled;
 
 async fn create_game(name: Option<String>) -> MutationResult<MutationValue, MutationError> {
     let client = reqwest::Client::new();
@@ -39,12 +40,15 @@ async fn create_game(name: Option<String>) -> MutationResult<MutationValue, Muta
 pub fn CreateGameButton() -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
     let mutate = use_mutation(create_game);
+    let mut disabled_signal = use_signal(|| false);
 
     let onclick = move |_| {
+        disabled_signal.set(true);
         spawn(async move {
             mutate.manual_mutate(None).await;
             if mutate.result().is_ok() {
                 if let MutationResult::Ok(MutationValue::NewGame(_game)) = mutate.result().deref() {
+                    disabled_signal.set(false);
                     client.invalidate_queries(&[QueryKey::Games]);
                 }
             }
@@ -53,6 +57,7 @@ pub fn CreateGameButton() -> Element {
 
     rsx! {
         Button {
+            disabled: Some(disabled_signal.read().clone()),
             extra_classes: Some(r#"
             theme1:bg-radial
             theme1:from-amber-300
@@ -89,10 +94,12 @@ pub fn CreateGameForm() -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
     let mut game_name_signal: Signal<String> = use_signal(String::default);
     let mutate = use_mutation(create_game);
+    let mut disabled_signal = use_signal(|| false);
 
     let onsubmit = move |_| {
         let name = game_name_signal.peek().clone();
         if name.is_empty() { return; }
+        disabled_signal.set(true);
 
         spawn(async move {
             mutate.manual_mutate(Some(name)).await;
@@ -101,6 +108,7 @@ pub fn CreateGameForm() -> Element {
                 match mutate.result().deref() {
                     MutationResult::Ok(MutationValue::NewGame(_game)) => {
                         client.invalidate_queries(&[QueryKey::Games]);
+                        disabled_signal.set(false);
                         game_name_signal.set(String::default());
                     },
                     MutationResult::Err(MutationError::UnableToCreateGame) => {},
@@ -154,6 +162,7 @@ pub fn CreateGameForm() -> Element {
                 }
             }
             Button {
+                disabled: Some(disabled_signal.read().clone()),
                 extra_classes: Some(r#"
                 theme1:bg-radial
                 theme1:from-amber-300

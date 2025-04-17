@@ -95,6 +95,7 @@ pub fn App() -> Element {
                 footer {
                     class: r#"
                     mt-4
+                    pb-4
                     text-xs
                     text-center
                     theme1:text-stone-200

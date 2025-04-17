@@ -27,6 +27,16 @@ async fn fetch_games(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError>
 }
 
 #[component]
+fn NoGames() -> Element {
+    rsx! {
+        p {
+            class: "pb-4 text-center theme1:text-stone-200 theme2:text-green-200 theme3:text-stone-700",
+            "No games yet"
+        }
+    }
+}
+
+#[component]
 pub fn GamesList() -> Element {
     let games_query = use_get_query([QueryKey::AllGames, QueryKey::Games], fetch_games);
 
@@ -53,10 +63,7 @@ pub fn GamesList() -> Element {
             QueryResult::Ok(QueryValue::Games(games)) => {
                 rsx! {
                     if games.is_empty() {
-                        p {
-                            class: "pb-4 text-center",
-                            "No games yet"
-                        }
+                        NoGames {}
                     } else {
                         ul {
                             for game in games {
@@ -66,13 +73,11 @@ pub fn GamesList() -> Element {
                     }
                 }
             },
-            QueryResult::Loading(_) => rsx! { p { "Loading..." } },
-            QueryResult::Err(QueryError::NoGames) => rsx! {
-                p {
-                    class: "pb-4 text-center",
-                    "No games yet"
-                }
-            },
+            QueryResult::Loading(_) => rsx! { p {
+                class: "pb-4 text-center theme1:text-stone-200 theme2:text-green-200 theme3:text-stone-700",
+                "Loading..."
+            } },
+            QueryResult::Err(QueryError::NoGames) => rsx! { NoGames {} },
             _ => rsx! { p { "Something went wrong" } },
         }
 

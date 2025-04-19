@@ -270,11 +270,6 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                                 theme2:fill-green-200
                                 "#,
                             }
-                            span {
-                                class: "sr-only",
-                                title: item.to_string(),
-                                "{item.to_string()}"
-                            }
                         }
                     }
                 }

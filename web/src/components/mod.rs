@@ -42,6 +42,7 @@ pub mod icons;
 mod icons_page;
 mod tribute_status_icon;
 mod item_icon;
+mod info_detail;
 
 pub(crate) use icons_page::IconsPage;
 

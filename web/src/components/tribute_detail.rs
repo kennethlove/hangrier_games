@@ -1,7 +1,9 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
-use crate::components::game_detail::InfoDetail;
 use crate::components::icons::uturn::UTurnIcon;
+use crate::components::info_detail::InfoDetail;
+use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_edit::{EditTributeModal, TributeEdit};
+use crate::components::tribute_status_icon::TributeStatusIcon;
 use crate::routes::Routes;
 use crate::API_HOST;
 use dioxus::prelude::*;
@@ -11,8 +13,6 @@ use game::messages::GameMessage;
 use game::tributes::{Attributes, Tribute};
 use shared::EditTribute;
 use std::collections::HashMap;
-use crate::components::item_icon::ItemIcon;
-use crate::components::tribute_status_icon::TributeStatusIcon;
 
 async fn fetch_tribute(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tribute(identifier)) = keys.first() {

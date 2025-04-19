@@ -4,6 +4,7 @@ use crate::components::game_day_log::GameDayLog;
 use crate::components::game_day_summary::GameDaySummary;
 use crate::components::game_edit::GameEdit;
 use crate::components::game_tributes::GameTributes;
+use crate::components::info_detail::InfoDetail;
 use crate::components::Button;
 use crate::API_HOST;
 use dioxus::prelude::*;
@@ -16,7 +17,7 @@ use game::tributes::Tribute;
 use reqwest::StatusCode;
 use std::ops::Deref;
 
-pub(crate) async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
+async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(identifier)) = keys.first() {
         let response = reqwest::get(format!("{}/api/games/{}", API_HOST, identifier))
             .await
@@ -299,158 +300,56 @@ fn GameStatusState() -> Element {
 
 #[component]
 pub fn GamePage(identifier: String) -> Element {
-    rsx! {
-        div {
-            class: "mb-4",
-            GameStatusState {}
-        }
-        GameDetailPage { identifier }
-    }
-}
-
-#[component]
-pub fn GameDetailPage(identifier: String) -> Element {
     let game_query = use_get_query(
         [QueryKey::Game(identifier.clone()), QueryKey::Games],
         fetch_game,
     );
     let mut game_signal: Signal<Option<Game>> = use_context();
 
-    match game_query.result().value() {
-        QueryResult::Ok(QueryValue::Game(game)) => {
-            game_signal.set(Some(*game.clone()));
-            rsx! {
-                GameDetails { game: *game.clone() }
-            }
-        }
-        QueryResult::Err(e) => {
-            dioxus_logger::tracing::error!("{:?}", e);
-            rsx! {
-                p {
-                    class: r#"
-                    text-center
-
-                    theme2:text-green-200
-                    "#,
-                    "Failed to load"
-                }
-            }
-        }
-        _ => {
-            rsx! {
-                p {
-                    class: r#"
-                    text-center
-
-                    theme2:text-green-200
-                    "#,
-                    "Loading..."
-                }
-            }
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Props)]
-pub struct InfoDetailProps {
-    pub title: String,
-    pub open: bool,
-    pub children: Element
-}
-
-#[component]
-pub fn InfoDetail(props: InfoDetailProps) -> Element {
     rsx! {
-        details {
-            open: props.open,
-            class: r#"
-            px-2
-            pt-1
-            open:pb-2
-            group
-            transition
-            duration-500
-            self-start
+        div {
+            class: "mb-4",
+            GameStatusState {}
+        }
 
-            theme1:bg-stone-800/50
-            theme1:hover:bg-stone-800
-            theme1:open:bg-stone-800/50
-
-            theme2:bg-green-900
-            theme2:rounded-md
-            theme2:border
-            theme2:border-green-800
-            theme2:hover:border-green-400
-            theme2:open:border-green-400
-
-            theme3:bg-stone-50/80
-            theme3:border-4
-            theme3:border-gold-rich
-            "#,
-
-            summary {
-                class: r#"
-                flex
-                items-center
-                justify-between
-                cursor-pointer
-                "#,
-
-                h3 {
-                    class: r#"
-                    mb-2
-                    transition
-
-                    theme1:text-xl
-                    theme1:font-[Cinzel]
-                    theme1:text-amber-300/75
-                    theme1:group-open:text-amber-300
-                    theme1:hover:text-amber-300
-
-                    theme2:font-[Forum]
-                    theme2:text-2xl
-                    theme2:text-green-200
-                    theme2:group-open:text-green-400
-
-                    theme3:font-[Orbitron]
-                    theme3:tracking-wider
-                    "#,
-
-                    "{props.title}",
+        match game_query.result().value() {
+            QueryResult::Ok(QueryValue::Game(game)) => {
+                game_signal.set(Some(*game.clone()));
+                rsx! {
+                    GameDetails { game: *game.clone() }
                 }
-                span {
-                    class: "transition group-open:rotate-180",
-                    svg {
+            }
+            QueryResult::Err(e) => {
+                dioxus_logger::tracing::error!("{:?}", e);
+                rsx! {
+                    p {
                         class: r#"
-                        size-4
-                        fill-none
-                        stroke-current
+                        text-center
 
-                        theme1:stroke-amber-300
-                        theme1:hover:stroke-amber-300
-                        theme1:group-open:stroke-amber-300
-
-                        theme2:group-open:stroke-green-400
-                        theme2:stroke-green-200
-                        theme2:hover:stroke-green-400
+                        theme2:text-green-200
                         "#,
-                        view_box: "0 0 24 24",
-                        path {
-                            stroke_linecap: "round",
-                            stroke_linejoin: "round",
-                            stroke_width: "2",
-                            d: "M19 9l-7 7-7-7"
-                        }
+                        "Failed to load"
                     }
                 }
             }
-            {props.children}
+            _ => {
+                rsx! {
+                    p {
+                        class: r#"
+                        text-center
+
+                        theme2:text-green-200
+                        "#,
+                        "Loading..."
+                    }
+                }
+            }
         }
     }
 }
 
 #[component]
-pub fn GameDetails(game: Game) -> Element {
+fn GameDetails(game: Game) -> Element {
     rsx! {
         div {
             class: r#"

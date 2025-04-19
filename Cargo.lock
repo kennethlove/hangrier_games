@@ -120,7 +120,6 @@ name = "announcers"
 version = "0.1.0"
 dependencies = [
  "async-stream",
- "axum",
  "futures",
  "ollama-rs",
  "thiserror 2.0.12",
@@ -2005,7 +2004,6 @@ dependencies = [
  "fake",
  "getrandom 0.2.15",
  "indefinite",
- "lazy_static",
  "once_cell",
  "rand 0.8.5",
  "rstest",
@@ -2013,9 +2011,7 @@ dependencies = [
  "serde_json",
  "strum 0.27.1",
  "strum_macros 0.27.1",
- "tokio",
  "tracing",
- "tracing-subscriber",
  "uuid",
  "witty-phrase-generator",
 ]

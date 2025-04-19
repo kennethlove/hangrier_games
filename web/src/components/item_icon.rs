@@ -1,6 +1,6 @@
+use crate::components::icons::game_icons_net::*;
 use dioxus::prelude::*;
 use game::items::{Attribute, Item, ItemType};
-use crate::components::icons::game_icons_net::*;
 
 #[component]
 fn Icon(item: Item, css_class: String) -> Element {
@@ -51,6 +51,11 @@ pub fn ItemIcon(item: Item, css_class: String) -> Element {
         span {
             title: item.to_string(),
             Icon { item: item.clone(), css_class }
+            span {
+                class: "sr-only",
+                title: item.to_string(),
+                "{item.to_string()}"
+            }
         }
     }
 }

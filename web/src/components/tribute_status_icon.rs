@@ -1,6 +1,6 @@
+use crate::components::icons::game_icons_net::*;
 use dioxus::prelude::*;
 use game::tributes::statuses::TributeStatus;
-use crate::components::icons::game_icons_net::*;
 
 #[component]
 fn StatusIcon(status: TributeStatus, css_class: String) -> Element {
@@ -30,7 +30,8 @@ pub fn TributeStatusIcon(status: TributeStatus, css_class: String) -> Element {
     rsx! {
         span {
             title: status.to_string(),
-            StatusIcon { status: status.clone(), css_class }
+            StatusIcon { status: status.clone(), css_class },
+            span { class: "sr-only", "{status}"},
         }
     }
 }

@@ -81,6 +81,8 @@ pub fn App() -> Element {
                 theme2:bg-no-repeat
                 theme2:bg-origin-border
                 theme2:bg-bottom
+                theme2:bg-size-[3200px_1311px]
+                theme2:bg-fixed
 
                 theme3:bg-linear-to-b
                 theme3:from-stone-50/80
@@ -91,8 +93,6 @@ pub fn App() -> Element {
                     class: r#"
                     py-4
                     px-2
-                    mx-auto
-                    container
                     "#,
                     Router::<Routes> {}
                 }

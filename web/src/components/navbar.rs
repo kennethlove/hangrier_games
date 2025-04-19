@@ -75,7 +75,7 @@ pub fn Navbar() -> Element {
                 "#,
 
                 ul {
-                    class: "flex flex-row gap-16",
+                    class: "flex flex-row flex-grow gap-16",
                     li {
                         Link {
                             class: r#"
@@ -182,8 +182,6 @@ pub fn Navbar() -> Element {
                             theme3:hover:border-b-5
                             theme3:hover:border-yellow-500
                             theme3:hover:text-yellow-500
-                            c:theme3:peer-focus:text-yellow-500
-                            c:theme3:focus-within:text-yellow-500
                             "#,
                             r#for: "theme-switcher",
                             "Theme",
@@ -309,12 +307,8 @@ pub fn Navbar() -> Element {
         }
         main {
             class: r#"
-            flex
             mx-auto
-            min-w-full
-            max-w-full
-            sm:max-w-3/4
-            min-h-full
+            max-w-3/4
             "#,
             Outlet::<Routes> {}
         }

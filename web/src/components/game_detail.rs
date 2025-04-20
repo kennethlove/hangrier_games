@@ -353,11 +353,11 @@ fn GameDetails(game: Game) -> Element {
     rsx! {
         div {
             class: r#"
-            pr-2
             grid
-            gap-8
-            grid-cols-none
-            md:grid-cols-2
+            gap-4
+            grid-cols-1
+            lg:grid-cols-2
+            xl:grid-cols-3
             "#,
 
             InfoDetail {

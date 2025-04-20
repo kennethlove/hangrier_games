@@ -68,7 +68,7 @@ pub fn GameTributes() -> Element {
         QueryResult::Ok(QueryValue::Tributes(tributes)) => {
             rsx! {
                 ul {
-                    class: "grid gap-4 grid-cols-2",
+                    class: "grid gap-2 grid-cols-2",
                     for tribute in tributes {
                         GameTributeListMember {
                             tribute: tribute.clone()

@@ -127,12 +127,15 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
 
             theme2:data-[alive=true]:border-green-400
             theme2:data-[alive=false]:border-red-400
+            theme2:data-[alive=false]:bg-linear-to-r
+            theme2:data-[alive=false]:from-green-900
+            theme2:data-[alive=false]:to-red-900/75
             theme2:text-green-200
             theme2:rounded-md
 
-            theme3:data-[alive=true]:border-green-600
-            theme3:data-[alive=false]:border-red-600
             theme3:border-2
+            theme3:data-[alive=true]:border-gold-rich
+            theme3:data-[alive=false]:opacity-50
             "#,
 
             div {
@@ -249,7 +252,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                         status: tribute.status.clone(),
                         css_class: r#"
                         inline-block
-                        size-6
+                        size-5
                         theme1:fill-stone-200
                         theme2:fill-green-200
                         "#

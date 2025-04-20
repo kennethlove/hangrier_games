@@ -310,7 +310,6 @@ pub fn Navbar() -> Element {
             class: r#"
             mx-auto
             max-w-3/4
-            min-h-full
             "#,
             Outlet::<Routes> {}
         }

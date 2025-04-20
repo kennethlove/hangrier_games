@@ -24,6 +24,7 @@ pub fn Navbar() -> Element {
                 class: r#"
                 text-4xl
                 sm:text-6xl
+                pb-2
 
                 theme1:font-[Cinzel]
                 theme1:font-bold
@@ -34,6 +35,7 @@ pub fn Navbar() -> Element {
                 theme1:to-red-500
                 theme1:text-4xl
                 theme1:drop-shadow-sm/25
+                theme1:md:text-7xl
 
                 theme2:font-[Forum]
                 theme2:font-bold
@@ -44,7 +46,7 @@ pub fn Navbar() -> Element {
                 theme2:from-teal-500
                 theme2:to-green-400
                 theme2:drop-shadow-sm/25
-                theme2:pb-2
+                theme2:md:text-7xl
 
                 theme3:bg-clip-text
                 theme3:text-transparent
@@ -52,7 +54,6 @@ pub fn Navbar() -> Element {
                 theme3:font-[Orbitron]
                 theme3:font-semibold
                 theme3:drop-shadow-sm/25
-                theme3:pb-2
                 "#,
 
                 "Hangry Games"

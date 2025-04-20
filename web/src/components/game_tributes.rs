@@ -121,9 +121,12 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
             relative
             overflow-hidden
 
-            theme1:data-[alive=true]:border-green-500
-            theme1:data-[alive=false]:border-red-500
+            theme1:border-1
             theme1:text-stone-200
+            theme1:data-[alive=false]:border-red-500/50
+            theme1:motion-safe:data-[alive=true]:border-tracer
+            theme1:motion-safe:data-[alive=true]:border-2
+            theme1:motion-reduce:data-[alive=true]:border-green-500
 
             theme2:data-[alive=true]:border-green-400
             theme2:data-[alive=false]:border-red-400

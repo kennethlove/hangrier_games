@@ -326,7 +326,9 @@ pub fn GamePage(identifier: String) -> Element {
                         class: r#"
                         text-center
 
+                        theme1:text-stone-200
                         theme2:text-green-200
+                        theme3:text-slate-700
                         "#,
                         "Failed to load"
                     }
@@ -338,7 +340,9 @@ pub fn GamePage(identifier: String) -> Element {
                         class: r#"
                         text-center
 
+                        theme1:text-stone-200
                         theme2:text-green-200
+                        theme3:text-slate-700
                         "#,
                         "Loading..."
                     }
@@ -357,7 +361,8 @@ fn GameDetails(game: Game) -> Element {
             gap-4
             grid-cols-1
             lg:grid-cols-2
-            xl:grid-cols-3
+            c:xl:grid-cols-3
+            xl:grid-cols-[1fr_1fr_18rem]
             "#,
 
             InfoDetail {

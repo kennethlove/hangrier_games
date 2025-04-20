@@ -21,9 +21,9 @@ pub fn InfoDetail(props: InfoDetailProps) -> Element {
             duration-500
             self-start
 
-            theme1:bg-stone-800/50
+            theme1:bg-stone-800/80
             theme1:hover:bg-stone-800
-            theme1:open:bg-stone-800/50
+            theme1:open:bg-stone-800/80
 
             theme2:bg-green-900
             theme2:rounded-md

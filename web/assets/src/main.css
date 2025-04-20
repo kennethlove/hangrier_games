@@ -39,3 +39,25 @@
 .theme3 {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='%239C92AC' fill-opacity='0.4'%3E%3Cpolygon fill-rule='evenodd' points='8 4 12 6 8 8 6 12 4 8 0 6 4 4 6 0 8 4'/%3E%3C/g%3E%3C/svg%3E");
 }
+
+@property --angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+}
+
+@keyframes rotate-border-angle {
+    to {
+        --angle: 360deg;
+    }
+}
+
+@utility border-tracer {
+    border-style: solid;
+    border-color: transparent; /* Important for border-image */
+    border-image-slice: 1;
+    /* Conic gradient for smooth rotation, adjust colors for desired "thin white" look */
+    border-image-source: conic-gradient(from var(--angle), rgba(255,255,255,0) 0%, green 10%, rgba(255,255,255,0) 20%);
+    animation: rotate-border-angle 4s linear infinite;
+}
+

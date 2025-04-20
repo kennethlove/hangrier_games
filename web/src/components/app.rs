@@ -72,8 +72,6 @@ pub fn App() -> Element {
                 duration-500
                 font-[Work_Sans]
 
-                theme1:bg-size-[700px_700px]
-                theme1:bg-repeat
                 theme1:bg-red-900/85
 
                 theme2:bg-green-800/85

@@ -24,7 +24,6 @@ pub fn Navbar() -> Element {
                 class: r#"
                 text-4xl
                 sm:text-6xl
-                pb-2
 
                 theme1:font-[Cinzel]
                 theme1:font-bold
@@ -46,7 +45,8 @@ pub fn Navbar() -> Element {
                 theme2:from-teal-500
                 theme2:to-green-400
                 theme2:drop-shadow-sm/25
-                theme2:md:text-7xl
+                theme2:pb-2
+                theme2:text-7xl
 
                 theme3:bg-clip-text
                 theme3:text-transparent
@@ -54,6 +54,7 @@ pub fn Navbar() -> Element {
                 theme3:font-[Orbitron]
                 theme3:font-semibold
                 theme3:drop-shadow-sm/25
+                theme3:pb-2
                 "#,
 
                 "Hangry Games"
@@ -143,6 +144,7 @@ pub fn Navbar() -> Element {
                             id: "theme-switcher",
                             r#type: "checkbox",
                             class: "peer sr-only",
+                            checked: true,
                         }
                         label {
                             class: r#"
@@ -192,11 +194,11 @@ pub fn Navbar() -> Element {
                                 right-0
                                 sm:left-0
                                 z-99
-                                opacity-0
+                                c:opacity-0
+                                c:invisible
                                 w-64
                                 transform
                                 duration-500
-                                invisible
                                 peer-focus:opacity-100
                                 peer-focus:visible
                                 focus-within:opacity-100
@@ -291,13 +293,13 @@ pub fn Navbar() -> Element {
                                     }
                                     MockingjayFlight {class: r#"
                                     stroke-50
-                                    fill-blue-700
-                                    stroke-blue-900
-                                    hover:stroke-blue-200
-                                    peer-checked:stroke-blue-200
-                                    peer-focus:stroke-blue-200
-                                    theme3:stroke-blue-900
-                                    theme3:hover:stroke-blue-900
+                                    fill-amber-500
+                                    stroke-amber-700
+                                    hover:stroke-amber-200
+                                    theme3:stroke-amber-200
+                                    theme3:fill-amber-500
+                                    theme3:hover:stroke-amber-700
+                                    theme3:hover:fill-amber-500
                                     "# }
                                 }
                             }

@@ -66,15 +66,8 @@ pub fn AccountsPage() -> Element {
             class: r#"
             grid
             grid-cols-1
-            divide-y
             sm:grid-cols-2
-            sm:divide-x
-            sm:divide-y-0
             my-4
-            place-items-center
-            theme1:divide-stone-800/50
-            theme2:divide-green-800
-            theme3:divide-stone-700
             "#,
             div {
                 class: "pb-6 sm:px-6",

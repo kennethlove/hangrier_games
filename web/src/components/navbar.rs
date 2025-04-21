@@ -70,7 +70,6 @@ pub fn Navbar() -> Element {
 
                 theme3:text-slate-800
                 theme3:uppercase
-                theme3:mt-2
                 "#,
 
                 ul {
@@ -186,9 +185,13 @@ pub fn Navbar() -> Element {
                             class: r#"
                             cursor-pointer
 
+                            theme1:px-2
+                            theme1:-ml-2
                             theme1:font-semibold
                             theme1:text-xl
                             theme1:text-amber-500
+                            theme1:hover:bg-amber-500
+                            theme1:hover:text-amber-900
                             theme1:group-focus:bg-amber-500
                             theme1:group-focus:text-red-900
                             theme1:group-focus:border-b-2
@@ -201,17 +204,24 @@ pub fn Navbar() -> Element {
                             theme2:px-2
                             theme2:-ml-2
                             theme2:text-green-200/50
-                            theme2:hover:text-green-900
+                            theme2:hover:text-green-200
+                            theme2:hover:underline
+                            theme2:hover:decoration-wavy
+                            theme2:hover:decoration-2
                             theme2:peer-focus:bg-green-200
                             theme2:peer-focus:text-green-900
                             theme2:peer-focus:rounded-t-sm
                             theme2:peer-focus:border-b-3
                             theme2:peer-focus:border-green-200
+                            theme2:peer-focus:hover:text-green-900
+                            theme2:peer-focus:hover:decoration-transparent
                             theme2:focus-within:bg-green-200
                             theme2:focus-within:text-green-900
                             theme2:focus-within:rounded-t-sm
                             theme2:focus-within:border-b-3
                             theme2:focus-within:border-green-200
+                            theme2:focus-within:hover:text-green-900
+                            theme2:focus-within:hover:decoration-transparent
 
                             theme3:transform
                             theme3:duration-500

@@ -24,7 +24,6 @@ pub fn Navbar() -> Element {
                 class: r#"
                 text-4xl
                 sm:text-6xl
-                pb-2
 
                 theme1:font-[Cinzel]
                 theme1:font-bold
@@ -193,10 +192,10 @@ pub fn Navbar() -> Element {
                                 sm:left-0
                                 z-99
                                 opacity-0
+                                invisible
                                 w-64
                                 transform
                                 duration-500
-                                invisible
                                 peer-focus:opacity-100
                                 peer-focus:visible
                                 focus-within:opacity-100
@@ -291,13 +290,13 @@ pub fn Navbar() -> Element {
                                     }
                                     MockingjayFlight {class: r#"
                                     stroke-50
-                                    fill-blue-700
-                                    stroke-blue-900
-                                    hover:stroke-blue-200
-                                    peer-checked:stroke-blue-200
-                                    peer-focus:stroke-blue-200
-                                    theme3:stroke-blue-900
-                                    theme3:hover:stroke-blue-900
+                                    fill-amber-500
+                                    stroke-amber-700
+                                    hover:stroke-amber-200
+                                    theme3:stroke-amber-200
+                                    theme3:fill-amber-500
+                                    theme3:hover:stroke-amber-700
+                                    theme3:hover:fill-amber-500
                                     "# }
                                 }
                             }

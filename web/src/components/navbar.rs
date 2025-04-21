@@ -16,7 +16,6 @@ pub fn Navbar() -> Element {
             class: r#"
             flex
             flex-col
-            flex-wrap
             items-center
             "#,
 
@@ -26,7 +25,7 @@ pub fn Navbar() -> Element {
 
                 theme1:font-[Cinzel]
                 theme1:font-bold
-                theme1:text-5xl
+                theme1:text-4xl
                 theme1:md:text-7xl
                 theme1:bg-radial
                 theme1:bg-clip-text
@@ -36,7 +35,7 @@ pub fn Navbar() -> Element {
                 theme1:drop-shadow-sm/25
 
                 theme2:font-[Playfair_Display]
-                theme2:text-6xl
+                theme2:text-5xl
                 theme2:text-transparent
                 theme2:md:text-7xl
                 theme2:bg-linear-to-b
@@ -45,7 +44,7 @@ pub fn Navbar() -> Element {
                 theme2:to-green-400
                 theme2:drop-shadow-sm/25
 
-                theme3:text-5xl
+                theme3:text-4xl
                 theme3:md:text-6xl
                 theme3:bg-clip-text
                 theme3:text-transparent
@@ -75,7 +74,7 @@ pub fn Navbar() -> Element {
                 "#,
 
                 ul {
-                    class: "flex flex-row flex-grow gap-8",
+                    class: "flex flex-row flex-grow gap-2 sm:gap-4 md:gap-8",
                     li {
                         Link {
                             class: r#"

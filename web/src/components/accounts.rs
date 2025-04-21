@@ -122,6 +122,8 @@ fn RegisterForm() -> Element {
     let mut password_signal = use_signal(String::default);
     let mut password2_signal = use_signal(String::default);
     let mut disabled_signal = use_signal(|| false);
+    let mut email_error_signal = use_signal(String::default);
+    let mut password_error_signal = use_signal(String::default);
 
     let mutate = use_mutation(register_user);
 
@@ -151,14 +153,18 @@ fn RegisterForm() -> Element {
                     method: "POST",
                     onsubmit: move |_| {
                         let email = email_signal.read().clone();
+                        if email.is_empty() {
+                            email_error_signal.set("Email is required".to_string());
+                        }
+
                         let password = password_signal.read().clone();
                         let password2 = password2_signal.read().clone();
 
-                        if password != password {
-                            dioxus_logger::tracing::error!("Passwords do not match");
-                            return;
-                        } else {
-                            dioxus_logger::tracing::info!("Passwords match");
+                        if password != password2 {
+                            password_error_signal.set("Passwords do not match".to_string());
+                        }
+
+                        if email_error_signal.peek().is_empty() && password_error_signal.peek().is_empty() {
                             disabled_signal.set(true);
 
                             spawn(async move {
@@ -168,7 +174,6 @@ fn RegisterForm() -> Element {
                                 };
                                 mutate.manual_mutate(user).await;
                                 if mutate.result().is_ok() {
-
                                     match mutate.result().deref() {
                                         MutationResult::Ok(MutationValue::NewUser(_user)) => {
                                             client.invalidate_queries(&[QueryKey::User]);
@@ -176,20 +181,46 @@ fn RegisterForm() -> Element {
                                             email_signal.set(String::default());
                                             password_signal.set(String::default());
                                             password2_signal.set(String::default());
+                                            password_error_signal.set(String::default());
+                                            email_error_signal.set(String::default());
                                         },
-                                        MutationResult::Err(MutationError::UnableToRegisterUser) => {},
+                                        MutationResult::Err(MutationError::UnableToRegisterUser) => {
+                                            email_error_signal.set("Unable to register user".to_string());
+                                            disabled_signal.set(false);
+                                        },
                                         _ => {}
                                     }
+                                } else {
+                                    email_error_signal.set("Unable to register user".to_string());
+                                    disabled_signal.set(false);
                                 }
                             });
                         }
                     },
+                    if !email_error_signal.read().is_empty() {
+                        div {
+                            class: r#"
+                            text-sm
+                            text-red-500
+                            "#,
+                            "{email_error_signal.read()}"
+                        }
+                    }
                     Input {
                         r#type: "email",
                         name: "email",
                         placeholder: "Email",
                         oninput: move |e: Event<FormData>| {
                             email_signal.set(e.value().clone());
+                        }
+                    }
+                    if !password_error_signal.read().is_empty() {
+                        div {
+                            class: r#"
+                            text-sm
+                            text-red-500
+                            "#,
+                            "{password_error_signal.read()}"
                         }
                     }
                     Input {

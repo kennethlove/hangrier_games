@@ -152,7 +152,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 theme1:font-[Cinzel]
                 theme2:text-green-200/20
                 theme2:text-8xl
-                theme2:font-[Forum]
+                theme2:font-[Playfair_Display]
                 theme3:text-stone-500/25
                 theme3:text-7xl
                 theme3:font-[Orbitron]
@@ -194,7 +194,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                     theme1:font-[Cinzel]
                     theme1:text-lg
 
-                    theme2:font-[Forum]
+                    theme2:font-[Playfair_Display]
                     theme2:text-xl
                     theme2:text-green-200
                     theme2:hover:underline

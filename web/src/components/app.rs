@@ -52,7 +52,7 @@ pub fn App() -> Element {
             crossorigin: "anonymous"
         }
         document::Link {
-            href: "https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&family=Forum&family=Work+Sans:ital,wght@0,100..900;1,100..900&family=Orbitron:wght@400..900&display=swap",
+            href: "https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&family=Work+Sans:ital,wght@0,100..900;1,100..900&family=Orbitron:wght@400..900&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap",
             rel: "stylesheet"
         }
 

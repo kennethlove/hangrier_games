@@ -83,7 +83,7 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                         theme1:font-[Cinzel]
                         theme1:text-amber-300
 
-                        theme2:font-[Forum]
+                        theme2:font-[Playfair_Display]
                         theme2:text-3xl
                         theme2:text-green-200
 

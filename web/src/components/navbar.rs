@@ -22,31 +22,31 @@ pub fn Navbar() -> Element {
 
             h1 {
                 class: r#"
-                text-4xl
-                sm:text-6xl
+                pb-2
 
                 theme1:font-[Cinzel]
                 theme1:font-bold
+                theme1:text-5xl
+                theme1:md:text-7xl
                 theme1:bg-radial
                 theme1:bg-clip-text
                 theme1:text-transparent
                 theme1:from-amber-300
                 theme1:to-red-500
-                theme1:text-4xl
                 theme1:drop-shadow-sm/25
-                theme1:md:text-7xl
 
-                theme2:font-[Forum]
-                theme2:font-bold
-                theme2:text-5xl
+                theme2:font-[Playfair_Display]
+                theme2:text-6xl
                 theme2:text-transparent
+                theme2:md:text-7xl
                 theme2:bg-linear-to-b
                 theme2:bg-clip-text
                 theme2:from-teal-500
                 theme2:to-green-400
                 theme2:drop-shadow-sm/25
-                theme2:md:text-7xl
 
+                theme3:text-5xl
+                theme3:md:text-6xl
                 theme3:bg-clip-text
                 theme3:text-transparent
                 theme3:bg-gold-rich

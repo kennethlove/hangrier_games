@@ -22,7 +22,7 @@ pub fn Credits() -> Element {
                 theme1:text-3xl
                 theme1:font-[Cinzel]
                 theme2:text-4xl
-                theme2:font-[Forum]
+                theme2:font-[Playfair_Display]
                 theme3:text-3xl
                 theme3:font-[Orbitron]
                 "#,
@@ -41,7 +41,7 @@ pub fn Credits() -> Element {
                 theme1:text-3xl
                 theme1:font-[Cinzel]
                 theme2:text-4xl
-                theme2:font-[Forum]
+                theme2:font-[Playfair_Display]
                 theme3:text-3xl
                 theme3:font-[Orbitron]
                 "#,
@@ -105,7 +105,7 @@ pub fn Credits() -> Element {
                 theme1:text-3xl
                 theme1:font-[Cinzel]
                 theme2:text-4xl
-                theme2:font-[Forum]
+                theme2:font-[Playfair_Display]
                 theme3:text-3xl
                 theme3:font-[Orbitron]
                 "#,
@@ -177,8 +177,8 @@ pub fn Credits() -> Element {
                                 theme2:decoration-wavy
                                 theme3:text-yellow-600
                                 "#,
-                                href: "https://fonts.google.com/specimen/Forum",
-                                "Forum"
+                                href: "https://fonts.google.com/specimen/Playfair+Display",
+                                "Playfair Display"
                             }
                         }
                         li {

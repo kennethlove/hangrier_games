@@ -56,7 +56,7 @@ pub fn InfoDetail(props: InfoDetailProps) -> Element {
                     theme1:group-open:text-amber-300
                     theme1:hover:text-amber-300
 
-                    theme2:font-[Forum]
+                    theme2:font-[Playfair_Display]
                     theme2:text-2xl
                     theme2:text-green-200
                     theme2:group-open:text-green-400

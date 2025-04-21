@@ -45,8 +45,7 @@ pub fn Navbar() -> Element {
                 theme2:from-teal-500
                 theme2:to-green-400
                 theme2:drop-shadow-sm/25
-                theme2:pb-2
-                theme2:text-7xl
+                theme2:md:text-7xl
 
                 theme3:bg-clip-text
                 theme3:text-transparent
@@ -54,7 +53,6 @@ pub fn Navbar() -> Element {
                 theme3:font-[Orbitron]
                 theme3:font-semibold
                 theme3:drop-shadow-sm/25
-                theme3:pb-2
                 "#,
 
                 "Hangry Games"
@@ -144,7 +142,6 @@ pub fn Navbar() -> Element {
                             id: "theme-switcher",
                             r#type: "checkbox",
                             class: "peer sr-only",
-                            checked: true,
                         }
                         label {
                             class: r#"
@@ -194,8 +191,8 @@ pub fn Navbar() -> Element {
                                 right-0
                                 sm:left-0
                                 z-99
-                                c:opacity-0
-                                c:invisible
+                                opacity-0
+                                invisible
                                 w-64
                                 transform
                                 duration-500

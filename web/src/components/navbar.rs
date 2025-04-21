@@ -11,6 +11,29 @@ pub fn Navbar() -> Element {
     let mut storage = use_persistent("hangry-games", AppState::default);
     let mut theme_signal: Signal<Colorscheme> = use_context();
 
+    let link_theme = r#"
+    theme1:hover:bg-amber-500
+    theme1:text-amber-500
+    theme1:hover:text-amber-900
+    theme1:font-semibold
+
+    theme2:text-green-200/50
+    theme2:hover:text-green-200
+    theme2:hover:underline
+    theme2:hover:decoration-wavy
+    theme2:hover:decoration-2
+
+    theme3:transform
+    theme3:duration-500
+    theme3:text-yellow-600
+    theme3:border-b-5
+    theme3:border-transparent
+    theme3:border-double
+    theme3:hover:border-b-5
+    theme3:hover:border-yellow-500
+    theme3:hover:text-yellow-500
+    "#;
+
     rsx! {
         header {
             class: r#"
@@ -85,29 +108,7 @@ pub fn Navbar() -> Element {
                     li {
                         class: "px-2",
                         Link {
-                            class: r#"
-                            theme1:hover:bg-amber-500
-                            theme1:text-amber-500
-                            theme1:hover:text-amber-900
-                            theme1:font-semibold
-                            theme1:px-2
-
-                            theme2:text-green-200/50
-                            theme2:hover:text-green-200
-                            theme2:hover:underline
-                            theme2:hover:decoration-wavy
-                            theme2:hover:decoration-2
-
-                            theme3:transform
-                            theme3:duration-500
-                            theme3:text-yellow-600
-                            theme3:border-b-5
-                            theme3:border-transparent
-                            theme3:border-double
-                            theme3:hover:border-b-5
-                            theme3:hover:border-yellow-500
-                            theme3:hover:text-yellow-500
-                            "#,
+                            class: "{link_theme}",
 
                             to: Routes::Home {},
                             "Home"
@@ -116,30 +117,7 @@ pub fn Navbar() -> Element {
                     li {
                         class: "px-2",
                         Link {
-                            class: r#"
-                            theme1:hover:bg-amber-500
-                            theme1:text-amber-500
-                            theme1:hover:text-amber-900
-                            theme1:font-semibold
-                            theme1:px-2
-
-                            theme2:text-green-200/50
-                            theme2:hover:text-green-200
-                            theme2:hover:underline
-                            theme2:hover:decoration-wavy
-                            theme2:hover:decoration-2
-
-                            theme3:transform
-                            theme3:duration-500
-                            theme3:text-yellow-600
-                            theme3:border-b-5
-                            theme3:border-transparent
-                            theme3:border-double
-                            theme3:hover:border-b-5
-                            theme3:hover:border-yellow-500
-                            theme3:hover:text-yellow-500
-                            "#,
-
+                            class: "{link_theme}",
                             to: Routes::GamesList {},
                             "Games"
                         }
@@ -147,29 +125,7 @@ pub fn Navbar() -> Element {
                     li {
                         class: "px-2",
                         Link {
-                            class: r#"
-                            theme1:hover:bg-amber-500
-                            theme1:text-amber-500
-                            theme1:hover:text-amber-900
-                            theme1:font-semibold
-                            theme1:px-2
-
-                            theme2:text-green-200/50
-                            theme2:hover:text-green-200
-                            theme2:hover:underline
-                            theme2:hover:decoration-wavy
-                            theme2:hover:decoration-2
-
-                            theme3:transform
-                            theme3:duration-500
-                            theme3:text-yellow-600
-                            theme3:border-b-5
-                            theme3:border-transparent
-                            theme3:border-double
-                            theme3:hover:border-b-5
-                            theme3:hover:border-yellow-500
-                            theme3:hover:text-yellow-500
-                            "#,
+                            class: "{link_theme}",
                             to: Routes::AccountsPage {},
                             "Account"
                         }
@@ -183,15 +139,11 @@ pub fn Navbar() -> Element {
                         }
                         label {
                             class: r#"
+                            {link_theme}
                             cursor-pointer
+                            px-2
+                            -ml-2
 
-                            theme1:px-2
-                            theme1:-ml-2
-                            theme1:font-semibold
-                            theme1:text-xl
-                            theme1:text-amber-500
-                            theme1:hover:bg-amber-500
-                            theme1:hover:text-amber-900
                             theme1:group-focus:bg-amber-500
                             theme1:group-focus:text-red-900
                             theme1:group-focus:border-b-2
@@ -200,14 +152,15 @@ pub fn Navbar() -> Element {
                             theme1:focus-within:text-red-900
                             theme1:focus-within:border-b-2
                             theme1:focus-within:border-amber-500
+                            theme1:peer-focus:bg-amber-500
+                            theme1:peer-focus:text-red-900
+                            theme1:peer-focus:border-b-2
+                            theme1:peer-focus:border-amber-500
+                            theme1:focus-within:bg-amber-500
+                            theme1:focus-within:text-red-900
+                            theme1:focus-within:border-b-2
+                            theme1:focus-within:border-amber-500
 
-                            theme2:px-2
-                            theme2:-ml-2
-                            theme2:text-green-200/50
-                            theme2:hover:text-green-200
-                            theme2:hover:underline
-                            theme2:hover:decoration-wavy
-                            theme2:hover:decoration-2
                             theme2:peer-focus:bg-green-200
                             theme2:peer-focus:text-green-900
                             theme2:peer-focus:rounded-t-sm
@@ -223,15 +176,8 @@ pub fn Navbar() -> Element {
                             theme2:focus-within:hover:text-green-900
                             theme2:focus-within:hover:decoration-transparent
 
-                            theme3:transform
-                            theme3:duration-500
-                            theme3:text-yellow-600
-                            theme3:border-b-5
-                            theme3:border-transparent
-                            theme3:border-double
-                            theme3:hover:border-b-5
-                            theme3:hover:border-yellow-500
-                            theme3:hover:text-yellow-500
+                            theme3:peer-focus:hover:text-yellow-600
+                            theme3:peer-focus:hover:border-transparent
                             "#,
                             r#for: "theme-switcher",
                             "Theme",

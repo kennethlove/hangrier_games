@@ -28,3 +28,9 @@ pub struct TributeKey {
     pub identifier: String,
     pub district: u32,
 }
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct User {
+    pub email: String,
+    pub password: String,
+}

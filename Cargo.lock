@@ -6016,6 +6016,7 @@ dependencies = [
  "gloo-storage",
  "reqwest",
  "serde",
+ "serde_json",
  "shared",
  "wasm-bindgen",
 ]

@@ -7,6 +7,7 @@ use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::games::{Game, GameStatus};
+use game::items::Item;
 use game::messages::GameMessage;
 use game::tributes::Tribute;
 use crate::components::icons::map_pin::MapPinIcon;
@@ -146,6 +147,8 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
         _ => Vec::new()
     };
 
+    let fist_item = Item::new_weapon("basic fist");
+
     rsx! {
         li {
             "data-alive": tribute.is_alive(),
@@ -257,6 +260,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 flex-row
                 gap-2
                 place-items-center
+                mb-2
                 "#,
                 MapPinIcon {
                     class: r#"
@@ -272,12 +276,28 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 }
             }
 
-            if !tribute.clone().items.is_empty() {
-                ul {
-                    class: "flex flex-row gap-2 flex-wrap",
+            ul {
+                class: "flex flex-row gap-2 flex-wrap",
+                if tribute.clone().items.is_empty() {
+                    li {
+                        class: "flex flex-row gap-2 flex-wrap place-items-center",
+                        ItemIcon {
+                            item: fist_item,
+                            css_class: r#"
+                            size-8
+                            theme1:fill-amber-500
+                            theme2:fill-green-200
+                            "#,
+                        }
+                        span {
+                            class: "text-sm",
+                            "Fist"
+                        }
+                    }
+                } else {
                     for item in tribute.clone().items {
                         li {
-                            class: "flex flex-row gap-2 flex-wrap",
+                            class: "flex flex-row gap-2 flex-wrap place-items-center",
                             ItemIcon {
                                 item: item.clone(),
                                 css_class: r#"
@@ -287,7 +307,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                                 "#,
                             }
                             span {
-                                class: "text-sm",
+                                class: "text-sm capitalize",
                                 "{item.to_string()}"
                             }
                         }

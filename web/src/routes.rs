@@ -1,4 +1,4 @@
-use crate::components::{Credits, GamePage, Games, GamesList, Home, IconsPage, Navbar, TributeDetail};
+use crate::components::{Accounts, AccountsPage, Credits, GamePage, Games, GamesList, Home, IconsPage, Navbar, TributeDetail};
 use dioxus::prelude::*;
 
 
@@ -25,6 +25,12 @@ pub enum Routes {
                 GamePage { identifier: String },
                 #[route("/:game_identifier/tributes/:tribute_identifier")]
                 TributeDetail { game_identifier: String, tribute_identifier: String },
+            #[end_layout]
+        #[end_nest]
+        #[nest("/account")]
+            #[layout(Accounts)]
+                #[route("/")]
+                AccountsPage {},
             #[end_layout]
         #[end_nest]
         #[route("/credits")]

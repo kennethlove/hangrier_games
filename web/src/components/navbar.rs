@@ -75,7 +75,7 @@ pub fn Navbar() -> Element {
                 "#,
 
                 ul {
-                    class: "flex flex-row flex-grow gap-16",
+                    class: "flex flex-row flex-grow gap-8",
                     li {
                         Link {
                             class: r#"
@@ -134,6 +134,36 @@ pub fn Navbar() -> Element {
 
                             to: Routes::GamesList {},
                             "Games"
+                        }
+                    }
+                    li {
+                        class: "relative group inline-block",
+                        Link {
+                            class: r#"
+                            theme1:hover:bg-amber-500
+                            theme1:text-amber-500
+                            theme1:hover:text-amber-900
+                            theme1:font-semibold
+                            theme1:px-2
+
+                            theme2:text-green-200/50
+                            theme2:hover:text-green-200
+                            theme2:hover:underline
+                            theme2:hover:decoration-wavy
+                            theme2:hover:decoration-2
+
+                            theme3:transform
+                            theme3:duration-500
+                            theme3:text-yellow-600
+                            theme3:border-b-5
+                            theme3:border-transparent
+                            theme3:border-double
+                            theme3:hover:border-b-5
+                            theme3:hover:border-yellow-500
+                            theme3:hover:text-yellow-500
+                            "#,
+                            to: Routes::AccountsPage {},
+                            "Account"
                         }
                     }
                     li {

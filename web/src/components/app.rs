@@ -29,6 +29,9 @@ pub fn App() -> Element {
     let edit_tribute_signal: Signal<Option<EditTribute>> = use_signal(|| None);
     use_context_provider(|| edit_tribute_signal);
 
+    let server_version = "0.1.8";
+    let client_version = env!("CARGO_PKG_VERSION");
+
     let favicon = match *theme_signal.read() {
         Colorscheme::One => asset!("/assets/favicons/theme1.png"),
         Colorscheme::Two => asset!("/assets/favicons/theme2.png"),
@@ -107,6 +110,13 @@ pub fn App() -> Element {
                     "#,
 
                     p {
+                        "Made with 💜 by ",
+                        a {
+                            class: "theme1:text-amber-300 theme2:text-green-200 theme3:text-yellow-600",
+                            href: "https://thekennethlove.com",
+                            "klove"
+                        },
+                        ". ",
                         a {
                             class: "theme1:text-amber-300 theme2:text-green-200 theme3:text-yellow-600",
                             href: "/credits",
@@ -114,13 +124,7 @@ pub fn App() -> Element {
                         }
                     }
                     p {
-                        "Made with 💜 by ",
-                        a {
-                            class: "theme1:text-amber-300 theme2:text-green-200 theme3:text-yellow-600",
-                            href: "https://thekennethlove.com",
-                            "klove"
-                        },
-                        ".",
+                        "Server version: {server_version}; Client version: {client_version}",
                     }
                 }
             }

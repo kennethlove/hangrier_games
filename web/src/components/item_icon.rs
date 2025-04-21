@@ -51,11 +51,6 @@ pub fn ItemIcon(item: Item, css_class: String) -> Element {
         span {
             title: item.to_string(),
             Icon { item: item.clone(), css_class }
-            span {
-                class: "sr-only",
-                title: item.to_string(),
-                "{item.to_string()}"
-            }
         }
     }
 }

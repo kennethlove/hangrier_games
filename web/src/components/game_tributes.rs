@@ -9,6 +9,7 @@ use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::games::{Game, GameStatus};
 use game::messages::GameMessage;
 use game::tributes::Tribute;
+use crate::components::icons::map_pin::MapPinIcon;
 
 async fn fetch_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tributes(identifier)) = keys.first() {
@@ -69,9 +70,43 @@ pub fn GameTributes() -> Element {
             rsx! {
                 ul {
                     class: "grid gap-2 grid-cols-2",
-                    for tribute in tributes {
-                        GameTributeListMember {
-                            tribute: tribute.clone()
+                    for chunk in tributes.as_slice().chunks(2) {
+                        li {
+                            class: r#"
+                            col-span-2
+                            pb-4
+                            theme1:not-last-of-type:border-b-2
+                            theme1:border-amber-900
+                            theme2:not-last-of-type:border-b-1
+                            theme2:border-dotted
+                            theme2:border-green-200
+                            theme3:not-last-of-type:border-b-2
+                            theme3:border-gold-rich
+                            "#,
+                            h3 {
+                                class: r#"
+                                text-xl
+                                text-center
+                                mb-2
+                                theme1:text-stone-200
+                                theme1:font-[Cinzel]
+                                theme2:text-green-200
+                                theme2:font-[Playfair_Display]
+                                theme3:text-yellow-700
+                                theme3:drop-shadow-sm
+                                theme3:font-[Orbitron]
+                                "#,
+                                "District {chunk.first().unwrap().district}"
+                            }
+                            ul {
+                                class: "grid subgrid gap-2 grid-cols-2",
+                                GameTributeListMember {
+                                    tribute: chunk.first().unwrap().clone(),
+                                }
+                                GameTributeListMember {
+                                    tribute: chunk.last().unwrap().clone(),
+                                }
+                            }
                         }
                     }
                 }
@@ -118,7 +153,6 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
             border
             p-2
             self-start
-            relative
             overflow-hidden
 
             theme1:border-1
@@ -143,43 +177,6 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
 
             div {
                 class: r#"
-                absolute
-                inset-0
-                text-right
-
-                theme1:text-amber-200/20
-                theme1:text-8xl
-                theme1:font-[Cinzel]
-                theme2:text-green-200/20
-                theme2:text-8xl
-                theme2:font-[Playfair_Display]
-                theme3:text-stone-500/25
-                theme3:text-7xl
-                theme3:font-[Orbitron]
-                "#,
-
-                span {
-                    class: r#"
-                    inline-block
-                    text-sm
-                    transform
-                    -rotate-90
-                    translate-x-1/3
-                    -translate-y-[1.25rem]
-
-                    theme1:translate-x-1/2
-                    theme1:-translate-y-[2rem]
-                    theme1:tracking-widest
-                    theme2:text-base
-                    "#,
-                    "district"
-                },
-
-                "{tribute.district}",
-            }
-
-            div {
-                class: r#"
                 flex
                 flex-row
                 gap-2
@@ -189,7 +186,6 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                 h4 {
                     class: r#"
                     mb-2
-                    z-1
 
                     theme1:font-[Cinzel]
                     theme1:text-lg
@@ -230,36 +226,49 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
 
                 if game.status == GameStatus::NotStarted {
                     div {
-                        class: "z-1",
                         TributeEdit {
                             identifier: tribute.clone().identifier,
                             district: tribute.district,
                             name: tribute.clone().name,
                         }
                     }
+                } else {
+                    div {
+                        class: r#"
+                        "#,
+
+                        TributeStatusIcon {
+                            status: tribute.status.clone(),
+                            css_class: r#"
+                            inline-block
+                            size-5
+                            theme1:fill-stone-200
+                            theme2:fill-green-200
+                            "#
+                        }
+                    }
                 }
             }
 
             div {
-                class: "text-sm flex flex-row gap-4",
-                p {
-                    "location: ",
-                    span {
-                        class: "font-bold",
-                        "{tribute.area}"
-                    }
+                class: r#"
+                text-sm
+                flex
+                flex-row
+                gap-2
+                place-items-center
+                "#,
+                MapPinIcon {
+                    class: r#"
+                    size-6
+                    ml-1
+                    theme1:fill-amber-500
+                    theme2:fill-green-200
+                    "#,
                 }
-                p {
-                    "status: ",
-                    TributeStatusIcon {
-                        status: tribute.status.clone(),
-                        css_class: r#"
-                        inline-block
-                        size-5
-                        theme1:fill-stone-200
-                        theme2:fill-green-200
-                        "#
-                    }
+                span {
+                    class: "",
+                    "{tribute.area}"
                 }
             }
 
@@ -268,13 +277,18 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                     class: "flex flex-row gap-2 flex-wrap",
                     for item in tribute.clone().items {
                         li {
+                            class: "flex flex-row gap-2 flex-wrap",
                             ItemIcon {
                                 item: item.clone(),
                                 css_class: r#"
-                                size-6
+                                size-8
                                 theme1:fill-amber-500
                                 theme2:fill-green-200
                                 "#,
+                            }
+                            span {
+                                class: "text-sm",
+                                "{item.to_string()}"
                             }
                         }
                     }

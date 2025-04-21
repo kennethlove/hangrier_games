@@ -74,8 +74,17 @@ pub fn Navbar() -> Element {
                 "#,
 
                 ul {
-                    class: "flex flex-row flex-grow gap-2 sm:gap-4 md:gap-8",
+                    class: r#"
+                    flex
+                    flex-row
+                    flex-grow
+                    gap-2
+                    sm:gap-4
+                    md:gap-8
+                    text-center
+                    "#,
                     li {
+                        class: "px-2",
                         Link {
                             class: r#"
                             theme1:hover:bg-amber-500
@@ -106,6 +115,7 @@ pub fn Navbar() -> Element {
                         }
                     }
                     li {
+                        class: "px-2",
                         Link {
                             class: r#"
                             theme1:hover:bg-amber-500
@@ -136,7 +146,7 @@ pub fn Navbar() -> Element {
                         }
                     }
                     li {
-                        class: "relative group inline-block",
+                        class: "px-2",
                         Link {
                             class: r#"
                             theme1:hover:bg-amber-500
@@ -166,7 +176,7 @@ pub fn Navbar() -> Element {
                         }
                     }
                     li {
-                        class: "relative group inline-block",
+                        class: "relative group inline-block px-2",
                         input {
                             id: "theme-switcher",
                             r#type: "checkbox",
@@ -174,7 +184,6 @@ pub fn Navbar() -> Element {
                         }
                         label {
                             class: r#"
-                            px-2
                             cursor-pointer
 
                             theme1:font-semibold
@@ -189,6 +198,8 @@ pub fn Navbar() -> Element {
                             theme1:focus-within:border-b-2
                             theme1:focus-within:border-amber-500
 
+                            theme2:px-2
+                            theme2:-ml-2
                             theme2:text-green-200/50
                             theme2:hover:text-green-900
                             theme2:peer-focus:bg-green-200
@@ -217,8 +228,8 @@ pub fn Navbar() -> Element {
                         }
                         div {
                             class: r#"absolute
-                                right-0
-                                sm:left-0
+                                right-2
+                                md:left-2
                                 z-99
                                 opacity-0
                                 invisible
@@ -236,7 +247,8 @@ pub fn Navbar() -> Element {
 
                                 theme2:bg-green-200
                                 theme2:rounded-sm
-                                theme2:rounded-tl-none
+                                theme2:rounded-tr-none
+                                theme2:sm:rounded-tl-none
 
                                 theme3:bg-stone-50
                                 theme3:border

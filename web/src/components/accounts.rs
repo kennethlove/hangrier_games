@@ -7,6 +7,7 @@ use crate::API_HOST;
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use crate::components::{Button, Input, ThemedButton};
 use crate::routes::Routes;
+use crate::storage::{use_persistent, AppState};
 
 async fn register_user(user: RegistrationUser) -> MutationResult<MutationValue, MutationError> {
     let client = reqwest::Client::new();
@@ -49,20 +50,26 @@ pub fn Accounts() -> Element {
 
 #[component]
 pub fn AccountsPage() -> Element {
+    let mut storage = use_persistent("hangry-games", AppState::default);
+
     rsx! {
-        div {
-            class: r#"
-            grid
-            grid-cols-1
-            sm:grid-cols-2
-            my-4
-            "#,
-            LoginForm {}
-            RegisterForm {}
-        }
-        p {
-            class: "text-sm text-center theme1:text-amber-200 theme2:text-green-200 theme3:text-stone-200",
-            "Your email and password are stored in a secure database. We do not share your data with third parties."
+        if storage.get().jwt.is_some() {
+            LogoutButton {}
+        } else {
+            div {
+                class: r#"
+                grid
+                grid-cols-1
+                sm:grid-cols-2
+                my-4
+                "#,
+                LoginForm {}
+                RegisterForm {}
+            }
+            p {
+                class: "text-sm text-center theme1:text-amber-200 theme2:text-green-200 theme3:text-stone-200",
+                "Your email and password are stored in a secure database. We do not share your data with third parties."
+            }
         }
     }
 }
@@ -118,6 +125,8 @@ fn LoginForm() -> Element {
 fn RegisterForm() -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
+    let mut user_signal: Signal<Option<AuthenticatedUser>> = use_context();
+
     let mut email_signal = use_signal(String::default);
     let mut password_signal = use_signal(String::default);
     let mut password2_signal = use_signal(String::default);
@@ -126,6 +135,8 @@ fn RegisterForm() -> Element {
     let mut password_error_signal = use_signal(String::default);
 
     let mutate = use_mutation(register_user);
+
+    let mut storage = use_persistent("hangry-games", AppState::default);
 
     rsx! {
         div {
@@ -178,7 +189,7 @@ fn RegisterForm() -> Element {
                                 mutate.manual_mutate(user).await;
                                 if mutate.result().is_ok() {
                                     match mutate.result().deref() {
-                                        MutationResult::Ok(MutationValue::NewUser(_user)) => {
+                                        MutationResult::Ok(MutationValue::NewUser(user)) => {
                                             client.invalidate_queries(&[QueryKey::User]);
                                             disabled_signal.set(false);
                                             email_signal.set(String::default());
@@ -187,6 +198,14 @@ fn RegisterForm() -> Element {
                                             password_error_signal.set(String::default());
                                             email_error_signal.set(String::default());
 
+                                            let mut state = storage.get();
+                                            state.jwt = Some(user.jwt.clone());
+                                            storage.set(state);
+
+                                            user_signal.set(Some(user.clone()));
+
+                                            let navigator = use_navigator();
+                                            navigator.replace(Routes::GamesList {});
                                         },
                                         MutationResult::Err(MutationError::UnableToRegisterUser) => {
                                             email_error_signal.set("Unable to register user".to_string());
@@ -255,6 +274,45 @@ fn RegisterForm() -> Element {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+#[component]
+fn LogoutButton() -> Element {
+    let mut storage = use_persistent("hangry-games", AppState::default);
+
+    let mut user_signal: Signal<Option<AuthenticatedUser>> = use_context();
+
+    rsx! {
+        form {
+            class: "flex flex-col gap-4 mt-4",
+            onsubmit: move |_| {
+                let mut state = storage.get();
+                state.jwt = None;
+                storage.set(state);
+                user_signal.set(None);
+                let navigator = use_navigator();
+                navigator.replace(Routes::Home {});
+            },
+            p {
+                class: r#"
+                text-xl
+                text-center
+                theme1:text-amber-500
+                theme1:font-[Cinzel]
+                theme2:text-green-300
+                theme2:font-[Playfair_Display]
+                theme3:text-stone-700
+                theme3:font-[Orbitron]
+                "#,
+                "Thanks for playing!"
+            }
+            ThemedButton {
+                class: "w-full",
+                r#type: "submit",
+                "Logout"
             }
         }
     }

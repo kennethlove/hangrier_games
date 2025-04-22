@@ -88,6 +88,7 @@ impl FromStr for Colorscheme {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppState {
     pub(crate) colorscheme: Colorscheme,
+    pub(crate) jwt: Option<String>,
 }
 
 impl AppState {

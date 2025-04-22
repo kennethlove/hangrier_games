@@ -5,11 +5,15 @@ use crate::components::Button;
 use crate::routes::Routes;
 use crate::storage::{use_persistent, AppState, Colorscheme};
 use dioxus::prelude::*;
+use shared::{AuthenticatedUser, RegistrationUser};
 
 #[component]
 pub fn Navbar() -> Element {
     let mut storage = use_persistent("hangry-games", AppState::default);
+    let user_signal: Signal<Option<AuthenticatedUser>> = use_context();
     let mut theme_signal: Signal<Colorscheme> = use_context();
+
+    let show_games = storage.get().jwt.is_some() || user_signal.read().is_some();
 
     let link_theme = r#"
     theme1:hover:bg-amber-500
@@ -114,12 +118,14 @@ pub fn Navbar() -> Element {
                             "Home"
                         }
                     }
-                    li {
-                        class: "px-2",
-                        Link {
-                            class: "{link_theme}",
-                            to: Routes::GamesList {},
-                            "Games"
+                    if show_games {
+                        li {
+                            class: "px-2",
+                            Link {
+                                class: "{link_theme}",
+                                to: Routes::GamesList {},
+                                "Games"
+                            }
                         }
                     }
                     li {

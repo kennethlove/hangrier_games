@@ -37,7 +37,7 @@ pub fn GameEdit(identifier: String, name: String, icon_class: String) -> Element
 
     rsx! {
         Button {
-            extra_classes: "border-none",
+            class: "border-none",
             title,
             onclick,
             EditIcon { class: icon_class }

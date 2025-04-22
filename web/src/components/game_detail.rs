@@ -180,7 +180,7 @@ fn GameStatusState() -> Element {
                         }
                     }
                     Button {
-                        extra_classes: Some(r#"
+                        class: Some(r#"
                         theme1:bg-radial
                         theme1:from-amber-300
                         theme1:to-red-500

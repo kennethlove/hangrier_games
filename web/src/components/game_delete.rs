@@ -38,7 +38,7 @@ pub fn GameDelete(game_identifier: String, game_name: String, icon_class: String
 
     rsx! {
         Button {
-            extra_classes: Some("border-none".to_string()),
+            class: Some("border-none".to_string()),
             title,
             onclick,
             DeleteIcon { class: icon_class }

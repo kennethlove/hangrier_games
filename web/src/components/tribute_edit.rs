@@ -48,7 +48,7 @@ pub fn TributeEdit(identifier: String, district: u32, name: String) -> Element {
 
     rsx! {
         Button {
-            extra_classes: r#"
+            class: r#"
             border-none
             "#,
             onclick,

@@ -54,7 +54,7 @@ pub(crate) enum MutationValue {
     GameFinished(String),
     GameStarted(String),
     GameAdvanced(String),
-    NewUser(AuthenticatedUser),
+    User(AuthenticatedUser),
 }
 
 #[derive(PartialEq, Debug)]
@@ -64,4 +64,5 @@ pub(crate) enum MutationError {
     UnableToAdvanceGame,
     UnableToCreateUser,
     UnableToRegisterUser,
+    UnableToAuthenticateUser,
 }

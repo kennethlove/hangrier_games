@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 use axum::{Json, Router};
-use axum::routing::{get, post};
+use axum::routing::post;
 use serde::{Deserialize, Serialize};
 use surrealdb::opt::auth::Record;
 use crate::DATABASE;
@@ -35,6 +35,7 @@ mod error {
 pub static USERS_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
         .route("/", post(user_create).get(session))
+        .route("/authenticate", post(user_authenticate))
 });
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -48,12 +49,12 @@ struct JwtResponse {
     jwt: String,
 }
 
-pub async fn session() -> Result<Json<String>, error::Error> {
+async fn session() -> Result<Json<String>, error::Error> {
     let res: Option<String> = DATABASE.query("RETURN <string>$session").await?.take(0)?;
     Ok(Json(res.unwrap_or("No session data found!".into())))
 }
 
-pub async fn user_create(Json(payload): Json<Params>) -> Result<Json<JwtResponse>, error::Error> {
+async fn user_create(Json(payload): Json<Params>) -> Result<Json<JwtResponse>, error::Error> {
     let email = payload.email;
     let password = payload.pass;
 
@@ -68,6 +69,29 @@ pub async fn user_create(Json(payload): Json<Params>) -> Result<Json<JwtResponse
     })
     .await?
     .into_insecure_token();
+
+    DATABASE.invalidate().await?;
+
+    Ok(Json(JwtResponse { jwt }))
+}
+
+async fn user_authenticate(Json(payload): Json<Params>) -> Result<Json<JwtResponse>, error::Error> {
+    let email = payload.email;
+    let password = payload.pass;
+
+    let jwt = DATABASE.signin(Record {
+        access: "account",
+        namespace: "hangry-games",
+        database: "games",
+        params: Params {
+            email: email.clone(),
+            pass: password.clone()
+        },
+    })
+    .await?
+    .into_insecure_token();
+
+    DATABASE.invalidate().await?;
 
     Ok(Json(JwtResponse { jwt }))
 }

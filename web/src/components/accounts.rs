@@ -24,7 +24,7 @@ async fn register_user(user: RegistrationUser) -> MutationResult<MutationValue, 
         Ok(response) => {
             match response.json::<AuthenticatedUser>().await {
                 Ok(user) => {
-                    MutationResult::Ok(MutationValue::NewUser(user))
+                    MutationResult::Ok(MutationValue::User(user))
                 }
                 Err(_) => {
                     MutationResult::Err(MutationError::UnableToCreateUser)
@@ -34,6 +34,35 @@ async fn register_user(user: RegistrationUser) -> MutationResult<MutationValue, 
         Err(e) => {
             dioxus_logger::tracing::error!("error creating user: {:?}", e);
             MutationResult::Err(MutationError::UnableToCreateUser)
+        }
+    }
+}
+
+async fn authenticate_user(user: RegistrationUser) -> MutationResult<MutationValue, MutationError> {
+    let client = reqwest::Client::new();
+    let json_body = serde_json::json!({
+        "email": user.email,
+        "pass": user.password,
+    });
+
+    let response = client.post(format!("{}/api/users/authenticate", API_HOST))
+        .json(&json_body)
+        .send().await;
+
+    match response {
+        Ok(response) => {
+            match response.json::<AuthenticatedUser>().await {
+                Ok(user) => {
+                    MutationResult::Ok(MutationValue::User(user))
+                }
+                Err(_) => {
+                    MutationResult::Err(MutationError::UnableToAuthenticateUser)
+                }
+            }
+        }
+        Err(e) => {
+            dioxus_logger::tracing::error!("error authenticating user: {:?}", e);
+            MutationResult::Err(MutationError::UnableToAuthenticateUser)
         }
     }
 }
@@ -76,6 +105,20 @@ pub fn AccountsPage() -> Element {
 
 #[component]
 fn LoginForm() -> Element {
+    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+
+    let mut user_signal: Signal<Option<AuthenticatedUser>> = use_context();
+
+    let mut email_signal = use_signal(String::default);
+    let mut password_signal = use_signal(String::default);
+    let mut disabled_signal = use_signal(|| false);
+    let mut email_error_signal = use_signal(String::default);
+    let mut password_error_signal = use_signal(String::default);
+
+    let mutate = use_mutation(authenticate_user);
+
+    let mut storage = use_persistent("hangry-games", AppState::default);
+
     rsx! {
         div {
             class: "pb-6 sm:px-6",
@@ -96,17 +139,100 @@ fn LoginForm() -> Element {
                 }
                 form {
                     class: "flex flex-col gap-2",
-                    id: "login-form",
+                    id: "register-form",
                     method: "POST",
+                    onsubmit: move |_| {
+                        email_error_signal.set(String::default());
+                        password_error_signal.set(String::default());
+
+                        let email = email_signal.read().clone();
+                        if email.is_empty() {
+                            email_error_signal.set("Email is required".to_string());
+                        }
+
+                        let password = password_signal.read().clone();
+                        if password.is_empty() {
+                            password_error_signal.set("Password is required".to_string());
+                        }
+
+                        if email_error_signal.peek().is_empty() && password_error_signal.peek().is_empty() {
+                            disabled_signal.set(true);
+
+                            spawn(async move {
+                                let user = RegistrationUser {
+                                    email: email.clone(),
+                                    password: password.clone(),
+                                };
+                                mutate.manual_mutate(user).await;
+                                if mutate.result().is_ok() {
+                                    match mutate.result().deref() {
+                                        MutationResult::Ok(MutationValue::User(user)) => {
+                                            client.invalidate_queries(&[QueryKey::User]);
+                                            disabled_signal.set(false);
+                                            email_signal.set(String::default());
+                                            password_signal.set(String::default());
+                                            password_error_signal.set(String::default());
+                                            email_error_signal.set(String::default());
+
+                                            let mut state = storage.get();
+                                            state.jwt = Some(user.jwt.clone());
+                                            storage.set(state);
+
+                                            user_signal.set(Some(user.clone()));
+
+                                            let navigator = use_navigator();
+                                            navigator.replace(Routes::GamesList {});
+                                        },
+                                        MutationResult::Err(MutationError::UnableToAuthenticateUser) => {
+                                            email_error_signal.set("Unable to authenticate user".to_string());
+                                            disabled_signal.set(false);
+                                        },
+                                        _ => {}
+                                    }
+                                } else {
+                                    email_error_signal.set("Unable to authenticate user".to_string());
+                                    disabled_signal.set(false);
+                                }
+                            });
+                        }
+                    },
+                    if !email_error_signal.read().is_empty() {
+                        div {
+                            class: r#"
+                            text-sm
+                            theme1:text-orange-300
+                            theme2:text-teal-300
+                            theme3:text-amber-400
+                            "#,
+                            "{email_error_signal.read()}"
+                        }
+                    }
                     Input {
                         r#type: "email",
                         name: "email",
-                        placeholder: "Email"
+                        placeholder: "Email",
+                        oninput: move |e: Event<FormData>| {
+                            email_signal.set(e.value().clone());
+                        }
+                    }
+                    if !password_error_signal.read().is_empty() {
+                        div {
+                            class: r#"
+                            text-sm
+                            theme1:text-orange-300
+                            theme2:text-teal-300
+                            theme3:text-amber-400
+                            "#,
+                            "{password_error_signal.read()}"
+                        }
                     }
                     Input {
                         r#type: "password",
                         name: "password",
-                        placeholder: "Password"
+                        placeholder: "Password",
+                        oninput: move |e: Event<FormData>| {
+                            password_signal.set(e.value().clone());
+                        }
                     }
                     div {
                         class: "clear",
@@ -189,7 +315,7 @@ fn RegisterForm() -> Element {
                                 mutate.manual_mutate(user).await;
                                 if mutate.result().is_ok() {
                                     match mutate.result().deref() {
-                                        MutationResult::Ok(MutationValue::NewUser(user)) => {
+                                        MutationResult::Ok(MutationValue::User(user)) => {
                                             client.invalidate_queries(&[QueryKey::User]);
                                             disabled_signal.set(false);
                                             email_signal.set(String::default());

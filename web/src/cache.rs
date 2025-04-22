@@ -2,7 +2,7 @@ use game::areas::AreaDetails;
 use game::games::Game;
 use game::messages::GameMessage;
 use game::tributes::Tribute;
-use shared::{TributeKey, User};
+use shared::{AuthenticatedUser, TributeKey};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum QueryKey {
@@ -54,7 +54,7 @@ pub(crate) enum MutationValue {
     GameFinished(String),
     GameStarted(String),
     GameAdvanced(String),
-    NewUser(User),
+    NewUser(AuthenticatedUser),
 }
 
 #[derive(PartialEq, Debug)]

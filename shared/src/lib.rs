@@ -30,7 +30,12 @@ pub struct TributeKey {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-pub struct User {
+pub struct RegistrationUser {
     pub email: String,
     pub password: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct AuthenticatedUser {
+    pub jwt: String,
 }

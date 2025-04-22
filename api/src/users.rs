@@ -43,12 +43,17 @@ struct Params {
     pass: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct JwtResponse {
+    jwt: String,
+}
+
 pub async fn session() -> Result<Json<String>, error::Error> {
     let res: Option<String> = DATABASE.query("RETURN <string>$session").await?.take(0)?;
     Ok(Json(res.unwrap_or("No session data found!".into())))
 }
 
-pub async fn user_create(Json(payload): Json<Params>) -> Result<String, error::Error> {
+pub async fn user_create(Json(payload): Json<Params>) -> Result<Json<JwtResponse>, error::Error> {
     let email = payload.email;
     let password = payload.pass;
 
@@ -64,5 +69,5 @@ pub async fn user_create(Json(payload): Json<Params>) -> Result<String, error::E
     .await?
     .into_insecure_token();
 
-    Ok(format!("New user created!\n\nemail: {email}\npassword: {password}\n\nJWT: {jwt}"))
+    Ok(Json(JwtResponse { jwt }))
 }

@@ -2,13 +2,13 @@ use std::ops::Deref;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use game::games::Game;
-use shared::User;
+use shared::{AuthenticatedUser, RegistrationUser};
 use crate::API_HOST;
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use crate::components::{Button, Input, ThemedButton};
 use crate::routes::Routes;
 
-async fn register_user(user: User) -> MutationResult<MutationValue, MutationError> {
+async fn register_user(user: RegistrationUser) -> MutationResult<MutationValue, MutationError> {
     let client = reqwest::Client::new();
     let json_body = serde_json::json!({
         "email": user.email,
@@ -21,7 +21,7 @@ async fn register_user(user: User) -> MutationResult<MutationValue, MutationErro
 
     match response {
         Ok(response) => {
-            match response.json::<User>().await {
+            match response.json::<AuthenticatedUser>().await {
                 Ok(user) => {
                     MutationResult::Ok(MutationValue::NewUser(user))
                 }
@@ -152,6 +152,9 @@ fn RegisterForm() -> Element {
                     id: "register-form",
                     method: "POST",
                     onsubmit: move |_| {
+                        email_error_signal.set(String::default());
+                        password_error_signal.set(String::default());
+
                         let email = email_signal.read().clone();
                         if email.is_empty() {
                             email_error_signal.set("Email is required".to_string());
@@ -168,7 +171,7 @@ fn RegisterForm() -> Element {
                             disabled_signal.set(true);
 
                             spawn(async move {
-                                let user = User {
+                                let user = RegistrationUser {
                                     email: email.clone(),
                                     password: password.clone(),
                                 };
@@ -183,6 +186,7 @@ fn RegisterForm() -> Element {
                                             password2_signal.set(String::default());
                                             password_error_signal.set(String::default());
                                             email_error_signal.set(String::default());
+
                                         },
                                         MutationResult::Err(MutationError::UnableToRegisterUser) => {
                                             email_error_signal.set("Unable to register user".to_string());
@@ -201,7 +205,9 @@ fn RegisterForm() -> Element {
                         div {
                             class: r#"
                             text-sm
-                            text-red-500
+                            theme1:text-orange-300
+                            theme2:text-teal-300
+                            theme3:text-amber-400
                             "#,
                             "{email_error_signal.read()}"
                         }
@@ -218,7 +224,9 @@ fn RegisterForm() -> Element {
                         div {
                             class: r#"
                             text-sm
-                            text-red-500
+                            theme1:text-orange-300
+                            theme2:text-teal-300
+                            theme3:text-amber-400
                             "#,
                             "{password_error_signal.read()}"
                         }

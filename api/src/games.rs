@@ -257,7 +257,9 @@ count(<-playing_in<-tribute.id) == 24
 AND
 count(array::distinct(<-playing_in<-tribute.district)) == 12
 AS ready
-FROM game;"#).await.unwrap();
+FROM game
+WHERE created_by = $auth
+;"#).await.unwrap();
 
     match games.take::<Vec<Game>>(0) {
         Ok(games) => {

@@ -70,8 +70,6 @@ async fn user_create(Json(payload): Json<Params>) -> Result<Json<JwtResponse>, e
     .await?
     .into_insecure_token();
 
-    DATABASE.invalidate().await?;
-
     Ok(Json(JwtResponse { jwt }))
 }
 
@@ -90,8 +88,6 @@ async fn user_authenticate(Json(payload): Json<Params>) -> Result<Json<JwtRespon
     })
     .await?
     .into_insecure_token();
-
-    DATABASE.invalidate().await?;
 
     Ok(Json(JwtResponse { jwt }))
 }

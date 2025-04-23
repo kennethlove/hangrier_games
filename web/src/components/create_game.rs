@@ -6,6 +6,7 @@ use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use game::games::Game;
 use std::ops::Deref;
 use dioxus::html::link::disabled;
+use crate::storage::{use_persistent, AppState};
 
 async fn create_game(name: Option<String>) -> MutationResult<MutationValue, MutationError> {
     let client = reqwest::Client::new();
@@ -14,11 +15,18 @@ async fn create_game(name: Option<String>) -> MutationResult<MutationValue, Muta
         None => Game::default()
     };
 
-    let response = client.post(format!("{}/api/games", API_HOST))
-        .json(&json_body)
-        .send().await;
+    let mut storage = use_persistent("hangry-games", AppState::default);
 
-    match response {
+    let response = client.request(
+        reqwest::Method::POST,
+        format!("{}/api/games", API_HOST),
+    ).bearer_auth(storage.get().jwt.expect("No JWT found")).json(&json_body);
+
+    // let response = client.post(format!("{}/api/games", API_HOST))
+    //     .json(&json_body)
+    //     .send().await;
+
+    match response.send().await {
         Ok(response) => {
             match response.json::<Game>().await {
                 Ok(game) => {

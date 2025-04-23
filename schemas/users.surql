@@ -3,12 +3,7 @@ DEFINE INDEX IF NOT EXISTS unique_user_email ON TABLE user FIELDS email UNIQUE;
 DEFINE ACCESS OVERWRITE account ON DATABASE TYPE RECORD
     SIGNUP ( CREATE user SET email = $email, pass = crypto::argon2::generate($pass) )
     SIGNIN ( SELECT * FROM user WHERE email = $email AND crypto::argon2::compare(pass, $pass) )
-    AUTHENTICATE {
-        IF type::thing("token", $token.jti).revoked = true {
-            THROW "This token has been revoked";
-        };
-        INSERT INTO token { id: $token.jti, exp: $token.exp, revoked: false };
-        CREATE audit CONTENT { token: $token.jti, time: time::now() };
-        RETURN $auth;
-    }
+    WITH JWT
+        ALGORITHM HS512
+        KEY "6dxLjU0m8ZmAzaLEk_qAeMpeD5ZAjGYlCjlvDi5DcgdJLATIHuCReUu7CbGyCDhRSp3btd7Ezob7RPYe6fUtsA"
     DURATION FOR TOKEN 30d, FOR SESSION 1h;

@@ -6,10 +6,18 @@ use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
 use game::games::Game;
+use crate::storage::{use_persistent, AppState};
 
 async fn fetch_games(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::AllGames) = keys.first() {
-        match reqwest::get(format!("{}/api/games", API_HOST)).await {
+        let mut storage = use_persistent("hangry-games", AppState::default);
+        let client = reqwest::Client::new();
+        let request = client.request(
+            reqwest::Method::GET,
+            format!("{}/api/games", API_HOST),
+        ).bearer_auth(storage.get().jwt.expect("No JWT found"));
+
+        match request.send().await{
             Ok(request) => {
                 if let Ok(response) = request.json::<Vec<Game>>().await {
                     QueryResult::Ok(QueryValue::Games(response))

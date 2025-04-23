@@ -7,11 +7,16 @@ mod users;
 use crate::tributes::TRIBUTES_ROUTER;
 use axum::error_handling::HandleErrorLayer;
 use axum::http::StatusCode;
-use axum::{BoxError, Router};
+use axum::{middleware, BoxError, Router};
+use axum_session::{SessionConfig, SessionLayer, SessionStore};
+use axum_session_surreal::SessionSurrealPool;
 use games::GAMES_ROUTER;
 use std::env;
 use std::sync::LazyLock;
 use std::time::Duration;
+use axum::extract::Request;
+use axum::middleware::{Next};
+use axum::response::{IntoResponse, Response};
 use surrealdb::engine::any::Any;
 use surrealdb::opt::auth::Root;
 use surrealdb::Surreal;
@@ -91,6 +96,11 @@ async fn main() {
         .expect("Failed to apply migrations");
     tracing::debug!("Applied migrations");
 
+    let session_config = SessionConfig::default();
+    let session_store = SessionStore::new(
+        Some(SessionSurrealPool::new(DATABASE.clone())), session_config)
+        .await.unwrap();
+
     let cors_layer = CorsLayer::new()
         .allow_origin(CorsAny)
         .allow_headers(CorsAny)
@@ -108,6 +118,7 @@ async fn main() {
 
     let router = Router::new()
         .nest("/api", api_routes)
+        .layer(SessionLayer::new(session_store))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|error: BoxError| async move {
@@ -121,6 +132,7 @@ async fn main() {
                     }
                 }))
                 .timeout(Duration::from_secs(10))
+                .layer(middleware::from_fn(surreal_jwt))
                 .layer(TraceLayer::new_for_http())
                 .layer(cors_layer)
                 .into_inner()
@@ -129,4 +141,24 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     tracing::info!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, router).await.unwrap();
+}
+
+async fn surreal_jwt(request: Request, next: Next) -> Response {
+    let token = request.headers().get("authorization");
+    match token {
+        None => StatusCode::UNAUTHORIZED.into_response(),
+        Some(token) => {
+            let token = token.to_str().expect("Failed to convert token to str");
+            let token = token.strip_prefix("Bearer ").expect("Failed to strip prefix");
+            match DATABASE.authenticate(token).await {
+                Ok(_) => {
+                    let response = next.run(request).await;
+                    response
+                },
+                Err(_) => {
+                    StatusCode::UNAUTHORIZED.into_response()
+                }
+            }
+        }
+    }
 }

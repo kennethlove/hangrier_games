@@ -6,15 +6,18 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use shared::EditGame;
 use std::ops::Deref;
+use crate::storage::{use_persistent, AppState};
 
 async fn edit_game(game: EditGame) -> MutationResult<MutationValue, MutationError> {
     let identifier = game.0.clone();
 
+    let mut storage = use_persistent("hangry-games", AppState::default);
     let client = reqwest::Client::new();
     let url: String = format!("{}/api/games/{}", API_HOST, identifier);
 
     let response = client
         .put(url)
+        .bearer_auth(storage.get().jwt.expect("No JWT found"))
         .json(&game.clone())
         .send().await;
 

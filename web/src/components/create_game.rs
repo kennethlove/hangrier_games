@@ -19,12 +19,9 @@ async fn create_game(name: Option<String>) -> MutationResult<MutationValue, Muta
 
     let response = client.request(
         reqwest::Method::POST,
-        format!("{}/api/games", API_HOST),
-    ).bearer_auth(storage.get().jwt.expect("No JWT found")).json(&json_body);
-
-    // let response = client.post(format!("{}/api/games", API_HOST))
-    //     .json(&json_body)
-    //     .send().await;
+        format!("{}/api/games", API_HOST))
+        .bearer_auth(storage.get().jwt.expect("No JWT found"))
+        .json(&json_body);
 
     match response.send().await {
         Ok(response) => {

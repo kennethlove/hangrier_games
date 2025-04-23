@@ -1,8 +1,8 @@
 use crate::tributes::{tribute_create, tribute_delete, tribute_detail, tribute_log, tribute_record_create, tribute_update, TributeOwns};
 use crate::DATABASE;
 use announcers::{summarize, summarize_stream};
-use axum::extract::{Path, Request};
-use axum::http::{HeaderMap, StatusCode};
+use axum::extract::{Path};
+use axum::http::{StatusCode};
 use axum::response::sse::Event;
 use axum::response::{IntoResponse, Sse};
 use axum::routing::{get, put};
@@ -114,27 +114,7 @@ async fn game_area_record_creator(area: Area, game_identifier: String) -> Option
     gar.expect("Failed to link area and game.").clone().pop()
 }
 
-pub async fn game_create(headers: HeaderMap, Json(payload): Json<Game>) -> impl IntoResponse {
-    let token = headers.get("authorization");
-    if token.is_none() {
-        return (StatusCode::UNAUTHORIZED, Json::<Vec<Game>>(Vec::new())).into_response();
-    } else {
-        let token = token.unwrap().to_str().unwrap();
-        if !token.starts_with("Bearer ") {
-            return (StatusCode::BAD_REQUEST, Json::<Vec<Game>>(Vec::new())).into_response();
-        } else {
-            let token = token.strip_prefix("Bearer ").unwrap();
-            if token.is_empty() {
-                return (StatusCode::BAD_REQUEST, Json::<Vec<Game>>(Vec::new())).into_response();
-            } else {
-                if let Err(e) = DATABASE.authenticate(token).await {
-                    tracing::error!("Error authenticating user: {}", e);
-                    return (StatusCode::FORBIDDEN, Json::<Vec<Game>>(Vec::new())).into_response();
-                }
-            }
-        }
-    }
-
+pub async fn game_create(Json(payload): Json<Game>) -> impl IntoResponse {
     let game: Option<Game> = DATABASE
         .create(("game", &payload.identifier))
         .content(payload.clone())
@@ -214,33 +194,7 @@ async fn delete_pieces(pieces: HashMap<String, Vec<Thing>>) {
     }
 }
 
-pub async fn game_list(request: Request) -> impl IntoResponse {
-    let token = request.headers().get("authorization");
-    if token.is_none() {
-        tracing::error!("No token");
-        return (StatusCode::UNAUTHORIZED, Json::<Vec<Game>>(Vec::new())).into_response();
-    } else {
-        let token = token.unwrap().to_str().unwrap();
-        if !token.starts_with("Bearer ") {
-            tracing::error!("No bearer");
-            return (StatusCode::UNAUTHORIZED, Json::<Vec<Game>>(Vec::new())).into_response();
-        } else {
-            let token = token.strip_prefix("Bearer ").unwrap();
-            if token.is_empty() {
-                tracing::error!("No token again");
-                return (StatusCode::UNAUTHORIZED, Json::<Vec<Game>>(Vec::new())).into_response();
-            } else {
-                match DATABASE.authenticate(token).await {
-                    Ok(_) => tracing::info!("User authenticated"),
-                    Err(e) => {
-                        tracing::error!("Error authenticating user: {}", e);
-                        return (StatusCode::UNAUTHORIZED, Json::<Vec<Game>>(Vec::new())).into_response();
-                    }
-                }
-            }
-        }
-    }
-
+pub async fn game_list() -> impl IntoResponse {
     let mut games = DATABASE.query(r#"
 SELECT *, (
     SELECT *, ->owns->item[*] AS items

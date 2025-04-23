@@ -64,7 +64,7 @@ impl Item {
     }
 
     pub fn new_random(name: Option<&str>) -> Item {
-        let mut rng = rand::thread_rng();
+        let mut rng = thread_rng();
 
         let item_type = ItemType::random();
         let is_shield = rng.gen_bool(0.5);

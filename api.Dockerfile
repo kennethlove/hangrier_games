@@ -55,7 +55,7 @@ WORKDIR /opt/api
 COPY --from=builder /app/schemas /opt/api/schemas
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl --fail http://localhost:3000/api/games/ || exit 1
+    CMD curl --fail http://localhost:3000/api/users || exit 1
 
 EXPOSE 3000
 ENTRYPOINT ["/usr/local/bin/hg_api"]

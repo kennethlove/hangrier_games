@@ -8,8 +8,6 @@ use crate::tributes::TRIBUTES_ROUTER;
 use axum::error_handling::HandleErrorLayer;
 use axum::http::StatusCode;
 use axum::{middleware, BoxError, Router};
-use axum_session::{SessionConfig, SessionLayer, SessionStore};
-use axum_session_surreal::SessionSurrealPool;
 use games::GAMES_ROUTER;
 use std::env;
 use std::sync::LazyLock;
@@ -96,11 +94,6 @@ async fn main() {
         .expect("Failed to apply migrations");
     tracing::debug!("Applied migrations");
 
-    let session_config = SessionConfig::default();
-    let session_store = SessionStore::new(
-        Some(SessionSurrealPool::new(DATABASE.clone())), session_config)
-        .await.unwrap();
-
     let cors_layer = CorsLayer::new()
         .allow_origin(CorsAny)
         .allow_headers(CorsAny)
@@ -112,13 +105,12 @@ async fn main() {
         ]);
 
     let api_routes = Router::new()
-        .nest("/games", GAMES_ROUTER.clone())
+        .nest("/games", GAMES_ROUTER.clone().layer(middleware::from_fn(surreal_jwt)))
         .nest("/tributes", TRIBUTES_ROUTER.clone())
         .nest("/users", USERS_ROUTER.clone());
 
     let router = Router::new()
         .nest("/api", api_routes)
-        .layer(SessionLayer::new(session_store))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|error: BoxError| async move {
@@ -132,7 +124,6 @@ async fn main() {
                     }
                 }))
                 .timeout(Duration::from_secs(10))
-                .layer(middleware::from_fn(surreal_jwt))
                 .layer(TraceLayer::new_for_http())
                 .layer(cors_layer)
                 .into_inner()

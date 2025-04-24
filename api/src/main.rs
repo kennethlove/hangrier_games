@@ -102,6 +102,8 @@ async fn main() {
             "POST".parse().unwrap(),
             "PUT".parse().unwrap(),
             "DELETE".parse().unwrap(),
+            "OPTIONS".parse().unwrap(),
+            "HEAD".parse().unwrap(),
         ]);
 
     let api_routes = Router::new()

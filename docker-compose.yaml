@@ -21,6 +21,7 @@ services:
       - 'SURREAL_HOST=${SURREAL_HOST:-surrealdb}'
       - 'SURREAL_USER=${SURREAL_USER:-root}'
       - 'SURREAL_PASS=${SURREAL_PASS:-root}'
+      - 'PRODUCTION=${PRODUCTION:-false}'
     labels:
       - "coolify.managed=true"
     healthcheck:

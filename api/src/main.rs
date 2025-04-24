@@ -6,7 +6,7 @@ mod users;
 
 use crate::tributes::TRIBUTES_ROUTER;
 use axum::error_handling::HandleErrorLayer;
-use axum::http::StatusCode;
+use axum::http::{HeaderValue, StatusCode};
 use axum::{middleware, BoxError, Router};
 use games::GAMES_ROUTER;
 use std::env;
@@ -20,7 +20,7 @@ use surrealdb::opt::auth::Root;
 use surrealdb::Surreal;
 use surrealdb_migrations::MigrationRunner;
 use tower::ServiceBuilder;
-use tower_http::cors::{Any as CorsAny, CorsLayer};
+use tower_http::cors::{Any as CorsAny, CorsLayer, AllowOrigin};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -76,6 +76,8 @@ fn initialize_logging() {
 async fn main() {
     initialize_logging();
 
+    let production = env::var("PRODUCTION").unwrap_or("false".to_string());
+
     DATABASE.connect(env::var("SURREAL_HOST").unwrap()).await.expect("Failed to connect to database");
     tracing::debug!("connected to SurrealDB");
 
@@ -94,8 +96,7 @@ async fn main() {
         .expect("Failed to apply migrations");
     tracing::debug!("Applied migrations");
 
-    let cors_layer = CorsLayer::new()
-        .allow_origin(CorsAny)
+    let mut cors_layer = CorsLayer::new()
         .allow_headers(CorsAny)
         .allow_methods(vec![
             "GET".parse().unwrap(),
@@ -105,6 +106,16 @@ async fn main() {
             "OPTIONS".parse().unwrap(),
             "HEAD".parse().unwrap(),
         ]);
+
+    match production.as_str() {
+        "true" => {
+            cors_layer = cors_layer
+                .allow_origin("https://hangry-games.eyeheartzombies.com".parse::<HeaderValue>().unwrap());
+        }
+        _ => {
+            cors_layer = cors_layer
+                .allow_origin(AllowOrigin::any());
+    }}
 
     let api_routes = Router::new()
         .nest("/games", GAMES_ROUTER.clone().layer(middleware::from_fn(surreal_jwt)))

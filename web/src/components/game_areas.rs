@@ -8,18 +8,30 @@ use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::areas::AreaDetails;
 use game::games::Game;
 use crate::components::item_icon::ItemIcon;
+use crate::storage::{use_persistent, AppState};
 
 async fn fetch_areas(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Areas(identifier)) = keys.first() {
-        let response = reqwest::get(format!("{}/api/games/{}/areas", API_HOST, identifier))
-            .await
-            .unwrap();
+        let mut storage = use_persistent("hangry-games", AppState::default);
+        let client = reqwest::Client::new();
 
-        match response.json::<Vec<AreaDetails>>().await {
-            Ok(areas) => {
-                QueryResult::Ok(QueryValue::Areas(areas))
+        let request = client.request(
+            reqwest::Method::GET,
+            format!("{}/api/games/{}/areas", API_HOST, identifier))
+            .bearer_auth(storage.get().jwt.expect("No JWT found"));
+
+        match request.send().await {
+            Ok(response) => {
+                match response.json::<Vec<AreaDetails>>().await {
+                    Ok(areas) => {
+                        QueryResult::Ok(QueryValue::Areas(areas))
+                    }
+                    Err(_) => QueryResult::Err(QueryError::GameNotFound(identifier.to_string())),
+                }
             }
-            Err(_) => QueryResult::Err(QueryError::GameNotFound(identifier.to_string())),
+            Err(e) => {
+                QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
+            }
         }
     } else {
         QueryResult::Err(QueryError::Unknown)

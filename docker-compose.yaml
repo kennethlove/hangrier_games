@@ -24,7 +24,7 @@ services:
     labels:
       - "coolify.managed=true"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://backend:3000/api/games"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/users"]
       interval: 30s
       timeout: 10s
       retries: 5

@@ -13,25 +13,33 @@ use game::messages::GameMessage;
 use game::tributes::{Attributes, Tribute};
 use shared::EditTribute;
 use std::collections::HashMap;
+use crate::storage::{use_persistent, AppState};
 
 async fn fetch_tribute(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tribute(identifier)) = keys.first() {
         if let Some(QueryKey::Game(game_identifier)) = keys.last() {
-            let response = reqwest::get(
-                format!(
-                    "{}/api/games/{}/tributes/{}",
-                    API_HOST,
-                    game_identifier,
-                    identifier
-                ))
-                .await
-                .unwrap();
+            let mut storage = use_persistent("hangry-games", AppState::default);
+            let client = reqwest::Client::new();
 
-            match response.json::<Option<Tribute>>().await {
-                Ok(Some(tribute)) => {
-                    QueryResult::Ok(QueryValue::Tribute(Box::new(tribute)))
+            let request = client.request(
+                reqwest::Method::GET,
+                format!("{}/api/games/{}/tributes/{}", API_HOST, game_identifier, identifier))
+                .bearer_auth(storage.get().jwt.expect("No JWT found"));
+
+            match request.send().await {
+                Ok(response) => {
+                    if response.status().is_success() {
+                        match response.json::<Option<Tribute>>().await {
+                            Ok(Some(tribute)) => QueryResult::Ok(QueryValue::Tribute(Box::new(tribute))),
+                            _ => QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
+                        }
+                    } else {
+                        QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
+                    }
                 }
-                _ => QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
+                Err(_) => {
+                    QueryResult::Err(QueryError::Unknown)
+                }
             }
         } else {
             QueryResult::Err(QueryError::Unknown)

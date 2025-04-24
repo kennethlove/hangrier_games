@@ -27,6 +27,7 @@ pub(crate) enum QueryError {
     GameNotFound(String),
     NoGames,
     TributeNotFound(String),
+    Unauthorized,
     Unknown,
 }
 

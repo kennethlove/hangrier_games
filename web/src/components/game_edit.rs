@@ -8,17 +8,17 @@ use shared::EditGame;
 use std::ops::Deref;
 use crate::storage::{use_persistent, AppState};
 
-async fn edit_game(game: EditGame) -> MutationResult<MutationValue, MutationError> {
-    let identifier = game.0.clone();
+async fn edit_game(args: (EditGame, String)) -> MutationResult<MutationValue, MutationError> {
+    let identifier = args.0.0.clone();
+    let token = args.1.clone();
 
-    let mut storage = use_persistent("hangry-games", AppState::default);
     let client = reqwest::Client::new();
     let url: String = format!("{}/api/games/{}", API_HOST, identifier);
 
     let response = client
         .put(url)
-        .bearer_auth(storage.get().jwt.expect("No JWT found"))
-        .json(&game.clone())
+        .bearer_auth(token)
+        .json(&args.0.clone())
         .send().await;
 
     if response.expect("Failed to update game").status().is_success() {
@@ -74,6 +74,8 @@ pub fn EditGameModal() -> Element {
 
 #[component]
 pub fn EditGameForm() -> Element {
+    let mut storage = use_persistent("hangry-games", AppState::default);
+
     let mut edit_game_signal: Signal<Option<EditGame>> = use_context();
     let game_details = edit_game_signal.read().clone().unwrap_or_default();
     let name = game_details.1.clone();
@@ -89,6 +91,7 @@ pub fn EditGameForm() -> Element {
 
     let save = move |e: Event<FormData>| {
         let identifier = identifier.clone();
+        let token = storage.get().jwt.expect("No JWT found");
 
         let data = e.data().values();
         let name = data.get("name").expect("No name value").0[0].clone();
@@ -96,7 +99,7 @@ pub fn EditGameForm() -> Element {
         if !name.is_empty() {
             let edit_game = EditGame(identifier.clone(), name.clone());
             spawn(async move {
-                mutate.manual_mutate(edit_game.clone()).await;
+                mutate.manual_mutate((edit_game.clone(), token)).await;
                 edit_game_signal.set(Some(edit_game.clone()));
 
                 if let MutationResult::Ok(MutationValue::GameUpdated(identifier)) = mutate.result().deref() {

@@ -15,16 +15,15 @@ use shared::EditTribute;
 use std::collections::HashMap;
 use crate::storage::{use_persistent, AppState};
 
-async fn fetch_tribute(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
+async fn fetch_tribute(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tribute(identifier)) = keys.first() {
         if let Some(QueryKey::Game(game_identifier)) = keys.last() {
-            let mut storage = use_persistent("hangry-games", AppState::default);
             let client = reqwest::Client::new();
 
             let request = client.request(
                 reqwest::Method::GET,
                 format!("{}/api/games/{}/tributes/{}", API_HOST, game_identifier, identifier))
-                .bearer_auth(storage.get().jwt.expect("No JWT found"));
+                .bearer_auth(token);
 
             match request.send().await {
                 Ok(response) => {
@@ -49,19 +48,29 @@ async fn fetch_tribute(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryErro
     }
 }
 
-async fn fetch_tribute_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
+async fn fetch_tribute_log(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::TributeLog(identifier)) = keys.first() {
-        let response = reqwest::get(format!("{}/api/tributes/{}/log", API_HOST, identifier))
-            .await
-            .unwrap();
+        let client = reqwest::Client::new();
 
-        match response.json::<Vec<GameMessage>>().await {
-            Ok(logs) => {
-                QueryResult::Ok(QueryValue::Logs(logs))
+        let request = client.request(
+            reqwest::Method::GET,
+            format!("{}/api/tributes/{}/log", API_HOST, identifier))
+            .bearer_auth(token);
+
+        match request.send().await {
+            Ok(response) => {
+                match response.json::<Vec<GameMessage>>().await {
+                    Ok(logs) => {
+                        QueryResult::Ok(QueryValue::Logs(logs))
+                    }
+                    Err(_) => {
+                        QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
+                    }
+                }
             }
-            Err(_err) => {
+            Err(_) => {
                 QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
-            },
+            }
         }
     } else {
         QueryResult::Err(QueryError::Unknown)
@@ -71,13 +80,16 @@ async fn fetch_tribute_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, Query
 
 #[component]
 pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Element {
+    let mut storage = use_persistent("hangry-games", AppState::default);
+    let token = storage.get().jwt.expect("No JWT found");
+
     let tribute_query = use_get_query(
         [
             QueryKey::Tribute(tribute_identifier.clone()),
             QueryKey::Tributes(game_identifier.clone()),
             QueryKey::Game(game_identifier.clone()),
         ],
-        fetch_tribute,
+        move|keys: Vec<QueryKey>| { fetch_tribute(keys, token.clone()) },
     );
 
     match tribute_query.result().value() {
@@ -228,12 +240,15 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
 
 #[component]
 fn TributeLog(identifier: String) -> Element {
+    let mut storage = use_persistent("hangry-games", AppState::default);
+    let token = storage.get().jwt.expect("No JWT found");
+
     let log_query = use_get_query(
         [
             QueryKey::TributeLog(identifier.clone()),
             QueryKey::Tribute(identifier.clone()),
         ],
-        fetch_tribute_log,
+        move |keys: Vec<QueryKey>| { fetch_tribute_log(keys, token.clone()) },
     );
 
     match log_query.result().value() {

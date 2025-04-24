@@ -14,15 +14,14 @@ use game::tributes::Tribute;
 use crate::components::icons::map_pin::MapPinIcon;
 use crate::storage::{use_persistent, AppState};
 
-async fn fetch_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
+async fn fetch_tributes(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tributes(identifier)) = keys.first() {
-        let mut storage = use_persistent("hangry-games", AppState::default);
         let client = reqwest::Client::new();
 
         let request = client.request(
             reqwest::Method::GET,
             format!("{}/api/games/{}/tributes", API_HOST, identifier))
-            .bearer_auth(storage.get().jwt.expect("No JWT found"));
+            .bearer_auth(token);
 
         match request.send().await {
             Ok(response) =>  {
@@ -39,16 +38,15 @@ async fn fetch_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryErr
     }
 }
 
-async fn fetch_tribute_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
+async fn fetch_tribute_log(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::TributeDayLog(identifier, day)) = keys.first() {
         if let Some(QueryKey::Game(game_identifier)) = keys.last() {
-            let mut storage = use_persistent("hangry-games", AppState::default);
             let client = reqwest::Client::new();
 
             let request = client.request(
                 reqwest::Method::GET,
                 format!("{}/api/games/{}/log/{}/{}", API_HOST, game_identifier, day, identifier))
-                .bearer_auth(storage.get().jwt.expect("No JWT found"));
+                .bearer_auth(token);
 
             match request.send().await {
                 Ok(response) => {
@@ -76,6 +74,8 @@ async fn fetch_tribute_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, Query
 
 #[component]
 pub fn GameTributes() -> Element {
+    let mut storage = use_persistent("hangry-games", AppState::default);
+    let token = storage.get().jwt.expect("No JWT found");
     let game_signal: Signal<Option<Game>> = use_context();
 
     let game = game_signal.read().clone();
@@ -87,7 +87,7 @@ pub fn GameTributes() -> Element {
             QueryKey::Tributes(identifier.clone()),
             QueryKey::Game(identifier.clone())
         ],
-        fetch_tributes,
+        move |keys: Vec<QueryKey>| { fetch_tributes(keys, token.clone()) },
     );
 
     match tribute_query.result().value() {
@@ -150,6 +150,8 @@ pub fn GameTributes() -> Element {
 
 #[component]
 pub fn GameTributeListMember(tribute: Tribute) -> Element {
+    let mut storage = use_persistent("hangry-games", AppState::default);
+    let token = storage.get().jwt.expect("No JWT found");
     let game_signal: Signal<Option<Game>> = use_context();
 
     let game = game_signal.read().clone();
@@ -163,7 +165,7 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
             QueryKey::Tribute(identifier.clone()),
             QueryKey::Game(game.clone().identifier)
         ],
-        fetch_tribute_log,
+        move |keys: Vec<QueryKey>| { fetch_tribute_log(keys, token.clone()) },
     );
 
     let tribute_logs: Vec<GameMessage> = match tribute_logs_query.result().value() {

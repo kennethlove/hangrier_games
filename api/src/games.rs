@@ -420,11 +420,18 @@ async fn save_game(game: &Game) -> Option<Game> {
     if let Ok(logs) = get_all_messages() {
         for mut log in logs {
             log.game_day = game.day.unwrap_or_default();
-            DATABASE
+            match DATABASE
                 .upsert::<Option<GameMessage>>(("message", &log.identifier))
                 .content(log.clone())
-                .await
-                .unwrap_or_else(|_| panic!("Failed to save message: {:#?}", log));
+                .await {
+                Ok(_) => {
+                    // Successfully saved
+                }
+                Err(err) => {
+                    eprintln!("Error saving message: {err:?}");
+                    // Handle the error
+                }
+            }
         }
     }
 

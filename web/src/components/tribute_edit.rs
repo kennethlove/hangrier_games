@@ -7,12 +7,14 @@ use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use game::games::Game;
 use shared::EditTribute;
 use std::ops::Deref;
+use crate::storage::{use_persistent, AppState};
 
 async fn edit_tribute(args: (EditTribute, String)) -> MutationResult<MutationValue, MutationError> {
     let tribute = args.clone().0;
     let identifier = args.clone().0.0;
     let game_identifier = args.clone().1;
 
+    let mut storage = use_persistent("hangry-games", AppState::default);
     let client = reqwest::Client::new();
     let url: String = format!(
         "{}/api/games/{}/tributes/{}",
@@ -21,7 +23,11 @@ async fn edit_tribute(args: (EditTribute, String)) -> MutationResult<MutationVal
         identifier
     );
 
-    let response = client.put(url).json(&tribute.clone()).send().await;
+    let response = client
+        .put(url)
+        .bearer_auth(storage.get().jwt.expect("No JWT found"))
+        .json(&tribute.clone())
+        .send().await;
 
     if response
         .expect("Failed to update tribute")

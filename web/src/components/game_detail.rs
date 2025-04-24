@@ -16,17 +16,25 @@ use game::games::GameStatus;
 use game::tributes::Tribute;
 use reqwest::StatusCode;
 use std::ops::Deref;
+use crate::storage::{use_persistent, AppState};
 
 async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(identifier)) = keys.first() {
-        let response = reqwest::get(format!("{}/api/games/{}", API_HOST, identifier))
-            .await
-            .expect("Failed to fetch game details");
+        let mut storage = use_persistent("hangry-games", AppState::default);
+        let client = reqwest::Client::new();
 
-        match response.json::<Game>().await {
-            Ok(game) => {
-                // GAME.set(game.clone());
-                QueryResult::Ok(QueryValue::Game(Box::new(game)))
+        let request = client.request(
+            reqwest::Method::GET,
+            format!("{}/api/games/{}", API_HOST, identifier))
+            .bearer_auth(storage.get().jwt.expect("No JWT found"));
+
+        match request.send().await {
+            Ok(response) =>  {
+                if let Ok(game) = response.json::<Game>().await {
+                    QueryResult::Ok(QueryValue::Game(Box::new(game)))
+                } else {
+                    QueryResult::Err(QueryError::BadJson)
+                }
             }
             Err(_) => QueryResult::Err(QueryError::GameNotFound(identifier.to_string())),
         }

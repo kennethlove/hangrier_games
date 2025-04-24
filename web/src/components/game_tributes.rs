@@ -1,3 +1,4 @@
+use std::process::id;
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_edit::TributeEdit;
@@ -11,16 +12,25 @@ use game::items::Item;
 use game::messages::GameMessage;
 use game::tributes::Tribute;
 use crate::components::icons::map_pin::MapPinIcon;
+use crate::storage::{use_persistent, AppState};
 
 async fn fetch_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tributes(identifier)) = keys.first() {
-        let response = reqwest::get(format!("{}/api/games/{}/tributes", API_HOST, identifier))
-            .await
-            .unwrap();
+        let mut storage = use_persistent("hangry-games", AppState::default);
+        let client = reqwest::Client::new();
 
-        match response.json::<Vec<Tribute>>().await {
-            Ok(tributes) => {
-                QueryResult::Ok(QueryValue::Tributes(tributes))
+        let request = client.request(
+            reqwest::Method::GET,
+            format!("{}/api/games/{}/tributes", API_HOST, identifier))
+            .bearer_auth(storage.get().jwt.expect("No JWT found"));
+
+        match request.send().await {
+            Ok(response) =>  {
+                if let Ok(tributes) = response.json::<Vec<Tribute>>().await {
+                    QueryResult::Ok(QueryValue::Tributes(tributes))
+                } else {
+                    QueryResult::Err(QueryError::BadJson)
+                }
             }
             Err(_) => QueryResult::Err(QueryError::GameNotFound(identifier.to_string())),
         }
@@ -32,18 +42,32 @@ async fn fetch_tributes(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryErr
 async fn fetch_tribute_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::TributeDayLog(identifier, day)) = keys.first() {
         if let Some(QueryKey::Game(game_identifier)) = keys.last() {
-            let response = reqwest::get(format!("{}/api/games/{}/log/{}/{}", API_HOST, game_identifier, day, identifier))
-                .await
-                .unwrap();
+            let mut storage = use_persistent("hangry-games", AppState::default);
+            let client = reqwest::Client::new();
 
-            match response.json::<Vec<GameMessage>>().await {
-                Ok(messages) => {
-                    QueryResult::Ok(QueryValue::Logs(messages))
+            let request = client.request(
+                reqwest::Method::GET,
+                format!("{}/api/games/{}/log/{}/{}", API_HOST, game_identifier, day, identifier))
+                .bearer_auth(storage.get().jwt.expect("No JWT found"));
+
+            match request.send().await {
+                Ok(response) => {
+                    if response.status().is_success() {
+                        let messages = response.json::<Vec<GameMessage>>().await;
+                        match messages {
+                            Ok(messages) => {
+                                QueryResult::Ok(QueryValue::Logs(messages))
+                            }
+                            Err(_) => QueryResult::Err(QueryError::BadJson)
+                        }
+                    } else {
+                        QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
+                    }
                 }
-                Err(_) => QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
+                Err(_) => QueryResult::Err(QueryError::GameNotFound(identifier.to_string())),
             }
         } else {
-            QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
+            QueryResult::Err(QueryError::Unknown)
         }
     } else {
         QueryResult::Err(QueryError::Unknown)

@@ -6,6 +6,7 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use shared::DeleteGame;
 use std::ops::Deref;
+use crate::storage::{use_persistent, AppState};
 
 async fn delete_game(delete_game_info: DeleteGame) -> MutationResult<MutationValue, MutationError> {
     let identifier = delete_game_info.0;
@@ -13,8 +14,11 @@ async fn delete_game(delete_game_info: DeleteGame) -> MutationResult<MutationVal
     let client = reqwest::Client::new();
     let url: String = format!("{}/api/games/{}", API_HOST, identifier);
 
+    let mut storage = use_persistent("hangry-games", AppState::default);
+
     let response = client
         .delete(url)
+        .bearer_auth(storage.get().jwt.expect("No JWT found"))
         .send().await;
 
     if response.unwrap().status().is_success() {
@@ -38,7 +42,7 @@ pub fn GameDelete(game_identifier: String, game_name: String, icon_class: String
 
     rsx! {
         Button {
-            extra_classes: Some("border-none".to_string()),
+            class: Some("border-none".to_string()),
             title,
             onclick,
             DeleteIcon { class: icon_class }

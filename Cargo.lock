@@ -198,6 +198,7 @@ dependencies = [
  "strum 0.27.1",
  "surrealdb",
  "surrealdb-migrations",
+ "thiserror 1.0.69",
  "tokio",
  "tower",
  "tower-http",
@@ -6015,6 +6016,7 @@ dependencies = [
  "gloo-storage",
  "reqwest",
  "serde",
+ "serde_json",
  "shared",
  "wasm-bindgen",
 ]

@@ -5,18 +5,44 @@ use crate::components::Button;
 use crate::routes::Routes;
 use crate::storage::{use_persistent, AppState, Colorscheme};
 use dioxus::prelude::*;
+use shared::{AuthenticatedUser, RegistrationUser};
 
 #[component]
 pub fn Navbar() -> Element {
     let mut storage = use_persistent("hangry-games", AppState::default);
+    let user_signal: Signal<Option<AuthenticatedUser>> = use_context();
     let mut theme_signal: Signal<Colorscheme> = use_context();
+
+    let show_games = storage.get().jwt.is_some() || user_signal.read().is_some();
+
+    let link_theme = r#"
+    theme1:hover:bg-amber-500
+    theme1:text-amber-500
+    theme1:hover:text-amber-900
+    theme1:font-semibold
+
+    theme2:text-green-200/50
+    theme2:hover:text-green-200
+    theme2:hover:underline
+    theme2:hover:decoration-wavy
+    theme2:hover:decoration-2
+
+    theme3:transform
+    theme3:duration-500
+    theme3:text-yellow-600
+    theme3:border-b-5
+    theme3:border-transparent
+    theme3:border-double
+    theme3:hover:border-b-5
+    theme3:hover:border-yellow-500
+    theme3:hover:text-yellow-500
+    "#;
 
     rsx! {
         header {
             class: r#"
             flex
             flex-col
-            flex-wrap
             items-center
             "#,
 
@@ -26,7 +52,7 @@ pub fn Navbar() -> Element {
 
                 theme1:font-[Cinzel]
                 theme1:font-bold
-                theme1:text-5xl
+                theme1:text-4xl
                 theme1:md:text-7xl
                 theme1:bg-radial
                 theme1:bg-clip-text
@@ -36,7 +62,7 @@ pub fn Navbar() -> Element {
                 theme1:drop-shadow-sm/25
 
                 theme2:font-[Playfair_Display]
-                theme2:text-6xl
+                theme2:text-5xl
                 theme2:text-transparent
                 theme2:md:text-7xl
                 theme2:bg-linear-to-b
@@ -45,7 +71,7 @@ pub fn Navbar() -> Element {
                 theme2:to-green-400
                 theme2:drop-shadow-sm/25
 
-                theme3:text-5xl
+                theme3:text-4xl
                 theme3:md:text-6xl
                 theme3:bg-clip-text
                 theme3:text-transparent
@@ -71,73 +97,47 @@ pub fn Navbar() -> Element {
 
                 theme3:text-slate-800
                 theme3:uppercase
-                theme3:mt-2
                 "#,
 
                 ul {
-                    class: "flex flex-row flex-grow gap-16",
+                    class: r#"
+                    flex
+                    flex-row
+                    flex-grow
+                    gap-2
+                    sm:gap-4
+                    md:gap-8
+                    text-center
+                    "#,
                     li {
+                        class: "px-2",
                         Link {
-                            class: r#"
-                            theme1:hover:bg-amber-500
-                            theme1:text-amber-500
-                            theme1:hover:text-amber-900
-                            theme1:font-semibold
-                            theme1:px-2
-
-                            theme2:text-green-200/50
-                            theme2:hover:text-green-200
-                            theme2:hover:underline
-                            theme2:hover:decoration-wavy
-                            theme2:hover:decoration-2
-
-                            theme3:transform
-                            theme3:duration-500
-                            theme3:text-yellow-600
-                            theme3:border-b-5
-                            theme3:border-transparent
-                            theme3:border-double
-                            theme3:hover:border-b-5
-                            theme3:hover:border-yellow-500
-                            theme3:hover:text-yellow-500
-                            "#,
+                            class: "{link_theme}",
 
                             to: Routes::Home {},
                             "Home"
                         }
                     }
-                    li {
-                        Link {
-                            class: r#"
-                            theme1:hover:bg-amber-500
-                            theme1:text-amber-500
-                            theme1:hover:text-amber-900
-                            theme1:font-semibold
-                            theme1:px-2
-
-                            theme2:text-green-200/50
-                            theme2:hover:text-green-200
-                            theme2:hover:underline
-                            theme2:hover:decoration-wavy
-                            theme2:hover:decoration-2
-
-                            theme3:transform
-                            theme3:duration-500
-                            theme3:text-yellow-600
-                            theme3:border-b-5
-                            theme3:border-transparent
-                            theme3:border-double
-                            theme3:hover:border-b-5
-                            theme3:hover:border-yellow-500
-                            theme3:hover:text-yellow-500
-                            "#,
-
-                            to: Routes::GamesList {},
-                            "Games"
+                    if show_games {
+                        li {
+                            class: "px-2",
+                            Link {
+                                class: "{link_theme}",
+                                to: Routes::GamesList {},
+                                "Games"
+                            }
                         }
                     }
                     li {
-                        class: "relative group inline-block",
+                        class: "px-2",
+                        Link {
+                            class: "{link_theme}",
+                            to: Routes::AccountsPage {},
+                            "Account"
+                        }
+                    }
+                    li {
+                        class: "relative group inline-block px-2",
                         input {
                             id: "theme-switcher",
                             r#type: "checkbox",
@@ -145,12 +145,11 @@ pub fn Navbar() -> Element {
                         }
                         label {
                             class: r#"
-                            px-2
+                            {link_theme}
                             cursor-pointer
+                            px-2
+                            -ml-2
 
-                            theme1:font-semibold
-                            theme1:text-xl
-                            theme1:text-amber-500
                             theme1:group-focus:bg-amber-500
                             theme1:group-focus:text-red-900
                             theme1:group-focus:border-b-2
@@ -159,37 +158,40 @@ pub fn Navbar() -> Element {
                             theme1:focus-within:text-red-900
                             theme1:focus-within:border-b-2
                             theme1:focus-within:border-amber-500
+                            theme1:peer-focus:bg-amber-500
+                            theme1:peer-focus:text-red-900
+                            theme1:peer-focus:border-b-2
+                            theme1:peer-focus:border-amber-500
+                            theme1:focus-within:bg-amber-500
+                            theme1:focus-within:text-red-900
+                            theme1:focus-within:border-b-2
+                            theme1:focus-within:border-amber-500
 
-                            theme2:text-green-200/50
-                            theme2:hover:text-green-900
                             theme2:peer-focus:bg-green-200
                             theme2:peer-focus:text-green-900
                             theme2:peer-focus:rounded-t-sm
                             theme2:peer-focus:border-b-3
                             theme2:peer-focus:border-green-200
+                            theme2:peer-focus:hover:text-green-900
+                            theme2:peer-focus:hover:decoration-transparent
                             theme2:focus-within:bg-green-200
                             theme2:focus-within:text-green-900
                             theme2:focus-within:rounded-t-sm
                             theme2:focus-within:border-b-3
                             theme2:focus-within:border-green-200
+                            theme2:focus-within:hover:text-green-900
+                            theme2:focus-within:hover:decoration-transparent
 
-                            theme3:transform
-                            theme3:duration-500
-                            theme3:text-yellow-600
-                            theme3:border-b-5
-                            theme3:border-transparent
-                            theme3:border-double
-                            theme3:hover:border-b-5
-                            theme3:hover:border-yellow-500
-                            theme3:hover:text-yellow-500
+                            theme3:peer-focus:hover:text-yellow-600
+                            theme3:peer-focus:hover:border-transparent
                             "#,
                             r#for: "theme-switcher",
                             "Theme",
                         }
                         div {
                             class: r#"absolute
-                                right-0
-                                sm:left-0
+                                right-2
+                                md:left-2
                                 z-99
                                 opacity-0
                                 invisible
@@ -207,7 +209,8 @@ pub fn Navbar() -> Element {
 
                                 theme2:bg-green-200
                                 theme2:rounded-sm
-                                theme2:rounded-tl-none
+                                theme2:rounded-tr-none
+                                theme2:sm:rounded-tl-none
 
                                 theme3:bg-stone-50
                                 theme3:border

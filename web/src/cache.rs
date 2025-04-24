@@ -2,7 +2,7 @@ use game::areas::AreaDetails;
 use game::games::Game;
 use game::messages::GameMessage;
 use game::tributes::Tribute;
-use shared::TributeKey;
+use shared::{AuthenticatedUser, TributeKey};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum QueryKey {
@@ -18,6 +18,7 @@ pub(crate) enum QueryKey {
     TributeDayLog(String, u32), // Tribute identifier, day
     _GameSummary(String),
     GameDaySummary(String, u32), // Game identifier, day
+    User,
 }
 
 #[derive(PartialEq, Debug)]
@@ -53,6 +54,7 @@ pub(crate) enum MutationValue {
     GameFinished(String),
     GameStarted(String),
     GameAdvanced(String),
+    User(AuthenticatedUser),
 }
 
 #[derive(PartialEq, Debug)]
@@ -60,4 +62,7 @@ pub(crate) enum MutationError {
     UnableToCreateGame,
     Unknown,
     UnableToAdvanceGame,
+    UnableToCreateUser,
+    UnableToRegisterUser,
+    UnableToAuthenticateUser,
 }

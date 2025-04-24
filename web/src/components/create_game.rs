@@ -1,11 +1,12 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
-use crate::components::Button;
+use crate::components::{Button, Input, ThemedButton};
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use game::games::Game;
 use std::ops::Deref;
 use dioxus::html::link::disabled;
+use crate::storage::{use_persistent, AppState};
 
 async fn create_game(name: Option<String>) -> MutationResult<MutationValue, MutationError> {
     let client = reqwest::Client::new();
@@ -14,11 +15,15 @@ async fn create_game(name: Option<String>) -> MutationResult<MutationValue, Muta
         None => Game::default()
     };
 
-    let response = client.post(format!("{}/api/games", API_HOST))
-        .json(&json_body)
-        .send().await;
+    let mut storage = use_persistent("hangry-games", AppState::default);
 
-    match response {
+    let response = client.request(
+        reqwest::Method::POST,
+        format!("{}/api/games", API_HOST))
+        .bearer_auth(storage.get().jwt.expect("No JWT found"))
+        .json(&json_body);
+
+    match response.send().await {
         Ok(response) => {
             match response.json::<Game>().await {
                 Ok(game) => {
@@ -56,33 +61,8 @@ pub fn CreateGameButton() -> Element {
     };
 
     rsx! {
-        Button {
+        ThemedButton {
             disabled: Some(disabled_signal.read().clone()),
-            extra_classes: Some(r#"
-            theme1:bg-radial
-            theme1:from-amber-300
-            theme1:to-red-500
-            theme1:border-red-500
-            theme1:text-red-900
-            theme1:hover:text-stone-200
-            theme1:hover:from-amber-500
-            theme1:hover:to-red-700
-
-            theme2:text-green-800
-            theme2:bg-linear-to-b
-            theme2:from-green-400
-            theme2:to-teal-500
-            theme2:border-none
-            theme2:hover:text-green-200
-            theme2:hover:from-green-500
-            theme2:hover:to-teal-600
-
-            theme3:border-none
-            theme3:bg-gold-rich
-            theme3:hover:bg-gold-rich-reverse
-            theme3:text-stone-700
-            theme3:hover:text-stone-50
-            "#.into()),
             onclick,
             "Quickstart"
         }
@@ -127,67 +107,18 @@ pub fn CreateGameForm() -> Element {
                 class: "sr-only",
                 "Game name"
             }
-            input {
-                class: r#"
-                block
-                border
-                w-half
-                px-2
-                py-1
-                transition
-
-                theme1:border-amber-600
-                theme1:text-amber-200
-                theme1:placeholder-amber-200/50
-                theme1:bg-stone-800/65
-                theme1:hover:bg-stone-800/75
-                theme1:focus:bg-stone-800/75
-
-                theme2:border-green-400
-                theme2:text-green-200
-                theme2:placeholder-green-200/50
-
-                theme3:bg-stone-50/50
-                theme3:border-yellow-600
-                theme3:placeholder-stone-500
-                theme3:text-stone-800
-                "#,
+            Input {
                 id: "game-name",
                 name: "game-name",
                 r#type: "text",
                 placeholder: "Game name",
                 value: game_name_signal.read().clone(),
-                oninput: move |e| {
+                oninput: move |e: Event<FormData>| {
                     game_name_signal.set(e.value().clone());
                 }
             }
-            Button {
+            ThemedButton {
                 disabled: Some(disabled_signal.read().clone()),
-                extra_classes: Some(r#"
-                theme1:bg-radial
-                theme1:from-amber-300
-                theme1:to-red-500
-                theme1:border-red-500
-                theme1:text-red-900
-                theme1:hover:text-stone-200
-                theme1:hover:from-amber-500
-                theme1:hover:to-red-700
-
-                theme2:text-green-800
-                theme2:bg-linear-to-b
-                theme2:from-green-400
-                theme2:to-teal-500
-                theme2:border-none
-                theme2:hover:text-green-200
-                theme2:hover:from-green-500
-                theme2:hover:to-teal-600
-
-                theme3:border-none
-                theme3:bg-gold-rich
-                theme3:hover:bg-gold-rich-reverse
-                theme3:text-stone-700
-                theme3:hover:text-stone-50
-                "#.into()),
                 r#type: "submit",
                 "Create game"
             }

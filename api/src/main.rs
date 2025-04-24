@@ -2,15 +2,19 @@ mod games;
 mod tributes;
 pub mod logging;
 pub mod messages;
+mod users;
 
 use crate::tributes::TRIBUTES_ROUTER;
 use axum::error_handling::HandleErrorLayer;
 use axum::http::StatusCode;
-use axum::{BoxError, Router};
+use axum::{middleware, BoxError, Router};
 use games::GAMES_ROUTER;
 use std::env;
 use std::sync::LazyLock;
 use std::time::Duration;
+use axum::extract::Request;
+use axum::middleware::{Next};
+use axum::response::{IntoResponse, Response};
 use surrealdb::engine::any::Any;
 use surrealdb::opt::auth::Root;
 use surrealdb::Surreal;
@@ -20,6 +24,7 @@ use tower_http::cors::{Any as CorsAny, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use crate::users::USERS_ROUTER;
 
 pub static DATABASE: LazyLock<Surreal<Any>> = LazyLock::new(Surreal::init);
 
@@ -100,8 +105,9 @@ async fn main() {
         ]);
 
     let api_routes = Router::new()
-        .nest("/games", GAMES_ROUTER.clone())
-        .nest("/tributes", TRIBUTES_ROUTER.clone());
+        .nest("/games", GAMES_ROUTER.clone().layer(middleware::from_fn(surreal_jwt)))
+        .nest("/tributes", TRIBUTES_ROUTER.clone())
+        .nest("/users", USERS_ROUTER.clone());
 
     let router = Router::new()
         .nest("/api", api_routes)
@@ -126,4 +132,24 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     tracing::info!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, router).await.unwrap();
+}
+
+async fn surreal_jwt(request: Request, next: Next) -> Response {
+    let token = request.headers().get("authorization");
+    match token {
+        None => StatusCode::UNAUTHORIZED.into_response(),
+        Some(token) => {
+            let token = token.to_str().expect("Failed to convert token to str");
+            let token = token.strip_prefix("Bearer ").expect("Failed to strip prefix");
+            match DATABASE.authenticate(token).await {
+                Ok(_) => {
+                    let response = next.run(request).await;
+                    response
+                },
+                Err(_) => {
+                    StatusCode::UNAUTHORIZED.into_response()
+                }
+            }
+        }
+    }
 }

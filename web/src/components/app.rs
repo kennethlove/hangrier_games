@@ -6,13 +6,16 @@ use crate::storage::{use_persistent, AppState, Colorscheme};
 use dioxus::prelude::*;
 use dioxus_query::prelude::use_init_query_client;
 use game::games::Game;
-use shared::{DeleteGame, EditGame, EditTribute};
+use shared::{AuthenticatedUser, DeleteGame, EditGame, EditTribute};
 
 #[component]
 pub fn App() -> Element {
     use_init_query_client::<QueryValue, QueryError, QueryKey>();
 
     let storage = use_persistent("hangry-games", AppState::default);
+
+    let user_signal: Signal<Option<AuthenticatedUser>> = Signal::default();
+    use_context_provider(|| user_signal);
 
     let theme_signal: Signal<Colorscheme> = use_signal(|| storage.get().colorscheme);
     use_context_provider(|| theme_signal);
@@ -29,7 +32,7 @@ pub fn App() -> Element {
     let edit_tribute_signal: Signal<Option<EditTribute>> = use_signal(|| None);
     use_context_provider(|| edit_tribute_signal);
 
-    let server_version = "0.1.8";
+    let server_version = "0.1.9";
     let client_version = env!("CARGO_PKG_VERSION");
 
     let favicon = match *theme_signal.read() {
@@ -82,7 +85,6 @@ pub fn App() -> Element {
                 theme2:bg-no-repeat
                 theme2:bg-origin-border
                 theme2:bg-bottom
-                theme2:bg-size-[3200px_1311px]
                 theme2:bg-fixed
 
                 theme3:bg-linear-to-b

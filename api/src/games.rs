@@ -1,8 +1,8 @@
 use crate::tributes::{tribute_create, tribute_delete, tribute_detail, tribute_log, tribute_record_create, tribute_update, TributeOwns};
 use crate::DATABASE;
 use announcers::{summarize, summarize_stream};
-use axum::extract::Path;
-use axum::http::StatusCode;
+use axum::extract::{Path};
+use axum::http::{StatusCode};
 use axum::response::sse::Event;
 use axum::response::{IntoResponse, Sse};
 use axum::routing::{get, put};
@@ -152,7 +152,7 @@ pub async fn game_create(Json(payload): Json<Game>) -> impl IntoResponse {
         }
     }
 
-    (StatusCode::OK, Json::<Game>(game.clone()))
+    (StatusCode::OK, Json::<Game>(game.clone())).into_response()
 }
 
 pub async fn game_delete(game_identifier: Path<String>) -> StatusCode {
@@ -195,7 +195,6 @@ async fn delete_pieces(pieces: HashMap<String, Vec<Thing>>) {
 }
 
 pub async fn game_list() -> impl IntoResponse {
-    // let games = DATABASE.select("game").await;
     let mut games = DATABASE.query(r#"
 SELECT *, (
     SELECT *, ->owns->item[*] AS items
@@ -212,7 +211,9 @@ count(<-playing_in<-tribute.id) == 24
 AND
 count(array::distinct(<-playing_in<-tribute.district)) == 12
 AS ready
-FROM game;"#).await.unwrap();
+FROM game
+WHERE created_by = $auth
+;"#).await.unwrap();
 
     match games.take::<Vec<Game>>(0) {
         Ok(games) => {

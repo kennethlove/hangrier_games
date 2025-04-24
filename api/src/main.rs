@@ -13,6 +13,7 @@ use std::env;
 use std::sync::LazyLock;
 use std::time::Duration;
 use axum::extract::Request;
+use axum::http::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
 use axum::middleware::{Next};
 use axum::response::{IntoResponse, Response};
 use surrealdb::engine::any::Any;
@@ -97,7 +98,6 @@ async fn main() {
     tracing::debug!("Applied migrations");
 
     let mut cors_layer = CorsLayer::new()
-        .allow_headers(CorsAny)
         .allow_methods(vec![
             "GET".parse().unwrap(),
             "POST".parse().unwrap(),
@@ -109,13 +109,17 @@ async fn main() {
 
     match production.as_str() {
         "true" => {
+            tracing::debug!("Production mode");
             cors_layer = cors_layer
-                .allow_origin("https://hangry-games.eyeheartzombies.com".parse::<HeaderValue>().unwrap());
+                .allow_origin("https://hangry-games.eyeheartzombies.com".parse::<HeaderValue>().unwrap())
+                .allow_headers([AUTHORIZATION, ACCEPT, CONTENT_TYPE]);
         }
         _ => {
             cors_layer = cors_layer
-                .allow_origin(AllowOrigin::any());
+                .allow_origin(AllowOrigin::any())
+                .allow_headers(CorsAny);
     }}
+    tracing::debug!("CORS: {:?}", cors_layer);
 
     let api_routes = Router::new()
         .nest("/games", GAMES_ROUTER.clone().layer(middleware::from_fn(surreal_jwt)))

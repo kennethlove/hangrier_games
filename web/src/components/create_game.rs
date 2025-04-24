@@ -55,7 +55,6 @@ pub fn CreateGameButton() -> Element {
             if mutate.result().is_ok() {
                 if let MutationResult::Ok(MutationValue::NewGame(_game)) = mutate.result().deref() {
                     disabled_signal.set(false);
-                    client.invalidate_queries(&[QueryKey::Games]);
                 }
             }
         });
@@ -89,7 +88,6 @@ pub fn CreateGameForm() -> Element {
 
                 match mutate.result().deref() {
                     MutationResult::Ok(MutationValue::NewGame(_game)) => {
-                        client.invalidate_queries(&[QueryKey::Games]);
                         disabled_signal.set(false);
                         game_name_signal.set(String::default());
                     },

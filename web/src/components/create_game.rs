@@ -49,6 +49,7 @@ pub fn CreateGameButton() -> Element {
 
     let onclick = move |_| {
         disabled_signal.set(true);
+        client.invalidate_queries(&[QueryKey::Games]);
         spawn(async move {
             mutate.manual_mutate(None).await;
             if mutate.result().is_ok() {
@@ -80,6 +81,7 @@ pub fn CreateGameForm() -> Element {
         let name = game_name_signal.peek().clone();
         if name.is_empty() { return; }
         disabled_signal.set(true);
+        client.invalidate_queries(&[QueryKey::Games]);
 
         spawn(async move {
             mutate.manual_mutate(Some(name)).await;

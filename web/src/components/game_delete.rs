@@ -8,17 +8,16 @@ use shared::DeleteGame;
 use std::ops::Deref;
 use crate::storage::{use_persistent, AppState};
 
-async fn delete_game(delete_game_info: DeleteGame) -> MutationResult<MutationValue, MutationError> {
-    let identifier = delete_game_info.0;
-    let name = delete_game_info.1;
+async fn delete_game(args: (DeleteGame, String)) -> MutationResult<MutationValue, MutationError> {
+    let identifier = args.0.0;
+    let name = args.0.1;
+    let token = args.1;
     let client = reqwest::Client::new();
     let url: String = format!("{}/api/games/{}", API_HOST, identifier);
 
-    let mut storage = use_persistent("hangry-games", AppState::default);
-
     let response = client
         .delete(url)
-        .bearer_auth(storage.get().jwt.expect("No JWT found"))
+        .bearer_auth(token)
         .send().await;
 
     if response.unwrap().status().is_success() {
@@ -56,6 +55,8 @@ pub fn GameDelete(game_identifier: String, game_name: String, icon_class: String
 
 #[component]
 pub fn DeleteGameModal() -> Element {
+    let mut storage = use_persistent("hangry-games", AppState::default);
+
     let mut delete_game_signal: Signal<Option<DeleteGame>> = use_context();
     let delete_game_info = delete_game_signal.read().clone();
     let mutate = use_mutation(delete_game);
@@ -74,8 +75,9 @@ pub fn DeleteGameModal() -> Element {
 
     let delete = move |_| {
         if let Some(dg) = delete_game_info.clone() {
+            let token = storage.get().jwt.expect("No JWT found");
             spawn(async move {
-                mutate.manual_mutate(dg.clone()).await;
+                mutate.manual_mutate((dg.clone(), token)).await;
                 if let MutationResult::Ok(MutationValue::GameDeleted(_, _)) = mutate.result().deref() {
                     client.invalidate_queries(&[QueryKey::Games]);
                     delete_game_signal.set(None);

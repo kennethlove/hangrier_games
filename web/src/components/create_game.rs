@@ -8,19 +8,19 @@ use std::ops::Deref;
 use dioxus::html::link::disabled;
 use crate::storage::{use_persistent, AppState};
 
-async fn create_game(name: Option<String>) -> MutationResult<MutationValue, MutationError> {
+async fn create_game(args: (Option<String>, String)) -> MutationResult<MutationValue, MutationError> {
+    let name = args.0.clone();
+    let token = args.1.clone();
     let client = reqwest::Client::new();
     let json_body = match name {
         Some(name) => Game::new(&name),
         None => Game::default()
     };
 
-    let mut storage = use_persistent("hangry-games", AppState::default);
-
     let response = client.request(
         reqwest::Method::POST,
         format!("{}/api/games", API_HOST))
-        .bearer_auth(storage.get().jwt.expect("No JWT found"))
+        .bearer_auth(token)
         .json(&json_body);
 
     match response.send().await {
@@ -43,14 +43,16 @@ async fn create_game(name: Option<String>) -> MutationResult<MutationValue, Muta
 
 #[component]
 pub fn CreateGameButton() -> Element {
+    let storage = use_persistent("hangry-games", AppState::default);
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
     let mutate = use_mutation(create_game);
     let mut disabled_signal = use_signal(|| false);
 
     let onclick = move |_| {
         disabled_signal.set(true);
+        let token = storage.get().jwt.expect("No JWT found");
         spawn(async move {
-            mutate.manual_mutate(None).await;
+            mutate.manual_mutate((None, token)).await;
             if mutate.result().is_ok() {
                 if let MutationResult::Ok(MutationValue::NewGame(_game)) = mutate.result().deref() {
                     disabled_signal.set(false);
@@ -71,18 +73,21 @@ pub fn CreateGameButton() -> Element {
 
 #[component]
 pub fn CreateGameForm() -> Element {
+    let storage = use_persistent("hangry-games", AppState::default);
+
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
     let mut game_name_signal: Signal<String> = use_signal(String::default);
     let mutate = use_mutation(create_game);
     let mut disabled_signal = use_signal(|| false);
 
     let onsubmit = move |_| {
+        let token = storage.get().jwt.expect("No JWT found");
         let name = game_name_signal.peek().clone();
         if name.is_empty() { return; }
         disabled_signal.set(true);
 
         spawn(async move {
-            mutate.manual_mutate(Some(name)).await;
+            mutate.manual_mutate((Some(name), token)).await;
             if mutate.result().is_ok() {
 
                 match mutate.result().deref() {

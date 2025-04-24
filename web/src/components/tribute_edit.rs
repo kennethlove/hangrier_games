@@ -9,12 +9,12 @@ use shared::EditTribute;
 use std::ops::Deref;
 use crate::storage::{use_persistent, AppState};
 
-async fn edit_tribute(args: (EditTribute, String)) -> MutationResult<MutationValue, MutationError> {
+async fn edit_tribute(args: (EditTribute, String, String)) -> MutationResult<MutationValue, MutationError> {
     let tribute = args.clone().0;
     let identifier = args.clone().0.0;
     let game_identifier = args.clone().1;
+    let token = args.clone().2;
 
-    let mut storage = use_persistent("hangry-games", AppState::default);
     let client = reqwest::Client::new();
     let url: String = format!(
         "{}/api/games/{}/tributes/{}",
@@ -25,7 +25,7 @@ async fn edit_tribute(args: (EditTribute, String)) -> MutationResult<MutationVal
 
     let response = client
         .put(url)
-        .bearer_auth(storage.get().jwt.expect("No JWT found"))
+        .bearer_auth(token)
         .json(&tribute.clone())
         .send().await;
 
@@ -98,6 +98,8 @@ pub fn EditTributeModal() -> Element {
 
 #[component]
 pub fn EditTributeForm() -> Element {
+    let mut storage = use_persistent("hangry-games", AppState::default);
+
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
     let tribute_details = edit_tribute_signal.read().clone().unwrap_or_default();
     let name = tribute_details.2.clone();
@@ -119,6 +121,7 @@ pub fn EditTributeForm() -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
     let save = move |e: Event<FormData>| {
+        let token = storage.get().jwt.expect("No JWT found");
         let game_identifier = game_identifier.clone();
         let tribute_details = edit_tribute_signal
             .read()
@@ -137,7 +140,7 @@ pub fn EditTributeForm() -> Element {
             let edit_tribute = EditTribute(identifier.clone(), district, name.clone());
             spawn(async move {
                 mutate
-                    .manual_mutate((edit_tribute.clone(), game_identifier.clone()))
+                    .manual_mutate((edit_tribute.clone(), game_identifier.clone(), token))
                     .await;
                 edit_tribute_signal.set(Some(edit_tribute));
 
@@ -152,56 +155,56 @@ pub fn EditTributeForm() -> Element {
     };
 
     rsx! {
-    form {
-        class: r#"
-        mx-auto
-        p-2
-        grid
-        grid-col
-        gap-4
-
-        theme1:bg-stone-200
-        theme1:text-stone-900
-
-        theme2:bg-green-200
-        theme2:text-green-900
-
-        theme3:bg-stone-50
-        theme3:border-gold-rich
-        theme3:border-3
-        "#,
-        onsubmit: save,
-
-        h1 {
+        form {
             class: r#"
-            block
+            mx-auto
             p-2
-            text-lg
-            theme1:bg-red-900
-            theme1:text-stone-200
+            grid
+            grid-col
+            gap-4
 
-            theme2:bg-green-800
-            theme2:text-green-200
+            theme1:bg-stone-200
+            theme1:text-stone-900
 
-            theme3:font-[Orbitron]
+            theme2:bg-green-200
+            theme2:text-green-900
+
+            theme3:bg-stone-50
+            theme3:border-gold-rich
+            theme3:border-3
             "#,
+            onsubmit: save,
 
-            "Edit tribute"
-        }
-        div {
-            label {
-                "Name",
+            h1 {
+                class: r#"
+                block
+                p-2
+                text-lg
+                theme1:bg-red-900
+                theme1:text-stone-200
 
-                input {
-                    class: "border ml-2 px-2 py-1",
-                    r#type: "text",
-                    name: "name",
-                    value: name,
-                }
+                theme2:bg-green-800
+                theme2:text-green-200
+
+                theme3:font-[Orbitron]
+                "#,
+
+                "Edit tribute"
             }
-            label {
-                class: "block mt-2",
-                "District",
+            div {
+                label {
+                    "Name",
+
+                    input {
+                        class: "border ml-2 px-2 py-1",
+                        r#type: "text",
+                        name: "name",
+                        value: name,
+                    }
+                }
+                label {
+                    class: "block mt-2",
+                    "District",
 
                     select {
                         class: "border ml-2 px-2 py-1",
@@ -215,17 +218,17 @@ pub fn EditTributeForm() -> Element {
                         }
                     }
                 }
-            }
-            div {
-                class: "flex justify-end gap-2",
-                Button {
-                    r#type: "submit",
-                    "Update"
-                }
-                Button {
-                    r#type: "dialog",
-                    onclick: dismiss,
-                    "Cancel"
+                div {
+                    class: "flex justify-end gap-2",
+                    Button {
+                        r#type: "submit",
+                        "Update"
+                    }
+                    Button {
+                        r#type: "dialog",
+                        onclick: dismiss,
+                        "Cancel"
+                    }
                 }
             }
         }

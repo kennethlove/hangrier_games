@@ -8,14 +8,13 @@ use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
 use game::games::Game;
 use crate::storage::{use_persistent, AppState};
 
-async fn fetch_games(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
+async fn fetch_games(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::AllGames) = keys.first() {
-        let mut storage = use_persistent("hangry-games", AppState::default);
         let client = reqwest::Client::new();
         let request = client.request(
             reqwest::Method::GET,
             format!("{}/api/games", API_HOST),
-        ).bearer_auth(storage.get().jwt.expect("No JWT found"));
+        ).bearer_auth(token);
 
         match request.send().await{
             Ok(request) => {
@@ -46,7 +45,11 @@ fn NoGames() -> Element {
 
 #[component]
 pub fn GamesList() -> Element {
-    let games_query = use_get_query([QueryKey::AllGames, QueryKey::Games], fetch_games);
+    let mut storage = use_persistent("hangry-games", AppState::default);
+    let token = storage.get().jwt.expect("No JWT found");
+    let games_query = use_get_query(
+        [QueryKey::AllGames, QueryKey::Games],
+        move |keys: Vec<QueryKey>| { fetch_games(keys, token.clone()) });
 
     rsx! {
         div {

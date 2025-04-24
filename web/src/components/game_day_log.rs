@@ -4,20 +4,28 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::games::Game;
 use game::messages::GameMessage;
+use crate::storage::{use_persistent, AppState};
 
-async fn fetch_game_day_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
+async fn fetch_game_day_log(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::GameDayLog(identifier, day)) = keys.first() {
-        let response = reqwest::get(format!("{}/api/games/{}/log/{}", API_HOST, identifier, day))
-            .await
-            .unwrap();
+        let client = reqwest::Client::new();
 
-        match response.json::<Vec<GameMessage>>().await {
-            Ok(logs) => {
-                QueryResult::Ok(QueryValue::Logs(logs))
+        let request = client.request(
+            reqwest::Method::GET,
+            format!("{}/api/games/{}/log/{}", API_HOST, identifier, day))
+            .bearer_auth(token);
+
+        match request.send().await {
+            Ok(response) => {
+                if let Ok(logs) = response.json::<Vec<GameMessage>>().await {
+                    QueryResult::Ok(QueryValue::Logs(logs))
+                } else {
+                    QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
+                }
             }
-            Err(_err) => {
+            Err(e) => {
                 QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
-            },
+            }
         }
     } else {
         QueryResult::Err(QueryError::Unknown)
@@ -26,6 +34,9 @@ async fn fetch_game_day_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, Quer
 
 #[component]
 pub fn GameDayLog(day: u32) -> Element {
+    let mut storage = use_persistent("hangry-games", AppState::default);
+    let token = storage.get().jwt.expect("No JWT found");
+
     let game_signal: Signal<Option<Game>> = use_context();
 
     let game = game_signal.read().clone();
@@ -38,7 +49,7 @@ pub fn GameDayLog(day: u32) -> Element {
             QueryKey::Game(identifier.clone()),
             QueryKey::Games
         ],
-        fetch_game_day_log,
+        move |keys: Vec<QueryKey>| { fetch_game_day_log(keys, token.clone()) },
     );
 
     match log_query.result().value() {

@@ -47,6 +47,7 @@ pub fn DeleteTributeModal() -> Element {
     let tribute_name  = delete_tribute_signal.peek().clone();
     let name = tribute_name.clone().unwrap_or_default().clone();
     let mutate = use_mutation(delete_tribute);
+    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
     let dismiss = move |_| {
         delete_tribute_signal.set(None);
@@ -54,7 +55,6 @@ pub fn DeleteTributeModal() -> Element {
 
     let delete = move |_| {
         if let Some(tribute_name) = tribute_name.clone() {
-            let client = use_query_client::<QueryValue, QueryError, QueryKey>();
             let game_name = game_name.clone();
             spawn(async move {
                 mutate.manual_mutate(tribute_name.clone()).await;

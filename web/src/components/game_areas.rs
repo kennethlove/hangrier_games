@@ -10,15 +10,14 @@ use game::games::Game;
 use crate::components::item_icon::ItemIcon;
 use crate::storage::{use_persistent, AppState};
 
-async fn fetch_areas(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
+async fn fetch_areas(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Areas(identifier)) = keys.first() {
-        let mut storage = use_persistent("hangry-games", AppState::default);
         let client = reqwest::Client::new();
 
         let request = client.request(
             reqwest::Method::GET,
             format!("{}/api/games/{}/areas", API_HOST, identifier))
-            .bearer_auth(storage.get().jwt.expect("No JWT found"));
+            .bearer_auth(token);
 
         match request.send().await {
             Ok(response) => {
@@ -40,6 +39,9 @@ async fn fetch_areas(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError>
 
 #[component]
 pub fn GameAreaList() -> Element {
+    let mut storage = use_persistent("hangry-games", AppState::default);
+    let token = storage.get().jwt.expect("No JWT found");
+
     let game_signal: Signal<Option<Game>> = use_context();
 
     let game = game_signal.read().clone();
@@ -52,7 +54,7 @@ pub fn GameAreaList() -> Element {
             QueryKey::Game(identifier.clone()),
             QueryKey::Games
         ],
-        fetch_areas,
+        move |keys: Vec<QueryKey>| { fetch_areas(keys, token.clone()) },
     );
 
     match area_query.result().value() {

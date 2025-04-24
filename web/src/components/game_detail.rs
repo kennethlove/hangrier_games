@@ -16,17 +16,17 @@ use game::games::GameStatus;
 use game::tributes::Tribute;
 use reqwest::StatusCode;
 use std::ops::Deref;
+use dioxus_logger::tracing;
 use crate::storage::{use_persistent, AppState};
 
-async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
+async fn fetch_game(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(identifier)) = keys.first() {
-        let mut storage = use_persistent("hangry-games", AppState::default);
         let client = reqwest::Client::new();
 
         let request = client.request(
             reqwest::Method::GET,
             format!("{}/api/games/{}", API_HOST, identifier))
-            .bearer_auth(storage.get().jwt.expect("No JWT found"));
+            .bearer_auth(token);
 
         match request.send().await {
             Ok(response) =>  {
@@ -43,23 +43,27 @@ async fn fetch_game(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> 
     }
 }
 
-async fn next_step(identifier: String) -> MutationResult<MutationValue, MutationError> {
+async fn next_step(args: (String, String)) -> MutationResult<MutationValue, MutationError> {
+    let identifier = args.0.clone();
+    let token = args.1.clone();
     let client = reqwest::Client::new();
     let url: String = format!("{}/api/games/{}/next", API_HOST, identifier);
 
-    let response = client
-        .put(url)
-        .send()
-        .await
-        .expect("Failed to advance game");
+    let request = client.request(reqwest::Method::PUT, url)
+        .bearer_auth(token);
 
-    dioxus_logger::tracing::info!("{:?}", &response);
-
-    match response.status() {
-        StatusCode::NO_CONTENT => MutationResult::Ok(MutationValue::GameFinished(identifier)),
-        StatusCode::CREATED => MutationResult::Ok(MutationValue::GameStarted(identifier)),
-        StatusCode::OK => MutationResult::Ok(MutationValue::GameAdvanced(identifier)),
-        _ => MutationResult::Err(MutationError::UnableToAdvanceGame),
+    match request.send().await {
+        Ok(response) => {
+            match response.status() {
+                StatusCode::NO_CONTENT => MutationResult::Ok(MutationValue::GameFinished(identifier)),
+                StatusCode::CREATED => MutationResult::Ok(MutationValue::GameStarted(identifier)),
+                StatusCode::OK => MutationResult::Ok(MutationValue::GameAdvanced(identifier)),
+                _ => MutationResult::Err(MutationError::UnableToAdvanceGame),
+            }
+        }
+        Err(_) => {
+            MutationResult::Err(MutationError::UnableToAdvanceGame)
+        }
     }
 }
 
@@ -67,6 +71,10 @@ async fn next_step(identifier: String) -> MutationResult<MutationValue, Mutation
 fn GameStatusState() -> Element {
     let game_signal: Signal<Option<Game>> = use_context();
     let game = game_signal.read();
+    let mut storage = use_persistent("hangry-games", AppState::default);
+
+    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+    let mutate = use_mutation(next_step);
 
     if let Some(game) = game.clone() {
         let game_next_step: String;
@@ -90,7 +98,6 @@ fn GameStatusState() -> Element {
             }
         };
 
-        let mutate = use_mutation(next_step);
         let game_id = game.identifier.clone();
         let game_name = game.name.clone();
         let game_day = game.day.unwrap_or(0);
@@ -115,10 +122,10 @@ fn GameStatusState() -> Element {
             let game_id = game_id.clone();
             let mut game = game.clone();
 
-            let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+            let token = storage.get().jwt.expect("No JWT found");
 
             spawn(async move {
-                mutate.manual_mutate(game_id.clone()).await;
+                mutate.manual_mutate((game_id.clone(), token)).await;
 
                 match mutate.result().deref() {
                     MutationResult::Ok(mutation_result) => match mutation_result {
@@ -135,7 +142,7 @@ fn GameStatusState() -> Element {
                         _ => {}
                     },
                     MutationResult::Err(MutationError::UnableToAdvanceGame) => {
-                        dioxus_logger::tracing::error!("Failed to advance game");
+                        tracing::error!("Failed to advance game");
                     }
                     _ => {}
                 }
@@ -308,9 +315,12 @@ fn GameStatusState() -> Element {
 
 #[component]
 pub fn GamePage(identifier: String) -> Element {
+    let storage = use_persistent("hangry-games", AppState::default);
+    let token = storage.get().jwt.expect("No JWT found");
+
     let game_query = use_get_query(
         [QueryKey::Game(identifier.clone()), QueryKey::Games],
-        fetch_game,
+        move |keys: Vec<QueryKey>| { fetch_game(keys, token.clone()) },
     );
     let mut game_signal: Signal<Option<Game>> = use_context();
 

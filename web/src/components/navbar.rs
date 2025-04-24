@@ -311,7 +311,7 @@ pub fn Navbar() -> Element {
         main {
             class: r#"
             mx-auto
-            max-w-3/4
+            sm:max-w-3/4
             "#,
             Outlet::<Routes> {}
         }

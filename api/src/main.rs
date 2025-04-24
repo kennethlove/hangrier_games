@@ -109,7 +109,6 @@ async fn main() {
 
     match production.as_str() {
         "true" => {
-            tracing::debug!("Production mode");
             cors_layer = cors_layer
                 .allow_origin("https://hangry-games.eyeheartzombies.com".parse::<HeaderValue>().unwrap())
                 .allow_headers([AUTHORIZATION, ACCEPT, CONTENT_TYPE]);
@@ -119,7 +118,6 @@ async fn main() {
                 .allow_origin(AllowOrigin::any())
                 .allow_headers(CorsAny);
     }}
-    tracing::debug!("CORS: {:?}", cors_layer);
 
     let api_routes = Router::new()
         .nest("/games", GAMES_ROUTER.clone().layer(middleware::from_fn(surreal_jwt)))

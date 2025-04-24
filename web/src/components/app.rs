@@ -32,7 +32,7 @@ pub fn App() -> Element {
     let edit_tribute_signal: Signal<Option<EditTribute>> = use_signal(|| None);
     use_context_provider(|| edit_tribute_signal);
 
-    let server_version = "0.1.8";
+    let server_version = "0.1.9";
     let client_version = env!("CARGO_PKG_VERSION");
 
     let favicon = match *theme_signal.read() {

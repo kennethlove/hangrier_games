@@ -168,37 +168,49 @@ pub fn GameListMember(game: Game) -> Element {
                         "{game.name}"
                     }
                 }
-                div {
-                    class: "flex flex-row gap-2",
-                    GameEdit {
-                        identifier: game.identifier.clone(),
-                        name: game.name.clone(),
-                        icon_class: r#"
-                        size-4
-                        theme1:fill-amber-600
-                        theme1:hover:fill-amber-500
+                if game.is_mine {
+                    div {
+                        class: "flex flex-row gap-2",
+                        GameEdit {
+                            identifier: game.identifier.clone(),
+                            name: game.name.clone(),
+                            icon_class: r#"
+                            size-4
+                            theme1:fill-amber-600
+                            theme1:hover:fill-amber-500
 
-                        theme2:fill-green-200/50
-                        theme2:hover:fill-green-200
+                            theme2:fill-green-200/50
+                            theme2:hover:fill-green-200
 
-                        theme3:fill-yellow-600
-                        theme3:hover:fill-amber-500
-                        "#,
+                            theme3:fill-yellow-600
+                            theme3:hover:fill-amber-500
+                            "#,
+                        }
+                        GameDelete {
+                            game_name: game.name.clone(),
+                            game_identifier: game.identifier.clone(),
+                            icon_class: r#"
+                            size-4
+                            theme1:fill-amber-600
+                            theme1:hover:fill-amber-500
+
+                            theme2:fill-green-200/50
+                            theme2:hover:fill-green-200
+
+                            theme3:fill-yellow-600
+                            theme3:hover:fill-amber-500
+                            "#,
+                        }
                     }
-                    GameDelete {
-                        game_name: game.name.clone(),
-                        game_identifier: game.identifier.clone(),
-                        icon_class: r#"
-                        size-4
-                        theme1:fill-amber-600
-                        theme1:hover:fill-amber-500
-
-                        theme2:fill-green-200/50
-                        theme2:hover:fill-green-200
-
-                        theme3:fill-yellow-600
-                        theme3:hover:fill-amber-500
+                } else {
+                    span {
+                        class: r#"
+                        text-sm
+                        theme1:text-stone-200/75
+                        theme2:text-green-200/50
+                        theme3:text-stone-700
                         "#,
+                        "public"
                     }
                 }
             }

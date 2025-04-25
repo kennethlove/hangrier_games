@@ -23,6 +23,7 @@ async fn fetch_areas(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryVal
             Ok(response) => {
                 match response.json::<Vec<AreaDetails>>().await {
                     Ok(areas) => {
+                        dioxus_logger::tracing::debug!("Areas: {:?}", areas);
                         QueryResult::Ok(QueryValue::Areas(areas))
                     }
                     Err(_) => QueryResult::Err(QueryError::GameNotFound(identifier.to_string())),
@@ -39,7 +40,7 @@ async fn fetch_areas(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryVal
 
 #[component]
 pub fn GameAreaList() -> Element {
-    let mut storage = use_persistent("hangry-games", AppState::default);
+    let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
 
     let game_signal: Signal<Option<Game>> = use_context();

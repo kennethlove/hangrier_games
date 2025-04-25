@@ -31,6 +31,10 @@ pub struct Game {
     pub tributes: Vec<Tribute>,
     #[serde(default)]
     pub ready: bool,
+    #[serde(default)]
+    pub private: bool,
+    #[serde(default)]
+    pub is_mine: bool,
 }
 
 impl Default for Game {
@@ -50,6 +54,8 @@ impl Default for Game {
             tribute_count: 0,
             tributes: vec![],
             ready: false,
+            private: true,
+            is_mine: true,
         }
     }
 }

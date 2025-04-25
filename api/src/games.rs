@@ -35,6 +35,8 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
         .route("/{game_identifier}/log/{day}", get(game_logs))
         .route("/{game_identifier}/log/{day}/{tribute_identifier}", get(tribute_logs))
         .route("/{game_identifier}/next", put(next_step))
+        .route("/{game_identifier}/publish", put(publish_game))
+        .route("/{game_identifier}/unpublish", put(unpublish_game))
         .route("/{game_identifier}/tributes", get(game_tributes).post(tribute_create))
         .route("/{game_identifier}/tributes/{tribute_identifier}", get(tribute_detail).delete(tribute_delete).put(tribute_update))
         .route("/{game_identifier}/tributes/{tribute_identifier}/log", get(tribute_log))
@@ -210,9 +212,9 @@ SELECT *, (
 count(<-playing_in<-tribute.id) == 24
 AND
 count(array::distinct(<-playing_in<-tribute.district)) == 12
-AS ready
+AS ready,
+created_by == $auth AS is_mine
 FROM game
-WHERE created_by = $auth
 ;"#).await.unwrap();
 
     match games.take::<Vec<Game>>(0) {
@@ -250,7 +252,8 @@ SELECT *, (
 ) AS areas, (
     RETURN count(SELECT id FROM <-playing_in<-tribute)
 ) AS tribute_count,
-count(<-playing_in<-tribute.id) == 24 AND count(array::distinct(<-playing_in<-tribute.district)) == 12 AS ready
+count(<-playing_in<-tribute.id) == 24 AND count(array::distinct(<-playing_in<-tribute.district)) == 12 AS ready,
+created_by == $auth AS is_mine
 FROM game
 WHERE identifier = "{identifier}";"#))
     .await.unwrap();
@@ -663,4 +666,32 @@ async fn game_summary(Path(game_identifier): Path<String>) -> impl IntoResponse 
     };
 
     Sse::new(stream)
+}
+
+async fn publish_game(Path(game_identifier): Path<String>) -> impl IntoResponse {
+    let response = DATABASE.query(
+        format!("UPDATE game SET private = false WHERE identifier = '{}'", game_identifier)
+    ).await;
+
+    match response {
+        Ok(_) => StatusCode::OK,
+        Err(e) => {
+            tracing::error!("{}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
+}
+
+async fn unpublish_game(Path(game_identifier): Path<String>) -> impl IntoResponse {
+    let response = DATABASE.query(
+        format!("UPDATE game SET private = true WHERE identifier = '{}'", game_identifier)
+    ).await;
+
+    match response {
+        Ok(_) => StatusCode::OK,
+        Err(e) => {
+            tracing::error!("{}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
 }

@@ -67,6 +67,26 @@ async fn next_step(args: (String, String)) -> MutationResult<MutationValue, Muta
     }
 }
 
+async fn toggle_publicity(args: (String, String, bool)) -> MutationResult<MutationValue, MutationError> {
+    let identifier = args.0.clone();
+    let token = args.1.clone();
+    let private = args.2;
+    let client = reqwest::Client::new();
+    let url: String = format!("{}/api/games/{}/{}", API_HOST, identifier, if private { "publish" } else { "unpublish" });
+
+    let request = client.request(reqwest::Method::PUT, url)
+        .bearer_auth(token);
+
+    match request.send().await {
+        Ok(response) => {
+            MutationResult::Ok(MutationValue::GamePublished(identifier))
+        }
+        Err(_) => {
+            MutationResult::Err(MutationError::UnableToAdvanceGame)
+        }
+    }
+}
+
 #[component]
 fn GameStatusState() -> Element {
     let game_signal: Signal<Option<Game>> = use_context();
@@ -184,8 +204,8 @@ fn GameStatusState() -> Element {
                         span {
                             class: "pl-2",
                             GameEdit {
-                                identifier: g.identifier,
-                                name: g.name,
+                                identifier: g.clone().identifier,
+                                name: g.clone().name,
                                 icon_class: r#"
                                 size-4
 
@@ -201,10 +221,15 @@ fn GameStatusState() -> Element {
                             }
                         }
                     }
-                    ThemedButton {
-                        onclick: next_step_handler,
-                        disabled: game_finished,
-                        "{game_next_step}"
+                    if g.clone().is_mine {
+                        ThemedButton {
+                            onclick: next_step_handler,
+                            disabled: game_finished,
+                            "{game_next_step}"
+                        }
+                        GamePublishButton {
+                            game: g.clone()
+                        }
                     }
                 }
 
@@ -388,6 +413,58 @@ fn GameDetails(game: Game) -> Element {
                     open: false,
                     GameDayLog { game: game.clone(), day: game.day.unwrap_or_default() }
                 }
+            }
+        }
+    }
+}
+
+#[component]
+fn GamePublishButton(game: Game) -> Element {
+    let mutate = use_mutation(toggle_publicity);
+    let storage = use_persistent("hangry-games", AppState::default);
+    let mut loading_signal = use_context::<Signal<LoadingState>>();
+    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+    let g = game.clone();
+
+    let toggle = move |_| {
+        let game = game.clone();
+        loading_signal.set(LoadingState::Loading);
+
+        let token = storage.get().jwt.expect("No JWT found");
+
+        spawn(async move {
+            mutate.manual_mutate((game.clone().identifier, token, game.clone().private)).await;
+
+            match mutate.result().deref() {
+                MutationResult::Ok(mutation_result) => match mutation_result {
+                    MutationValue::GamePublished(game_identifier) => {
+                        client.invalidate_queries(&[QueryKey::Game(game_identifier.into())]);
+                        loading_signal.set(LoadingState::Loaded);
+                    }
+                    MutationValue::GameUnpublished(game_identifier) => {
+                        client.invalidate_queries(&[QueryKey::Game(game_identifier.into())]);
+                        loading_signal.set(LoadingState::Loaded);
+                    }
+                    _ => {}
+                },
+                MutationResult::Err(MutationError::UnableToPublishGame) => {
+                    tracing::error!("Failed to publish game");
+                },
+                MutationResult::Err(MutationError::UnableToUnpublishGame) => {
+                    tracing::error!("Failed to unpublish game");
+                }
+                _ => {}
+            }
+        });
+    };
+
+    rsx! {
+        Button {
+            onclick: toggle,
+            if g.clone().private {
+                "Private"
+            } else {
+                "Public"
             }
         }
     }

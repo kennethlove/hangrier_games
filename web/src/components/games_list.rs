@@ -6,7 +6,6 @@ use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
 use game::games::Game;
-use crate::components::game_detail::GamePublishButton;
 use crate::components::icons::eye_closed::EyeClosedIcon;
 use crate::components::icons::eye_open::EyeOpenIcon;
 use crate::storage::{use_persistent, AppState};

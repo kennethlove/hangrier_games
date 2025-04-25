@@ -66,26 +66,6 @@ async fn next_step(args: (String, String)) -> MutationResult<MutationValue, Muta
     }
 }
 
-async fn toggle_publicity(args: (String, String, bool)) -> MutationResult<MutationValue, MutationError> {
-    let identifier = args.0.clone();
-    let token = args.1.clone();
-    let private = args.2;
-    let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}/{}", &*API_HOST, identifier, if private { "publish" } else { "unpublish" });
-
-    let request = client.request(reqwest::Method::PUT, url)
-        .bearer_auth(token);
-
-    match request.send().await {
-        Ok(_) => {
-            MutationResult::Ok(MutationValue::GamePublished(identifier))
-        }
-        Err(_) => {
-            MutationResult::Err(MutationError::UnableToAdvanceGame)
-        }
-    }
-}
-
 #[component]
 fn GameStatusState(game: Game) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);

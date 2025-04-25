@@ -269,7 +269,11 @@ WHERE identifier = "{identifier}";"#))
 
 pub async fn game_update(Path(_): Path<String>, Json(payload): Json<EditGame>) -> (StatusCode, Json<Option<Game>>) {
     let response = DATABASE.query(
-        format!("UPDATE game SET name = '{}' WHERE identifier = '{}'", payload.1, payload.0)
+        format!(r#"
+        UPDATE game
+        SET name = '{}', private = {}
+        WHERE identifier = '{}'
+        "#, payload.1, payload.2, payload.0)
     ).await;
 
     match response {

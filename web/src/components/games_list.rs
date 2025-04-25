@@ -6,6 +6,9 @@ use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
 use game::games::Game;
+use crate::components::game_detail::GamePublishButton;
+use crate::components::icons::eye_closed::EyeClosedIcon;
+use crate::components::icons::eye_open::EyeOpenIcon;
 use crate::storage::{use_persistent, AppState};
 
 async fn fetch_games(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
@@ -174,6 +177,7 @@ pub fn GameListMember(game: Game) -> Element {
                         GameEdit {
                             identifier: game.identifier.clone(),
                             name: game.name.clone(),
+                            private: game.private.clone(),
                             icon_class: r#"
                             size-4
                             theme1:fill-amber-600
@@ -202,16 +206,6 @@ pub fn GameListMember(game: Game) -> Element {
                             "#,
                         }
                     }
-                } else {
-                    span {
-                        class: r#"
-                        text-sm
-                        theme1:text-stone-200/75
-                        theme2:text-green-200/50
-                        theme3:text-stone-700
-                        "#,
-                        "public"
-                    }
                 }
             }
             div {
@@ -226,7 +220,29 @@ pub fn GameListMember(game: Game) -> Element {
                 "#,
                 p { class: "flex-grow", "{living_count} / {game.tribute_count} tributes" }
                 p { class: "flex-grow", "Day {game.day.unwrap_or_default()}" }
-                p { "Status: {game.status}" }
+                p {
+                    class: "flex-grow",
+                    match game.status {
+                        game::games::GameStatus::InProgress => "In progress",
+                        game::games::GameStatus::Finished => "Finished",
+                        game::games::GameStatus::NotStarted => "Not started",
+                    }
+                }
+                if game.private {
+                    EyeClosedIcon { class: r#"
+                        size-4
+                        theme1:fill-amber-600
+                        theme2:fill-green-200/50
+                        theme3:fill-yellow-600
+                    "# }
+                } else {
+                    EyeOpenIcon { class: r#"
+                        size-4
+                        theme1:fill-amber-600
+                        theme2:fill-green-200/50
+                        theme3:fill-yellow-600
+                    "# }
+                }
             }
         }
     }

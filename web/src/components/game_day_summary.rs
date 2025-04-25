@@ -28,11 +28,7 @@ async fn fetch_game_day_summary(keys: Vec<QueryKey>) -> QueryResult<QueryValue, 
 }
 
 #[component]
-pub fn GameDaySummary(day: u32) -> Element {
-    let game_signal: Signal<Option<Game>> = use_context();
-
-    let game = game_signal.read().clone();
-    let game = game.unwrap();
+pub fn GameDaySummary(game: Game, day: u32) -> Element {
     let identifier = game.identifier.clone();
 
     let summary_query = use_get_query(

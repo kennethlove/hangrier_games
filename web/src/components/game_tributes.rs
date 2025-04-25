@@ -76,7 +76,6 @@ async fn fetch_tribute_log(keys: Vec<QueryKey>, token: String) -> QueryResult<Qu
 pub fn GameTributes(game: Game) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
-    let game_signal: Signal<Option<Game>> = use_context();
 
     let identifier = game.identifier.clone();
 
@@ -147,7 +146,7 @@ pub fn GameTributes(game: Game) -> Element {
 
 #[component]
 pub fn GameTributeListMember(tribute: Tribute) -> Element {
-    let mut storage = use_persistent("hangry-games", AppState::default);
+    let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
     let game_signal: Signal<Option<Game>> = use_context();
 

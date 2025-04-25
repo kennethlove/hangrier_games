@@ -29,13 +29,14 @@ async fn edit_game(args: (EditGame, String)) -> MutationResult<MutationValue, Mu
 }
 
 #[component]
-pub fn GameEdit(identifier: String, name: String, icon_class: String) -> Element {
+pub fn GameEdit(identifier: String, name: String, icon_class: String, private: bool) -> Element {
     let mut edit_game_signal: Signal<Option<EditGame>> = use_context();
     let title = format!("Edit {name}");
 
     let onclick = move |_| {
         let name = name.clone();
-        edit_game_signal.set(Some(EditGame(identifier.clone(), name.clone())));
+        let private = private.clone();
+        edit_game_signal.set(Some(EditGame(identifier.clone(), name.clone(), private.clone())));
     };
 
     rsx! {
@@ -74,12 +75,13 @@ pub fn EditGameModal() -> Element {
 
 #[component]
 pub fn EditGameForm() -> Element {
-    let mut storage = use_persistent("hangry-games", AppState::default);
+    let storage = use_persistent("hangry-games", AppState::default);
 
     let mut edit_game_signal: Signal<Option<EditGame>> = use_context();
     let game_details = edit_game_signal.read().clone().unwrap_or_default();
     let name = game_details.1.clone();
     let identifier = game_details.0.clone();
+    let private = game_details.2.clone();
 
     let mutate = use_mutation(edit_game);
 
@@ -95,9 +97,15 @@ pub fn EditGameForm() -> Element {
 
         let data = e.data().values();
         let name = data.get("name").expect("No name value").0[0].clone();
+        let private = {
+            match data.get("private").expect("No private value").0[0].clone().as_str() {
+                "on" => true,
+                _ => false,
+            }
+        };
 
         if !name.is_empty() {
-            let edit_game = EditGame(identifier.clone(), name.clone());
+            let edit_game = EditGame(identifier.clone(), name.clone(), private.clone());
             spawn(async move {
                 mutate.manual_mutate((edit_game.clone(), token)).await;
                 edit_game_signal.set(Some(edit_game.clone()));
@@ -153,6 +161,34 @@ pub fn EditGameForm() -> Element {
                     r#type: "text",
                     name: "name",
                     value: name,
+                }
+            }
+            fieldset {
+                class: "grid grid-cols-2 gap-4",
+                legend {
+                    "Allow spectators?"
+                }
+                label {
+                    "No"
+
+                    input {
+                        class: "border ml-2 px-2 py-1",
+                        r#type: "radio",
+                        name: "private",
+                        checked: private,
+                        value: "on",
+                    }
+                }
+                label {
+                    "Yes",
+
+                    input {
+                        class: "border ml-2 px-2 py-1",
+                        r#type: "radio",
+                        name: "private",
+                        checked: !private,
+                        value: "off",
+                    }
                 }
             }
             div {

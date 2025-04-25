@@ -13,7 +13,7 @@ use std::env;
 use std::sync::LazyLock;
 use std::time::Duration;
 use axum::extract::Request;
-use axum::http::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
+use axum::http::header::{ACCEPT, ACCESS_CONTROL_ALLOW_ORIGIN, AUTHORIZATION, CONTENT_TYPE};
 use axum::middleware::{Next};
 use axum::response::{IntoResponse, Response};
 use surrealdb::engine::any::Any;
@@ -111,7 +111,7 @@ async fn main() {
         "true" => {
             cors_layer = cors_layer
                 .allow_origin("https://hangry-games.eyeheartzombies.com".parse::<HeaderValue>().unwrap())
-                .allow_headers([AUTHORIZATION, ACCEPT, CONTENT_TYPE]);
+                .allow_headers([ACCEPT, ACCESS_CONTROL_ALLOW_ORIGIN, AUTHORIZATION, CONTENT_TYPE]);
         }
         _ => {
             cors_layer = cors_layer

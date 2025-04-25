@@ -67,6 +67,66 @@ async fn next_step(args: (String, String)) -> MutationResult<MutationValue, Muta
 }
 
 #[component]
+pub fn GamePage(identifier: String) -> Element {
+    let storage = use_persistent("hangry-games", AppState::default);
+    let token = storage.get().jwt.expect("No JWT found");
+
+    let game_query = use_get_query(
+        [QueryKey::Game(identifier.clone())],
+        move |keys: Vec<QueryKey>| { fetch_game(keys, token.clone()) },
+    );
+
+    match game_query.result().value() {
+        QueryResult::Ok(QueryValue::Game(game)) => {
+            let mut game_signal: Signal<Option<Game>> = use_context();
+            use_effect({
+                let game = game.clone();
+                move || {
+                    game_signal.set(Some(*game.clone()));
+                }
+            });
+
+            rsx! {
+                div {
+                    class: "mb-4",
+                    GameStatusState { game: *game.clone() }
+                }
+
+                GameDetails { game: *game.clone() }
+            }
+        }
+        QueryResult::Err(e) => {
+            rsx! {
+                p {
+                    class: r#"
+                    text-center
+
+                    theme1:text-stone-200
+                    theme2:text-green-200
+                    theme3:text-slate-700
+                    "#,
+                    "Failed to load"
+                }
+            }
+        }
+        _ => {
+            rsx! {
+                p {
+                    class: r#"
+                    text-center
+
+                    theme1:text-stone-200
+                    theme2:text-green-200
+                    theme3:text-slate-700
+                    "#,
+                    "Loading..."
+                }
+            }
+        }
+    }
+}
+
+#[component]
 fn GameStatusState(game: Game) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
 
@@ -76,6 +136,9 @@ fn GameStatusState(game: Game) -> Element {
     let mutate = use_mutation(next_step);
 
     let game_next_step: String;
+
+    let game_signal = use_context::<Signal<Option<Game>>>();
+    let game = game_signal.read().clone().unwrap_or(game);
 
     let game_status = match game.status {
         GameStatus::NotStarted => {
@@ -287,66 +350,6 @@ fn GameStatusState(game: Game) -> Element {
                         "tributes alive"
                     }
                     "{tribute_count}"
-                }
-            }
-        }
-    }
-}
-
-#[component]
-pub fn GamePage(identifier: String) -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.expect("No JWT found");
-
-    let game_query = use_get_query(
-        [QueryKey::Game(identifier.clone())],
-        move |keys: Vec<QueryKey>| { fetch_game(keys, token.clone()) },
-    );
-
-    match game_query.result().value() {
-        QueryResult::Ok(QueryValue::Game(game)) => {
-            let mut game_signal: Signal<Option<Game>> = use_context();
-            use_effect({
-                let game = game.clone();
-                move || {
-                    game_signal.set(Some(*game.clone()));
-                }
-            });
-
-            rsx! {
-                div {
-                    class: "mb-4",
-                    GameStatusState { game: *game.clone() }
-                }
-
-                GameDetails { game: *game.clone() }
-            }
-        }
-        QueryResult::Err(e) => {
-            rsx! {
-                p {
-                    class: r#"
-                    text-center
-
-                    theme1:text-stone-200
-                    theme2:text-green-200
-                    theme3:text-slate-700
-                    "#,
-                    "Failed to load"
-                }
-            }
-        }
-        _ => {
-            rsx! {
-                p {
-                    class: r#"
-                    text-center
-
-                    theme1:text-stone-200
-                    theme2:text-green-200
-                    theme3:text-slate-700
-                    "#,
-                    "Loading..."
                 }
             }
         }

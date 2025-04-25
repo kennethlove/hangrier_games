@@ -33,14 +33,10 @@ async fn fetch_game_day_log(keys: Vec<QueryKey>, token: String) -> QueryResult<Q
 }
 
 #[component]
-pub fn GameDayLog(day: u32) -> Element {
-    let mut storage = use_persistent("hangry-games", AppState::default);
+pub fn GameDayLog(game: Game, day: u32) -> Element {
+    let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
 
-    let game_signal: Signal<Option<Game>> = use_context();
-
-    let game = game_signal.read().clone();
-    let game = game.unwrap();
     let identifier = game.identifier.clone();
 
     let log_query = use_get_query(

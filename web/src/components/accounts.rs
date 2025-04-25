@@ -1,11 +1,10 @@
 use std::ops::Deref;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
-use game::games::Game;
 use shared::{AuthenticatedUser, RegistrationUser};
 use crate::API_HOST;
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
-use crate::components::{Button, Input, ThemedButton};
+use crate::components::{Input, ThemedButton};
 use crate::routes::Routes;
 use crate::storage::{use_persistent, AppState};
 
@@ -79,7 +78,7 @@ pub fn Accounts() -> Element {
 
 #[component]
 pub fn AccountsPage() -> Element {
-    let mut storage = use_persistent("hangry-games", AppState::default);
+    let storage = use_persistent("hangry-games", AppState::default);
 
     rsx! {
         if storage.get().jwt.is_some() {

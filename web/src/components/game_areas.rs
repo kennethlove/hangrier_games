@@ -38,14 +38,10 @@ async fn fetch_areas(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryVal
 }
 
 #[component]
-pub fn GameAreaList() -> Element {
+pub fn GameAreaList(game: Game) -> Element {
     let mut storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
 
-    let game_signal: Signal<Option<Game>> = use_context();
-
-    let game = game_signal.read().clone();
-    let game = game.unwrap();
     let identifier = game.identifier.clone();
 
     let area_query = use_get_query(
@@ -200,7 +196,6 @@ pub fn GameAreaList() -> Element {
             }
         }
         QueryResult::Err(e) => {
-            dioxus_logger::tracing::error!("{:?}", e);
             rsx! { p { "Something went wrong" } }
         }
         QueryResult::Loading(_) => {

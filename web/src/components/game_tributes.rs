@@ -73,13 +73,11 @@ async fn fetch_tribute_log(keys: Vec<QueryKey>, token: String) -> QueryResult<Qu
 }
 
 #[component]
-pub fn GameTributes() -> Element {
-    let mut storage = use_persistent("hangry-games", AppState::default);
+pub fn GameTributes(game: Game) -> Element {
+    let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
     let game_signal: Signal<Option<Game>> = use_context();
 
-    let game = game_signal.read().clone();
-    let game = game.unwrap();
     let identifier = game.identifier.clone();
 
     let tribute_query = use_get_query(
@@ -138,7 +136,6 @@ pub fn GameTributes() -> Element {
             }
         }
         QueryResult::Err(e) => {
-            dioxus_logger::tracing::error!("{:?}", e);
             rsx! { p { "Something went wrong" } }
         }
         QueryResult::Loading(_) => {

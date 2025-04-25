@@ -329,7 +329,6 @@ pub fn GamePage(identifier: String) -> Element {
         [QueryKey::Game(identifier.clone()), QueryKey::Games],
         move |keys: Vec<QueryKey>| { fetch_game(keys, token.clone()) },
     );
-    let mut game_signal: Signal<Option<Game>> = use_context();
 
     rsx! {
         div {
@@ -339,7 +338,14 @@ pub fn GamePage(identifier: String) -> Element {
 
         match game_query.result().value() {
             QueryResult::Ok(QueryValue::Game(game)) => {
-                game_signal.set(Some(*game.clone()));
+                let mut game_signal: Signal<Option<Game>> = use_context();
+                use_effect({
+                    let game = game.clone();
+                    move || {
+                        game_signal.set(Some(*game.clone()));
+                    }
+                });
+
                 rsx! {
                     GameDetails { game: *game.clone() }
                 }
@@ -392,20 +398,20 @@ fn GameDetails(game: Game) -> Element {
             InfoDetail {
                 title: "Areas",
                 open: false,
-                GameAreaList { }
+                GameAreaList { game: game.clone() }
             }
 
             InfoDetail {
                 title: "Tributes",
                 open: false,
-                GameTributes { }
+                GameTributes { game: game.clone() }
             }
 
             if game.day.unwrap_or(0) > 0 {
                 InfoDetail {
                     title: "Day log",
                     open: false,
-                    GameDayLog { day: game.day.unwrap_or_default() }
+                    GameDayLog { game: game.clone(), day: game.day.unwrap_or_default() }
                 }
             }
         }

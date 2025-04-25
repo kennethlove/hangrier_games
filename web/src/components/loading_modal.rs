@@ -76,7 +76,8 @@ pub fn LoadingModal() -> Element {
                                 MockingjayArrow {
                                     class: r#"
                                     size-16
-                                    animate-spin
+                                    motion-safe:animate-spin
+                                    motion-reduce:animate-pulse
                                     theme1:fill-red-900
                                     theme2:fill-green-800
                                     theme3:fill-amber-600

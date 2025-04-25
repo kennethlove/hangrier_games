@@ -107,8 +107,6 @@ pub fn AccountsPage() -> Element {
 fn LoginForm() -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
-    let mut user_signal: Signal<Option<AuthenticatedUser>> = use_context();
-
     let mut email_signal = use_signal(String::default);
     let mut password_signal = use_signal(String::default);
     let mut disabled_signal = use_signal(|| false);
@@ -177,8 +175,6 @@ fn LoginForm() -> Element {
                                             let mut state = storage.get();
                                             state.jwt = Some(user.jwt.clone());
                                             storage.set(state);
-
-                                            user_signal.set(Some(user.clone()));
 
                                             let navigator = use_navigator();
                                             navigator.replace(Routes::GamesList {});
@@ -250,8 +246,6 @@ fn LoginForm() -> Element {
 #[component]
 fn RegisterForm() -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
-
-    let mut user_signal: Signal<Option<AuthenticatedUser>> = use_context();
 
     let mut email_signal = use_signal(String::default);
     let mut password_signal = use_signal(String::default);
@@ -327,8 +321,6 @@ fn RegisterForm() -> Element {
                                             let mut state = storage.get();
                                             state.jwt = Some(user.jwt.clone());
                                             storage.set(state);
-
-                                            user_signal.set(Some(user.clone()));
 
                                             let navigator = use_navigator();
                                             navigator.replace(Routes::GamesList {});
@@ -409,8 +401,6 @@ fn RegisterForm() -> Element {
 fn LogoutButton() -> Element {
     let mut storage = use_persistent("hangry-games", AppState::default);
 
-    let mut user_signal: Signal<Option<AuthenticatedUser>> = use_context();
-
     rsx! {
         form {
             class: "flex flex-col gap-4 mt-4",
@@ -418,7 +408,6 @@ fn LogoutButton() -> Element {
                 let mut state = storage.get();
                 state.jwt = None;
                 storage.set(state);
-                user_signal.set(None);
                 let navigator = use_navigator();
                 navigator.replace(Routes::Home {});
             },

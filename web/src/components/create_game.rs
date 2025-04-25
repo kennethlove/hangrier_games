@@ -1,6 +1,6 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use crate::components::{Button, Input, ThemedButton};
-use crate::API_HOST;
+use crate::{LoadingState, API_HOST};
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use game::games::Game;
@@ -46,16 +46,16 @@ pub fn CreateGameButton() -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
     let mutate = use_mutation(create_game);
-    let mut disabled_signal = use_signal(|| false);
+    let mut loading_signal = use_context::<Signal<LoadingState>>();
 
     let onclick = move |_| {
-        disabled_signal.set(true);
+        loading_signal.set(LoadingState::Loading);
         let token = storage.get().jwt.expect("No JWT found");
         spawn(async move {
             mutate.manual_mutate((None, token)).await;
             if mutate.result().is_ok() {
                 if let MutationResult::Ok(MutationValue::NewGame(_game)) = mutate.result().deref() {
-                    disabled_signal.set(false);
+                    loading_signal.set(LoadingState::Loaded);
                     client.invalidate_queries(&[QueryKey::Games]);
                 }
             }
@@ -64,7 +64,6 @@ pub fn CreateGameButton() -> Element {
 
     rsx! {
         ThemedButton {
-            disabled: Some(disabled_signal.read().clone()),
             onclick,
             "Quickstart"
         }
@@ -78,13 +77,13 @@ pub fn CreateGameForm() -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
     let mut game_name_signal: Signal<String> = use_signal(String::default);
     let mutate = use_mutation(create_game);
-    let mut disabled_signal = use_signal(|| false);
+    let mut loading_signal = use_context::<Signal<LoadingState>>();
 
     let onsubmit = move |_| {
         let token = storage.get().jwt.expect("No JWT found");
         let name = game_name_signal.peek().clone();
         if name.is_empty() { return; }
-        disabled_signal.set(true);
+        loading_signal.set(LoadingState::Loading);
 
         spawn(async move {
             mutate.manual_mutate((Some(name), token)).await;
@@ -93,7 +92,7 @@ pub fn CreateGameForm() -> Element {
                 match mutate.result().deref() {
                     MutationResult::Ok(MutationValue::NewGame(_game)) => {
                         client.invalidate_queries(&[QueryKey::Games]);
-                        disabled_signal.set(false);
+                        loading_signal.set(LoadingState::Loaded);
                         game_name_signal.set(String::default());
                     },
                     MutationResult::Err(MutationError::UnableToCreateGame) => {},
@@ -123,7 +122,6 @@ pub fn CreateGameForm() -> Element {
                 }
             }
             ThemedButton {
-                disabled: Some(disabled_signal.read().clone()),
                 r#type: "submit",
                 "Create game"
             }

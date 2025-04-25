@@ -6,7 +6,7 @@ use crate::components::game_edit::GameEdit;
 use crate::components::game_tributes::GameTributes;
 use crate::components::info_detail::InfoDetail;
 use crate::components::Button;
-use crate::API_HOST;
+use crate::{LoadingState, API_HOST};
 use dioxus::prelude::*;
 use dioxus_query::prelude::{
     use_get_query, use_mutation, use_query_client, MutationResult, QueryResult,
@@ -73,6 +73,8 @@ fn GameStatusState() -> Element {
     let game = game_signal.read();
     let mut storage = use_persistent("hangry-games", AppState::default);
 
+    let mut loading_signal = use_context::<Signal<LoadingState>>();
+
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
     let mutate = use_mutation(next_step);
 
@@ -122,6 +124,8 @@ fn GameStatusState() -> Element {
             let game_id = game_id.clone();
             let mut game = game.clone();
 
+            loading_signal.set(LoadingState::Loading);
+
             let token = storage.get().jwt.expect("No JWT found");
 
             spawn(async move {
@@ -131,13 +135,16 @@ fn GameStatusState() -> Element {
                     MutationResult::Ok(mutation_result) => match mutation_result {
                         MutationValue::GameAdvanced(game_identifier) => {
                             client.invalidate_queries(&[QueryKey::Game(game_identifier.into())]);
+                            loading_signal.set(LoadingState::Loaded);
                         }
                         MutationValue::GameFinished(_) => {
                             game.end();
+                            loading_signal.set(LoadingState::Loaded);
                         }
                         MutationValue::GameStarted(game_identifier) => {
                             game.start();
                             client.invalidate_queries(&[QueryKey::Game(game_identifier.into())]);
+                            loading_signal.set(LoadingState::Loaded);
                         }
                         _ => {}
                     },

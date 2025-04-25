@@ -61,3 +61,28 @@
     animation: rotate-border-angle 4s linear infinite;
 }
 
+@keyframes spinner {
+    0% {
+        stroke-dasharray: 1, 200;
+        stroke-dashoffset: 0;
+        transform: rotate(0deg);
+    }
+    50% {
+        stroke-dasharray: 89, 200;
+        stroke-dashoffset: -35px;
+        transform: rotate(180deg);
+    }
+    100% {
+        stroke-dasharray: 89, 200;
+        stroke-dashoffset: -124px;
+        transform: rotate(360deg);
+    }
+}
+.spinner {
+    stroke: currentColor;
+    stroke-width: 5;
+    fill: none;
+    stroke-linecap: round;
+    animation: spinner 1.5s linear infinite;
+    transform-origin: center;
+}

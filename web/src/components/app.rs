@@ -7,6 +7,8 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::use_init_query_client;
 use game::games::Game;
 use shared::{AuthenticatedUser, DeleteGame, EditGame, EditTribute};
+use crate::components::loading_modal::LoadingModal;
+use crate::LoadingState;
 
 #[component]
 pub fn App() -> Element {
@@ -14,8 +16,8 @@ pub fn App() -> Element {
 
     let storage = use_persistent("hangry-games", AppState::default);
 
-    let user_signal: Signal<Option<AuthenticatedUser>> = Signal::default();
-    use_context_provider(|| user_signal);
+    let loading_signal: Signal<LoadingState> = use_signal(|| LoadingState::default());
+    use_context_provider(|| loading_signal);
 
     let theme_signal: Signal<Colorscheme> = use_signal(|| storage.get().colorscheme);
     use_context_provider(|| theme_signal);
@@ -133,6 +135,7 @@ pub fn App() -> Element {
 
             EditGameModal {}
             EditTributeModal {}
+            LoadingModal {}
         }
     }
 }

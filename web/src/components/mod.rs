@@ -1,56 +1,40 @@
+mod accounts;
+pub use accounts::{Accounts, AccountsPage};
 mod app;
-
-pub(crate) use app::App;
-
+pub use app::App;
+mod button;
+pub use button::{Button, ThemedButton};
 mod create_game;
-pub(crate) use create_game::CreateGameButton;
-pub(crate) use create_game::CreateGameForm;
-
-mod games;
-pub(crate) use games::Games;
-
-mod game_detail;
-pub(crate) use game_detail::GamePage;
-
-mod games_list;
-pub(crate) use games_list::GamesList;
-
-mod game_delete;
-pub(crate) use game_delete::DeleteGameModal;
-pub(crate) use game_delete::GameDelete;
-
+pub use create_game::{CreateGameButton, CreateGameForm};
+mod credits;
+pub use credits::Credits;
 mod game_areas;
+mod game_day_log;
+mod game_day_summary;
+mod game_delete;
+pub use game_delete::{DeleteGameModal, GameDelete};
+mod game_detail;
+pub use game_detail::GamePage;
 mod game_edit;
 mod game_tributes;
-mod navbar;
-mod tribute_detail;
-mod tribute_edit;
-pub(crate) use navbar::Navbar;
-mod game_day_log;
+mod games;
+pub use games::Games;
+mod games_list;
+pub use games_list::GamesList;
 mod home;
-
-pub(crate) use home::Home;
-
-pub(crate) use tribute_detail::TributeDetail;
-
-mod game_day_summary;
-
-mod button;
-mod map;
-mod credits;
+pub use home::Home;
 pub mod icons;
 mod icons_page;
-mod tribute_status_icon;
-mod item_icon;
+pub use icons_page::IconsPage;
 mod info_detail;
-mod accounts;
 mod input;
-
-pub(crate) use icons_page::IconsPage;
-
-pub(crate) use credits::Credits;
-
-pub(crate) use button::{Button, ThemedButton};
-
-pub(crate) use accounts::{Accounts, AccountsPage};
-pub(crate) use input::Input;
+pub use input::Input;
+mod item_icon;
+mod map;
+mod navbar;
+pub use navbar::Navbar;
+mod tribute_detail;
+pub use tribute_detail::TributeDetail;
+mod tribute_edit;
+mod tribute_status_icon;
+mod loading_modal;

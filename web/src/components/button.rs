@@ -46,7 +46,7 @@ pub fn ThemedButton(props: ButtonProps) -> Element {
     let extra_classes = props.class.unwrap_or_default();
     let is_disabled = props.disabled.unwrap_or(false); // Calculate disabled state
 
-    let classes = r#"
+    let classes = format!(r#"
     theme1:bg-radial
     theme1:from-amber-300
     theme1:to-red-500
@@ -74,7 +74,7 @@ pub fn ThemedButton(props: ButtonProps) -> Element {
     theme3:hover:text-stone-50
 
     {extra_classes}
-    "#;
+    "#);
 
     rsx! {
         Button {

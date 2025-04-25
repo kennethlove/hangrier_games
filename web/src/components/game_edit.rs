@@ -13,7 +13,7 @@ async fn edit_game(args: (EditGame, String)) -> MutationResult<MutationValue, Mu
     let token = args.1.clone();
 
     let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}", API_HOST, identifier);
+    let url: String = format!("{}/api/games/{}", &*API_HOST, identifier);
 
     let response = client
         .put(url)

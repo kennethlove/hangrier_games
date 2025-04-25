@@ -24,7 +24,7 @@ async fn fetch_game(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValu
 
         let request = client.request(
             reqwest::Method::GET,
-            format!("{}/api/games/{}", API_HOST, identifier))
+            format!("{}/api/games/{}", &*API_HOST, identifier))
             .bearer_auth(token);
 
         match request.send().await {
@@ -46,7 +46,7 @@ async fn next_step(args: (String, String)) -> MutationResult<MutationValue, Muta
     let identifier = args.0.clone();
     let token = args.1.clone();
     let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}/next", API_HOST, identifier);
+    let url: String = format!("{}/api/games/{}/next", &*API_HOST, identifier);
 
     let request = client.request(reqwest::Method::PUT, url)
         .bearer_auth(token);
@@ -71,7 +71,7 @@ async fn toggle_publicity(args: (String, String, bool)) -> MutationResult<Mutati
     let token = args.1.clone();
     let private = args.2;
     let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}/{}", API_HOST, identifier, if private { "publish" } else { "unpublish" });
+    let url: String = format!("{}/api/games/{}/{}", &*API_HOST, identifier, if private { "publish" } else { "unpublish" });
 
     let request = client.request(reqwest::Method::PUT, url)
         .bearer_auth(token);

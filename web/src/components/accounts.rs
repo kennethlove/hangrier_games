@@ -15,7 +15,7 @@ async fn register_user(user: RegistrationUser) -> MutationResult<MutationValue, 
         "pass": user.password,
     });
 
-    let response = client.post(format!("{}/api/users", API_HOST))
+    let response = client.post(format!("{}/api/users", &*API_HOST))
         .json(&json_body)
         .send().await;
 
@@ -44,7 +44,7 @@ async fn authenticate_user(user: RegistrationUser) -> MutationResult<MutationVal
         "pass": user.password,
     });
 
-    let response = client.post(format!("{}/api/users/authenticate", API_HOST))
+    let response = client.post(format!("{}/api/users/authenticate", &*API_HOST))
         .json(&json_body)
         .send().await;
 

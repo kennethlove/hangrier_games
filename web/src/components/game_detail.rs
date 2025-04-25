@@ -5,7 +5,7 @@ use crate::components::game_day_summary::GameDaySummary;
 use crate::components::game_edit::GameEdit;
 use crate::components::game_tributes::GameTributes;
 use crate::components::info_detail::InfoDetail;
-use crate::components::Button;
+use crate::components::{Button, ThemedButton};
 use crate::{LoadingState, API_HOST};
 use dioxus::prelude::*;
 use dioxus_query::prelude::{
@@ -201,32 +201,7 @@ fn GameStatusState() -> Element {
                             }
                         }
                     }
-                    Button {
-                        class: Some(r#"
-                        theme1:bg-radial
-                        theme1:from-amber-300
-                        theme1:to-red-500
-                        theme1:border-red-500
-                        theme1:text-red-900
-                        theme1:hover:text-stone-200
-                        theme1:hover:from-amber-500
-                        theme1:hover:to-red-700
-
-                        theme2:bg-linear-to-b
-                        theme2:from-green-400
-                        theme2:to-teal-500
-                        theme2:border-none
-                        theme2:hover:text-green-200
-                        theme2:hover:from-green-500
-                        theme2:hover:to-teal-600
-
-                        theme3:border-none
-                        theme3:bg-gold-rich
-                        theme3:hover:bg-gold-rich-reverse
-                        theme3:text-stone-700
-                        theme3:hover:text-stone-50
-                        "#.into()),
-
+                    ThemedButton {
                         onclick: next_step_handler,
                         disabled: game_finished,
                         "{game_next_step}"

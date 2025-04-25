@@ -76,6 +76,7 @@ pub fn GameAreaList() -> Element {
                             theme1:text-stone-200
 
                             theme2:border-3
+                            theme2:rounded-md
                             theme2:bg-green-200
                             theme2:data-[open=true]:border-green-500
                             theme2:data-[open=false]:border-red-400
@@ -126,6 +127,7 @@ pub fn GameAreaList() -> Element {
                                 theme2:text-green-200
                                 theme2:bg-green-800
                                 theme2:px-2
+                                theme2:rounded-sm
 
                                 theme3:border-gold-rich
                                 theme3:border-0
@@ -170,6 +172,7 @@ pub fn GameAreaList() -> Element {
                                 theme2:text-green-200
                                 theme2:bg-green-800
                                 theme2:px-2
+                                theme2:rounded-sm
 
                                 theme3:border-gold-rich
                                 theme3:border-0

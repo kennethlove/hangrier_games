@@ -136,6 +136,7 @@ pub fn GameListMember(game: Game) -> Element {
 
             theme2:border-none
             theme2:bg-green-900
+            theme2:rounded-md
 
             theme3:border-3
             theme3:border-gold-rich

@@ -176,11 +176,12 @@ fn GameStatusState(game: Game) -> Element {
         div {
             class: "flex flex-col gap-2 mt-4",
             div {
-                class: "flex flex-row flex-wrap gap-2 place-content-between",
+                class: "flex flex-col gap-2",
                 h2 {
                     class: r#"
                     flex
                     flex-row
+                    place-content-between
 
                     theme1:text-2xl
                     theme1:font-[Cinzel]
@@ -212,14 +213,15 @@ fn GameStatusState(game: Game) -> Element {
                             theme2:fill-green-200/50
                             theme2:hover:fill-green-200
 
-                            theme3:fill-amber-600/50
-                            theme3:hover:fill-amber-600
+                            theme3:fill-amber-700/75
+                            theme3:hover:fill-amber-700
                             "#
                         }
                     }
                 }
                 if g.clone().is_mine {
                     ThemedButton {
+                        class: "place-self-center-safe",
                         onclick: next_step_handler,
                         disabled: game_finished,
                         "{game_next_step}"

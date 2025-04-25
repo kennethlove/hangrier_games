@@ -28,7 +28,7 @@ async fn fetch_areas(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryVal
                     Err(_) => QueryResult::Err(QueryError::GameNotFound(identifier.to_string())),
                 }
             }
-            Err(e) => {
+            Err(_) => {
                 QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
             }
         }

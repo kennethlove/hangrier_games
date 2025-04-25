@@ -133,6 +133,7 @@ pub fn GameListMember(game: Game) -> Element {
             theme1:border-stone-950
             theme1:bg-stone-800/65
             theme1:hover:bg-stone-800/75
+            theme1:rounded-sm
 
             theme2:border-none
             theme2:bg-green-900

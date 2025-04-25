@@ -55,6 +55,7 @@ pub fn ThemedButton(props: ButtonProps) -> Element {
     theme1:hover:text-stone-200
     theme1:hover:from-amber-500
     theme1:hover:to-red-700
+    theme1:rounded-sm
 
     theme2:text-green-800
     theme2:bg-linear-to-b

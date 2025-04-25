@@ -24,6 +24,7 @@ pub fn InfoDetail(props: InfoDetailProps) -> Element {
             theme1:bg-stone-800/80
             theme1:hover:bg-stone-800
             theme1:open:bg-stone-800/80
+            theme1:rounded-sm
 
             theme2:bg-green-900
             theme2:rounded-md

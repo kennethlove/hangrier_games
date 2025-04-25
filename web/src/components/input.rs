@@ -40,10 +40,12 @@ pub fn Input(props: InputProperties) -> Element {
             theme1:bg-stone-800/65
             theme1:hover:bg-stone-800/75
             theme1:focus:bg-stone-800/75
+            theme1:rounded-sm
 
             theme2:border-green-400
             theme2:text-green-200
             theme2:placeholder-green-200/50
+            theme2:rounded-md
 
             theme3:bg-stone-50/50
             theme3:border-yellow-600

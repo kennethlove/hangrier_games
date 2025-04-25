@@ -155,20 +155,6 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
 
     let identifier = tribute.clone().identifier;
 
-    let tribute_logs_query = use_get_query(
-        [
-            QueryKey::TributeDayLog(identifier.clone(), game.clone().day.unwrap_or_default()),
-            QueryKey::Tribute(identifier.clone()),
-            QueryKey::Game(game.clone().identifier)
-        ],
-        move |keys: Vec<QueryKey>| { fetch_tribute_log(keys, token.clone()) },
-    );
-
-    let tribute_logs: Vec<GameMessage> = match tribute_logs_query.result().value() {
-        QueryResult::Ok(QueryValue::Logs(logs)) => logs.clone(),
-        _ => Vec::new()
-    };
-
     let fist_item = Item::new_weapon("basic fist");
 
     rsx! {

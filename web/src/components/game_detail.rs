@@ -80,142 +80,8 @@ pub fn GamePage(identifier: String) -> Element {
             gap-4
             "#,
             GameState { }
-            GameStats { }
-            GameDetails { identifier }
-        }
-    }
-}
-
-#[component]
-fn GameStats() -> Element {
-    let game_signal = use_context::<Signal<Option<Game>>>();
-    let game = game_signal.read().clone();
-
-    if game.is_some() {
-        let game = game.unwrap();
-        let game_name = game.name.clone();
-        let game_day = game.day.unwrap_or(0);
-        let game_finished = game.status == GameStatus::Finished;
-        let tribute_count = game
-            .clone()
-            .tributes
-            .into_iter()
-            .filter(|t| t.is_alive())
-            .collect::<Vec<Tribute>>()
-            .len();
-
-        let game_status = match game.status {
-            GameStatus::NotStarted => "Not started".to_string(),
-            GameStatus::InProgress => "In progress".to_string(),
-            GameStatus::Finished => "Finished".to_string(),
-        };
-
-        let winner_name = {
-            if game.winner().is_some() {
-                game.winner().unwrap().name
-            } else {
-                String::new()
-            }
-        };
-        let g = game.clone();
-
-        rsx! {
-            div {
-                class: "flex flex-col gap-2 mt-4",
-
-                if !winner_name.is_empty() {
-                    h1 {
-                        class: "block text-3xl",
-                        "Winner: {winner_name}!"
-                    }
-                }
-
-                div {
-                    class: "flex flex-row place-content-between pr-2",
-
-                    p {
-                        class: r#"
-                        flex-grow
-                        theme1:text-amber-300
-                        theme2:text-green-200
-
-                        theme3:text-stone-700
-                        "#,
-
-                        span {
-                            class: r#"
-                            block
-                            text-sm
-                            theme1:text-amber-500
-                            theme1:font-semibold
-                            theme2:text-teal-500
-                            theme3:text-yellow-600
-                            theme3:font-semibold
-                            "#,
-
-                            "status"
-                        }
-                        "{game_status}"
-                    }
-                    p {
-                        class: r#"
-                        flex-grow
-                        theme1:text-amber-300
-                        theme2:text-green-200
-                        theme3:text-stone-700
-                        "#,
-
-                        span {
-                            class: r#"
-                            block
-                            text-sm
-                            theme1:text-amber-500
-                            theme1:font-semibold
-                            theme2:text-teal-500
-                            theme3:text-yellow-600
-                            theme3:font-semibold
-                            "#,
-
-                            "day"
-                        }
-                        "{game_day}"
-                    }
-                    p {
-                        class: r#"
-                        theme1:text-amber-300
-                        theme2:text-green-200
-                        theme3:text-stone-700
-                        "#,
-
-                        span {
-                            class: r#"
-                            block
-                            text-sm
-                            theme1:text-amber-500
-                            theme1:font-semibold
-                            theme2:text-teal-500
-                            theme3:text-yellow-600
-                            theme3:font-semibold
-                            "#,
-
-                            "tributes alive"
-                        }
-                        "{tribute_count}"
-                    }
-                }
-            }
-        }
-    } else {
-        rsx! {
-            p {
-                class: r#"
-                text-center
-                theme1:text-stone-200
-                theme2:text-green-200
-                theme3:text-slate-700
-                "#,
-                "Loading..."
-            }
+            GameStats { identifier: identifier.clone() }
+            GameDetails { identifier: identifier.clone() }
         }
     }
 }
@@ -348,6 +214,159 @@ fn GameState() -> Element {
                             "{game_next_step}"
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn GameStats(identifier: String) -> Element {
+    let storage = use_persistent("hangry-games", AppState::default);
+    let token = storage.get().jwt.expect("No JWT found");
+
+    let game_query = use_get_query(
+        [QueryKey::Game(identifier.clone())],
+        move |keys: Vec<QueryKey>| { fetch_game(keys, token.clone()) },
+    );
+    
+    match game_query.result().value() {
+        QueryResult::Ok(QueryValue::Game(game)) => {
+            let game_day = game.day.unwrap_or(0);
+            let tribute_count = game
+                .clone()
+                .tributes
+                .into_iter()
+                .filter(|t| t.is_alive())
+                .collect::<Vec<Tribute>>()
+                .len();
+
+            let game_status = match game.status {
+                GameStatus::NotStarted => "Not started".to_string(),
+                GameStatus::InProgress => "In progress".to_string(),
+                GameStatus::Finished => "Finished".to_string(),
+            };
+
+            let winner_name = {
+                if game.winner().is_some() {
+                    game.winner().unwrap().name
+                } else {
+                    String::new()
+                }
+            };
+            let g = game.clone();
+
+            rsx! {
+                div {
+                    class: "flex flex-col gap-2 mt-4",
+
+                    if !winner_name.is_empty() {
+                        h1 {
+                            class: "block text-3xl",
+                            "Winner: {winner_name}!"
+                        }
+                    }
+
+                    div {
+                        class: "flex flex-row place-content-between pr-2",
+
+                        p {
+                            class: r#"
+                            flex-grow
+                            theme1:text-amber-300
+                            theme2:text-green-200
+
+                            theme3:text-stone-700
+                            "#,
+
+                            span {
+                                class: r#"
+                                block
+                                text-sm
+                                theme1:text-amber-500
+                                theme1:font-semibold
+                                theme2:text-teal-500
+                                theme3:text-yellow-600
+                                theme3:font-semibold
+                                "#,
+
+                                "status"
+                            }
+                            "{game_status}"
+                        }
+                        p {
+                            class: r#"
+                            flex-grow
+                            theme1:text-amber-300
+                            theme2:text-green-200
+                            theme3:text-stone-700
+                            "#,
+
+                            span {
+                                class: r#"
+                                block
+                                text-sm
+                                theme1:text-amber-500
+                                theme1:font-semibold
+                                theme2:text-teal-500
+                                theme3:text-yellow-600
+                                theme3:font-semibold
+                                "#,
+
+                                "day"
+                            }
+                            "{game_day}"
+                        }
+                        p {
+                            class: r#"
+                            theme1:text-amber-300
+                            theme2:text-green-200
+                            theme3:text-stone-700
+                            "#,
+
+                            span {
+                                class: r#"
+                                block
+                                text-sm
+                                theme1:text-amber-500
+                                theme1:font-semibold
+                                theme2:text-teal-500
+                                theme3:text-yellow-600
+                                theme3:font-semibold
+                                "#,
+
+                                "tributes alive"
+                            }
+                            "{tribute_count}"
+                        }
+                    }
+                }
+            }
+        },
+        QueryResult::Err(e) => {
+            rsx! {
+                p {
+                    class: r#"
+                    text-center
+                    theme1:text-stone-200
+                    theme2:text-green-200
+                    theme3:text-slate-700
+                    "#,
+
+                    "Failed to load: {e:?}"
+                }
+            }
+        },
+        _ => {
+            rsx! {
+                p {
+                    class: r#"
+                    text-center
+                    theme1:text-stone-200
+                    theme2:text-green-200
+                    theme3:text-slate-700
+                    "#,
+                    "Loading..."
                 }
             }
         }

@@ -15,7 +15,7 @@ async fn fetch_games(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryVal
         let client = reqwest::Client::new();
         let request = client.request(
             reqwest::Method::GET,
-            format!("{}/api/games", API_HOST),
+            format!("{}/api/games", &*API_HOST),
         ).bearer_auth(token);
 
         match request.send().await{

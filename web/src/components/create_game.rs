@@ -19,7 +19,7 @@ async fn create_game(args: (Option<String>, String)) -> MutationResult<MutationV
 
     let response = client.request(
         reqwest::Method::POST,
-        format!("{}/api/games", API_HOST))
+        format!("{}/api/games", &*API_HOST))
         .bearer_auth(token)
         .json(&json_body);
 

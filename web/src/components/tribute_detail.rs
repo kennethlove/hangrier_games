@@ -22,7 +22,7 @@ async fn fetch_tribute(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryV
 
             let request = client.request(
                 reqwest::Method::GET,
-                format!("{}/api/games/{}/tributes/{}", API_HOST, game_identifier, identifier))
+                format!("{}/api/games/{}/tributes/{}", &*API_HOST, game_identifier, identifier))
                 .bearer_auth(token);
 
             match request.send().await {
@@ -54,7 +54,7 @@ async fn fetch_tribute_log(keys: Vec<QueryKey>, token: String) -> QueryResult<Qu
 
         let request = client.request(
             reqwest::Method::GET,
-            format!("{}/api/tributes/{}/log", API_HOST, identifier))
+            format!("{}/api/tributes/{}/log", &*API_HOST, identifier))
             .bearer_auth(token);
 
         match request.send().await {

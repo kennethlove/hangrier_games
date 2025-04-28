@@ -1,9 +1,10 @@
-use std::process::id;
 use crate::cache::{QueryError, QueryKey, QueryValue};
+use crate::components::icons::map_pin::MapPinIcon;
 use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_edit::TributeEdit;
 use crate::components::tribute_status_icon::TributeStatusIcon;
 use crate::routes::Routes;
+use crate::storage::{use_persistent, AppState};
 use crate::API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
@@ -11,8 +12,7 @@ use game::games::{Game, GameStatus};
 use game::items::Item;
 use game::messages::GameMessage;
 use game::tributes::Tribute;
-use crate::components::icons::map_pin::MapPinIcon;
-use crate::storage::{use_persistent, AppState};
+use std::process::id;
 
 async fn fetch_tributes(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tributes(identifier)) = keys.first() {
@@ -20,7 +20,7 @@ async fn fetch_tributes(keys: Vec<QueryKey>, token: String) -> QueryResult<Query
 
         let request = client.request(
             reqwest::Method::GET,
-            format!("{}/api/games/{}/tributes", API_HOST, identifier))
+            format!("{}/api/games/{}/tributes", &*API_HOST, identifier))
             .bearer_auth(token);
 
         match request.send().await {
@@ -45,7 +45,7 @@ async fn fetch_tribute_log(keys: Vec<QueryKey>, token: String) -> QueryResult<Qu
 
             let request = client.request(
                 reqwest::Method::GET,
-                format!("{}/api/games/{}/log/{}/{}", API_HOST, game_identifier, day, identifier))
+                format!("{}/api/games/{}/log/{}/{}", &*API_HOST, game_identifier, day, identifier))
                 .bearer_auth(token);
 
             match request.send().await {
@@ -124,9 +124,13 @@ pub fn GameTributes(game: Game) -> Element {
                                 class: "grid subgrid gap-2 grid-cols-2",
                                 GameTributeListMember {
                                     tribute: chunk.first().unwrap().clone(),
+                                    game_identifier: identifier.clone(),
+                                    game_status: game.status.clone(),
                                 }
                                 GameTributeListMember {
                                     tribute: chunk.last().unwrap().clone(),
+                                    game_identifier: identifier.clone(),
+                                    game_status: game.status.clone(),
                                 }
                             }
                         }
@@ -145,13 +149,9 @@ pub fn GameTributes(game: Game) -> Element {
 }
 
 #[component]
-pub fn GameTributeListMember(tribute: Tribute) -> Element {
+pub fn GameTributeListMember(tribute: Tribute, game_identifier: String, game_status: GameStatus) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
-    let game_signal: Signal<Option<Game>> = use_context();
-
-    let game = game_signal.read().clone();
-    let game = game.unwrap();
 
     let identifier = tribute.clone().identifier;
 
@@ -228,14 +228,14 @@ pub fn GameTributeListMember(tribute: Tribute) -> Element {
                         theme3:hover:text-yellow-500
                         "#,
                         to: Routes::TributeDetail {
-                            game_identifier: game.identifier.clone(),
+                            game_identifier: game_identifier.clone(),
                             tribute_identifier: tribute.identifier.clone()
                         },
                         "{tribute.name}"
                     }
                 }
 
-                if game.status == GameStatus::NotStarted {
+                if game_status == GameStatus::NotStarted {
                     div {
                         TributeEdit {
                             identifier: tribute.clone().identifier,

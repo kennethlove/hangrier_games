@@ -12,7 +12,7 @@ async fn fetch_game_day_log(keys: Vec<QueryKey>, token: String) -> QueryResult<Q
 
         let request = client.request(
             reqwest::Method::GET,
-            format!("{}/api/games/{}/log/{}", API_HOST, identifier, day))
+            format!("{}/api/games/{}/log/{}", &*API_HOST, identifier, day))
             .bearer_auth(token);
 
         match request.send().await {

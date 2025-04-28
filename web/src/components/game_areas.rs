@@ -16,7 +16,7 @@ async fn fetch_areas(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryVal
 
         let request = client.request(
             reqwest::Method::GET,
-            format!("{}/api/games/{}/areas", API_HOST, identifier))
+            format!("{}/api/games/{}/areas", &*API_HOST, identifier))
             .bearer_auth(token);
 
         match request.send().await {

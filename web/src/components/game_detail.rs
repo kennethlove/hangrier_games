@@ -9,9 +9,7 @@ use crate::storage::{use_persistent, AppState};
 use crate::{LoadingState, API_HOST};
 use dioxus::prelude::*;
 use dioxus_logger::tracing;
-use dioxus_query::prelude::{
-    use_get_query, use_mutation, use_query_client, MutationResult, QueryResult,
-};
+use dioxus_query::prelude::{use_get_query, use_mutation, use_query_client, MutationResult, QueryResult, UseMutation, UseQueryClient};
 use game::games::Game;
 use game::games::GameStatus;
 use game::tributes::Tribute;
@@ -69,6 +67,50 @@ async fn next_step(args: (String, String)) -> MutationResult<MutationValue, Muta
     }
 }
 
+async fn handle_next_step(
+    game_id: String,
+    token: String,
+    mutate: UseMutation<MutationValue, MutationError, (String, String)>,
+    client: UseQueryClient<QueryValue, QueryError, QueryKey>,
+    mut loading_signal: Signal<LoadingState>,
+) {
+    loading_signal.set(LoadingState::Loading);
+    mutate.manual_mutate((game_id.clone(), token)).await;
+
+    let mut invalidate_keys = None;
+
+    match mutate.result().deref() {
+        MutationResult::Ok(mutation_result) => {
+            match mutation_result {
+                MutationValue::GameAdvanced(game_identifier)
+                | MutationValue::GameFinished(game_identifier)
+                | MutationValue::GameStarted(game_identifier) => {
+                    invalidate_keys = Some(vec![QueryKey::Game(game_identifier.into()), QueryKey::Games]);
+                }
+                _ => {}
+            }
+            loading_signal.set(LoadingState::Loaded);
+        },
+        MutationResult::Err(MutationError::UnableToAdvanceGame) => {
+            tracing::error!("Failed to advance game {}", game_id);
+            // Potentially reset loading state or show an error message
+            loading_signal.set(LoadingState::Loaded); // Or an error state
+        },
+        MutationResult::Err(e) => {
+            tracing::error!("Mutation failed for game {}: {:?}", game_id, e);
+            loading_signal.set(LoadingState::Loaded); // Or an error state
+        },
+        _ => {
+            // Handle pending/uninitialized states if needed
+            // Usually covered by the initial loading_signal.set(LoadingState::Loading)
+        }
+    }
+
+    if let Some(keys) = invalidate_keys {
+        client.invalidate_queries(&keys);
+    }
+}
+
 #[component]
 pub fn GamePage(identifier: String) -> Element {
     rsx! {
@@ -79,7 +121,7 @@ pub fn GamePage(identifier: String) -> Element {
             flex-col
             gap-4
             "#,
-            GameState { }
+            GameState { identifier: identifier.clone() }
             GameStats { identifier: identifier.clone() }
             GameDetails { identifier: identifier.clone() }
         }
@@ -87,75 +129,57 @@ pub fn GamePage(identifier: String) -> Element {
 }
 
 #[component]
-fn GameState() -> Element {
+fn GameState(identifier: String) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
-    let mut loading_signal = use_context::<Signal<LoadingState>>();
+    let token = storage.get().jwt.expect("No JWT found");
+
+    let loading_signal = use_context::<Signal<LoadingState>>();
+
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
-    let game_signal = use_context::<Signal<Option<Game>>>();
 
-    match game_signal.read().clone() {
-        None => {
-            rsx! {
-                p {
-                    class: r#"
-                    text-center
+    let token_clone = token.clone();
+    let game_query = use_get_query(
+        [QueryKey::Game(identifier.clone())],
+        move |keys: Vec<QueryKey>| { fetch_game(keys, token.clone()) },
+    );
 
-                    theme1:text-stone-200
-                    theme2:text-green-200
-                    theme3:text-slate-700
-                    "#,
-                    "Loading..."
-                }
-            }
-        }
-        Some(game) => {
+    match game_query.result().value() {
+        QueryResult::Ok(QueryValue::Game(game_data)) => {
+            let game = *game_data.clone();
+            let game_id = game.identifier.clone();
+            let g_id = game_id.clone();
+            let game_name = game.name.clone();
+            let game_status = game.status.clone();
+            let is_mine = game.is_mine;
+            let is_ready = game.ready;
+            let is_finished = game.status == GameStatus::Finished;
+            let game_private = game.private;
+
             let mutate = use_mutation(next_step);
-            let game_name = game.clone().name;
 
-            let game_next_step = match game.clone().status {
+            let game_next_step = match game_status {
                 GameStatus::NotStarted => {
-                    if game.ready { "Start".to_string() } else { "Wait".to_string() }
-                }
+                    if is_ready { "Start" } else { "Wait" }.to_string()
+                },
                 GameStatus::InProgress => "Play next step".to_string(),
                 GameStatus::Finished => "Clone".to_string(),
             };
 
-            let game_ = game.clone();
-
             let next_step_handler = move |_| {
-                let mut game = game.clone();
-                let game_id = game.clone().identifier;
-
-                loading_signal.set(LoadingState::Loading);
-
-                let token = storage.get().jwt.expect("No JWT found");
+                let game_id_clone = game_id.clone();
+                let token_clone = token_clone.clone();
+                let mutate_clone = mutate.clone();
+                let client_clone = client.clone();
+                let loading_signal_clone = loading_signal.clone();
 
                 spawn(async move {
-                    mutate.manual_mutate((game_id.clone(), token)).await;
-
-                    match mutate.result().deref() {
-                        MutationResult::Ok(mutation_result) => match mutation_result {
-                            MutationValue::GameAdvanced(game_identifier) => {
-                                client.invalidate_queries(&[QueryKey::Game(game_identifier.into()), QueryKey::Games]);
-                                loading_signal.set(LoadingState::Loaded);
-                            }
-                            MutationValue::GameFinished(game_identifier) => {
-                                game.end();
-                                client.invalidate_queries(&[QueryKey::Game(game_identifier.into()), QueryKey::Games]);
-                                loading_signal.set(LoadingState::Loaded);
-                            }
-                            MutationValue::GameStarted(game_identifier) => {
-                                game.start();
-                                client.invalidate_queries(&[QueryKey::Game(game_identifier.into()), QueryKey::Games]);
-                                loading_signal.set(LoadingState::Loaded);
-                            }
-                            _ => {}
-                        },
-                        MutationResult::Err(MutationError::UnableToAdvanceGame) => {
-                            tracing::error!("Failed to advance game");
-                        },
-                        _ => {}
-                    }
+                    handle_next_step(
+                        game_id_clone,
+                        token_clone,
+                        mutate_clone,
+                        client_clone,
+                        loading_signal_clone
+                    ).await;
                 });
             };
 
@@ -183,13 +207,13 @@ fn GameState() -> Element {
 
                         "{game_name}"
 
-                        if game_.clone().is_mine {
+                        if is_mine {
                             span {
                                 class: "pl-2",
                                 GameEdit {
-                                    identifier: game_.clone().identifier,
-                                    name: game_.clone().name,
-                                    private: game_.clone().private,
+                                    identifier: g_id.clone(),
+                                    name: game_name.clone(),
+                                    private: game_private,
                                     icon_class: r#"
                                     size-4
 
@@ -206,14 +230,40 @@ fn GameState() -> Element {
                             }
                         }
                     }
-                    if game_.clone().is_mine {
+                    if is_mine {
                         ThemedButton {
                             class: "place-self-center-safe",
                             onclick: next_step_handler,
-                            disabled: game_.clone().status == GameStatus::Finished,
+                            disabled: is_finished,
                             "{game_next_step}"
                         }
                     }
+                }
+            }
+        },
+        QueryResult::Err(e) => {
+            rsx! {
+                p {
+                    class: r#"
+                    text-center
+                    theme1:text-stone-200
+                    theme2:text-green-200
+                    theme3:text-slate-700
+                    "#,
+                    "Failed to load: {e:?}"
+                }
+            }
+        },
+        _ => {
+            rsx! {
+                p {
+                    class: r#"
+                    text-center
+                    theme1:text-stone-200
+                    theme2:text-green-200
+                    theme3:text-slate-700
+                    "#,
+                    "Loading..."
                 }
             }
         }
@@ -229,7 +279,7 @@ fn GameStats(identifier: String) -> Element {
         [QueryKey::Game(identifier.clone())],
         move |keys: Vec<QueryKey>| { fetch_game(keys, token.clone()) },
     );
-    
+
     match game_query.result().value() {
         QueryResult::Ok(QueryValue::Game(game)) => {
             let game_day = game.day.unwrap_or(0);

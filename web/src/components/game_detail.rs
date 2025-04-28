@@ -5,8 +5,10 @@ use crate::components::game_edit::GameEdit;
 use crate::components::game_tributes::GameTributes;
 use crate::components::info_detail::InfoDetail;
 use crate::components::{Button, ThemedButton};
+use crate::storage::{use_persistent, AppState};
 use crate::{LoadingState, API_HOST};
 use dioxus::prelude::*;
+use dioxus_logger::tracing;
 use dioxus_query::prelude::{
     use_get_query, use_mutation, use_query_client, MutationResult, QueryResult,
 };
@@ -15,8 +17,6 @@ use game::games::GameStatus;
 use game::tributes::Tribute;
 use reqwest::StatusCode;
 use std::ops::Deref;
-use dioxus_logger::tracing;
-use crate::storage::{use_persistent, AppState};
 
 async fn fetch_game(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(identifier)) = keys.first() {
@@ -56,7 +56,10 @@ async fn next_step(args: (String, String)) -> MutationResult<MutationValue, Muta
             match response.status() {
                 StatusCode::NO_CONTENT => MutationResult::Ok(MutationValue::GameFinished(identifier)),
                 StatusCode::CREATED => MutationResult::Ok(MutationValue::GameStarted(identifier)),
-                StatusCode::OK => MutationResult::Ok(MutationValue::GameAdvanced(identifier)),
+                StatusCode::OK => {
+                    tracing::info!("{:?}", &response);
+                    MutationResult::Ok(MutationValue::GameAdvanced(identifier))
+                },
                 _ => MutationResult::Err(MutationError::UnableToAdvanceGame),
             }
         }
@@ -68,48 +71,164 @@ async fn next_step(args: (String, String)) -> MutationResult<MutationValue, Muta
 
 #[component]
 pub fn GamePage(identifier: String) -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.expect("No JWT found");
+    rsx! {
+        div {
+            class: r#"
+            mt-4
+            flex
+            flex-col
+            gap-4
+            "#,
+            GameState { }
+            GameStats { }
+            GameDetails { identifier }
+        }
+    }
+}
 
-    let game_query = use_get_query(
-        [QueryKey::Game(identifier.clone())],
-        move |keys: Vec<QueryKey>| { fetch_game(keys, token.clone()) },
-    );
+#[component]
+fn GameStats() -> Element {
+    let game_signal = use_context::<Signal<Option<Game>>>();
+    let game = game_signal.read().clone();
 
-    match game_query.result().value() {
-        QueryResult::Ok(QueryValue::Game(game)) => {
-            let mut game_signal: Signal<Option<Game>> = use_context();
-            use_effect({
-                let game = game.clone();
-                move || {
-                    game_signal.set(Some(*game.clone()));
+    if game.is_some() {
+        let game = game.unwrap();
+        let game_name = game.name.clone();
+        let game_day = game.day.unwrap_or(0);
+        let game_finished = game.status == GameStatus::Finished;
+        let tribute_count = game
+            .clone()
+            .tributes
+            .into_iter()
+            .filter(|t| t.is_alive())
+            .collect::<Vec<Tribute>>()
+            .len();
+
+        let game_status = match game.status {
+            GameStatus::NotStarted => "Not started".to_string(),
+            GameStatus::InProgress => "In progress".to_string(),
+            GameStatus::Finished => "Finished".to_string(),
+        };
+
+        let winner_name = {
+            if game.winner().is_some() {
+                game.winner().unwrap().name
+            } else {
+                String::new()
+            }
+        };
+        let g = game.clone();
+
+        rsx! {
+            div {
+                class: "flex flex-col gap-2 mt-4",
+
+                if !winner_name.is_empty() {
+                    h1 {
+                        class: "block text-3xl",
+                        "Winner: {winner_name}!"
+                    }
                 }
-            });
 
-            rsx! {
                 div {
-                    class: "mb-4",
-                    GameStatusState { game: *game.clone() }
-                }
+                    class: "flex flex-row place-content-between pr-2",
 
-                GameDetails { game: *game.clone() }
+                    p {
+                        class: r#"
+                        flex-grow
+                        theme1:text-amber-300
+                        theme2:text-green-200
+
+                        theme3:text-stone-700
+                        "#,
+
+                        span {
+                            class: r#"
+                            block
+                            text-sm
+                            theme1:text-amber-500
+                            theme1:font-semibold
+                            theme2:text-teal-500
+                            theme3:text-yellow-600
+                            theme3:font-semibold
+                            "#,
+
+                            "status"
+                        }
+                        "{game_status}"
+                    }
+                    p {
+                        class: r#"
+                        flex-grow
+                        theme1:text-amber-300
+                        theme2:text-green-200
+                        theme3:text-stone-700
+                        "#,
+
+                        span {
+                            class: r#"
+                            block
+                            text-sm
+                            theme1:text-amber-500
+                            theme1:font-semibold
+                            theme2:text-teal-500
+                            theme3:text-yellow-600
+                            theme3:font-semibold
+                            "#,
+
+                            "day"
+                        }
+                        "{game_day}"
+                    }
+                    p {
+                        class: r#"
+                        theme1:text-amber-300
+                        theme2:text-green-200
+                        theme3:text-stone-700
+                        "#,
+
+                        span {
+                            class: r#"
+                            block
+                            text-sm
+                            theme1:text-amber-500
+                            theme1:font-semibold
+                            theme2:text-teal-500
+                            theme3:text-yellow-600
+                            theme3:font-semibold
+                            "#,
+
+                            "tributes alive"
+                        }
+                        "{tribute_count}"
+                    }
+                }
             }
         }
-        QueryResult::Err(e) => {
-            rsx! {
-                p {
-                    class: r#"
-                    text-center
-
-                    theme1:text-stone-200
-                    theme2:text-green-200
-                    theme3:text-slate-700
-                    "#,
-                    "Failed to load"
-                }
+    } else {
+        rsx! {
+            p {
+                class: r#"
+                text-center
+                theme1:text-stone-200
+                theme2:text-green-200
+                theme3:text-slate-700
+                "#,
+                "Loading..."
             }
         }
-        _ => {
+    }
+}
+
+#[component]
+fn GameState() -> Element {
+    let storage = use_persistent("hangry-games", AppState::default);
+    let mut loading_signal = use_context::<Signal<LoadingState>>();
+    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+    let game_signal = use_context::<Signal<Option<Game>>>();
+
+    match game_signal.read().clone() {
+        None => {
             rsx! {
                 p {
                     class: r#"
@@ -123,269 +242,198 @@ pub fn GamePage(identifier: String) -> Element {
                 }
             }
         }
-    }
-}
+        Some(game) => {
+            let mutate = use_mutation(next_step);
+            let game_name = game.clone().name;
 
-#[component]
-fn GameStatusState(game: Game) -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-
-    let mut loading_signal = use_context::<Signal<LoadingState>>();
-
-    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
-    let mutate = use_mutation(next_step);
-
-    let game_next_step: String;
-
-    let game_signal = use_context::<Signal<Option<Game>>>();
-    let game = game_signal.read().clone().unwrap_or(game);
-
-    let game_status = match game.status {
-        GameStatus::NotStarted => {
-            if game.ready {
-                game_next_step = "Start".to_string();
-            } else {
-                game_next_step = "Wait".to_string();
-            }
-            "Not started".to_string()
-        }
-        GameStatus::InProgress => {
-            game_next_step = "Play next step".to_string();
-            "In progress".to_string()
-        }
-        GameStatus::Finished => {
-            game_next_step = "Clone".to_string();
-            "Finished".to_string()
-        }
-    };
-
-    let game_id = game.identifier.clone();
-    let game_name = game.name.clone();
-    let game_day = game.day.unwrap_or(0);
-    let game_finished = game.status == GameStatus::Finished;
-    let tribute_count = game
-        .clone()
-        .tributes
-        .into_iter()
-        .filter(|t| t.is_alive())
-        .collect::<Vec<Tribute>>()
-        .len();
-    let winner_name = {
-        if game.winner().is_some() {
-            game.winner().unwrap().name
-        } else {
-            String::new()
-        }
-    };
-    let g = game.clone();
-
-    let next_step_handler = move |_| {
-        let game_id = game_id.clone();
-        let mut game = game.clone();
-
-        loading_signal.set(LoadingState::Loading);
-
-        let token = storage.get().jwt.expect("No JWT found");
-
-        spawn(async move {
-            mutate.manual_mutate((game_id.clone(), token)).await;
-
-            match mutate.result().deref() {
-                MutationResult::Ok(mutation_result) => match mutation_result {
-                    MutationValue::GameAdvanced(game_identifier) => {
-                        client.invalidate_queries(&[QueryKey::Game(game_identifier.into())]);
-                        loading_signal.set(LoadingState::Loaded);
-                    }
-                    MutationValue::GameFinished(_) => {
-                        game.end();
-                        loading_signal.set(LoadingState::Loaded);
-                    }
-                    MutationValue::GameStarted(game_identifier) => {
-                        game.start();
-                        client.invalidate_queries(&[QueryKey::Game(game_identifier.into())]);
-                        loading_signal.set(LoadingState::Loaded);
-                    }
-                    _ => {}
-                },
-                MutationResult::Err(MutationError::UnableToAdvanceGame) => {
-                    tracing::error!("Failed to advance game");
+            let game_next_step = match game.clone().status {
+                GameStatus::NotStarted => {
+                    if game.ready { "Start".to_string() } else { "Wait".to_string() }
                 }
-                _ => {}
-            }
-        });
-    };
+                GameStatus::InProgress => "Play next step".to_string(),
+                GameStatus::Finished => "Clone".to_string(),
+            };
 
-    rsx! {
-        div {
-            class: "flex flex-col gap-2 mt-4",
-            div {
-                class: "flex flex-col gap-2",
-                h2 {
-                    class: r#"
-                    flex
-                    flex-row
-                    place-content-between
+            let game_ = game.clone();
 
-                    theme1:text-2xl
-                    theme1:font-[Cinzel]
-                    theme1:text-amber-300
+            let next_step_handler = move |_| {
+                let mut game = game.clone();
+                let game_id = game.clone().identifier;
 
-                    theme2:font-[Playfair_Display]
-                    theme2:text-3xl
-                    theme2:text-green-200
+                loading_signal.set(LoadingState::Loading);
 
-                    theme3:font-[Orbitron]
-                    theme3:text-2xl
-                    theme3:text-stone-700
-                    "#,
+                let token = storage.get().jwt.expect("No JWT found");
 
-                    "{game_name}"
+                spawn(async move {
+                    mutate.manual_mutate((game_id.clone(), token)).await;
 
-                    span {
-                        class: "pl-2",
-                        GameEdit {
-                            identifier: g.clone().identifier,
-                            name: g.clone().name,
-                            private: g.clone().private,
-                            icon_class: r#"
-                            size-4
+                    match mutate.result().deref() {
+                        MutationResult::Ok(mutation_result) => match mutation_result {
+                            MutationValue::GameAdvanced(game_identifier) => {
+                                client.invalidate_queries(&[QueryKey::Game(game_identifier.into()), QueryKey::Games]);
+                                loading_signal.set(LoadingState::Loaded);
+                            }
+                            MutationValue::GameFinished(game_identifier) => {
+                                game.end();
+                                client.invalidate_queries(&[QueryKey::Game(game_identifier.into()), QueryKey::Games]);
+                                loading_signal.set(LoadingState::Loaded);
+                            }
+                            MutationValue::GameStarted(game_identifier) => {
+                                game.start();
+                                client.invalidate_queries(&[QueryKey::Game(game_identifier.into()), QueryKey::Games]);
+                                loading_signal.set(LoadingState::Loaded);
+                            }
+                            _ => {}
+                        },
+                        MutationResult::Err(MutationError::UnableToAdvanceGame) => {
+                            tracing::error!("Failed to advance game");
+                        },
+                        _ => {}
+                    }
+                });
+            };
 
-                            theme1:fill-amber-500
-                            theme1:hover:fill-amber-200
+            rsx! {
+                div {
+                    class: "flex flex-col gap-2",
+                    h2 {
+                        class: r#"
+                        flex
+                        flex-row
+                        place-content-between
 
-                            theme2:fill-green-200/50
-                            theme2:hover:fill-green-200
+                        theme1:text-2xl
+                        theme1:font-[Cinzel]
+                        theme1:text-amber-300
 
-                            theme3:fill-amber-700/75
-                            theme3:hover:fill-amber-700
-                            "#
+                        theme2:font-[Playfair_Display]
+                        theme2:text-3xl
+                        theme2:text-green-200
+
+                        theme3:font-[Orbitron]
+                        theme3:text-2xl
+                        theme3:text-stone-700
+                        "#,
+
+                        "{game_name}"
+
+                        if game_.clone().is_mine {
+                            span {
+                                class: "pl-2",
+                                GameEdit {
+                                    identifier: game_.clone().identifier,
+                                    name: game_.clone().name,
+                                    private: game_.clone().private,
+                                    icon_class: r#"
+                                    size-4
+
+                                    theme1:fill-amber-500
+                                    theme1:hover:fill-amber-200
+
+                                    theme2:fill-green-200/50
+                                    theme2:hover:fill-green-200
+
+                                    theme3:fill-amber-700/75
+                                    theme3:hover:fill-amber-700
+                                    "#
+                                }
+                            }
+                        }
+                    }
+                    if game_.clone().is_mine {
+                        ThemedButton {
+                            class: "place-self-center-safe",
+                            onclick: next_step_handler,
+                            disabled: game_.clone().status == GameStatus::Finished,
+                            "{game_next_step}"
                         }
                     }
                 }
-                if g.clone().is_mine {
-                    ThemedButton {
-                        class: "place-self-center-safe",
-                        onclick: next_step_handler,
-                        disabled: game_finished,
-                        "{game_next_step}"
-                    }
-                }
-            }
-
-            if !winner_name.is_empty() {
-                h1 {
-                    class: "block text-3xl",
-                    "Winner: {winner_name}!"
-                }
-            }
-
-            div {
-                class: "flex flex-row place-content-between pr-2",
-
-                p {
-                    class: r#"
-                    flex-grow
-                    theme1:text-amber-300
-                    theme2:text-green-200
-
-                    theme3:text-stone-700
-                    "#,
-
-                    span {
-                        class: r#"
-                        block
-                        text-sm
-                        theme1:text-amber-500
-                        theme1:font-semibold
-                        theme2:text-teal-500
-                        theme3:text-yellow-600
-                        theme3:font-semibold
-                        "#,
-
-                        "status"
-                    }
-                    "{game_status}"
-                }
-                p {
-                    class: r#"
-                    flex-grow
-                    theme1:text-amber-300
-                    theme2:text-green-200
-                    theme3:text-stone-700
-                    "#,
-
-                    span {
-                        class: r#"
-                        block
-                        text-sm
-                        theme1:text-amber-500
-                        theme1:font-semibold
-                        theme2:text-teal-500
-                        theme3:text-yellow-600
-                        theme3:font-semibold
-                        "#,
-
-                        "day"
-                    }
-                    "{game_day}"
-                }
-                p {
-                    class: r#"
-                    theme1:text-amber-300
-                    theme2:text-green-200
-                    theme3:text-stone-700
-                    "#,
-
-                    span {
-                        class: r#"
-                        block
-                        text-sm
-                        theme1:text-amber-500
-                        theme1:font-semibold
-                        theme2:text-teal-500
-                        theme3:text-yellow-600
-                        theme3:font-semibold
-                        "#,
-
-                        "tributes alive"
-                    }
-                    "{tribute_count}"
-                }
             }
         }
     }
 }
 
 #[component]
-fn GameDetails(game: Game) -> Element {
-    rsx! {
-        div {
-            class: r#"
-            grid
-            gap-4
-            grid-cols-1
-            lg:grid-cols-2
-            c:xl:grid-cols-3
-            xl:grid-cols-[1fr_1fr_18rem]
-            "#,
+fn GameDetails(identifier: String) -> Element {
+    let storage = use_persistent("hangry-games", AppState::default);
+    let token = storage.get().jwt.expect("No JWT found");
 
-            InfoDetail {
-                title: "Areas",
-                open: false,
-                GameAreaList { game: game.clone() }
+    let game_query = use_get_query(
+        [QueryKey::Game(identifier.clone())],
+        move |keys: Vec<QueryKey>| { fetch_game(keys, token.clone()) },
+    );
+
+    match game_query.result().value() {
+        QueryResult::Ok(QueryValue::Game(game)) => {
+            let game_ = game.clone();
+
+            let mut game_signal: Signal<Option<Game>> = use_context();
+            use_effect({
+                let game = game.clone();
+                move || {
+                    game_signal.set(Some(*game.clone()));
+                }
+            });
+
+            rsx! {
+                div {
+                    class: r#"
+                    grid
+                    gap-4
+                    grid-cols-1
+                    lg:grid-cols-2
+                    c:xl:grid-cols-3
+                    xl:grid-cols-[1fr_1fr_18rem]
+                    "#,
+
+                    InfoDetail {
+                        title: "Areas",
+                        open: false,
+                        GameAreaList { game: *game_.clone() }
+                    }
+
+                    InfoDetail {
+                        title: "Tributes",
+                        open: false,
+                        GameTributes { game: *game_.clone() }
+                    }
+
+                    if game.day.unwrap_or(0) > 0 {
+                        InfoDetail {
+                            title: "Day log",
+                            open: false,
+                            GameDayLog { game: *game_.clone(), day: game_.day.unwrap_or_default() }
+                        }
+                    }
+                }
             }
+        },
+        QueryResult::Err(e) => {
+            rsx! {
+                p {
+                    class: r#"
+                    text-center
+                    theme1:text-stone-200
+                    theme2:text-green-200
+                    theme3:text-slate-700
+                    "#,
 
-            InfoDetail {
-                title: "Tributes",
-                open: false,
-                GameTributes { game: game.clone() }
+                    "Failed to load: {e:?}"
+                }
             }
+        },
+        _ => {
+            rsx! {
+                p {
+                    class: r#"
+                    text-center
 
-            if game.day.unwrap_or(0) > 0 {
-                InfoDetail {
-                    title: "Day log",
-                    open: false,
-                    GameDayLog { game: game.clone(), day: game.day.unwrap_or_default() }
+                    theme1:text-stone-200
+                    theme2:text-green-200
+                    theme3:text-slate-700
+                    "#,
+                    "Loading..."
                 }
             }
         }

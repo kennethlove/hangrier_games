@@ -1,8 +1,8 @@
 use crate::tributes::{tribute_create, tribute_delete, tribute_detail, tribute_log, tribute_record_create, tribute_update, TributeOwns};
 use crate::DATABASE;
 use announcers::{summarize, summarize_stream};
-use axum::extract::{Path};
-use axum::http::{StatusCode};
+use axum::extract::Path;
+use axum::http::StatusCode;
 use axum::response::sse::Event;
 use axum::response::{IntoResponse, Sse};
 use axum::routing::{get, put};
@@ -472,7 +472,7 @@ async fn save_game(game: &Game) -> Option<Game> {
         DATABASE
             .update::<Option<Tribute>>(id)
             .content(tribute)
-            .await.expect("Failed to update area items");
+            .await.expect("Failed to update tributes");
     }
 
     DATABASE

@@ -159,15 +159,13 @@ async fn surreal_jwt(request: Request, next: Next) -> Response {
         None => StatusCode::UNAUTHORIZED.into_response(),
         Some(token) => {
             let token = token.to_str().expect("Failed to convert token to str");
-            let token = token.strip_prefix("Bearer ").expect("Failed to strip prefix");
+            let token = match token.strip_prefix("Bearer ") {
+                Some(token) => token,
+                None => return StatusCode::UNAUTHORIZED.into_response(),
+            };
             match DATABASE.authenticate(token).await {
-                Ok(_) => {
-                    let response = next.run(request).await;
-                    response
-                },
-                Err(_) => {
-                    StatusCode::UNAUTHORIZED.into_response()
-                }
+                Ok(_) => { next.run(request).await },
+                Err(_) => { StatusCode::UNAUTHORIZED.into_response() }
             }
         }
     }

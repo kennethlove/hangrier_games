@@ -15,6 +15,7 @@ use game::games::GameStatus;
 use game::tributes::Tribute;
 use reqwest::StatusCode;
 use std::ops::Deref;
+use crate::routes::Routes;
 
 async fn fetch_game(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(identifier)) = keys.first() {
@@ -27,13 +28,30 @@ async fn fetch_game(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValu
 
         match request.send().await {
             Ok(response) =>  {
-                if let Ok(game) = response.json::<Game>().await {
-                    QueryResult::Ok(QueryValue::Game(Box::new(game)))
-                } else {
-                    QueryResult::Err(QueryError::BadJson)
+                match response.error_for_status() {
+                    Ok(response) => {
+                        if let Ok(game) = response.json::<Game>().await {
+                            QueryResult::Ok(QueryValue::Game(Box::new(game)))
+                        } else {
+                            QueryResult::Err(QueryError::BadJson)
+                        }
+                    }
+                    Err(e) => {
+                        if e.status() == Some(StatusCode::UNAUTHORIZED) {
+                            QueryResult::Err(QueryError::Unauthorized)
+                        } else {
+                            QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
+                        }
+                    }
                 }
             }
-            Err(_) => QueryResult::Err(QueryError::GameNotFound(identifier.to_string())),
+            Err(e) => {
+                if e.status() == Some(StatusCode::UNAUTHORIZED) {
+                    QueryResult::Err(QueryError::Unauthorized)
+                } else {
+                    QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
+                }
+            }
         }
     } else {
         QueryResult::Err(QueryError::Unknown)
@@ -131,7 +149,7 @@ pub fn GamePage(identifier: String) -> Element {
 #[component]
 fn GameState(identifier: String) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.expect("No JWT found");
+    let token = storage.get().jwt.unwrap_or_default();
 
     let loading_signal = use_context::<Signal<LoadingState>>();
 
@@ -241,6 +259,57 @@ fn GameState(identifier: String) -> Element {
                 }
             }
         },
+        QueryResult::Err(QueryError::GameNotFound(_)) => {
+            rsx! {
+                p {
+                    class: r#"
+                    text-center
+                    theme1:text-stone-200
+                    theme2:text-green-200
+                    theme3:text-slate-700
+                    "#,
+                    "Game not found"
+                }
+            }
+        },
+        QueryResult::Err(QueryError::Unauthorized) => {
+            rsx! {
+                p {
+                    class: r#"
+                    text-center
+                    theme1:text-stone-200
+                    theme2:text-green-200
+                    theme3:text-slate-700
+                    "#,
+
+                    h2 {
+                        class: r#"
+                        text-2xl
+                        theme1:text-amber-300
+                        theme2:text-green-200
+                        theme3:text-slate-700
+                        "#,
+                        "Unauthorized"
+                    }
+                    p {
+                        "Do you need to "
+                        Link {
+                            class: r#"
+                            underline
+                            theme1:text-amber-300
+                            theme1:hover:text-amber-200
+                            theme2:text-green-200
+                            theme2:hover:text-green-100
+                            theme3:text-slate-700
+                            theme3:hover:text-slate-500
+                            "#,
+                            to: Routes::AccountsPage {},
+                            "login or signup?"
+                        }
+                    }
+                }
+            }
+        },
         QueryResult::Err(e) => {
             rsx! {
                 p {
@@ -273,7 +342,7 @@ fn GameState(identifier: String) -> Element {
 #[component]
 fn GameStats(identifier: String) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.expect("No JWT found");
+    let token = storage.get().jwt.unwrap_or_default();
 
     let game_query = use_get_query(
         [QueryKey::Game(identifier.clone())],
@@ -393,20 +462,7 @@ fn GameStats(identifier: String) -> Element {
                 }
             }
         },
-        QueryResult::Err(e) => {
-            rsx! {
-                p {
-                    class: r#"
-                    text-center
-                    theme1:text-stone-200
-                    theme2:text-green-200
-                    theme3:text-slate-700
-                    "#,
-
-                    "Failed to load: {e:?}"
-                }
-            }
-        },
+        QueryResult::Err(e) => { rsx! {} },
         _ => {
             rsx! {
                 p {
@@ -426,7 +482,7 @@ fn GameStats(identifier: String) -> Element {
 #[component]
 fn GameDetails(identifier: String) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.expect("No JWT found");
+    let token = storage.get().jwt.unwrap_or_default();
 
     let game_query = use_get_query(
         [QueryKey::Game(identifier.clone())],
@@ -478,20 +534,7 @@ fn GameDetails(identifier: String) -> Element {
                 }
             }
         },
-        QueryResult::Err(e) => {
-            rsx! {
-                p {
-                    class: r#"
-                    text-center
-                    theme1:text-stone-200
-                    theme2:text-green-200
-                    theme3:text-slate-700
-                    "#,
-
-                    "Failed to load: {e:?}"
-                }
-            }
-        },
+        QueryResult::Err(e) => { rsx! { } },
         _ => {
             rsx! {
                 p {

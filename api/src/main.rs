@@ -5,27 +5,27 @@ pub mod messages;
 mod users;
 
 use crate::tributes::TRIBUTES_ROUTER;
+use crate::users::USERS_ROUTER;
 use axum::error_handling::HandleErrorLayer;
+use axum::extract::Request;
+use axum::http::header::{ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_MAX_AGE, AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE, EXPIRES};
 use axum::http::{HeaderValue, StatusCode};
+use axum::middleware::Next;
+use axum::response::{IntoResponse, Response};
 use axum::{middleware, BoxError, Router};
 use games::GAMES_ROUTER;
 use std::env;
 use std::sync::LazyLock;
 use std::time::Duration;
-use axum::extract::Request;
-use axum::http::header::{ACCEPT, ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_ORIGIN, AUTHORIZATION, CONTENT_TYPE};
-use axum::middleware::{Next};
-use axum::response::{IntoResponse, Response};
 use surrealdb::engine::any::Any;
 use surrealdb::opt::auth::Root;
 use surrealdb::Surreal;
 use surrealdb_migrations::MigrationRunner;
 use tower::ServiceBuilder;
-use tower_http::cors::{Any as CorsAny, CorsLayer, AllowOrigin};
+use tower_http::cors::{AllowOrigin, Any as CorsAny, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use crate::users::USERS_ROUTER;
 
 pub static DATABASE: LazyLock<Surreal<Any>> = LazyLock::new(Surreal::init);
 
@@ -97,33 +97,27 @@ async fn main() {
         .expect("Failed to apply migrations");
     tracing::debug!("Applied migrations");
 
-    let mut cors_layer = CorsLayer::new()
+    let cors_layer = CorsLayer::new()
         .allow_methods(vec![
+            "DELETE".parse().unwrap(),
             "GET".parse().unwrap(),
+            "HEAD".parse().unwrap(),
+            "OPTIONS".parse().unwrap(),
             "POST".parse().unwrap(),
             "PUT".parse().unwrap(),
-            "DELETE".parse().unwrap(),
-            "OPTIONS".parse().unwrap(),
-            "HEAD".parse().unwrap(),
+        ])
+        .allow_origin(AllowOrigin::any())
+        .allow_headers([
+            ACCEPT,
+            ACCEPT_ENCODING,
+            ACCEPT_LANGUAGE,
+            ACCESS_CONTROL_ALLOW_METHODS,
+            ACCESS_CONTROL_MAX_AGE,
+            AUTHORIZATION,
+            CACHE_CONTROL,
+            CONTENT_TYPE,
+            EXPIRES,
         ]);
-
-    match production.as_str() {
-        "true" => {
-            cors_layer = cors_layer
-                .allow_origin("https://hangry-games.eyeheartzombies.com".parse::<HeaderValue>().unwrap())
-                .allow_headers([
-                    ACCEPT,
-                    ACCESS_CONTROL_ALLOW_ORIGIN,
-                    ACCESS_CONTROL_ALLOW_HEADERS,
-                    AUTHORIZATION,
-                    CONTENT_TYPE
-                ]);
-        }
-        _ => {
-            cors_layer = cors_layer
-                .allow_origin(AllowOrigin::any())
-                .allow_headers(CorsAny);
-    }}
 
     let api_routes = Router::new()
         .nest("/games", GAMES_ROUTER.clone().layer(middleware::from_fn(surreal_jwt)))
@@ -156,6 +150,10 @@ async fn main() {
 }
 
 async fn surreal_jwt(request: Request, next: Next) -> Response {
+    if request.method() == axum::http::Method::OPTIONS {
+        return next.run(request).await;
+    }
+
     let token = request.headers().get("authorization");
     match token {
         None => StatusCode::UNAUTHORIZED.into_response(),

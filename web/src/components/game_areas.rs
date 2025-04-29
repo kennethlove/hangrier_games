@@ -195,7 +195,7 @@ pub fn GameAreaList(game: Game) -> Element {
                 }
             }
         }
-        QueryResult::Err(e) => {
+        QueryResult::Err(_) => {
             rsx! { p { "Something went wrong" } }
         }
         QueryResult::Loading(_) => {

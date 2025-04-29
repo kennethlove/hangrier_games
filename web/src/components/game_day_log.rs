@@ -23,7 +23,7 @@ async fn fetch_game_day_log(keys: Vec<QueryKey>, token: String) -> QueryResult<Q
                     QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
                 }
             }
-            Err(e) => {
+            Err(_) => {
                 QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
             }
         }

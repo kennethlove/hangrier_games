@@ -15,9 +15,9 @@ pub(crate) enum QueryKey {
     _GameLog(String), // Game identifier
     GameDayLog(String, u32), // Game identifier, day
     TributeLog(String), // Tribute identifier
-    TributeDayLog(String, u32), // Tribute identifier, day
+    _TributeDayLog(String, u32), // Tribute identifier, day
     _GameSummary(String),
-    GameDaySummary(String, u32), // Game identifier, day
+    _GameDaySummary(String, u32), // Game identifier, day
     User,
 }
 
@@ -65,9 +65,8 @@ pub(crate) enum MutationError {
     UnableToCreateGame,
     Unknown,
     UnableToAdvanceGame,
-    UnableToCreateUser,
     UnableToRegisterUser,
     UnableToAuthenticateUser,
-    UnableToPublishGame,
-    UnableToUnpublishGame,
+    _UnableToPublishGame,
+    _UnableToUnpublishGame,
 }

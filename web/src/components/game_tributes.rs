@@ -12,7 +12,6 @@ use game::games::{Game, GameStatus};
 use game::items::Item;
 use game::messages::GameMessage;
 use game::tributes::Tribute;
-use std::process::id;
 
 async fn fetch_tributes(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tributes(identifier)) = keys.first() {
@@ -38,8 +37,8 @@ async fn fetch_tributes(keys: Vec<QueryKey>, token: String) -> QueryResult<Query
     }
 }
 
-async fn fetch_tribute_log(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::TributeDayLog(identifier, day)) = keys.first() {
+async fn _fetch_tribute_log(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
+    if let Some(QueryKey::_TributeDayLog(identifier, day)) = keys.first() {
         if let Some(QueryKey::Game(game_identifier)) = keys.last() {
             let client = reqwest::Client::new();
 
@@ -138,7 +137,7 @@ pub fn GameTributes(game: Game) -> Element {
                 }
             }
         }
-        QueryResult::Err(e) => {
+        QueryResult::Err(_) => {
             rsx! { p { "Something went wrong" } }
         }
         QueryResult::Loading(_) => {
@@ -150,11 +149,6 @@ pub fn GameTributes(game: Game) -> Element {
 
 #[component]
 pub fn GameTributeListMember(tribute: Tribute, game_identifier: String, game_status: GameStatus) -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.expect("No JWT found");
-
-    let identifier = tribute.clone().identifier;
-
     let fist_item = Item::new_weapon("basic fist");
 
     rsx! {

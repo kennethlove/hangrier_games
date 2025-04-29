@@ -2,17 +2,13 @@ use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::icons::uturn::UTurnIcon;
 use crate::components::info_detail::InfoDetail;
 use crate::components::item_icon::ItemIcon;
-use crate::components::tribute_edit::{EditTributeModal, TributeEdit};
 use crate::components::tribute_status_icon::TributeStatusIcon;
 use crate::routes::Routes;
 use crate::env::APP_API_HOST as API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
-use game::games::Game;
 use game::messages::GameMessage;
 use game::tributes::{Attributes, Tribute};
-use shared::EditTribute;
-use std::collections::HashMap;
 use crate::storage::{use_persistent, AppState};
 
 async fn fetch_tribute(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
@@ -80,7 +76,7 @@ async fn fetch_tribute_log(keys: Vec<QueryKey>, token: String) -> QueryResult<Qu
 
 #[component]
 pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Element {
-    let mut storage = use_persistent("hangry-games", AppState::default);
+    let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
 
     let tribute_query = use_get_query(
@@ -240,7 +236,7 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
 
 #[component]
 fn TributeLog(identifier: String) -> Element {
-    let mut storage = use_persistent("hangry-games", AppState::default);
+    let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
 
     let log_query = use_get_query(

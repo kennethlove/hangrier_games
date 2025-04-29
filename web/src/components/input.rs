@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use dioxus::prelude::*;
 #[derive(Clone, Debug, PartialEq, Props)]
 pub struct InputProperties {
@@ -12,7 +11,6 @@ pub struct InputProperties {
 
 #[component]
 pub fn Input(props: InputProperties) -> Element {
-    let oninput = props.oninput.unwrap_or_default();
     rsx! {
         input {
             r#type: "{props.clone().r#type}",

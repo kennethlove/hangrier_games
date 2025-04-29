@@ -4,7 +4,7 @@ use crate::components::game_day_log::GameDayLog;
 use crate::components::game_edit::GameEdit;
 use crate::components::game_tributes::GameTributes;
 use crate::components::info_detail::InfoDetail;
-use crate::components::{Button, ThemedButton};
+use crate::components::ThemedButton;
 use crate::storage::{use_persistent, AppState};
 use crate::LoadingState;
 use crate::env::APP_API_HOST as API_HOST;
@@ -374,7 +374,6 @@ fn GameStats(identifier: String) -> Element {
                     String::new()
                 }
             };
-            let g = game.clone();
 
             rsx! {
                 div {
@@ -463,7 +462,7 @@ fn GameStats(identifier: String) -> Element {
                 }
             }
         },
-        QueryResult::Err(e) => { rsx! {} },
+        QueryResult::Err(_) => { rsx! {} },
         _ => {
             rsx! {
                 p {
@@ -535,7 +534,7 @@ fn GameDetails(identifier: String) -> Element {
                 }
             }
         },
-        QueryResult::Err(e) => { rsx! { } },
+        QueryResult::Err(_) => { rsx! { } },
         _ => {
             rsx! {
                 p {

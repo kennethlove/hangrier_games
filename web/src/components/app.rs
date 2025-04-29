@@ -6,7 +6,7 @@ use crate::storage::{use_persistent, AppState, Colorscheme};
 use dioxus::prelude::*;
 use dioxus_query::prelude::use_init_query_client;
 use game::games::Game;
-use shared::{AuthenticatedUser, DeleteGame, EditGame, EditTribute};
+use shared::{DeleteGame, EditGame, EditTribute};
 use crate::components::loading_modal::LoadingModal;
 use crate::LoadingState;
 

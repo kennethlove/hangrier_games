@@ -26,13 +26,13 @@ async fn register_user(user: RegistrationUser) -> MutationResult<MutationValue, 
                     MutationResult::Ok(MutationValue::User(user))
                 }
                 Err(_) => {
-                    MutationResult::Err(MutationError::UnableToCreateUser)
+                    MutationResult::Err(MutationError::UnableToRegisterUser)
                 }
             }
         }
         Err(e) => {
             dioxus_logger::tracing::error!("error creating user: {:?}", e);
-            MutationResult::Err(MutationError::UnableToCreateUser)
+            MutationResult::Err(MutationError::UnableToRegisterUser)
         }
     }
 }

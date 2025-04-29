@@ -98,7 +98,7 @@ pub fn EditTributeModal() -> Element {
 
 #[component]
 pub fn EditTributeForm() -> Element {
-    let mut storage = use_persistent("hangry-games", AppState::default);
+    let storage = use_persistent("hangry-games", AppState::default);
 
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
     let tribute_details = edit_tribute_signal.read().clone().unwrap_or_default();

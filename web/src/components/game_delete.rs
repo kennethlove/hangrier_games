@@ -55,7 +55,7 @@ pub fn GameDelete(game_identifier: String, game_name: String, icon_class: String
 
 #[component]
 pub fn DeleteGameModal() -> Element {
-    let mut storage = use_persistent("hangry-games", AppState::default);
+    let storage = use_persistent("hangry-games", AppState::default);
 
     let mut delete_game_signal: Signal<Option<DeleteGame>> = use_context();
     let delete_game_info = delete_game_signal.read().clone();

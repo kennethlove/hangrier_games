@@ -37,6 +37,7 @@ services:
       dockerfile: frontend.Dockerfile
       args:
         - 'API_HOST=${API_HOST:-http://backend:3000}'
+        - 'APP_API_HOST=${APP_API_HOST:-http://backend:3000}'
       cache_from:
         - ${REGISTRY_URL:-localhost}/hg_frontend:latest
     image: ${REGISTRY_URL:-localhost}/hg_frontend:latest
@@ -49,6 +50,7 @@ services:
       - SERVICE_FQDN_FRONTEND_80
       - 'SERVICE_FQDN_FRONTEND=${SERVICE_FQDN_FRONTEND}'
       - 'API_HOST=${API_HOST:-http://backend:3000}'
+      - 'APP_API_HOST=${APP_API_HOST:-http://backend:3000}'
     labels:
       - "coolify.managed=true"
     volumes:

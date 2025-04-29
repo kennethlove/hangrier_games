@@ -1,4 +1,5 @@
 ARG RUST_VERSION=1.86.0
+ARG API_HOST="http://backend:3000"
 
 # Build stage for Tailwind
 FROM node:23-slim AS css-builder
@@ -35,11 +36,12 @@ RUN cargo install dioxus-cli --locked
 # Build a dummy app with real dependencies
 COPY web/Cargo.toml ./web/Cargo.toml
 COPY web/Dioxus.toml ./web/Dioxus.toml
+COPY web/build.rs ./web/build.rs
 COPY shared/ ./shared/
 COPY game ./game/
+ENV APP_API_HOST=$API_HOST
 RUN mkdir -p web/src && \
     echo "fn main() {}" > web/src/main.rs && \
-    touch web/src/env.rs && \
     cd web && \
     cargo build --release && \
     rm -f target/release/deps/web*

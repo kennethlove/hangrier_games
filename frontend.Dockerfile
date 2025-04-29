@@ -39,6 +39,7 @@ COPY shared/ ./shared/
 COPY game ./game/
 RUN mkdir -p web/src && \
     echo "fn main() {}" > web/src/main.rs && \
+    touch web/src/env.rs && \
     cd web && \
     cargo build --release && \
     rm -f target/release/deps/web*
@@ -48,9 +49,6 @@ COPY web/src/ ./web/src/
 COPY --from=css-builder /app/assets/dist/ ./web/assets/dist/
 COPY web/assets/images/ ./web/assets/images/
 COPY web/assets/favicons/ ./web/assets/favicons/
-
-ARG API_HOST=http://localhost:3000
-ENV API_HOST=${API_HOST}
 
 WORKDIR /app/web
 RUN dx build --release

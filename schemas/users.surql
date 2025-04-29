@@ -1,6 +1,6 @@
 DEFINE FIELD IF NOT EXISTS email ON TABLE user TYPE string ASSERT $value.is_email();
 DEFINE INDEX IF NOT EXISTS unique_user_email ON TABLE user FIELDS email UNIQUE;
-DEFINE ACCESS OVERWRITE account ON DATABASE TYPE RECORD
+DEFINE ACCESS IF NOT EXISTS account ON DATABASE TYPE RECORD
     SIGNUP ( CREATE user SET email = $email, pass = crypto::argon2::generate($pass) )
     SIGNIN ( SELECT * FROM user WHERE email = $email AND crypto::argon2::compare(pass, $pass) )
     WITH JWT

@@ -8,8 +8,8 @@ use crate::tributes::TRIBUTES_ROUTER;
 use crate::users::USERS_ROUTER;
 use axum::error_handling::HandleErrorLayer;
 use axum::extract::Request;
-use axum::http::header::{ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_MAX_AGE, AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE, EXPIRES};
-use axum::http::{HeaderValue, StatusCode};
+use axum::http::header::{ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_MAX_AGE, AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE, EXPIRES};
+use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::{middleware, BoxError, Router};
@@ -22,7 +22,7 @@ use surrealdb::opt::auth::Root;
 use surrealdb::Surreal;
 use surrealdb_migrations::MigrationRunner;
 use tower::ServiceBuilder;
-use tower_http::cors::{AllowOrigin, Any as CorsAny, CorsLayer};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -42,11 +42,14 @@ fn initialize_logging() {
     let _log_targets = tracing_subscriber::filter::Targets::new()
         .with_target("api::game", tracing::Level::INFO)
         .with_target("api::tribute", tracing::Level::INFO);
+    
+    let production = env::var("PRODUCTION").unwrap_or("true".to_string());
+    let tracing_level = if production == "true" { "info" } else { "debug" };
 
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                format!("{}=debug,tower_http=debug,surrealdb=debug,surrealdb_client=debug",
+                format!("{}={tracing_level},tower_http={tracing_level},surrealdb={tracing_level},surrealdb_client={tracing_level}",
                         env!("CARGO_CRATE_NAME")).into()
             })
         )
@@ -76,8 +79,6 @@ fn initialize_logging() {
 #[tokio::main]
 async fn main() {
     initialize_logging();
-
-    let production = env::var("PRODUCTION").unwrap_or("false".to_string());
 
     DATABASE.connect(env::var("SURREAL_HOST").unwrap()).await.expect("Failed to connect to database");
     tracing::debug!("connected to SurrealDB");
@@ -121,7 +122,7 @@ async fn main() {
 
     let api_routes = Router::new()
         .nest("/games", GAMES_ROUTER.clone().layer(middleware::from_fn(surreal_jwt)))
-        .nest("/tributes", TRIBUTES_ROUTER.clone())
+        .nest("/tributes", TRIBUTES_ROUTER.clone().layer(middleware::from_fn(surreal_jwt)))
         .nest("/users", USERS_ROUTER.clone());
 
     let router = Router::new()
@@ -150,10 +151,6 @@ async fn main() {
 }
 
 async fn surreal_jwt(request: Request, next: Next) -> Response {
-    if request.method() == axum::http::Method::OPTIONS {
-        return next.run(request).await;
-    }
-
     let token = request.headers().get("authorization");
     match token {
         None => StatusCode::UNAUTHORIZED.into_response(),

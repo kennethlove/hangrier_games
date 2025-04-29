@@ -178,6 +178,7 @@ fn LoginForm() -> Element {
 
                                         let mut state = storage.get();
                                         state.jwt = Some(user.jwt.clone());
+                                        state.email = Some(email.clone());
                                         storage.set(state);
 
                                         let navigator = use_navigator();
@@ -321,6 +322,7 @@ fn RegisterForm() -> Element {
 
                                         let mut state = storage.get();
                                         state.jwt = Some(user.jwt.clone());
+                                        state.email = Some(email.clone());
                                         storage.set(state);
 
                                         let navigator = use_navigator();
@@ -400,12 +402,15 @@ fn RegisterForm() -> Element {
 #[component]
 fn LogoutButton() -> Element {
     let mut storage = use_persistent("hangry-games", AppState::default);
+    let state = storage.get();
+    let email = state.email.clone().unwrap_or("whoever you are".to_string());
 
     rsx! {
         form {
             class: "flex flex-col gap-4 mt-4",
             onsubmit: move |_| {
                 let mut state = storage.get();
+                state.email = None;
                 state.jwt = None;
                 storage.set(state);
                 let navigator = use_navigator();
@@ -422,7 +427,7 @@ fn LogoutButton() -> Element {
                 theme3:text-stone-700
                 theme3:font-[Orbitron]
                 "#,
-                "Thanks for playing!"
+                "Thanks for playing, {email}!"
             }
             ThemedButton {
                 class: "w-full",

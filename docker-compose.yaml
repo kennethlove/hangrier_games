@@ -51,6 +51,8 @@ services:
       - 'API_HOST=${API_HOST:-http://backend:3000}'
     labels:
       - "coolify.managed=true"
+    volumes:
+      - ./.env:/app/.env
 
 networks:
     internal:

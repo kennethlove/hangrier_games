@@ -2,7 +2,7 @@ use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::game_edit::GameEdit;
 use crate::components::{Button, CreateGameButton, CreateGameForm, DeleteGameModal, GameDelete};
 use crate::routes::Routes;
-use crate::API_HOST;
+use crate::env::APP_API_HOST as API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
 use game::games::Game;

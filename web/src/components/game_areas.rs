@@ -2,7 +2,7 @@ use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::icons::lock_closed::LockClosedIcon;
 use crate::components::icons::lock_open::LockOpenIcon;
 use crate::components::map::Map;
-use crate::API_HOST;
+use crate::env::APP_API_HOST as API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::areas::AreaDetails;

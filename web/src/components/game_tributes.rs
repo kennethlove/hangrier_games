@@ -5,7 +5,7 @@ use crate::components::tribute_edit::TributeEdit;
 use crate::components::tribute_status_icon::TributeStatusIcon;
 use crate::routes::Routes;
 use crate::storage::{use_persistent, AppState};
-use crate::API_HOST;
+use crate::env::APP_API_HOST as API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::games::{Game, GameStatus};

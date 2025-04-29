@@ -2,7 +2,7 @@ use std::ops::Deref;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use shared::{AuthenticatedUser, RegistrationUser};
-use crate::API_HOST;
+use crate::env::APP_API_HOST as API_HOST;
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use crate::components::{Input, ThemedButton};
 use crate::routes::Routes;

@@ -1,5 +1,5 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
-use crate::API_HOST;
+use crate::env::APP_API_HOST as API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::games::Game;

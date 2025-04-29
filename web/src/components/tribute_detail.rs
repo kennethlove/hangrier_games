@@ -5,7 +5,7 @@ use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_edit::{EditTributeModal, TributeEdit};
 use crate::components::tribute_status_icon::TributeStatusIcon;
 use crate::routes::Routes;
-use crate::API_HOST;
+use crate::env::APP_API_HOST as API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::games::Game;

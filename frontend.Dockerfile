@@ -1,5 +1,4 @@
 ARG RUST_VERSION=1.86.0
-ARG API_HOST="http://backend:3000"
 
 # Build stage for Tailwind
 FROM node:23-slim AS css-builder
@@ -17,6 +16,9 @@ RUN npx @tailwindcss/cli -i ./assets/src/main.css -o ./assets/dist/main.css
 
 # Build stage for Dioxus
 FROM rust:${RUST_VERSION}-slim-bookworm AS rust-builder
+
+ARG APP_API_HOST
+
 WORKDIR /app
 
 RUN apt-get update && \
@@ -29,7 +31,8 @@ RUN apt-get update && \
         llvm \
         libclang-dev \
         build-essential && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    rustup target add wasm32-unknown-unknown
 
 RUN cargo install dioxus-cli --locked
 
@@ -39,7 +42,7 @@ COPY web/Dioxus.toml ./web/Dioxus.toml
 COPY web/build.rs ./web/build.rs
 COPY shared/ ./shared/
 COPY game ./game/
-ENV APP_API_HOST=$API_HOST
+ENV APP_API_HOST=${APP_API_HOST}
 RUN mkdir -p web/src && \
     echo "fn main() {}" > web/src/main.rs && \
     cd web && \

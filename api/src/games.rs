@@ -10,7 +10,7 @@ use axum::Router;
 use axum::{BoxError, Json};
 use futures::StreamExt;
 use game::areas::{Area, AreaDetails};
-use game::games::{Game, GameStatus};
+use game::games::{DisplayGame, Game, GameStatus};
 use game::items::Item;
 use game::messages::{get_all_messages, GameMessage};
 use game::tributes::Tribute;
@@ -213,13 +213,14 @@ count(<-playing_in<-tribute.id) == 24
 AND
 count(array::distinct(<-playing_in<-tribute.district)) == 12
 AS ready,
-created_by == $auth AS is_mine
+created_by.id == $auth.id AS is_mine,
+created_by.username
 FROM game
 ;"#).await.unwrap();
 
-    match games.take::<Vec<Game>>(0) {
+    match games.take::<Vec<DisplayGame>>(0) {
         Ok(games) => {
-            (StatusCode::OK, Json::<Vec<Game>>(games)).into_response()
+            (StatusCode::OK, Json::<Vec<DisplayGame>>(games)).into_response()
         }
         Err(e) => {
             tracing::error!("{}", e);
@@ -228,7 +229,7 @@ FROM game
     }
 }
 
-pub async fn game_detail(game_identifier: Path<String>) -> (StatusCode, Json<Option<Game>>) {
+pub async fn game_detail(game_identifier: Path<String>) -> impl IntoResponse {
     let identifier = game_identifier.0;
     let day = DATABASE.query(format!("SELECT day FROM game WHERE identifier = '{identifier}' LIMIT 1")).await;
     let day: Option<i64> = day.unwrap().take("day").unwrap();
@@ -253,17 +254,18 @@ SELECT *, (
     RETURN count(SELECT id FROM <-playing_in<-tribute)
 ) AS tribute_count,
 count(<-playing_in<-tribute.id) == 24 AND count(array::distinct(<-playing_in<-tribute.district)) == 12 AS ready,
-created_by == $auth AS is_mine
+created_by.id == $auth.id AS is_mine,
+created_by.username
 FROM game
 WHERE identifier = "{identifier}";"#))
     .await.unwrap();
 
-    let game: Option<Game> = result.take(0).expect("No game found");
+    let game: Option<DisplayGame> = result.take(0).expect("No game found");
 
     if let Some(game) = game {
-        (StatusCode::OK, Json(Some(game)))
+        (StatusCode::OK, Json(Some(game))).into_response()
     } else {
-        (StatusCode::NOT_FOUND, Json(None))
+        (StatusCode::NOT_FOUND, Json(None::<DisplayGame>)).into_response()
     }
 }
 

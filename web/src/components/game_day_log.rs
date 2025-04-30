@@ -2,7 +2,7 @@ use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
-use game::games::Game;
+use game::games::{DisplayGame, Game};
 use game::messages::GameMessage;
 use crate::storage::{use_persistent, AppState};
 
@@ -33,7 +33,7 @@ async fn fetch_game_day_log(keys: Vec<QueryKey>, token: String) -> QueryResult<Q
 }
 
 #[component]
-pub fn GameDayLog(game: Game, day: u32) -> Element {
+pub fn GameDayLog(game: DisplayGame, day: u32) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
 

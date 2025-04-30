@@ -33,7 +33,7 @@ pub struct TributeKey {
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct RegistrationUser {
-    pub email: String,
+    pub username: String,
     pub password: String,
 }
 

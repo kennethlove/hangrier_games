@@ -1,5 +1,5 @@
 use game::areas::AreaDetails;
-use game::games::Game;
+use game::games::{DisplayGame, Game};
 use game::messages::GameMessage;
 use game::tributes::Tribute;
 use shared::{AuthenticatedUser, TributeKey};
@@ -35,8 +35,8 @@ pub(crate) enum QueryError {
 #[derive(PartialEq, Debug)]
 pub(crate) enum QueryValue {
     Areas(Vec<AreaDetails>),
-    Game(Box<Game>),
-    Games(Vec<Game>),
+    Game(Box<DisplayGame>),
+    Games(Vec<DisplayGame>),
     Tribute(Box<Tribute>),
     Tributes(Vec<Tribute>),
     GameTributes(Vec<TributeKey>),

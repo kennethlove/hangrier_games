@@ -6,7 +6,7 @@ use crate::storage::{use_persistent, AppState, Colorscheme};
 use dioxus::prelude::*;
 use dioxus_query::prelude::use_init_query_client;
 use game::games::Game;
-use shared::{AuthenticatedUser, DeleteGame, EditGame, EditTribute};
+use shared::{DeleteGame, EditGame, EditTribute};
 use crate::components::loading_modal::LoadingModal;
 use crate::LoadingState;
 
@@ -34,7 +34,7 @@ pub fn App() -> Element {
     let edit_tribute_signal: Signal<Option<EditTribute>> = use_signal(|| None);
     use_context_provider(|| edit_tribute_signal);
 
-    let server_version = "0.1.11";
+    let server_version = "0.1.12";
     let client_version = env!("CARGO_PKG_VERSION");
 
     let favicon = match *theme_signal.read() {

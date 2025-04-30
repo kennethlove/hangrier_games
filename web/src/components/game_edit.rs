@@ -1,7 +1,7 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use crate::components::icons::edit::EditIcon;
 use crate::components::Button;
-use crate::API_HOST;
+use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use shared::EditGame;
@@ -13,7 +13,7 @@ async fn edit_game(args: (EditGame, String)) -> MutationResult<MutationValue, Mu
     let token = args.1.clone();
 
     let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}", &*API_HOST, identifier);
+    let url: String = format!("{}/api/games/{}", APP_API_HOST, identifier);
 
     let response = client
         .put(url)

@@ -1,5 +1,5 @@
 use game::areas::AreaDetails;
-use game::games::Game;
+use game::games::{DisplayGame, Game};
 use game::messages::GameMessage;
 use game::tributes::Tribute;
 use shared::{AuthenticatedUser, TributeKey};
@@ -15,9 +15,9 @@ pub(crate) enum QueryKey {
     _GameLog(String), // Game identifier
     GameDayLog(String, u32), // Game identifier, day
     TributeLog(String), // Tribute identifier
-    TributeDayLog(String, u32), // Tribute identifier, day
+    _TributeDayLog(String, u32), // Tribute identifier, day
     _GameSummary(String),
-    GameDaySummary(String, u32), // Game identifier, day
+    _GameDaySummary(String, u32), // Game identifier, day
     User,
 }
 
@@ -35,8 +35,8 @@ pub(crate) enum QueryError {
 #[derive(PartialEq, Debug)]
 pub(crate) enum QueryValue {
     Areas(Vec<AreaDetails>),
-    Game(Box<Game>),
-    Games(Vec<Game>),
+    Game(Box<DisplayGame>),
+    Games(Vec<DisplayGame>),
     Tribute(Box<Tribute>),
     Tributes(Vec<Tribute>),
     GameTributes(Vec<TributeKey>),
@@ -65,9 +65,8 @@ pub(crate) enum MutationError {
     UnableToCreateGame,
     Unknown,
     UnableToAdvanceGame,
-    UnableToCreateUser,
     UnableToRegisterUser,
     UnableToAuthenticateUser,
-    UnableToPublishGame,
-    UnableToUnpublishGame,
+    _UnableToPublishGame,
+    _UnableToUnpublishGame,
 }

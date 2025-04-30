@@ -1,11 +1,11 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
-use crate::components::{Button, Input, ThemedButton};
-use crate::{LoadingState, API_HOST};
+use crate::components::{Input, ThemedButton};
+use crate::LoadingState;
+use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use game::games::Game;
 use std::ops::Deref;
-use dioxus::html::link::disabled;
 use crate::storage::{use_persistent, AppState};
 
 async fn create_game(args: (Option<String>, String)) -> MutationResult<MutationValue, MutationError> {
@@ -19,7 +19,7 @@ async fn create_game(args: (Option<String>, String)) -> MutationResult<MutationV
 
     let response = client.request(
         reqwest::Method::POST,
-        format!("{}/api/games", &*API_HOST))
+        format!("{}/api/games", APP_API_HOST))
         .bearer_auth(token)
         .json(&json_body);
 

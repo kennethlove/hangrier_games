@@ -1,6 +1,6 @@
 [package]
 name = "web"
-version = "0.1.16"
+version = "0.1.17"
 edition = "2024"
 
 [dependencies]
@@ -20,6 +20,9 @@ features = ["js"]
 
 [dependencies.wasm-bindgen]
 version = "0.2.99"
+
+[build-dependencies]
+dotenvy = "0.15.7"
 
 [features]
 default = ["web"]

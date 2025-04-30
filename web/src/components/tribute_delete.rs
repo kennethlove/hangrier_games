@@ -1,5 +1,5 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
-use crate::API_HOST;
+use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use game::games::GAME;
@@ -11,7 +11,7 @@ async fn delete_tribute(name: String) -> MutationResult<MutationValue, MutationE
     let game_name = GAME.with_borrow(|g| { g.name.clone() });
 
     let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}/tributes/{}", API_HOST.clone(), game_name, name);
+    let url: String = format!("{}/api/games/{}/tributes/{}", APP_API_HOST.clone(), game_name, name);
 
     let response = client
         .delete(url)

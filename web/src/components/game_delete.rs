@@ -1,7 +1,7 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use crate::components::icons::delete::DeleteIcon;
 use crate::components::Button;
-use crate::API_HOST;
+use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use shared::DeleteGame;
@@ -13,7 +13,7 @@ async fn delete_game(args: (DeleteGame, String)) -> MutationResult<MutationValue
     let name = args.0.1;
     let token = args.1;
     let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}", &*API_HOST, identifier);
+    let url: String = format!("{}/api/games/{}", APP_API_HOST, identifier);
 
     let response = client
         .delete(url)
@@ -55,7 +55,7 @@ pub fn GameDelete(game_identifier: String, game_name: String, icon_class: String
 
 #[component]
 pub fn DeleteGameModal() -> Element {
-    let mut storage = use_persistent("hangry-games", AppState::default);
+    let storage = use_persistent("hangry-games", AppState::default);
 
     let mut delete_game_signal: Signal<Option<DeleteGame>> = use_context();
     let delete_game_info = delete_game_signal.read().clone();

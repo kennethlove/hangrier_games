@@ -1,6 +1,4 @@
 use dioxus::prelude::*;
-use crate::components::icons::loading::LoadingIcon;
-use crate::components::icons::mockingjay::Mockingjay;
 use crate::components::icons::mockingjay_arrow::MockingjayArrow;
 use crate::LoadingState;
 

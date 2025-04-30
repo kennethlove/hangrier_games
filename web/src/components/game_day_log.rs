@@ -1,8 +1,8 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
-use crate::API_HOST;
+use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
-use game::games::Game;
+use game::games::{DisplayGame, Game};
 use game::messages::GameMessage;
 use crate::storage::{use_persistent, AppState};
 
@@ -12,7 +12,7 @@ async fn fetch_game_day_log(keys: Vec<QueryKey>, token: String) -> QueryResult<Q
 
         let request = client.request(
             reqwest::Method::GET,
-            format!("{}/api/games/{}/log/{}", &*API_HOST, identifier, day))
+            format!("{}/api/games/{}/log/{}", APP_API_HOST, identifier, day))
             .bearer_auth(token);
 
         match request.send().await {
@@ -23,7 +23,7 @@ async fn fetch_game_day_log(keys: Vec<QueryKey>, token: String) -> QueryResult<Q
                     QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
                 }
             }
-            Err(e) => {
+            Err(_) => {
                 QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
             }
         }
@@ -33,7 +33,7 @@ async fn fetch_game_day_log(keys: Vec<QueryKey>, token: String) -> QueryResult<Q
 }
 
 #[component]
-pub fn GameDayLog(game: Game, day: u32) -> Element {
+pub fn GameDayLog(game: DisplayGame, day: u32) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
 

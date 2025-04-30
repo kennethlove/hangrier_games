@@ -1,7 +1,7 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use crate::components::icons::edit::EditIcon;
 use crate::components::Button;
-use crate::API_HOST;
+use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use game::games::Game;
@@ -18,7 +18,7 @@ async fn edit_tribute(args: (EditTribute, String, String)) -> MutationResult<Mut
     let client = reqwest::Client::new();
     let url: String = format!(
         "{}/api/games/{}/tributes/{}",
-        &*API_HOST,
+        APP_API_HOST,
         game_identifier,
         identifier
     );
@@ -98,7 +98,7 @@ pub fn EditTributeModal() -> Element {
 
 #[component]
 pub fn EditTributeForm() -> Element {
-    let mut storage = use_persistent("hangry-games", AppState::default);
+    let storage = use_persistent("hangry-games", AppState::default);
 
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
     let tribute_details = edit_tribute_signal.read().clone().unwrap_or_default();

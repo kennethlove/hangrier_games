@@ -1,10 +1,10 @@
-DEFINE TABLE OVERWRITE game SCHEMALESS
+DEFINE TABLE OVERWRITE game SCHEMAFULL
     PERMISSIONS
         FOR select
             WHERE private = false
-            OR created_by = $auth
+            OR created_by.id = $auth.id
         FOR create, update, delete
-            WHERE created_by = $auth;
+            WHERE created_by.id = $auth.id;
 
 DEFINE FIELD OVERWRITE identifier ON game;
 DEFINE FIELD OVERWRITE name ON game;

@@ -1,14 +1,14 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
-use crate::API_HOST;
+use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::games::Game;
 
-async fn fetch_game_day_summary(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::GameDaySummary(identifier, day)) = keys.first() {
+async fn _fetch_game_day_summary(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
+    if let Some(QueryKey::_GameDaySummary(identifier, day)) = keys.first() {
         let response = reqwest::get(format!(
             "{}/api/games/{}/summarize/{}",
-            &*API_HOST,
+            APP_API_HOST,
             identifier,
             day
         ))
@@ -33,11 +33,11 @@ pub fn GameDaySummary(game: Game, day: u32) -> Element {
 
     let summary_query = use_get_query(
         [
-            QueryKey::GameDaySummary(identifier.clone(), day),
+            QueryKey::_GameDaySummary(identifier.clone(), day),
             QueryKey::Game(identifier.clone()),
             QueryKey::Games,
         ],
-        fetch_game_day_summary,
+        _fetch_game_day_summary,
     );
 
     match summary_query.result().value() {

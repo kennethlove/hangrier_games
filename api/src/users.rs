@@ -40,8 +40,8 @@ pub static USERS_ROUTER: LazyLock<Router> = LazyLock::new(|| {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Params {
-    email: String,
-    pass: String,
+    username: String,
+    password: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -55,16 +55,16 @@ async fn session() -> Result<Json<String>, error::Error> {
 }
 
 async fn user_create(Json(payload): Json<Params>) -> Result<Json<JwtResponse>, error::Error> {
-    let email = payload.email;
-    let password = payload.pass;
+    let username = payload.username;
+    let password = payload.password;
 
     let jwt = DATABASE.signup(Record {
-        access: "account",
+        access: "user",
         namespace: "hangry-games",
         database: "games",
         params: Params {
-            email: email.clone(),
-            pass: password.clone()
+            username: username.clone(),
+            password: password.clone()
         },
     })
     .await?
@@ -74,16 +74,16 @@ async fn user_create(Json(payload): Json<Params>) -> Result<Json<JwtResponse>, e
 }
 
 async fn user_authenticate(Json(payload): Json<Params>) -> Result<Json<JwtResponse>, error::Error> {
-    let email = payload.email;
-    let password = payload.pass;
+    let username = payload.username;
+    let password = payload.password;
 
     let jwt = DATABASE.signin(Record {
-        access: "account",
+        access: "user",
         namespace: "hangry-games",
         database: "games",
         params: Params {
-            email: email.clone(),
-            pass: password.clone()
+            username: username.clone(),
+            password: password.clone()
         },
     })
     .await?

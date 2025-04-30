@@ -2,10 +2,10 @@ use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::game_edit::GameEdit;
 use crate::components::{Button, CreateGameButton, CreateGameForm, DeleteGameModal, GameDelete};
 use crate::routes::Routes;
-use crate::API_HOST;
+use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
-use game::games::Game;
+use game::games::{DisplayGame, Game};
 use crate::components::icons::eye_closed::EyeClosedIcon;
 use crate::components::icons::eye_open::EyeOpenIcon;
 use crate::storage::{use_persistent, AppState};
@@ -15,12 +15,12 @@ async fn fetch_games(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryVal
         let client = reqwest::Client::new();
         let request = client.request(
             reqwest::Method::GET,
-            format!("{}/api/games", &*API_HOST),
+            format!("{}/api/games", APP_API_HOST),
         ).bearer_auth(token);
 
         match request.send().await{
             Ok(request) => {
-                if let Ok(response) = request.json::<Vec<Game>>().await {
+                if let Ok(response) = request.json::<Vec<DisplayGame>>().await {
                     QueryResult::Ok(QueryValue::Games(response))
                 } else {
                     QueryResult::Err(QueryError::BadJson)
@@ -47,7 +47,7 @@ fn NoGames() -> Element {
 
 #[component]
 pub fn GamesList() -> Element {
-    let mut storage = use_persistent("hangry-games", AppState::default);
+    let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
     let games_query = use_get_query(
         [QueryKey::AllGames, QueryKey::Games],
@@ -120,7 +120,11 @@ fn RefreshButton() -> Element {
 }
 
 #[component]
-pub fn GameListMember(game: Game) -> Element {
+pub fn GameListMember(game: DisplayGame) -> Element {
+    let created_by = game.clone().created_by;
+    let is_mine = game.clone().is_mine;
+
+    let game = Game::from(game);
     let living_count = game.living_tributes().len();
     rsx! {
         li {
@@ -170,7 +174,7 @@ pub fn GameListMember(game: Game) -> Element {
                         "{game.name}"
                     }
                 }
-                if game.is_mine {
+                if is_mine {
                     div {
                         class: "flex flex-row gap-2",
                         GameEdit {
@@ -203,6 +207,19 @@ pub fn GameListMember(game: Game) -> Element {
                             theme3:fill-yellow-600
                             theme3:hover:fill-amber-500
                             "#,
+                        }
+                    }
+                } else {
+                    div {
+                        class: "flex flex-row gap-2",
+                        p {
+                            class: r#"
+                            text-sm
+                            theme1:text-stone-200/75
+                            theme2:text-green-200/50
+                            theme3:text-stone-700
+                            "#,
+                            "By {created_by.username}"
                         }
                     }
                 }

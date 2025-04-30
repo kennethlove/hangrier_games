@@ -16,6 +16,9 @@ RUN npx @tailwindcss/cli -i ./assets/src/main.css -o ./assets/dist/main.css
 
 # Build stage for Dioxus
 FROM rust:${RUST_VERSION}-slim-bookworm AS rust-builder
+
+ARG APP_API_HOST
+
 WORKDIR /app
 
 RUN apt-get update && \
@@ -28,15 +31,18 @@ RUN apt-get update && \
         llvm \
         libclang-dev \
         build-essential && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    rustup target add wasm32-unknown-unknown
 
 RUN cargo install dioxus-cli --locked
 
 # Build a dummy app with real dependencies
 COPY web/Cargo.toml ./web/Cargo.toml
 COPY web/Dioxus.toml ./web/Dioxus.toml
+COPY web/build.rs ./web/build.rs
 COPY shared/ ./shared/
 COPY game ./game/
+ENV APP_API_HOST=${APP_API_HOST}
 RUN mkdir -p web/src && \
     echo "fn main() {}" > web/src/main.rs && \
     cd web && \
@@ -48,9 +54,6 @@ COPY web/src/ ./web/src/
 COPY --from=css-builder /app/assets/dist/ ./web/assets/dist/
 COPY web/assets/images/ ./web/assets/images/
 COPY web/assets/favicons/ ./web/assets/favicons/
-
-ARG API_HOST=http://localhost:3000
-ENV API_HOST=${API_HOST}
 
 WORKDIR /app/web
 RUN dx build --release

@@ -89,7 +89,7 @@ impl FromStr for Colorscheme {
 pub struct AppState {
     pub(crate) colorscheme: Colorscheme,
     pub(crate) jwt: Option<String>,
-    pub(crate) email: Option<String>,
+    pub(crate) username: Option<String>,
 }
 
 impl AppState {

@@ -11,7 +11,7 @@ use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_logger::tracing;
 use dioxus_query::prelude::{use_get_query, use_mutation, use_query_client, MutationResult, QueryResult, UseMutation, UseQueryClient};
-use game::games::Game;
+use game::games::{DisplayGame, Game};
 use game::games::GameStatus;
 use game::tributes::Tribute;
 use reqwest::StatusCode;
@@ -31,7 +31,7 @@ async fn fetch_game(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValu
             Ok(response) =>  {
                 match response.error_for_status() {
                     Ok(response) => {
-                        if let Ok(game) = response.json::<Game>().await {
+                        if let Ok(game) = response.json::<DisplayGame>().await {
                             QueryResult::Ok(QueryValue::Game(Box::new(game)))
                         } else {
                             QueryResult::Err(QueryError::BadJson)
@@ -173,6 +173,7 @@ fn GameState(identifier: String) -> Element {
             let is_ready = game.ready;
             let is_finished = game.status == GameStatus::Finished;
             let game_private = game.private;
+            let creator = game.created_by.username.clone();
 
             let mutate = use_mutation(next_step);
 
@@ -205,47 +206,60 @@ fn GameState(identifier: String) -> Element {
             rsx! {
                 div {
                     class: "flex flex-col gap-2",
-                    h2 {
+                    div {
                         class: r#"
                         flex
                         flex-row
+                        gap-4
                         place-content-between
-
-                        theme1:text-2xl
-                        theme1:font-[Cinzel]
-                        theme1:text-amber-300
-
-                        theme2:font-[Playfair_Display]
-                        theme2:text-3xl
-                        theme2:text-green-200
-
-                        theme3:font-[Orbitron]
-                        theme3:text-2xl
-                        theme3:text-stone-700
+                        align-middle
                         "#,
 
-                        "{game_name}"
+                        h2 {
+                            class: r#"
+                            theme1:text-2xl
+                            theme1:font-[Cinzel]
+                            theme1:text-amber-300
+
+                            theme2:font-[Playfair_Display]
+                            theme2:text-3xl
+                            theme2:text-green-200
+
+                            theme3:font-[Orbitron]
+                            theme3:text-2xl
+                            theme3:text-stone-700
+                            "#,
+
+                            "{game_name}"
+                        }
 
                         if is_mine {
+                            GameEdit {
+                                identifier: g_id.clone(),
+                                name: game_name.clone(),
+                                private: game_private,
+                                icon_class: r#"
+                                size-4
+
+                                theme1:fill-amber-500
+                                theme1:hover:fill-amber-200
+
+                                theme2:fill-green-200/50
+                                theme2:hover:fill-green-200
+
+                                theme3:fill-amber-700/75
+                                theme3:hover:fill-amber-700
+                                "#
+                            }
+                        } else {
                             span {
-                                class: "pl-2",
-                                GameEdit {
-                                    identifier: g_id.clone(),
-                                    name: game_name.clone(),
-                                    private: game_private,
-                                    icon_class: r#"
-                                    size-4
-
-                                    theme1:fill-amber-500
-                                    theme1:hover:fill-amber-200
-
-                                    theme2:fill-green-200/50
-                                    theme2:hover:fill-green-200
-
-                                    theme3:fill-amber-700/75
-                                    theme3:hover:fill-amber-700
-                                    "#
-                                }
+                                class: r#"
+                                text-sm
+                                theme1:text-stone-200/75
+                                theme2:text-green-200/50
+                                theme3:text-stone-700
+                                "#,
+                                "By {creator}"
                             }
                         }
                     }
@@ -352,6 +366,7 @@ fn GameStats(identifier: String) -> Element {
 
     match game_query.result().value() {
         QueryResult::Ok(QueryValue::Game(game)) => {
+            let game = Game::from(*game.clone());
             let game_day = game.day.unwrap_or(0);
             let tribute_count = game
                 .clone()
@@ -495,9 +510,9 @@ fn GameDetails(identifier: String) -> Element {
 
             let mut game_signal: Signal<Option<Game>> = use_context();
             use_effect({
-                let game = game.clone();
+                let game = Game::from(*game.clone());
                 move || {
-                    game_signal.set(Some(*game.clone()));
+                    game_signal.set(Some(game.clone()));
                 }
             });
 

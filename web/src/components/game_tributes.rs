@@ -8,7 +8,7 @@ use crate::storage::{use_persistent, AppState};
 use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
-use game::games::{Game, GameStatus};
+use game::games::{DisplayGame, Game, GameStatus};
 use game::items::Item;
 use game::messages::GameMessage;
 use game::tributes::Tribute;
@@ -72,7 +72,7 @@ async fn _fetch_tribute_log(keys: Vec<QueryKey>, token: String) -> QueryResult<Q
 }
 
 #[component]
-pub fn GameTributes(game: Game) -> Element {
+pub fn GameTributes(game: DisplayGame) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
 

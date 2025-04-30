@@ -11,8 +11,8 @@ use crate::storage::{use_persistent, AppState};
 async fn register_user(user: RegistrationUser) -> MutationResult<MutationValue, MutationError> {
     let client = reqwest::Client::new();
     let json_body = serde_json::json!({
-        "email": user.email,
-        "pass": user.password,
+        "username": user.username,
+        "password": user.password,
     });
 
     let response = client.post(format!("{}/api/users", APP_API_HOST))
@@ -40,8 +40,8 @@ async fn register_user(user: RegistrationUser) -> MutationResult<MutationValue, 
 async fn authenticate_user(user: RegistrationUser) -> MutationResult<MutationValue, MutationError> {
     let client = reqwest::Client::new();
     let json_body = serde_json::json!({
-        "email": user.email,
-        "pass": user.password,
+        "username": user.username,
+        "password": user.password,
     });
 
     let response = client.post(format!("{}/api/users/authenticate", APP_API_HOST))
@@ -103,7 +103,7 @@ pub fn AccountsPage() -> Element {
                 theme3:text-stone-200
                 "#,
 
-                "Your email and password are stored in a secure database. We do not share your data with third parties."
+                "Your username and password are stored in a secure database. We do not share your data with third parties."
             }
         }
     }
@@ -113,10 +113,10 @@ pub fn AccountsPage() -> Element {
 fn LoginForm() -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
-    let mut email_signal = use_signal(String::default);
+    let mut username_signal = use_signal(String::default);
     let mut password_signal = use_signal(String::default);
     let mut disabled_signal = use_signal(|| false);
-    let mut email_error_signal = use_signal(String::default);
+    let mut username_error_signal = use_signal(String::default);
     let mut password_error_signal = use_signal(String::default);
 
     let mutate = use_mutation(authenticate_user);
@@ -144,12 +144,12 @@ fn LoginForm() -> Element {
                 id: "register-form",
                 method: "POST",
                 onsubmit: move |_| {
-                    email_error_signal.set(String::default());
+                    username_error_signal.set(String::default());
                     password_error_signal.set(String::default());
 
-                    let email = email_signal.read().clone();
-                    if email.is_empty() {
-                        email_error_signal.set("Email is required".to_string());
+                    let username = username_signal.read().clone();
+                    if username.is_empty() {
+                        username_error_signal.set("Username is required".to_string());
                     }
 
                     let password = password_signal.read().clone();
@@ -157,12 +157,12 @@ fn LoginForm() -> Element {
                         password_error_signal.set("Password is required".to_string());
                     }
 
-                    if email_error_signal.peek().is_empty() && password_error_signal.peek().is_empty() {
+                    if username_error_signal.peek().is_empty() && password_error_signal.peek().is_empty() {
                         disabled_signal.set(true);
 
                         spawn(async move {
                             let user = RegistrationUser {
-                                email: email.clone(),
+                                username: username.clone(),
                                 password: password.clone(),
                             };
                             mutate.manual_mutate(user).await;
@@ -171,33 +171,33 @@ fn LoginForm() -> Element {
                                     MutationResult::Ok(MutationValue::User(user)) => {
                                         client.invalidate_queries(&[QueryKey::User]);
                                         disabled_signal.set(false);
-                                        email_signal.set(String::default());
+                                        username_signal.set(String::default());
                                         password_signal.set(String::default());
                                         password_error_signal.set(String::default());
-                                        email_error_signal.set(String::default());
+                                        username_error_signal.set(String::default());
 
                                         let mut state = storage.get();
                                         state.jwt = Some(user.jwt.clone());
-                                        state.email = Some(email.clone());
+                                        state.username = Some(username.clone());
                                         storage.set(state);
 
                                         let navigator = use_navigator();
                                         navigator.replace(Routes::GamesList {});
                                     },
                                     MutationResult::Err(MutationError::UnableToAuthenticateUser) => {
-                                        email_error_signal.set("Unable to authenticate user".to_string());
+                                        username_error_signal.set("Unable to authenticate user".to_string());
                                         disabled_signal.set(false);
                                     },
                                     _ => {}
                                 }
                             } else {
-                                email_error_signal.set("Unable to authenticate user".to_string());
+                                username_error_signal.set("Unable to authenticate user".to_string());
                                 disabled_signal.set(false);
                             }
                         });
                     }
                 },
-                if !email_error_signal.read().is_empty() {
+                if !username_error_signal.read().is_empty() {
                     div {
                         class: r#"
                         text-sm
@@ -205,15 +205,15 @@ fn LoginForm() -> Element {
                         theme2:text-teal-300
                         theme3:text-amber-400
                         "#,
-                        "{email_error_signal.read()}"
+                        "{username_error_signal.read()}"
                     }
                 }
                 Input {
-                    r#type: "email",
-                    name: "email",
-                    placeholder: "Email",
+                    r#type: "string",
+                    name: "username",
+                    placeholder: "Username",
                     oninput: move |e: Event<FormData>| {
-                        email_signal.set(e.value().clone());
+                        username_signal.set(e.value().clone());
                     }
                 }
                 if !password_error_signal.read().is_empty() {
@@ -251,11 +251,11 @@ fn LoginForm() -> Element {
 fn RegisterForm() -> Element {
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
-    let mut email_signal = use_signal(String::default);
+    let mut username_signal = use_signal(String::default);
     let mut password_signal = use_signal(String::default);
     let mut password2_signal = use_signal(String::default);
     let mut disabled_signal = use_signal(|| false);
-    let mut email_error_signal = use_signal(String::default);
+    let mut username_error_signal = use_signal(String::default);
     let mut password_error_signal = use_signal(String::default);
 
     let mutate = use_mutation(register_user);
@@ -285,12 +285,12 @@ fn RegisterForm() -> Element {
                 id: "register-form",
                 method: "POST",
                 onsubmit: move |_| {
-                    email_error_signal.set(String::default());
+                    username_error_signal.set(String::default());
                     password_error_signal.set(String::default());
 
-                    let email = email_signal.read().clone();
-                    if email.is_empty() {
-                        email_error_signal.set("Email is required".to_string());
+                    let username = username_signal.read().clone();
+                    if username.is_empty() {
+                        username_error_signal.set("Username is required".to_string());
                     }
 
                     let password = password_signal.read().clone();
@@ -300,12 +300,12 @@ fn RegisterForm() -> Element {
                         password_error_signal.set("Passwords do not match".to_string());
                     }
 
-                    if email_error_signal.peek().is_empty() && password_error_signal.peek().is_empty() {
+                    if username_error_signal.peek().is_empty() && password_error_signal.peek().is_empty() {
                         disabled_signal.set(true);
 
                         spawn(async move {
                             let user = RegistrationUser {
-                                email: email.clone(),
+                                username: username.clone(),
                                 password: password.clone(),
                             };
                             mutate.manual_mutate(user).await;
@@ -314,34 +314,34 @@ fn RegisterForm() -> Element {
                                     MutationResult::Ok(MutationValue::User(user)) => {
                                         client.invalidate_queries(&[QueryKey::User]);
                                         disabled_signal.set(false);
-                                        email_signal.set(String::default());
+                                        username_signal.set(String::default());
                                         password_signal.set(String::default());
                                         password2_signal.set(String::default());
                                         password_error_signal.set(String::default());
-                                        email_error_signal.set(String::default());
+                                        username_error_signal.set(String::default());
 
                                         let mut state = storage.get();
                                         state.jwt = Some(user.jwt.clone());
-                                        state.email = Some(email.clone());
+                                        state.username = Some(username.clone());
                                         storage.set(state);
 
                                         let navigator = use_navigator();
                                         navigator.replace(Routes::GamesList {});
                                     },
                                     MutationResult::Err(MutationError::UnableToRegisterUser) => {
-                                        email_error_signal.set("Unable to register user".to_string());
+                                        username_error_signal.set("Unable to register user".to_string());
                                         disabled_signal.set(false);
                                     },
                                     _ => {}
                                 }
                             } else {
-                                email_error_signal.set("Unable to register user".to_string());
+                                username_error_signal.set("Unable to register user".to_string());
                                 disabled_signal.set(false);
                             }
                         });
                     }
                 },
-                if !email_error_signal.read().is_empty() {
+                if !username_error_signal.read().is_empty() {
                     div {
                         class: r#"
                         text-sm
@@ -349,15 +349,15 @@ fn RegisterForm() -> Element {
                         theme2:text-teal-300
                         theme3:text-amber-400
                         "#,
-                        "{email_error_signal.read()}"
+                        "{username_error_signal.read()}"
                     }
                 }
                 Input {
-                    r#type: "email",
-                    name: "email",
-                    placeholder: "Email",
+                    r#type: "text",
+                    name: "username",
+                    placeholder: "Username",
                     oninput: move |e: Event<FormData>| {
-                        email_signal.set(e.value().clone());
+                        username_signal.set(e.value().clone());
                     }
                 }
                 if !password_error_signal.read().is_empty() {
@@ -403,14 +403,14 @@ fn RegisterForm() -> Element {
 fn LogoutButton() -> Element {
     let mut storage = use_persistent("hangry-games", AppState::default);
     let state = storage.get();
-    let email = state.email.clone().unwrap_or("whoever you are".to_string());
+    let username = state.username.clone().unwrap_or("whoever you are".to_string());
 
     rsx! {
         form {
             class: "flex flex-col gap-4 mt-4",
             onsubmit: move |_| {
                 let mut state = storage.get();
-                state.email = None;
+                state.username = None;
                 state.jwt = None;
                 storage.set(state);
                 let navigator = use_navigator();
@@ -427,7 +427,7 @@ fn LogoutButton() -> Element {
                 theme3:text-stone-700
                 theme3:font-[Orbitron]
                 "#,
-                "Thanks for playing, {email}!"
+                "Thanks for playing, {username}!"
             }
             ThemedButton {
                 class: "w-full",

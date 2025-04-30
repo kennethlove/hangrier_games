@@ -1,5 +1,5 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
-use crate::env::APP_API_HOST as API_HOST;
+use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::games::Game;
@@ -8,7 +8,7 @@ async fn _fetch_game_day_summary(keys: Vec<QueryKey>) -> QueryResult<QueryValue,
     if let Some(QueryKey::_GameDaySummary(identifier, day)) = keys.first() {
         let response = reqwest::get(format!(
             "{}/api/games/{}/summarize/{}",
-            &*API_HOST,
+            APP_API_HOST,
             identifier,
             day
         ))

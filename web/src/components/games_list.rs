@@ -2,7 +2,7 @@ use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::game_edit::GameEdit;
 use crate::components::{Button, CreateGameButton, CreateGameForm, DeleteGameModal, GameDelete};
 use crate::routes::Routes;
-use crate::env::APP_API_HOST as API_HOST;
+use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
 use game::games::Game;
@@ -15,7 +15,7 @@ async fn fetch_games(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryVal
         let client = reqwest::Client::new();
         let request = client.request(
             reqwest::Method::GET,
-            format!("{}/api/games", &*API_HOST),
+            format!("{}/api/games", APP_API_HOST),
         ).bearer_auth(token);
 
         match request.send().await{

@@ -1,7 +1,7 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use crate::components::{Input, ThemedButton};
 use crate::LoadingState;
-use crate::env::APP_API_HOST as API_HOST;
+use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use game::games::Game;
@@ -19,7 +19,7 @@ async fn create_game(args: (Option<String>, String)) -> MutationResult<MutationV
 
     let response = client.request(
         reqwest::Method::POST,
-        format!("{}/api/games", &*API_HOST))
+        format!("{}/api/games", APP_API_HOST))
         .bearer_auth(token)
         .json(&json_body);
 

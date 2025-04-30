@@ -7,7 +7,7 @@ use crate::components::info_detail::InfoDetail;
 use crate::components::ThemedButton;
 use crate::storage::{use_persistent, AppState};
 use crate::LoadingState;
-use crate::env::APP_API_HOST as API_HOST;
+use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_logger::tracing;
 use dioxus_query::prelude::{use_get_query, use_mutation, use_query_client, MutationResult, QueryResult, UseMutation, UseQueryClient};
@@ -24,7 +24,7 @@ async fn fetch_game(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValu
 
         let request = client.request(
             reqwest::Method::GET,
-            format!("{}/api/games/{}", &*API_HOST, identifier))
+            format!("{}/api/games/{}", APP_API_HOST, identifier))
             .bearer_auth(token);
 
         match request.send().await {
@@ -63,7 +63,7 @@ async fn next_step(args: (String, String)) -> MutationResult<MutationValue, Muta
     let identifier = args.0.clone();
     let token = args.1.clone();
     let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}/next", &*API_HOST, identifier);
+    let url: String = format!("{}/api/games/{}/next", APP_API_HOST, identifier);
 
     let request = client.request(reqwest::Method::PUT, url)
         .bearer_auth(token);

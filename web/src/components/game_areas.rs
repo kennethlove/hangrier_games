@@ -2,7 +2,7 @@ use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::icons::lock_closed::LockClosedIcon;
 use crate::components::icons::lock_open::LockOpenIcon;
 use crate::components::map::Map;
-use crate::env::APP_API_HOST as API_HOST;
+use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::areas::AreaDetails;
@@ -16,7 +16,7 @@ async fn fetch_areas(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryVal
 
         let request = client.request(
             reqwest::Method::GET,
-            format!("{}/api/games/{}/areas", &*API_HOST, identifier))
+            format!("{}/api/games/{}/areas", APP_API_HOST, identifier))
             .bearer_auth(token);
 
         match request.send().await {

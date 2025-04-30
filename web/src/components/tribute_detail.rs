@@ -4,7 +4,7 @@ use crate::components::info_detail::InfoDetail;
 use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_status_icon::TributeStatusIcon;
 use crate::routes::Routes;
-use crate::env::APP_API_HOST as API_HOST;
+use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::messages::GameMessage;
@@ -18,7 +18,7 @@ async fn fetch_tribute(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryV
 
             let request = client.request(
                 reqwest::Method::GET,
-                format!("{}/api/games/{}/tributes/{}", &*API_HOST, game_identifier, identifier))
+                format!("{}/api/games/{}/tributes/{}", APP_API_HOST, game_identifier, identifier))
                 .bearer_auth(token);
 
             match request.send().await {
@@ -50,7 +50,7 @@ async fn fetch_tribute_log(keys: Vec<QueryKey>, token: String) -> QueryResult<Qu
 
         let request = client.request(
             reqwest::Method::GET,
-            format!("{}/api/tributes/{}/log", &*API_HOST, identifier))
+            format!("{}/api/tributes/{}/log", APP_API_HOST, identifier))
             .bearer_auth(token);
 
         match request.send().await {

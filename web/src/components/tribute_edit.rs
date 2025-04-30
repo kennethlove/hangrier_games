@@ -1,7 +1,7 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use crate::components::icons::edit::EditIcon;
 use crate::components::Button;
-use crate::env::APP_API_HOST as API_HOST;
+use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
 use game::games::Game;
@@ -18,7 +18,7 @@ async fn edit_tribute(args: (EditTribute, String, String)) -> MutationResult<Mut
     let client = reqwest::Client::new();
     let url: String = format!(
         "{}/api/games/{}/tributes/{}",
-        &*API_HOST,
+        APP_API_HOST,
         game_identifier,
         identifier
     );

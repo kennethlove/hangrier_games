@@ -235,7 +235,10 @@ FROM game
 
 pub async fn game_detail(game_identifier: Path<String>) -> impl IntoResponse {
     let identifier = game_identifier.0;
-    let day = DATABASE.query("SELECT day FROM game WHERE identifier = '$identifier' LIMIT 1").bind(("identifier", identifier)).await;
+    let day = DATABASE
+        .query("SELECT day FROM game WHERE identifier = '$identifier' LIMIT 1")
+        .bind(("identifier", identifier.clone()))
+        .await;
     let day: Option<i64> = day.unwrap().take("day").unwrap();
     let day: i64 = day.unwrap_or(0);
 
@@ -320,7 +323,10 @@ SELECT (
 }
 
 pub async fn game_tributes(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
-    let mut game_day = DATABASE.query("SELECT day FROM game WHERE identifier = '$identifier'").bind(("identifier", identifier)).await.unwrap();
+    let mut game_day = DATABASE
+        .query("SELECT day FROM game WHERE identifier = '$identifier'")
+        .bind(("identifier", identifier.clone()))
+        .await.unwrap();
     let game_day: Option<i64> = game_day.take("day").unwrap();
     let _game_day: i64 = game_day.unwrap_or(0);
 
@@ -385,7 +391,7 @@ RETURN count(
                         (StatusCode::NO_CONTENT, Json(GameResponse::default())).into_response()
                     }
                     _ => {
-                        if let Some(mut game) = get_full_game(&identifier).await {
+                        if let Some(mut game) = get_full_game(identifier).await {
                             // Run day
                             let mut game = game.run_day_night_cycle(true).await;
                             save_game(&game).await;
@@ -408,7 +414,7 @@ RETURN count(
     } else { (StatusCode::NOT_FOUND, Json(GameResponse::default())).into_response() }
 }
 
-async fn get_full_game(identifier: &str) -> Option<Game> {
+async fn get_full_game(identifier: String) -> Option<Game> {
     let mut result = DATABASE.query(r#"
 SELECT *, (
     SELECT *, ->owns->item[*] AS items
@@ -427,10 +433,9 @@ count(array::distinct(<-playing_in<-tribute.district)) == 12
 AS ready
 FROM game
 WHERE identifier = "$identifier";"#)
-        .bind(("identifier", identifier))
+        .bind(("identifier", identifier.clone()))
         .await.unwrap();
     result.take(0).expect("No game found")
-
 }
 
 async fn save_game(game: &Game) -> Option<Game> {

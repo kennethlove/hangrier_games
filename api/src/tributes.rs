@@ -30,7 +30,7 @@ pub struct TributeOwns {
 pub async fn tribute_record_create(tribute: Option<Tribute>, game_identifier: String) -> Option<Tribute> {
     let game_id = RecordId::from(("game", game_identifier.clone()));
     let tribute_count = DATABASE
-        .query("RETURN count(SELECT id FROM playing_in WHERE out.identifier='$game')")
+        .query("RETURN count(SELECT id FROM playing_in WHERE out.identifier=$game)")
         .bind(("game", game_identifier.clone()))
         .await;
     let tribute_count: Option<u32> = tribute_count.unwrap().take(0).unwrap();
@@ -96,9 +96,13 @@ pub async fn tribute_delete(Path((_, tribute_identifier)): Path<(String, String)
     }
 }
 
-pub async fn tribute_update(Path((_game_identifier, _tribute_identifier)): Path<(String, String)>, Json(payload): Json<EditTribute>) -> impl IntoResponse {
+pub async fn tribute_update(
+    Path((_game_identifier, _tribute_identifier)): Path<(String, String)>,
+    Json(payload): Json<EditTribute>
+) -> impl IntoResponse {
+    tracing::debug!("Payload: {:?}", &payload);
     let response = DATABASE
-        .query("UPDATE tribute SET name = '$name', district = $district WHERE identifier = '$identifier'")
+        .query("UPDATE tribute SET name = $name, district = $district WHERE identifier = $identifier;")
         .bind(("identifier", payload.0))
         .bind(("district", payload.1))
         .bind(("name", payload.2))
@@ -106,11 +110,16 @@ pub async fn tribute_update(Path((_game_identifier, _tribute_identifier)): Path<
 
     match response {
         Ok(mut response) => {
-            let tribute: Option<Tribute> = response.take(0).unwrap();
-            (StatusCode::OK, Json::<Tribute>(tribute.expect("No tribute updated."))).into_response()
+            match response.take::<Option<Tribute>>(0).unwrap() {
+                Some(tribute) => {
+                    tracing::debug!("Tribute update: {:?}", &tribute);
+                    Box::new(StatusCode::OK).into_response()
+                }
+                None => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to update tribute").into_response()
+            }
         }
         Err(e) => {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json::<String>(e.to_string())).into_response()
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
         }
     }
 }
@@ -119,10 +128,10 @@ pub async fn tribute_detail(Path((_game_identifier, tribute_identifier)): Path<(
     let mut result = DATABASE
         .query(r#"
         SELECT *, ->owns->item[*] AS items,
-        (SELECT * FROM fn::get_messages_by_tribute_id("$identifier")) AS log,
+        (SELECT * FROM fn::get_messages_by_tribute_id($identifier)) AS log,
         (->playing_in->game.status)[0] == "NotStarted" AS editable
         FROM tribute
-        WHERE identifier = "$identifier"
+        WHERE identifier = $identifier
         "#)
         .bind(("identifier", tribute_identifier))
         .await.expect("Failed to find tribute");

@@ -32,7 +32,7 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
         .route("/{game_identifier}/areas", get(game_areas))
         .route("/{game_identifier}/summarize/{day}", get(game_day_summary))
         .route("/{game_identifier}/summarize", get(game_summary))
-        .route("/{game_identifier}/log/{day}", get(game_logs))
+        .route("/{game_identifier}/log/{day}", get(game_day_logs))
         .route("/{game_identifier}/log/{day}/{tribute_identifier}", get(tribute_logs))
         .route("/{game_identifier}/next", put(next_step))
         .route("/{game_identifier}/publish", put(publish_game))
@@ -264,7 +264,7 @@ count(<-playing_in<-tribute.id) == 24 AND count(array::distinct(<-playing_in<-tr
 created_by.id == $auth.id AS is_mine,
 created_by.username
 FROM game
-WHERE identifier = "$identifier";"#)
+WHERE identifier = $identifier;"#)
         .bind(("day", day))
         .bind(("identifier", identifier.clone()))
         .await.unwrap();
@@ -281,8 +281,8 @@ WHERE identifier = "$identifier";"#)
 pub async fn game_update(Path(_): Path<String>, Json(payload): Json<EditGame>) -> (StatusCode, Json<Option<Game>>) {
     let response = DATABASE.query(r#"
         UPDATE game
-        SET name = '$name', private = $private
-        WHERE identifier = '$identifier';
+        SET name = $name, private = $private
+        WHERE identifier = $identifier;
         "#
     )
         .bind(("identifier", payload.0.clone()))
@@ -307,7 +307,7 @@ pub async fn game_areas(Path(identifier): Path<String>) -> (StatusCode, Json<Vec
 SELECT (
     SELECT *, ->items->item[*] AS items
     FROM ->areas->area
-) AS areas FROM game WHERE identifier = "$identifier";
+) AS areas FROM game WHERE identifier = $identifier;
 "#).bind(("identifier", identifier)).await;
 
     match response {
@@ -324,7 +324,7 @@ SELECT (
 
 pub async fn game_tributes(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
     let mut game_day = DATABASE
-        .query("SELECT day FROM game WHERE identifier = '$identifier'")
+        .query("SELECT day FROM game WHERE identifier = $identifier")
         .bind(("identifier", identifier.clone()))
         .await.unwrap();
     let game_day: Option<i64> = game_day.take("day").unwrap();
@@ -336,7 +336,7 @@ SELECT (
     SELECT *, ->owns->item[*] as items
     FROM <-playing_in<-tribute
     ORDER district
-) AS tributes FROM game WHERE identifier = "$identifier";"#)
+) AS tributes FROM game WHERE identifier = $identifier;"#)
         .bind(("identifier", identifier.clone())).await;
 
     match response {
@@ -359,11 +359,11 @@ pub struct GameResponse {
 pub async fn next_step(Path(identifier): Path<String>) -> impl IntoResponse {
     let record_id = RecordId::from(("game", identifier.clone()));
     let mut result = DATABASE.query(r#"
-SELECT status FROM game WHERE identifier = "$identifier";
+SELECT status FROM game WHERE identifier = $identifier;
 RETURN count(
     SELECT in.identifier
     FROM playing_in
-    WHERE out.identifier = "$identifier"
+    WHERE out.identifier = $identifier
     AND in.status IN ["RecentlyDead", "Dead"]
 );"#).bind(("identifier", identifier.clone())).await.expect("No game found");
     let status: Option<String> = result.take("status").expect("No game found");
@@ -374,7 +374,7 @@ RETURN count(
         match status {
             GameStatus::NotStarted => {
                 DATABASE
-                    .query("UPDATE $record_id SET status = '$status'")
+                    .query("UPDATE $record_id SET status = $status")
                     .bind(("record_id", record_id.clone()))
                     .bind(("status", GameStatus::InProgress))
                     .await.expect("Failed to start game");
@@ -384,7 +384,7 @@ RETURN count(
                 match dead_tribute_count {
                     Some(23) | Some(24) => {
                         DATABASE
-                            .query(r#"UPDATE $record_id SET status = "$status""#)
+                            .query(r#"UPDATE $record_id SET status = $status"#)
                             .bind(("record_id", record_id.clone()))
                             .bind(("status", GameStatus::Finished))
                             .await.expect("Failed to end game");
@@ -432,7 +432,7 @@ AND
 count(array::distinct(<-playing_in<-tribute.district)) == 12
 AS ready
 FROM game
-WHERE identifier = "$identifier";"#)
+WHERE identifier = $identifier;"#)
         .bind(("identifier", identifier.clone()))
         .await.unwrap();
     result.take(0).expect("No game found")
@@ -542,18 +542,27 @@ async fn save_items(items: Vec<Item>, owner: RecordId) {
     }
 }
 
-async fn game_logs(Path((game_identifier, day)): Path<(String, String)>) -> Json<Vec<GameMessage>> {
+async fn game_day_logs(Path((game_identifier, day)): Path<(String, String)>) -> Json<Vec<GameMessage>> {
+    let day: u32 = match day.parse() {
+        Ok(num) => num,
+        Err(_) => {
+            eprintln!("Invalid day: {day}");
+            return Json(vec![]);
+        }
+    };
     match DATABASE
-        .query(r#"
-        SELECT * FROM message
-        WHERE string::starts_with(subject, "$identifier")
-        AND game_day = $day ORDER BY timestamp;"#.to_string())
+        .query(r#"SELECT * FROM message
+        WHERE string::starts_with(subject, $identifier) AND
+        game_day = $day ORDER BY timestamp;"#)
         .bind(("identifier", game_identifier))
         .bind(("day", day))
         .await
     {
         Ok(mut logs) => {
-            let logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
+            let logs: Vec<GameMessage> = logs.take(0).unwrap_or_else(|err| {
+                eprintln!("Error taking logs: {err:?}");
+                vec![]
+            });
             Json(logs)
         }
         Err(err) => {

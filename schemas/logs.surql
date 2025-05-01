@@ -1,6 +1,8 @@
 DEFINE TABLE OVERWRITE message SCHEMAFULL
-    PERMISSIONS FOR
-        CREATE, SELECT, UPDATE, DELETE WHERE $auth;
+    PERMISSIONS
+        FOR select FULL
+        FOR update, delete NONE
+        FOR create WHERE $auth;
 
 DEFINE FIELD OVERWRITE identifier ON message;
 DEFINE FIELD OVERWRITE source ON message TYPE object;

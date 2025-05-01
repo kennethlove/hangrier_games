@@ -7,7 +7,7 @@ DEFINE TABLE OVERWRITE user SCHEMAFULL
 DEFINE FIELD OVERWRITE username ON user TYPE string
     PERMISSIONS
         FOR select FULL
-        FOR update, delete WHERE id = $auth.id;
+        FOR update WHERE id = $auth.id;
 DEFINE FIELD OVERWRITE password on user TYPE string;
 
 DEFINE INDEX OVERWRITE unique_username ON user FIELDS username UNIQUE;

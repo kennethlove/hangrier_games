@@ -87,16 +87,15 @@ async fn game_area_record_create(identifier: String, game_id: RecordId) -> Optio
 
 async fn game_area_record_creator(area: Area, game_identifier: String) -> Option<GameAreaRecord> {
     // Does the `area` exist for the game?
-    let mut existing_area = DATABASE.query(
-        format!(r#"
+    let mut existing_area = DATABASE.query(r#"
         SELECT identifier
         FROM area
-        WHERE original_name = '{}'
-        AND <-areas<-game.identifier = '{}'"#,
-            area,
-            game_identifier.clone()
-        )
-    ).await.expect("Failed to query game area");
+        WHERE original_name = '$name'
+        AND <-areas<-game.identifier = '$game_id'"#,
+    )
+        .bind(("name", area.clone()))
+        .bind(("game_id", game_identifier.clone()))
+        .await.expect("Failed to query game area");
     let existing_area: Option<String> = existing_area.take(0).unwrap(); // e.g. a UUID
 
     let game_id = RecordId::from(("game", game_identifier));
@@ -159,18 +158,20 @@ pub async fn game_create(Json(payload): Json<Game>) -> impl IntoResponse {
 
 pub async fn game_delete(game_identifier: Path<String>) -> StatusCode {
     let game_identifier = game_identifier.to_string().clone();
-    let mut result = DATABASE.query(format!(r#"
+    let mut result = DATABASE.query(r#"
     SELECT <-playing_in<-tribute as tribute,
            <-playing_in<-tribute->owns->item as item,
            <-playing_in<-tribute->owns as owns
-    FROM game WHERE identifier = "{game_identifier}";
+    FROM game WHERE identifier = "$game_identifier";
 
     SELECT ->areas->area AS area,
            ->areas->area->items->item AS item,
            ->areas->area->items as items,
            ->areas AS areas
-    FROM game WHERE identifier = "{game_identifier}";
-    "#)).await.expect("Failed to find game pieces");
+    FROM game WHERE identifier = "$game_identifier";
+    "#.to_string())
+        .bind(("game_id", game_identifier.clone()))
+        .await.expect("Failed to find game pieces");
 
     let game_pieces: Option<HashMap<String, Vec<Thing>>> = result.take(0).unwrap();
     let area_pieces: Option<HashMap<String, Vec<Thing>>> = result.take(1).unwrap();
@@ -188,11 +189,14 @@ pub async fn game_delete(game_identifier: Path<String>) -> StatusCode {
 
 async fn delete_pieces(pieces: HashMap<String, Vec<Thing>>) {
     for (table, ids) in pieces {
-        let _ = DATABASE.query(
-            format!("DELETE {table} WHERE id IN [{}]",
-                    ids.iter().map(|i| format!(r#"{table}:{}"#, i.id))
-                        .collect::<Vec<String>>().join(","))
-        ).await.unwrap_or_else(|_| panic!("Failed to delete {} pieces.", table));
+        let _ = DATABASE
+            .query("DELETE $table WHERE id IN [$ids]".to_string())
+            .bind(("table", table.clone()))
+            .bind(("ids", ids.iter()
+                .map(|i| format!(r#"{table}:{}"#, i.id))
+                .collect::<Vec<String>>().join(",")
+            ))
+            .await.unwrap_or_else(|_| panic!("Failed to delete {} pieces.", table));
     }
 }
 
@@ -231,18 +235,18 @@ FROM game
 
 pub async fn game_detail(game_identifier: Path<String>) -> impl IntoResponse {
     let identifier = game_identifier.0;
-    let day = DATABASE.query(format!("SELECT day FROM game WHERE identifier = '{identifier}' LIMIT 1")).await;
+    let day = DATABASE.query("SELECT day FROM game WHERE identifier = '$identifier' LIMIT 1").bind(("identifier", identifier)).await;
     let day: Option<i64> = day.unwrap().take("day").unwrap();
     let day: i64 = day.unwrap_or(0);
 
-    let mut result = DATABASE.query(format!(r#"
+    let mut result = DATABASE.query(r#"
 SELECT *, (
     SELECT *,
     ->owns->item[*] AS items, (
         SELECT *
         FROM tribute_log
         WHERE tribute_identifier = $parent.identifier
-        AND day = {day}
+        AND day = $day
         ORDER BY instant
     ) AS log
     FROM <-playing_in<-tribute[*]
@@ -257,8 +261,10 @@ count(<-playing_in<-tribute.id) == 24 AND count(array::distinct(<-playing_in<-tr
 created_by.id == $auth.id AS is_mine,
 created_by.username
 FROM game
-WHERE identifier = "{identifier}";"#))
-    .await.unwrap();
+WHERE identifier = "$identifier";"#)
+        .bind(("day", day))
+        .bind(("identifier", identifier.clone()))
+        .await.unwrap();
 
     let game: Option<DisplayGame> = result.take(0).expect("No game found");
 
@@ -270,13 +276,16 @@ WHERE identifier = "{identifier}";"#))
 }
 
 pub async fn game_update(Path(_): Path<String>, Json(payload): Json<EditGame>) -> (StatusCode, Json<Option<Game>>) {
-    let response = DATABASE.query(
-        format!(r#"
+    let response = DATABASE.query(r#"
         UPDATE game
-        SET name = '{}', private = {}
-        WHERE identifier = '{}'
-        "#, payload.1, payload.2, payload.0)
-    ).await;
+        SET name = '$name', private = $private
+        WHERE identifier = '$identifier';
+        "#
+    )
+        .bind(("identifier", payload.0.clone()))
+        .bind(("name", payload.1.clone()))
+        .bind(("private", payload.2))
+        .await;
 
     match response {
         Ok(mut response) => {
@@ -291,13 +300,12 @@ pub async fn game_update(Path(_): Path<String>, Json(payload): Json<EditGame>) -
 }
 
 pub async fn game_areas(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<AreaDetails>>) {
-    let response = DATABASE.query(
-        format!(r#"
+    let response = DATABASE.query(r#"
 SELECT (
     SELECT *, ->items->item[*] AS items
     FROM ->areas->area
-) AS areas FROM game WHERE identifier = "{identifier}";
-"#)).await;
+) AS areas FROM game WHERE identifier = "$identifier";
+"#).bind(("identifier", identifier)).await;
 
     match response {
         Ok(mut response) => {
@@ -312,19 +320,18 @@ SELECT (
 }
 
 pub async fn game_tributes(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
-    let mut game_day = DATABASE.query(format!("SELECT day FROM game WHERE identifier = '{identifier}'")).await.unwrap();
+    let mut game_day = DATABASE.query("SELECT day FROM game WHERE identifier = '$identifier'").bind(("identifier", identifier)).await.unwrap();
     let game_day: Option<i64> = game_day.take("day").unwrap();
     let _game_day: i64 = game_day.unwrap_or(0);
 
 
-    let response = DATABASE.query(
-        format!(r#"
+    let response = DATABASE.query(r#"
 SELECT (
     SELECT *, ->owns->item[*] as items
     FROM <-playing_in<-tribute
     ORDER district
-) AS tributes FROM game WHERE identifier = "{identifier}";
-"#)).await;
+) AS tributes FROM game WHERE identifier = "$identifier";"#)
+        .bind(("identifier", identifier.clone())).await;
 
     match response {
         Ok(mut response) => {
@@ -345,14 +352,14 @@ pub struct GameResponse {
 
 pub async fn next_step(Path(identifier): Path<String>) -> impl IntoResponse {
     let record_id = RecordId::from(("game", identifier.clone()));
-    let mut result = DATABASE.query(format!(r#"
-SELECT status FROM game WHERE identifier = "{identifier}";
+    let mut result = DATABASE.query(r#"
+SELECT status FROM game WHERE identifier = "$identifier";
 RETURN count(
     SELECT in.identifier
     FROM playing_in
-    WHERE out.identifier = "{identifier}"
+    WHERE out.identifier = "$identifier"
     AND in.status IN ["RecentlyDead", "Dead"]
-);"#)).await.expect("No game found");
+);"#).bind(("identifier", identifier.clone())).await.expect("No game found");
     let status: Option<String> = result.take("status").expect("No game found");
     let dead_tribute_count: Option<u32> = result.take(1).unwrap_or(Some(0));
 
@@ -361,7 +368,9 @@ RETURN count(
         match status {
             GameStatus::NotStarted => {
                 DATABASE
-                    .query(format!(r#"UPDATE {record_id} SET status = "{}""#, GameStatus::InProgress))
+                    .query("UPDATE $record_id SET status = '$status'")
+                    .bind(("record_id", record_id.clone()))
+                    .bind(("status", GameStatus::InProgress))
                     .await.expect("Failed to start game");
                 (StatusCode::CREATED, Json(GameResponse::default())).into_response()
             }
@@ -369,7 +378,9 @@ RETURN count(
                 match dead_tribute_count {
                     Some(23) | Some(24) => {
                         DATABASE
-                            .query(format!(r#"UPDATE {record_id} SET status = "{}""#, GameStatus::Finished))
+                            .query(r#"UPDATE $record_id SET status = "$status""#)
+                            .bind(("record_id", record_id.clone()))
+                            .bind(("status", GameStatus::Finished))
                             .await.expect("Failed to end game");
                         (StatusCode::NO_CONTENT, Json(GameResponse::default())).into_response()
                     }
@@ -398,7 +409,7 @@ RETURN count(
 }
 
 async fn get_full_game(identifier: &str) -> Option<Game> {
-    let mut result = DATABASE.query(format!(r#"
+    let mut result = DATABASE.query(r#"
 SELECT *, (
     SELECT *, ->owns->item[*] AS items
     FROM <-playing_in<-tribute[*]
@@ -415,7 +426,8 @@ AND
 count(array::distinct(<-playing_in<-tribute.district)) == 12
 AS ready
 FROM game
-WHERE identifier = "{identifier}";"#))
+WHERE identifier = "$identifier";"#)
+        .bind(("identifier", identifier))
         .await.unwrap();
     result.take(0).expect("No game found")
 
@@ -485,13 +497,11 @@ async fn save_game(game: &Game) -> Option<Game> {
 
 async fn save_items(items: Vec<Item>, owner: RecordId) {
     let is_area = owner.table() == "area";
-    let query: String = format!(
-        "DELETE FROM {} WHERE in = {}",
-        if is_area { "items" } else { "owns" },
-        owner.clone()
-    );
-
-    let _ = DATABASE.query(query).await.expect("Failed to delete items");
+    let _ = DATABASE
+        .query("DELETE FROM $table WHERE in = $owner")
+        .bind(("table", if is_area { "items" } else { "owns" }))
+        .bind(("owner", owner.clone()))
+        .await.expect("Failed to delete items");
 
     for item in items {
         let item_identifier = RecordId::from(("item", item.identifier.clone()));
@@ -528,7 +538,15 @@ async fn save_items(items: Vec<Item>, owner: RecordId) {
 }
 
 async fn game_logs(Path((game_identifier, day)): Path<(String, String)>) -> Json<Vec<GameMessage>> {
-    match DATABASE.query(format!(r#"SELECT * FROM message WHERE string::starts_with(subject, "{game_identifier}") AND game_day = {day} ORDER BY timestamp;"#)).await {
+    match DATABASE
+        .query(r#"
+        SELECT * FROM message
+        WHERE string::starts_with(subject, "$identifier")
+        AND game_day = $day ORDER BY timestamp;"#.to_string())
+        .bind(("identifier", game_identifier))
+        .bind(("day", day))
+        .await
+    {
         Ok(mut logs) => {
             let logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
             Json(logs)
@@ -541,14 +559,18 @@ async fn game_logs(Path((game_identifier, day)): Path<(String, String)>) -> Json
 }
 
 async fn tribute_logs(Path((game_identifier, day, tribute_identifier)): Path<(String, String, String)>) -> Json<Vec<GameMessage>> {
-    match DATABASE.query(format!(
-        r#"SELECT *
+    match DATABASE
+        .query(r#"SELECT *
         FROM message
-        WHERE string::starts_with(subject, "{game_identifier}")
-        AND game_day = {day}
-        AND source.value = "{tribute_identifier}"
-        ORDER BY timestamp;"#
-    )).await {
+        WHERE string::starts_with(subject, "$game_identifier")
+        AND game_day = $day
+        AND source.value = "$tribute_identifier"
+        ORDER BY timestamp;"#.to_string())
+        .bind(("game_identifier", game_identifier))
+        .bind(("day", day))
+        .bind(("tribute_identifier", tribute_identifier))
+        .await
+    {
         Ok(mut logs) => {
             let logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
             Json(logs)
@@ -567,9 +589,12 @@ pub struct GameSummary {
 }
 
 async fn game_day_summary(Path((game_identifier, day)): Path<(String, String)>) -> Json<String> {
-    match DATABASE.query(
-        format!(r#"SELECT * FROM summary WHERE <-game->game.identifier = "{game_identifier}" AND day = {day};"#)
-    ).await {
+    match DATABASE
+        .query(r#"SELECT * FROM summary WHERE <-game->game.identifier = "$game_identifier" AND day = $day;"#)
+        .bind(("game_identifier", game_identifier.clone()))
+        .bind(("day", day.clone()))
+        .await
+    {
         Ok(mut logs) => {
             let log: Option<GameSummary> = logs.take(0).expect("log is empty");
             if log.is_some() {
@@ -577,15 +602,18 @@ async fn game_day_summary(Path((game_identifier, day)): Path<(String, String)>) 
                 let summary = log.summary;
                 Json(summary)
             } else {
-                match DATABASE.query(
-                    format!(r#"
-        SELECT *
-        FROM message
-        WHERE string::starts_with(subject, "{game_identifier}")
-        AND game_day = {day}
-        ORDER BY timestamp;
-        "#)
-                ).await {
+                match DATABASE.query(r#"
+                    SELECT *
+                    FROM message
+                    WHERE string::starts_with(subject, "$game_identifier")
+                    AND game_day = $day
+                    ORDER BY timestamp;
+                    "#
+                )
+                    .bind(("game_identifier", game_identifier))
+                    .bind(("day", day.clone()))
+                    .await
+                {
                     Ok(mut logs) => {
                         let logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
                         let logs = logs.into_iter().map(|l| l.content).collect::<Vec<String>>().join("\n");
@@ -616,14 +644,12 @@ async fn game_day_summary(Path((game_identifier, day)): Path<(String, String)>) 
 }
 
 async fn game_summary(Path(game_identifier): Path<String>) -> impl IntoResponse {
-    let result = DATABASE.query(
-        format!(r#"
-        SELECT *
+    let result = DATABASE.query(r#"SELECT *
         FROM message
-        WHERE string::starts_with(subject, "{game_identifier}")
-        ORDER BY timestamp;
-        "#)
-    ).await;
+        WHERE string::starts_with(subject, "$game_identifier")
+        ORDER BY timestamp;"#)
+        .bind(("game_identifier", game_identifier.clone()))
+        .await;
 
     let stream = match result {
         Ok(mut result) => {
@@ -675,9 +701,10 @@ async fn game_summary(Path(game_identifier): Path<String>) -> impl IntoResponse 
 }
 
 async fn publish_game(Path(game_identifier): Path<String>) -> impl IntoResponse {
-    let response = DATABASE.query(
-        format!("UPDATE game SET private = false WHERE identifier = '{}'", game_identifier)
-    ).await;
+    let response = DATABASE
+        .query("UPDATE game SET private = false WHERE identifier = '$identifier'")
+        .bind(("identifier", game_identifier))
+        .await;
 
     match response {
         Ok(_) => StatusCode::OK,
@@ -689,9 +716,10 @@ async fn publish_game(Path(game_identifier): Path<String>) -> impl IntoResponse 
 }
 
 async fn unpublish_game(Path(game_identifier): Path<String>) -> impl IntoResponse {
-    let response = DATABASE.query(
-        format!("UPDATE game SET private = true WHERE identifier = '{}'", game_identifier)
-    ).await;
+    let response = DATABASE
+        .query("UPDATE game SET private = true WHERE identifier = '$identifier'")
+        .bind(("identifier", game_identifier))
+        .await;
 
     match response {
         Ok(_) => StatusCode::OK,

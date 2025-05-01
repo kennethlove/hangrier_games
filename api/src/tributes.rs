@@ -29,9 +29,10 @@ pub struct TributeOwns {
 
 pub async fn tribute_record_create(tribute: Option<Tribute>, game_identifier: String) -> Option<Tribute> {
     let game_id = RecordId::from(("game", game_identifier.clone()));
-    let tribute_count = DATABASE.query(
-        format!("RETURN count(SELECT id FROM playing_in WHERE out.identifier='{}')", game_identifier.clone())
-    ).await;
+    let tribute_count = DATABASE
+        .query("RETURN count(SELECT id FROM playing_in WHERE out.identifier='$game')")
+        .bind(("game", game_identifier.clone()))
+        .await;
     let tribute_count: Option<u32> = tribute_count.unwrap().take(0).unwrap();
     if tribute_count >= Some(24) {
         return None;
@@ -96,9 +97,12 @@ pub async fn tribute_delete(Path((_, tribute_identifier)): Path<(String, String)
 }
 
 pub async fn tribute_update(Path((_game_identifier, _tribute_identifier)): Path<(String, String)>, Json(payload): Json<EditTribute>) -> impl IntoResponse {
-    let response = DATABASE.query(
-        format!("UPDATE tribute SET name = '{}', district = {} WHERE identifier = '{}'", payload.2, payload.1, payload.0)
-    ).await;
+    let response = DATABASE
+        .query("UPDATE tribute SET name = '$name', district = $district WHERE identifier = '$identifier'")
+        .bind(("identifier", payload.0))
+        .bind(("district", payload.1))
+        .bind(("name", payload.2))
+        .await;
 
     match response {
         Ok(mut response) => {
@@ -112,13 +116,16 @@ pub async fn tribute_update(Path((_game_identifier, _tribute_identifier)): Path<
 }
 
 pub async fn tribute_detail(Path((_game_identifier, tribute_identifier)): Path<(String, String)>) -> (StatusCode, Json<Option<Tribute>>) {
-    let mut result = DATABASE.query(format!(r#"
-SELECT *, ->owns->item[*] AS items,
-(SELECT * FROM fn::get_messages_by_tribute_id("{tribute_identifier}")) AS log,
-(->playing_in->game.status)[0] == "NotStarted" AS editable
-FROM tribute
-WHERE identifier = "{tribute_identifier}"
-"#)).await.expect("Failed to find tribute");
+    let mut result = DATABASE
+        .query(r#"
+        SELECT *, ->owns->item[*] AS items,
+        (SELECT * FROM fn::get_messages_by_tribute_id("$identifier")) AS log,
+        (->playing_in->game.status)[0] == "NotStarted" AS editable
+        FROM tribute
+        WHERE identifier = "$identifier"
+        "#)
+        .bind(("identifier", tribute_identifier))
+        .await.expect("Failed to find tribute");
 
     let tribute: Option<Tribute> = result.take(0).expect("");
 
@@ -130,9 +137,10 @@ WHERE identifier = "{tribute_identifier}"
 }
 
 pub async fn tribute_log(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<GameMessage>>) {
-    let mut result = DATABASE.query(format!(r#"
-        SELECT * FROM fn::get_messages_by_tribute_id("{identifier}")
-    "#)).await.expect("Failed to find log");
+    let mut result = DATABASE
+        .query(r#"SELECT * FROM fn::get_messages_by_tribute_id("$identifier")"#)
+        .bind(("identifier", identifier))
+        .await.expect("Failed to find log");
 
     let logs: Vec<GameMessage> = result.take(0).unwrap();
     if logs.is_empty() {

@@ -523,7 +523,6 @@ fn GameDetails(identifier: String) -> Element {
                     gap-4
                     grid-cols-1
                     lg:grid-cols-2
-                    c:xl:grid-cols-3
                     xl:grid-cols-[1fr_1fr_18rem]
                     "#,
 

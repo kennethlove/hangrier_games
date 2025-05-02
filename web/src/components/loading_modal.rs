@@ -14,7 +14,7 @@ pub fn LoadingModal() -> Element {
 
     let props = ModalProps {
         title: "Loading...".to_string(),
-        open: open,
+        open,
         children: Some(rsx! {
             div {
                 class: "flex justify-center pb-4",

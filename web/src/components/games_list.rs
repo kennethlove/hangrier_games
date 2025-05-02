@@ -147,7 +147,7 @@ pub fn GameListMember(game: DisplayGame) -> Element {
 
             theme3:border-3
             theme3:border-gold-rich
-            theme3:bg-stone-50/50
+            theme3:bg-stone-50/75
             "#,
             div {
                 class: "flex place-content-between",

@@ -33,7 +33,9 @@ pub fn InfoDetail(props: InfoDetailProps) -> Element {
             theme2:hover:border-green-400
             theme2:open:border-green-400
 
-            theme3:bg-stone-50/80
+            theme3:bg-linear-to-b
+            theme3:from-stone-50/50
+            theme3:to-stone-50/80
             theme3:border-4
             theme3:border-gold-rich
             "#,

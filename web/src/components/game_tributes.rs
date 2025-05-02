@@ -175,9 +175,10 @@ pub fn GameTributeListMember(tribute: Tribute, game_identifier: String, game_sta
             theme2:text-green-200
             theme2:rounded-md
 
-            theme3:border-2
+            theme3:border-3
             theme3:data-[alive=true]:border-gold-rich
             theme3:data-[alive=false]:opacity-50
+            theme3:bg-stone-50
             "#,
 
             div {

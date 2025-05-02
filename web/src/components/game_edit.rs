@@ -1,4 +1,5 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
+use crate::components::modal::{Modal, Props as ModalProps};
 use crate::components::icons::edit::EditIcon;
 use crate::components::Button;
 use crate::env::APP_API_HOST;
@@ -57,18 +58,20 @@ pub fn GameEdit(identifier: String, name: String, icon_class: String, private: b
 pub fn EditGameModal() -> Element {
     let edit_game_signal: Signal<Option<EditGame>> = use_context();
 
-    rsx! {
-        dialog {
-            role: "confirm",
-            open: edit_game_signal.read().clone().is_some(),
-            div { class: "fixed inset-0 backdrop-blur-sm backdrop-grayscale" }
+    let props = ModalProps {
+        title: "Edit Game".to_string(),
+        open: edit_game_signal.read().clone().is_some(),
+        children: Some(rsx! {
             div {
-                class: "fixed inset-0 z-10 w-screen h-screen overflow-y-hidden",
-                div {
-                    class: "flex items-center gap-8 min-h-full justify-center",
-                    EditGameForm {}
-                }
+                class: "flex items-center gap-8 min-h-full justify-center",
+                EditGameForm {}
             }
+        }),
+    };
+
+    rsx! {
+        Modal {
+            modal_props: props
         }
     }
 }
@@ -134,25 +137,8 @@ pub fn EditGameForm() -> Element {
             theme2:bg-green-200
 
             theme3:bg-stone-50
-            theme3:border-3
-            theme3:border-gold-rich
             "#,
             onsubmit: save,
-            h1 {
-                class: r#"
-                block
-                p-2
-                text-lg
-                theme1:bg-red-900
-                theme1:text-stone-200
-
-                theme2:bg-green-800
-                theme2:text-green-200
-
-                theme3:font-[Orbitron]
-                "#,
-                "Edit game"
-            }
             label {
                 "Name",
 

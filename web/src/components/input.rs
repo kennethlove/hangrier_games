@@ -7,10 +7,13 @@ pub struct InputProperties {
     id: Option<String>,
     value: Option<String>,
     oninput: Option<EventHandler<Event<FormData>>>,
+    class: Option<String>,
 }
 
 #[component]
 pub fn Input(props: InputProperties) -> Element {
+    let classes = props.class.clone().unwrap_or(String::new());
+
     rsx! {
         input {
             r#type: "{props.clone().r#type}",
@@ -49,6 +52,7 @@ pub fn Input(props: InputProperties) -> Element {
             theme3:border-yellow-600
             theme3:placeholder-stone-500
             theme3:text-stone-800
+            {classes}
             "#,
         }
     }

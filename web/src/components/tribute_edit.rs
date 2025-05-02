@@ -1,6 +1,7 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use crate::components::icons::edit::EditIcon;
-use crate::components::Button;
+use crate::components::modal::{Modal, Props as ModalProps};
+use crate::components::{Button, Input};
 use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
@@ -79,19 +80,20 @@ pub fn TributeEdit(identifier: String, district: u32, name: String) -> Element {
 pub fn EditTributeModal() -> Element {
     let edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
 
-    rsx! {
-        dialog {
-            role: "confirm",
-            open: edit_tribute_signal.read().clone().is_some(),
-
-            div { class: "fixed inset-0 backdrop-blur-sm backdrop-grayscale" }
+    let props = ModalProps {
+        title: "Edit Tribute".to_string(),
+        open: edit_tribute_signal.read().clone().is_some(),
+        children: Some(rsx! {
             div {
-                class: "fixed inset-0 z-10 w-screen h-screen overflow-y-hidden",
-                div {
-                    class: "flex items-center gap-8 min-h-full justify-center",
-                    EditTributeForm {}
-                }
+                class: "flex items-center gap-8 min-h-full justify-center",
+                EditTributeForm {}
             }
+        }),
+    };
+
+    rsx! {
+        Modal {
+            modal_props: props
         }
     }
 }
@@ -170,33 +172,14 @@ pub fn EditTributeForm() -> Element {
             theme2:text-green-900
 
             theme3:bg-stone-50
-            theme3:border-gold-rich
-            theme3:border-3
             "#,
             onsubmit: save,
 
-            h1 {
-                class: r#"
-                block
-                p-2
-                text-lg
-                theme1:bg-red-900
-                theme1:text-stone-200
-
-                theme2:bg-green-800
-                theme2:text-green-200
-
-                theme3:font-[Orbitron]
-                "#,
-
-                "Edit tribute"
-            }
             div {
                 label {
                     "Name",
 
-                    input {
-                        class: "border ml-2 px-2 py-1",
+                    Input {
                         r#type: "text",
                         name: "name",
                         value: name,
@@ -218,17 +201,17 @@ pub fn EditTributeForm() -> Element {
                         }
                     }
                 }
-                div {
-                    class: "flex justify-end gap-2",
-                    Button {
-                        r#type: "submit",
-                        "Update"
-                    }
-                    Button {
-                        r#type: "dialog",
-                        onclick: dismiss,
-                        "Cancel"
-                    }
+            }
+            div {
+                class: "flex justify-end gap-2",
+                Button {
+                    r#type: "submit",
+                    "Update"
+                }
+                Button {
+                    r#type: "dialog",
+                    onclick: dismiss,
+                    "Cancel"
                 }
             }
         }

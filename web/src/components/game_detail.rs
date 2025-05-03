@@ -5,18 +5,18 @@ use crate::components::game_edit::GameEdit;
 use crate::components::game_tributes::GameTributes;
 use crate::components::info_detail::InfoDetail;
 use crate::components::ThemedButton;
+use crate::env::APP_API_HOST;
+use crate::routes::Routes;
 use crate::storage::{use_persistent, AppState};
 use crate::LoadingState;
-use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_logger::tracing;
 use dioxus_query::prelude::{use_get_query, use_mutation, use_query_client, MutationResult, QueryResult, UseMutation, UseQueryClient};
-use game::games::{DisplayGame, Game};
 use game::games::GameStatus;
+use game::games::{DisplayGame, Game};
 use game::tributes::Tribute;
 use reqwest::StatusCode;
 use std::ops::Deref;
-use crate::routes::Routes;
 
 async fn fetch_display_game(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::DisplayGame(identifier)) = keys.first() {
@@ -65,7 +65,7 @@ async fn fetch_full_game(keys: Vec<QueryKey>, token: String) -> QueryResult<Quer
 
         let request = client.request(
             reqwest::Method::GET,
-            format!("{}/api/games/{}/display", APP_API_HOST, identifier))
+            format!("{}/api/games/{}", APP_API_HOST, identifier))
             .bearer_auth(token);
 
         match request.send().await {
@@ -73,7 +73,7 @@ async fn fetch_full_game(keys: Vec<QueryKey>, token: String) -> QueryResult<Quer
                 match response.error_for_status() {
                     Ok(response) => {
                         if let Ok(game) = response.json::<Game>().await {
-                            QueryResult::Ok(QueryValue::DisplayGame(Box::new(game)))
+                            QueryResult::Ok(QueryValue::Game(Box::new(game)))
                         } else {
                             QueryResult::Err(QueryError::BadJson)
                         }
@@ -419,7 +419,7 @@ fn GameStats(identifier: String) -> Element {
                 div {
                     class: "flex flex-col gap-2 mt-4",
 
-                    if game.winner.is_empty() {
+                    if game.winner.is_empty() && game_status == GameStatus::Finished.to_string() {
                         h1 {
                             class: "block text-3xl",
                             "Winner: {game.winner}!"
@@ -522,24 +522,37 @@ fn GameStats(identifier: String) -> Element {
 #[component]
 fn GameDetails(identifier: String) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.unwrap_or_default();
+    let display_token = storage.get().jwt.unwrap_or_default();
+    let full_token = display_token.clone();
 
-    let game_query = use_get_query(
+    let display_game_query = use_get_query(
         [QueryKey::DisplayGame(identifier.clone())],
-        move |keys: Vec<QueryKey>| { fetch_display_game(keys, token.clone()) },
+        move |keys: Vec<QueryKey>| { fetch_display_game(keys, display_token.clone()) },
     );
 
-    match game_query.result().value() {
+    match display_game_query.result().value() {
         QueryResult::Ok(QueryValue::DisplayGame(game)) => {
-            let game_ = game.clone();
+            let display_game = *game.clone();
+            let day = display_game.clone().day.unwrap_or(0);
 
-            let mut game_signal: Signal<Option<Game>> = use_context();
-            use_effect({
-                let game = fetch_full_game(identifier);
-                move || {
-                    game_signal.set(Some(game.clone()));
-                }
-            });
+            // let game_query = use_get_query(
+            //     [QueryKey::Game(identifier.clone())],
+            //     move |keys: Vec<QueryKey>| { fetch_full_game(keys, full_token.clone()) },
+            // );
+            //
+            // let mut game_signal: Signal<Option<Game>> = use_context();
+            //
+            // use_effect(move || {
+            //     match game_query.result().value() {
+            //         QueryResult::Ok(QueryValue::Game(game)) => {
+            //             game_signal.set(Some(*game.clone()));
+            //         }
+            //         QueryResult::Err(_) => {
+            //             game_signal.set(None);
+            //         }
+            //         _ => {}
+            //     }
+            // });
 
             rsx! {
                 div {
@@ -554,20 +567,20 @@ fn GameDetails(identifier: String) -> Element {
                     InfoDetail {
                         title: "Areas",
                         open: false,
-                        GameAreaList { game: *game_.clone() }
+                        GameAreaList { game: display_game.clone() }
                     }
 
                     InfoDetail {
                         title: "Tributes",
                         open: false,
-                        GameTributes { game: *game_.clone() }
+                        GameTributes { game: display_game.clone() }
                     }
 
-                    if game.day.unwrap_or(0) > 0 {
+                    if day > 0 {
                         InfoDetail {
                             title: "Day log",
                             open: false,
-                            GameDayLog { game: *game_.clone(), day: game_.day.unwrap_or_default() }
+                            GameDayLog { game: display_game.clone(), day: day }
                         }
                     }
                 }

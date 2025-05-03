@@ -7,6 +7,8 @@ use shared::{AuthenticatedUser, TributeKey};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum QueryKey {
     AllGames,
+    DisplayGame(String),
+    DisplayGames,
     Game(String),
     Games,
     Tributes(String),
@@ -35,8 +37,10 @@ pub(crate) enum QueryError {
 #[derive(PartialEq, Debug)]
 pub(crate) enum QueryValue {
     Areas(Vec<AreaDetails>),
-    Game(Box<DisplayGame>),
-    Games(Vec<DisplayGame>),
+    DisplayGame(Box<DisplayGame>),
+    DisplayGames(Vec<DisplayGame>),
+    Game(Box<Game>),
+    Games(Vec<Game>),
     Tribute(Box<Tribute>),
     Tributes(Vec<Tribute>),
     GameTributes(Vec<TributeKey>),

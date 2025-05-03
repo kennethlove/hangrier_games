@@ -71,13 +71,14 @@ impl OwnsItems for Tribute {
         let used_item = self.items.iter_mut().find(|i| *i == &item);
 
         if let Some(used_item) = used_item {
-            if used_item.quantity > 0 {
-                let item = used_item.clone();
-                used_item.quantity = used_item.quantity.saturating_sub(1);
-                return Some(item);
+            used_item.quantity = used_item.quantity.saturating_sub(1);
+            if used_item.quantity >= 1 {
+                Some(used_item.clone())
+            } else {
+                self.remove_item(item.clone());
+                None
             }
-        }
-        None
+        } else { None }
     }
 
     fn remove_item(&mut self, item: Item) { self.items.retain(|i| i != &item); }
@@ -726,6 +727,7 @@ impl Tribute {
                 }
             }
             Action::TakeItem => {
+                info!(target: "api", "Taking item");
                 if let Some(item) = self.take_nearby_item(game) {
                     add_tribute_message(
                         self.identifier.as_str(),
@@ -752,6 +754,7 @@ impl Tribute {
                                 format!("{}", GameOutput::TributeUseItem(self.clone(), item.clone())),
                             ).expect("");
                             self.use_item(item.clone());
+                            info!(target: "api", "true, Items: {:?}", &self.items);
                             self.take_action(&action, None);
                         }
                         false => {
@@ -760,6 +763,7 @@ impl Tribute {
                                 self.statistics.game.as_str(),
                                 format!("{}", GameOutput::TributeCannotUseItem(self.clone(), item.clone())),
                             ).expect("");
+                            info!(target: "api", "false, Items: {:?}", &self.items);
                             self.short_rests();
                             self.take_action(&Action::Rest, None);
                         }
@@ -767,6 +771,7 @@ impl Tribute {
                 }
             }
             Action::UseItem(item) => {
+                info!(target: "api", "Using item");
                 let items = self.consumable_items();
                 if let Some(item) = item {
                     if items.contains(item) {
@@ -834,6 +839,7 @@ impl Tribute {
         } else {
             let item = items.choose(&mut rng).unwrap().clone();
             if let Some(item) = area_details.use_item(item.clone()) {
+                info!(target: "api", "Taking nearby item: {:?}", item);
                 self.add_item(item.clone());
 
                 game.areas.push(area_details);

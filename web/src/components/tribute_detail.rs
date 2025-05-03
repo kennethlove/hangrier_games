@@ -13,7 +13,7 @@ use crate::storage::{use_persistent, AppState};
 
 async fn fetch_tribute(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tribute(identifier)) = keys.first() {
-        if let Some(QueryKey::Game(game_identifier)) = keys.last() {
+        if let Some(QueryKey::DisplayGame(game_identifier)) = keys.last() {
             let client = reqwest::Client::new();
 
             let request = client.request(
@@ -83,7 +83,7 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
         [
             QueryKey::Tribute(tribute_identifier.clone()),
             QueryKey::Tributes(game_identifier.clone()),
-            QueryKey::Game(game_identifier.clone()),
+            QueryKey::DisplayGame(game_identifier.clone()),
         ],
         move|keys: Vec<QueryKey>| { fetch_tribute(keys, token.clone()) },
     );

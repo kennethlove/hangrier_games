@@ -18,13 +18,13 @@ use reqwest::StatusCode;
 use std::ops::Deref;
 use crate::routes::Routes;
 
-async fn fetch_game(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::Game(identifier)) = keys.first() {
+async fn fetch_display_game(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
+    if let Some(QueryKey::DisplayGame(identifier)) = keys.first() {
         let client = reqwest::Client::new();
 
         let request = client.request(
             reqwest::Method::GET,
-            format!("{}/api/games/{}", APP_API_HOST, identifier))
+            format!("{}/api/games/{}/display", APP_API_HOST, identifier))
             .bearer_auth(token);
 
         match request.send().await {
@@ -32,7 +32,48 @@ async fn fetch_game(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValu
                 match response.error_for_status() {
                     Ok(response) => {
                         if let Ok(game) = response.json::<DisplayGame>().await {
-                            QueryResult::Ok(QueryValue::Game(Box::new(game)))
+                            QueryResult::Ok(QueryValue::DisplayGame(Box::new(game)))
+                        } else {
+                            QueryResult::Err(QueryError::BadJson)
+                        }
+                    }
+                    Err(e) => {
+                        if e.status() == Some(StatusCode::UNAUTHORIZED) {
+                            QueryResult::Err(QueryError::Unauthorized)
+                        } else {
+                            QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                if e.status() == Some(StatusCode::UNAUTHORIZED) {
+                    QueryResult::Err(QueryError::Unauthorized)
+                } else {
+                    QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
+                }
+            }
+        }
+    } else {
+        QueryResult::Err(QueryError::Unknown)
+    }
+}
+
+async fn fetch_full_game(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
+    if let Some(QueryKey::Game(identifier)) = keys.first() {
+        let client = reqwest::Client::new();
+
+        let request = client.request(
+            reqwest::Method::GET,
+            format!("{}/api/games/{}/display", APP_API_HOST, identifier))
+            .bearer_auth(token);
+
+        match request.send().await {
+            Ok(response) =>  {
+                match response.error_for_status() {
+                    Ok(response) => {
+                        if let Ok(game) = response.json::<Game>().await {
+                            QueryResult::Ok(QueryValue::DisplayGame(Box::new(game)))
                         } else {
                             QueryResult::Err(QueryError::BadJson)
                         }
@@ -74,7 +115,6 @@ async fn next_step(args: (String, String)) -> MutationResult<MutationValue, Muta
                 StatusCode::NO_CONTENT => MutationResult::Ok(MutationValue::GameFinished(identifier)),
                 StatusCode::CREATED => MutationResult::Ok(MutationValue::GameStarted(identifier)),
                 StatusCode::OK => {
-                    tracing::info!("{:?}", &response);
                     MutationResult::Ok(MutationValue::GameAdvanced(identifier))
                 },
                 _ => MutationResult::Err(MutationError::UnableToAdvanceGame),
@@ -104,7 +144,7 @@ async fn handle_next_step(
                 MutationValue::GameAdvanced(game_identifier)
                 | MutationValue::GameFinished(game_identifier)
                 | MutationValue::GameStarted(game_identifier) => {
-                    invalidate_keys = Some(vec![QueryKey::Game(game_identifier.into()), QueryKey::Games]);
+                    invalidate_keys = Some(vec![QueryKey::DisplayGame(game_identifier.into()), QueryKey::Games]);
                 }
                 _ => {}
             }
@@ -158,12 +198,12 @@ fn GameState(identifier: String) -> Element {
 
     let token_clone = token.clone();
     let game_query = use_get_query(
-        [QueryKey::Game(identifier.clone())],
-        move |keys: Vec<QueryKey>| { fetch_game(keys, token.clone()) },
+        [QueryKey::DisplayGame(identifier.clone())],
+        move |keys: Vec<QueryKey>| { fetch_display_game(keys, token.clone()) },
     );
 
     match game_query.result().value() {
-        QueryResult::Ok(QueryValue::Game(game_data)) => {
+        QueryResult::Ok(QueryValue::DisplayGame(game_data)) => {
             let game = *game_data.clone();
             let game_id = game.identifier.clone();
             let g_id = game_id.clone();
@@ -360,21 +400,14 @@ fn GameStats(identifier: String) -> Element {
     let token = storage.get().jwt.unwrap_or_default();
 
     let game_query = use_get_query(
-        [QueryKey::Game(identifier.clone())],
-        move |keys: Vec<QueryKey>| { fetch_game(keys, token.clone()) },
+        [QueryKey::DisplayGame(identifier.clone())],
+        move |keys: Vec<QueryKey>| { fetch_display_game(keys, token.clone()) },
     );
 
     match game_query.result().value() {
-        QueryResult::Ok(QueryValue::Game(game)) => {
-            let game = Game::from(*game.clone());
+        QueryResult::Ok(QueryValue::DisplayGame(game)) => {
             let game_day = game.day.unwrap_or(0);
-            let tribute_count = game
-                .clone()
-                .tributes
-                .into_iter()
-                .filter(|t| t.is_alive())
-                .collect::<Vec<Tribute>>()
-                .len();
+            let tribute_count = game.living_count;
 
             let game_status = match game.status {
                 GameStatus::NotStarted => "Not started".to_string(),
@@ -382,22 +415,14 @@ fn GameStats(identifier: String) -> Element {
                 GameStatus::Finished => "Finished".to_string(),
             };
 
-            let winner_name = {
-                if game.winner().is_some() {
-                    game.winner().unwrap().name
-                } else {
-                    String::new()
-                }
-            };
-
             rsx! {
                 div {
                     class: "flex flex-col gap-2 mt-4",
 
-                    if !winner_name.is_empty() {
+                    if game.winner.is_empty() {
                         h1 {
                             class: "block text-3xl",
-                            "Winner: {winner_name}!"
+                            "Winner: {game.winner}!"
                         }
                     }
 
@@ -500,17 +525,17 @@ fn GameDetails(identifier: String) -> Element {
     let token = storage.get().jwt.unwrap_or_default();
 
     let game_query = use_get_query(
-        [QueryKey::Game(identifier.clone())],
-        move |keys: Vec<QueryKey>| { fetch_game(keys, token.clone()) },
+        [QueryKey::DisplayGame(identifier.clone())],
+        move |keys: Vec<QueryKey>| { fetch_display_game(keys, token.clone()) },
     );
 
     match game_query.result().value() {
-        QueryResult::Ok(QueryValue::Game(game)) => {
+        QueryResult::Ok(QueryValue::DisplayGame(game)) => {
             let game_ = game.clone();
 
             let mut game_signal: Signal<Option<Game>> = use_context();
             use_effect({
-                let game = Game::from(*game.clone());
+                let game = fetch_full_game(identifier);
                 move || {
                     game_signal.set(Some(game.clone()));
                 }

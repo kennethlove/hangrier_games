@@ -114,7 +114,7 @@ pub fn EditGameForm() -> Element {
                 edit_game_signal.set(Some(edit_game.clone()));
 
                 if let MutationResult::Ok(MutationValue::GameUpdated(identifier)) = mutate.result().deref() {
-                    client.invalidate_queries(&[QueryKey::Game(identifier.clone()), QueryKey::Games]);
+                    client.invalidate_queries(&[QueryKey::DisplayGame(identifier.clone()), QueryKey::Games]);
                     edit_game_signal.set(None);
                 }
             });

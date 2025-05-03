@@ -29,6 +29,7 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
         .route("/", get(game_list).post(game_create))
         .route("/{game_identifier}", get(game_detail).delete(game_delete).put(game_update))
+        .route("/{game_identifier}/display", get(game_display))
         .route("/{game_identifier}/areas", get(game_areas))
         .route("/{game_identifier}/summarize/{day}", get(game_day_summary))
         .route("/{game_identifier}/summarize", get(game_summary))
@@ -741,5 +742,56 @@ async fn unpublish_game(Path(game_identifier): Path<String>) -> impl IntoRespons
             tracing::error!("{}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         }
+    }
+}
+
+pub async fn game_display(game_identifier: Path<String>) -> impl IntoResponse {
+    let identifier = game_identifier.0;
+    let day = DATABASE
+        .query("SELECT day FROM game WHERE identifier = $identifier LIMIT 1")
+        .bind(("identifier", identifier.clone()))
+        .await;
+    let day: Option<i64> = day.unwrap().take("day").unwrap();
+    let day: i64 = day.unwrap_or(0);
+
+    let mut result = DATABASE.query(r#"
+LET $tributes = (
+    SELECT id, name, district, attributes.health
+    FROM tribute WHERE playing_in->game.identifier = $identifier
+);
+
+LET $winner = (
+    IF count(tributes) == 1 THEN
+        RETURN $tributes[0].name
+    ELSE
+        RETURN ""
+    END
+);
+
+SELECT identifier,
+name,
+status,
+day,
+private,
+created_by.username,
+created_by.id == $auth.id AS is_mine,
+count($tributes) as tribute_count,
+count(SELECT * FROM $tributes WHERE attributes.health > 0) AS living_count,
+count($tributes) == 24 AND count(array::distinct(<-playing_in<-tribute.district)) == 12 AS ready,
+$winner AS winner
+FROM game
+WHERE identifier = $identifier
+FETCH tribute
+;"#)
+        .bind(("day", day))
+        .bind(("identifier", identifier.clone()))
+        .await.unwrap();
+
+    let game: Option<DisplayGame> = result.take(0).expect("No game found");
+
+    if let Some(game) = game {
+        (StatusCode::OK, Json(Some(game))).into_response()
+    } else {
+        (StatusCode::NOT_FOUND, Json(None::<DisplayGame>)).into_response()
     }
 }

@@ -375,37 +375,21 @@ pub struct DisplayGame {
     pub status: GameStatus,
     pub day: Option<u32>,
     #[serde(default)]
-    pub areas: Vec<AreaDetails>,
-    #[serde(default)]
     pub tribute_count: u32,
     #[serde(default)]
-    pub tributes: Vec<Tribute>,
+    pub living_count: u32,
     #[serde(default)]
     pub ready: bool,
     #[serde(default)]
     pub private: bool,
     #[serde(default)]
     pub is_mine: bool,
-    pub created_by: CreatedBy
+    pub created_by: CreatedBy,
+    #[serde(default)]
+    pub winner: String
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct CreatedBy {
     pub username: String,
-}
-
-impl From<DisplayGame> for Game {
-    fn from(display_game: DisplayGame) -> Self {
-        Game {
-            identifier: display_game.identifier,
-            name: display_game.name,
-            status: display_game.status,
-            day: display_game.day,
-            areas: display_game.areas,
-            tribute_count: display_game.tribute_count,
-            tributes: display_game.tributes,
-            ready: display_game.ready,
-            private: display_game.private,
-        }
-    }
 }

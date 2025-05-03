@@ -42,7 +42,7 @@ pub fn GameDayLog(game: DisplayGame, day: u32) -> Element {
     let log_query = use_get_query(
         [
             QueryKey::GameDayLog(identifier.clone(), day),
-            QueryKey::Game(identifier.clone()),
+            QueryKey::DisplayGame(identifier.clone()),
             QueryKey::Games
         ],
         move |keys: Vec<QueryKey>| { fetch_game_day_log(keys, token.clone()) },

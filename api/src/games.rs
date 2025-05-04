@@ -203,23 +203,23 @@ async fn delete_pieces(pieces: HashMap<String, Vec<Thing>>) {
 
 pub async fn game_list() -> impl IntoResponse {
     let mut games = DATABASE.query(r#"
-SELECT *, (
-    SELECT *, ->owns->item[*] AS items
-    FROM <-playing_in<-tribute[*]
-) AS tributes, (
-    SELECT *, ->items->item[*] AS items
-    FROM ->areas->area
-) AS areas, (
+SELECT name, identifier, status, day, private,
+created_by.id == $auth.id AS is_mine,
+created_by.username,
+(
     RETURN count(
         SELECT id FROM <-playing_in<-tribute
     )
 ) AS tribute_count,
+(
+    RETURN count(
+        SELECT id FROM <-playing_in<-tribute WHERE attributes.health > 0
+    )
+) AS living_count,
 count(<-playing_in<-tribute.id) == 24
 AND
 count(array::distinct(<-playing_in<-tribute.district)) == 12
-AS ready,
-created_by.id == $auth.id AS is_mine,
-created_by.username
+AS ready
 FROM game
 ;"#).await.unwrap();
 

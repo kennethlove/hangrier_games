@@ -3,13 +3,13 @@ use crate::components::icons::uturn::UTurnIcon;
 use crate::components::info_detail::InfoDetail;
 use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_status_icon::TributeStatusIcon;
-use crate::routes::Routes;
 use crate::env::APP_API_HOST;
+use crate::routes::Routes;
+use crate::storage::{use_persistent, AppState};
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::messages::GameMessage;
 use game::tributes::{Attributes, Tribute};
-use crate::storage::{use_persistent, AppState};
 
 async fn fetch_tribute(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tribute(identifier)) = keys.first() {
@@ -188,7 +188,7 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                             class: "flex flex-row gap-2 flew-wrap",
                             for item in tribute.clone().items {
                                 li {
-                                    class: "flex flex-row gap-2 items-center",
+                                    class: "flex flex-row flex-wrap gap-2 items-center",
                                     ItemIcon {
                                         item: item.clone(),
                                         css_class: r#"

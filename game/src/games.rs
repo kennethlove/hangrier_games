@@ -3,6 +3,7 @@ use crate::areas::{Area, AreaDetails};
 use crate::items::Item;
 use crate::items::OwnsItems;
 use crate::messages::{add_area_message, add_game_message, clear_messages};
+use crate::output::GameOutput;
 use crate::tributes::actions::Action;
 use crate::tributes::events::TributeEvent;
 use crate::tributes::statuses::TributeStatus;
@@ -10,12 +11,11 @@ use crate::tributes::Tribute;
 use rand::prelude::{IteratorRandom, SliceRandom};
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
+use shared::GameStatus;
 use std::fmt::Display;
 use std::ops::Index;
 use std::str::FromStr;
 use uuid::Uuid;
-
-use crate::output::GameOutput;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Game {
@@ -333,63 +333,4 @@ impl Game {
     fn get_area_details_mut(&mut self, area: Area) -> Option<&mut AreaDetails> {
         self.areas.iter_mut().find(|a| a.area == area.to_string())
     }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Default, Serialize, Deserialize)]
-pub enum GameStatus {
-    #[default]
-    NotStarted,
-    InProgress,
-    Finished,
-}
-
-impl Display for GameStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GameStatus::NotStarted => write!(f, "NotStarted"),
-            GameStatus::InProgress => write!(f, "InProgress"),
-            GameStatus::Finished => write!(f, "Finished"),
-        }
-    }
-}
-
-impl FromStr for GameStatus {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "not started" => Ok(GameStatus::NotStarted),
-            "notstarted" => Ok(GameStatus::NotStarted),
-            "in progress" => Ok(GameStatus::InProgress),
-            "inprogress" => Ok(GameStatus::InProgress),
-            "finished" => Ok(GameStatus::Finished),
-            _ => Err(()),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct DisplayGame {
-    pub identifier: String,
-    pub name: String,
-    pub status: GameStatus,
-    pub day: Option<u32>,
-    #[serde(default)]
-    pub tribute_count: u32,
-    #[serde(default)]
-    pub living_count: u32,
-    #[serde(default)]
-    pub ready: bool,
-    #[serde(default)]
-    pub private: bool,
-    #[serde(default)]
-    pub is_mine: bool,
-    pub created_by: CreatedBy,
-    #[serde(default)]
-    pub winner: String
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct CreatedBy {
-    pub username: String,
 }

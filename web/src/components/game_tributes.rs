@@ -3,15 +3,15 @@ use crate::components::icons::map_pin::MapPinIcon;
 use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_edit::TributeEdit;
 use crate::components::tribute_status_icon::TributeStatusIcon;
+use crate::env::APP_API_HOST;
 use crate::routes::Routes;
 use crate::storage::{use_persistent, AppState};
-use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
-use game::games::{DisplayGame, Game, GameStatus};
 use game::items::Item;
 use game::messages::GameMessage;
 use game::tributes::Tribute;
+use shared::{DisplayGame, GameStatus};
 
 async fn fetch_tributes(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tributes(identifier)) = keys.first() {

@@ -1,14 +1,14 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::game_edit::GameEdit;
-use crate::components::{Button, CreateGameButton, CreateGameForm, DeleteGameModal, GameDelete};
-use crate::routes::Routes;
-use crate::env::APP_API_HOST;
-use dioxus::prelude::*;
-use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
-use game::games::{DisplayGame, Game};
 use crate::components::icons::eye_closed::EyeClosedIcon;
 use crate::components::icons::eye_open::EyeOpenIcon;
+use crate::components::{Button, CreateGameButton, CreateGameForm, DeleteGameModal, GameDelete};
+use crate::env::APP_API_HOST;
+use crate::routes::Routes;
 use crate::storage::{use_persistent, AppState};
+use dioxus::prelude::*;
+use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
+use shared::{DisplayGame, GameStatus};
 
 async fn fetch_games(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::AllGames) = keys.first() {
@@ -239,9 +239,9 @@ pub fn GameListMember(game: DisplayGame) -> Element {
                 p {
                     class: "flex-grow",
                     match game.status {
-                        game::games::GameStatus::InProgress => "In progress",
-                        game::games::GameStatus::Finished => "Finished",
-                        game::games::GameStatus::NotStarted => "Not started",
+                        GameStatus::InProgress => "In progress",
+                        GameStatus::Finished => "Finished",
+                        GameStatus::NotStarted => "Not started",
                     }
                 }
                 div {

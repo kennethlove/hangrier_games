@@ -12,10 +12,9 @@ use crate::LoadingState;
 use dioxus::prelude::*;
 use dioxus_logger::tracing;
 use dioxus_query::prelude::{use_get_query, use_mutation, use_query_client, MutationResult, QueryResult, UseMutation, UseQueryClient};
-use game::games::GameStatus;
-use game::games::{DisplayGame, Game};
-use game::tributes::Tribute;
+use game::games::Game;
 use reqwest::StatusCode;
+use shared::{DisplayGame, GameStatus};
 use std::ops::Deref;
 
 async fn fetch_display_game(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
@@ -59,7 +58,7 @@ async fn fetch_display_game(keys: Vec<QueryKey>, token: String) -> QueryResult<Q
     }
 }
 
-async fn fetch_full_game(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
+async fn _fetch_full_game(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Game(identifier)) = keys.first() {
         let client = reqwest::Client::new();
 
@@ -523,7 +522,6 @@ fn GameStats(identifier: String) -> Element {
 fn GameDetails(identifier: String) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
     let display_token = storage.get().jwt.unwrap_or_default();
-    let full_token = display_token.clone();
 
     let display_game_query = use_get_query(
         [QueryKey::DisplayGame(identifier.clone())],

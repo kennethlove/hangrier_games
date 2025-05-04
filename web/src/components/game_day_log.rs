@@ -1,10 +1,10 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::env::APP_API_HOST;
+use crate::storage::{use_persistent, AppState};
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
-use game::games::{DisplayGame, Game};
 use game::messages::GameMessage;
-use crate::storage::{use_persistent, AppState};
+use shared::DisplayGame;
 
 async fn fetch_game_day_log(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::GameDayLog(identifier, day)) = keys.first() {

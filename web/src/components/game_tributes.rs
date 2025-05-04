@@ -39,7 +39,7 @@ async fn fetch_tributes(keys: Vec<QueryKey>, token: String) -> QueryResult<Query
 
 async fn _fetch_tribute_log(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::_TributeDayLog(identifier, day)) = keys.first() {
-        if let Some(QueryKey::Game(game_identifier)) = keys.last() {
+        if let Some(QueryKey::DisplayGame(game_identifier)) = keys.last() {
             let client = reqwest::Client::new();
 
             let request = client.request(
@@ -81,7 +81,7 @@ pub fn GameTributes(game: DisplayGame) -> Element {
     let tribute_query = use_get_query(
         [
             QueryKey::Tributes(identifier.clone()),
-            QueryKey::Game(identifier.clone())
+            QueryKey::DisplayGame(identifier.clone())
         ],
         move |keys: Vec<QueryKey>| { fetch_tributes(keys, token.clone()) },
     );

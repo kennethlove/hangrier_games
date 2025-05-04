@@ -21,7 +21,7 @@ async fn fetch_games(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryVal
         match request.send().await{
             Ok(request) => {
                 if let Ok(response) = request.json::<Vec<DisplayGame>>().await {
-                    QueryResult::Ok(QueryValue::Games(response))
+                    QueryResult::Ok(QueryValue::DisplayGames(response))
                 } else {
                     QueryResult::Err(QueryError::BadJson)
                 }
@@ -73,7 +73,7 @@ pub fn GamesList() -> Element {
         }
 
         match games_query.result().value() {
-            QueryResult::Ok(QueryValue::Games(games)) => {
+            QueryResult::Ok(QueryValue::DisplayGames(games)) => {
                 rsx! {
                     if games.is_empty() {
                         NoGames {}
@@ -124,8 +124,8 @@ pub fn GameListMember(game: DisplayGame) -> Element {
     let created_by = game.clone().created_by;
     let is_mine = game.clone().is_mine;
 
-    let game = Game::from(game);
-    let living_count = game.living_tributes().len();
+    let living_count = game.living_count;
+
     rsx! {
         li {
             class: r#"
@@ -244,20 +244,23 @@ pub fn GameListMember(game: DisplayGame) -> Element {
                         game::games::GameStatus::NotStarted => "Not started",
                     }
                 }
-                if game.private {
-                    EyeClosedIcon { class: r#"
-                        size-4
-                        theme1:fill-amber-600
-                        theme2:fill-green-200/50
-                        theme3:fill-yellow-600
-                    "# }
-                } else {
-                    EyeOpenIcon { class: r#"
-                        size-4
-                        theme1:fill-amber-600
-                        theme2:fill-green-200/50
-                        theme3:fill-yellow-600
-                    "# }
+                div {
+                    class: "px-2",
+                    if game.private {
+                        EyeClosedIcon { class: r#"
+                            size-4
+                            theme1:fill-amber-600
+                            theme2:fill-green-200/50
+                            theme3:fill-yellow-600
+                        "# }
+                    } else {
+                        EyeOpenIcon { class: r#"
+                            size-4
+                            theme1:fill-amber-600
+                            theme2:fill-green-200/50
+                            theme3:fill-yellow-600
+                        "# }
+                    }
                 }
             }
         }

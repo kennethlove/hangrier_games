@@ -30,16 +30,17 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
         .route("/", get(game_list).post(game_create))
         .route("/{game_identifier}", get(game_detail).delete(game_delete).put(game_update))
         .route("/{game_identifier}/areas", get(game_areas))
-        .route("/{game_identifier}/summarize/{day}", get(game_day_summary))
-        .route("/{game_identifier}/summarize", get(game_summary))
+        .route("/{game_identifier}/display", get(game_display))
         .route("/{game_identifier}/log/{day}", get(game_day_logs))
         .route("/{game_identifier}/log/{day}/{tribute_identifier}", get(tribute_logs))
         .route("/{game_identifier}/next", put(next_step))
         .route("/{game_identifier}/publish", put(publish_game))
-        .route("/{game_identifier}/unpublish", put(unpublish_game))
+        .route("/{game_identifier}/summarize", get(game_summary))
+        .route("/{game_identifier}/summarize/{day}", get(game_day_summary))
         .route("/{game_identifier}/tributes", get(game_tributes).post(tribute_create))
         .route("/{game_identifier}/tributes/{tribute_identifier}", get(tribute_detail).delete(tribute_delete).put(tribute_update))
         .route("/{game_identifier}/tributes/{tribute_identifier}/log", get(tribute_log))
+        .route("/{game_identifier}/unpublish", put(unpublish_game))
 });
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -741,5 +742,57 @@ async fn unpublish_game(Path(game_identifier): Path<String>) -> impl IntoRespons
             tracing::error!("{}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         }
+    }
+}
+
+pub async fn game_display(game_identifier: Path<String>) -> impl IntoResponse {
+    let identifier = game_identifier.to_string();
+    let mut result = DATABASE.query(r#"
+LET $tributes = (
+    SELECT  in.id,
+            in.name,
+            in.district,
+            in.attributes.health
+    FROM playing_in
+    WHERE out.identifier = $identifier
+);
+
+LET $winner = (
+    IF count($tributes) == 1 THEN
+        RETURN $tributes[0].name
+    ELSE
+        RETURN ""
+    END
+);
+
+
+SELECT
+    identifier,
+    name,
+    status,
+    day,
+    private,
+    created_by.username,
+    created_by.id == $auth.id AS is_mine,
+    $tributes.in AS tributes,
+    count($tributes.in) as tribute_count,
+    count(SELECT * FROM $tributes.in WHERE attributes.health > 0) AS living_count,
+    count($tributes.in) == 24 AND
+        count(array::distinct(<-playing_in<-tribute.district)) == 12 AS ready,
+    $winner AS winner
+FROM game
+WHERE identifier = $identifier
+LIMIT 1
+FETCH tribute
+;"#)
+        .bind(("identifier", identifier.clone()))
+        .await.unwrap();
+
+    let game: Option<DisplayGame> = result.take(2).expect("No game found");
+
+    if let Some(game) = game {
+        (StatusCode::OK, Json(game)).into_response()
+    } else {
+        StatusCode::NOT_FOUND.into_response()
     }
 }

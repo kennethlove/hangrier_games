@@ -1,9 +1,9 @@
-use std::sync::LazyLock;
-use axum::{Json, Router};
-use axum::routing::post;
-use serde::{Deserialize, Serialize};
-use surrealdb::opt::auth::Record;
 use crate::DATABASE;
+use axum::routing::post;
+use axum::{Json, Router};
+use serde::{Deserialize, Serialize};
+use std::sync::LazyLock;
+use surrealdb::opt::auth::Record;
 
 mod error {
     use axum::http::StatusCode;
@@ -58,7 +58,7 @@ async fn user_create(Json(payload): Json<Params>) -> Result<Json<JwtResponse>, e
     let username = payload.username;
     let password = payload.password;
 
-    let jwt = DATABASE.signup(Record {
+    match DATABASE.signup(Record {
         access: "user",
         namespace: "hangry-games",
         database: "games",
@@ -66,11 +66,15 @@ async fn user_create(Json(payload): Json<Params>) -> Result<Json<JwtResponse>, e
             username: username.clone(),
             password: password.clone()
         },
-    })
-    .await?
-    .into_insecure_token();
-
-    Ok(Json(JwtResponse { jwt }))
+    }).await {
+        Ok(token) => {
+            Ok(Json(JwtResponse { jwt: token.into_insecure_token() }))
+        }
+        Err(e) => {
+            tracing::error!(target: "api", "Error creating user: {e}");
+            Err(error::Error::Db)
+        }
+    }
 }
 
 async fn user_authenticate(Json(payload): Json<Params>) -> Result<Json<JwtResponse>, error::Error> {

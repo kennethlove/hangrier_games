@@ -34,7 +34,7 @@ pub fn GameDaySummary(game: Game, day: u32) -> Element {
     let summary_query = use_get_query(
         [
             QueryKey::_GameDaySummary(identifier.clone(), day),
-            QueryKey::Game(identifier.clone()),
+            QueryKey::DisplayGame(identifier.clone()),
             QueryKey::Games,
         ],
         _fetch_game_day_summary,

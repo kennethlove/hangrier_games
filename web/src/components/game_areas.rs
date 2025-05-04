@@ -1,14 +1,14 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::icons::lock_closed::LockClosedIcon;
 use crate::components::icons::lock_open::LockOpenIcon;
+use crate::components::item_icon::ItemIcon;
 use crate::components::map::Map;
 use crate::env::APP_API_HOST;
+use crate::storage::{use_persistent, AppState};
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult};
 use game::areas::AreaDetails;
 use game::games::{DisplayGame, Game};
-use crate::components::item_icon::ItemIcon;
-use crate::storage::{use_persistent, AppState};
 
 async fn fetch_areas(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Areas(identifier)) = keys.first() {

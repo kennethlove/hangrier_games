@@ -285,12 +285,33 @@ impl Game {
         if !day || ![1u32, 3u32].contains(&self.day.unwrap_or(1u32)) {
             for area in self.areas.iter_mut() {
                 if rng.gen_bool(frequency) {
-                    // TODO: Announce area event?
                     let area_event = AreaEvent::random();
-                    area.events.push(area_event);
+                    area.events.push(area_event.clone());
+                    add_area_message(
+                        area.area.as_str(),
+                        &self.identifier,
+                        format!("{}", GameOutput::AreaEvent(area_event.clone(), Area::from_str(&area.area).unwrap()))
+                    ).expect("Failed to add area event message");
                 }
             }
         }
+
+        // Day 3 is Feast Day, refill the Cornucopia with a random assortment of items
+        if day && self.day == Some(3) {
+            let area = self.areas.iter_mut()
+                .find(|a| a.area == *"Cornucopia")
+                .expect("Cannot find Cornucopia");
+            for _ in rng.gen_range(1..=2) {
+                area.add_item(Item::new_random_weapon());
+            }
+            for _ in rng.gen_range(1..=2) {
+                area.add_item(Item::new_random_shield());
+            }
+            for _ in rng.gen_range(1..=4) {
+                area.add_item(Item::new_random_consumable());
+            }
+        }
+
     }
 
     /// If the tribute count is low, constrain them by closing areas.
@@ -389,22 +410,6 @@ impl Game {
 
         // Trigger any events for this cycle
         self.trigger_cycle_events(day, &mut rng);
-
-        // Day 3 is Feast Day, refill the Cornucopia
-        if self.day == Some(3) && day {
-            let area = self.areas.iter_mut()
-                .find(|a| a.area == *"Cornucopia")
-                .expect("Cannot find Cornucopia");
-            for _ in rng.gen_range(1..=2) {
-                area.add_item(Item::new_random_weapon());
-            }
-            for _ in rng.gen_range(1..=2) {
-                area.add_item(Item::new_random_shield());
-            }
-            for _ in rng.gen_range(1..=4) {
-                area.add_item(Item::new_random_consumable());
-            }
-        }
 
         // If the tribute count is low, constrain them by closing areas.
         self.constrain_areas(&mut rng);
@@ -596,4 +601,28 @@ mod tests {
         // Game should be finished
         assert_eq!(game.status, starting_state);
     }
+
+    #[test]
+    fn test_prepare_cycle() {}
+
+    #[test]
+    fn test_announce_cycle_start() {}
+
+    #[test]
+    fn test_announce_cycle_end() {}
+
+    #[test]
+    fn test_announce_area_events() {}
+
+    #[test]
+    fn test_ensure_open_area() {}
+
+    #[test]
+    fn test_trigger_cycle_events() {}
+
+    #[test]
+    fn test_constrain_areas() {}
+
+    #[tokio::test]
+    fn test_run_tribute_cycle() {}
 }

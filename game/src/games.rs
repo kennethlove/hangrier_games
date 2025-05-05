@@ -26,13 +26,7 @@ pub struct Game {
     #[serde(default)]
     pub areas: Vec<AreaDetails>,
     #[serde(default)]
-    pub tribute_count: u32,
-    #[serde(default)]
     pub tributes: Vec<Tribute>,
-    #[serde(default)]
-    pub ready: bool,
-    #[serde(default)]
-    pub private: bool,
 }
 
 impl Default for Game {
@@ -49,10 +43,7 @@ impl Default for Game {
             status: Default::default(),
             day: None,
             areas: vec![],
-            tribute_count: 0,
             tributes: vec![],
-            ready: false,
-            private: true,
         }
     }
 }
@@ -110,7 +101,7 @@ impl Game {
 
     fn random_open_area(&self) -> Option<AreaDetails> {
         self.areas.iter()
-            .filter(|a| a.open())
+            .filter(|a| a.is_open())
             .choose(&mut rand::thread_rng())
             .cloned()
     }
@@ -212,7 +203,7 @@ impl Game {
         let night_event_frequency = 1.0 / 8.0;
 
         for area in &self.areas {
-            if !area.open() {
+            if !area.is_open() {
                 add_area_message(
                     &area.area,
                     &self.identifier,
@@ -318,19 +309,112 @@ impl Game {
     }
 
     async fn clean_up_recent_deaths(&mut self) {
-        for mut tribute in self.recently_dead_tributes() {
-            let area = self.get_area_details_mut(tribute.area.clone());
-            if let Some(area) = area {
-                for item in tribute.items.iter() {
-                    area.add_item(item.clone());
+        let tribute_count = self.tributes.len();
+
+        for i in 0..tribute_count {
+            if self.tributes[i].is_alive() { continue }
+            let tribute_items: Vec<Item> = self.tributes[i].items.clone();
+
+            if self.tributes[i].status == TributeStatus::RecentlyDead {
+                let tribute_area = self.tributes[i].area.clone();
+
+                if let Some(area) = self.get_area_details_mut(tribute_area) {
+                    for item in tribute_items {
+                        area.add_item(item.clone());
+                    }
                 }
             }
 
-            tribute.dies();
+            self.tributes[i].dies();
         }
     }
 
     fn get_area_details_mut(&mut self, area: Area) -> Option<&mut AreaDetails> {
         self.areas.iter_mut().find(|a| a.area == area.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_game_new() {
+        let game = Game::new("Test Game");
+        assert_eq!(game.name, "Test Game");
+        assert_eq!(game.status, GameStatus::NotStarted);
+        assert_eq!(game.day, None);
+        assert_eq!(game.tributes.len(), 0);
+    }
+
+    #[test]
+    fn test_game_start() {
+        let mut game = Game::new("Test Game");
+        game.start();
+        assert_eq!(game.status, GameStatus::InProgress);
+        assert_eq!(game.day, None);
+    }
+
+    #[test]
+    fn test_game_end() {
+        let mut game = Game::new("Test Game");
+        game.start();
+        game.end();
+        assert_eq!(game.status, GameStatus::Finished);
+    }
+
+    #[test]
+    fn test_living_and_recently_dead_tributes() {
+        let mut game = Game::new("Test Game");
+        let t1 = Tribute::default();
+        let t2 = Tribute::default();
+        game.tributes.push(t1);
+        game.tributes.push(t2);
+        assert_eq!(game.living_tributes().len(), 2);
+        assert_eq!(game.recently_dead_tributes().len(), 0);
+        game.tributes[0].status = TributeStatus::RecentlyDead;
+        assert_eq!(game.living_tributes().len(), 1);
+        assert_eq!(game.recently_dead_tributes().len(), 1);
+    }
+
+    #[test]
+    fn test_game_winner() {
+        let mut game = Game::new("Test Game");
+        let t1 = Tribute::default();
+        let t2 = Tribute::default();
+        game.tributes.push(t1);
+        game.tributes.push(t2.clone());
+        game.start();
+        assert_eq!(game.winner(), None);
+        game.tributes[0].status = TributeStatus::Dead;
+        assert_eq!(game.winner().unwrap().name, t2.name);
+    }
+
+    #[test]
+    fn test_random_open_area() {
+        let mut game = Game::new("Test Game");
+        let area1 = AreaDetails::new(Some("Lake".to_string()), Area::North);
+        let area2 = AreaDetails::new(Some("Forest".to_string()), Area::South);
+        game.areas.push(area1);
+        game.areas.push(area2.clone());
+        assert!(game.random_area().is_some());
+        let event = AreaEvent::random();
+        game.areas[0].events.push(event.clone());
+        assert_eq!(game.random_open_area().unwrap(), area2);
+    }
+
+    #[tokio::test]
+    async fn test_clean_up_recent_deaths() {
+        let mut game = Game::new("Test Game");
+
+        let mut tribute = Tribute::default();
+        tribute.set_status(TributeStatus::RecentlyDead);
+        game.tributes.push(tribute.clone());
+
+        assert_eq!(game.recently_dead_tributes().len(), 1);
+        assert_eq!(game.recently_dead_tributes()[0], tribute);
+
+        game.clean_up_recent_deaths().await;
+        assert_eq!(game.tributes[0].status, TributeStatus::Dead);
     }
 }

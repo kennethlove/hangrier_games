@@ -159,7 +159,7 @@ impl Tribute {
 
     /// Marks the tribute as dead and reveals them.
     pub fn dies(&mut self) {
-        self.status = TributeStatus::Dead;
+        self.set_status(TributeStatus::Dead);
         self.attributes.is_hidden = false;
         self.items.clear();
     }

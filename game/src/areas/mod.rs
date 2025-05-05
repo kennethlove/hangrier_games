@@ -110,7 +110,7 @@ impl AreaDetails {
         }
     }
 
-    pub fn open(&self) -> bool {
+    pub fn is_open(&self) -> bool {
         self.events.is_empty()
     }
 }
@@ -159,10 +159,10 @@ mod tests {
     #[test]
     fn process_events_closes_area() {
         let mut area_details = AreaDetails::new(None, Area::North);
-        assert!(area_details.open());
+        assert!(area_details.is_open());
         let event = AreaEvent::Wildfire;
         area_details.events.push(event.clone());
-        assert!(!area_details.open());
+        assert!(!area_details.is_open());
     }
 
     #[test]

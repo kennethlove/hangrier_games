@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::areas::events::AreaEvent;
 use crate::areas::{Area, AreaDetails};
 use crate::items::Item;
@@ -15,6 +16,7 @@ use shared::GameStatus;
 use std::fmt::Display;
 use std::ops::Index;
 use std::str::FromStr;
+use rand::rngs::SmallRng;
 use uuid::Uuid;
 
 /// Represents the current state of the game.
@@ -238,22 +240,8 @@ impl Game {
         self.clean_up_recent_deaths().await;
     }
 
-    /// Runs a cycle of the game, either day or night.
-    /// 1. Announce area events.
-    /// 2. Open an area if there are no open areas.
-    /// 3. Trigger any events for this cycle if we're past the first three days.
-    /// 4. Trigger Feast Day events.
-    /// 5. Close more areas by spawning more events if the tributes are getting low.
-    /// 6. Shuffle the tributes.
-    /// 6a. If the tribute is unlucky, they get a random event.
-    /// 6b. Trigger day or night cycles for the tribute.
-    /// 7. Update the tributes in the game.
-    async fn do_a_cycle(&mut self, day: bool) {
-        let mut rng = rand::rngs::SmallRng::from_entropy();
-        let day_event_frequency = 1.0 / 4.0;
-        let night_event_frequency = 1.0 / 8.0;
-
-        // Announce area events
+    /// Announces events in closed areas.
+    fn announce_area_events(&self) {
         for area in &self.areas {
             if !area.is_open() {
                 add_area_message(
@@ -271,70 +259,90 @@ impl Game {
                 }
             }
         }
+    }
 
-        // If there are no open areas, we need to open one.
+    /// Ensures at least one area is open. If not, opens a random area by clearing its events.
+    fn ensure_open_area(&mut self) {
         if self.random_open_area().is_none() {
-            let mut area = self.random_area().expect("No areas?");
-            area.events.clear();
+            if let Some(mut area) = self.random_area() {
+                area.events.clear();
+            }
         }
+    }
 
-        // Trigger any events for this cycle if we're past the first three days
-        if self.day > Some(3) || !day {
+    /// Triggers events for the current cycle.
+    fn trigger_cycle_events(&mut self, day: bool, rng: &mut SmallRng) {
+        let frequency = {
+            if day {
+                1.0 / 4.0
+            } else {
+                1.0 / 8.0
+            }
+        };
+
+        // If it's nighttime, trigger an event
+        // If it is daytime and not day #1 or day #3, trigger an event
+        if !day || ![1u32, 3u32].contains(&self.day.unwrap_or(1u32)) {
             for area in self.areas.iter_mut() {
-                if rng.gen_bool(if day {
-                    day_event_frequency
-                } else {
-                    night_event_frequency
-                }) {
+                if rng.gen_bool(frequency) {
                     // TODO: Announce area event?
                     let area_event = AreaEvent::random();
                     area.events.push(area_event);
                 }
             }
         }
+    }
 
-        // Day 3 is Feast Day, refill the Cornucopia
-        if self.day == Some(3) && day {
-            let area = self.areas.iter_mut()
-                .find(|a| a.area == *"Cornucopia")
-                .expect("Cannot find Cornucopia");
-            for _ in 0..=3 {
-                area.add_item(Item::new_random_weapon());
-                area.add_item(Item::new_random_shield());
-                area.add_item(Item::new_random_consumable());
-                area.add_item(Item::new_random_consumable());
-            }
-        }
+    /// If the tribute count is low, constrain them by closing areas.
+    /// We achieve this by spawning events in open areas.
+    fn constrain_areas(&mut self, rng: &mut SmallRng) {
+        let tribute_count = self.living_tributes().len() as u32;
+        let odds = tribute_count as f64 / 24.0;
+        let mut area_events: HashMap<AreaDetails, Vec<AreaEvent>> = HashMap::new();
 
-        // When we're getting low on tributes, close more areas by spawning
-        // more events. This will also constrain the tributes to fewer areas.
-        if self.living_tributes().len() > 1 && self.living_tributes().len() < 8 {
+        if (1u32..8u32).contains(&tribute_count) {
+            // If there is an open area, close it.
             if let Some(mut area) = self.random_open_area() {
-                // TODO: Announce area event?
                 let event = AreaEvent::random();
-                area.events.push(event);
+                area_events.insert(area.clone(), vec![event.clone()]);
             }
 
-            // If the tributes are really unlucky, they get a second event.
-            if rng.gen_bool(self.living_tributes().len() as f64 / 24.0) {
+            if rng.gen_bool(odds) {
+                // Assuming there's still an open area.
                 if let Some(mut area) = self.random_open_area() {
-                    // TODO: Announce area event?
                     let event = AreaEvent::random();
+                    if area_events[area.clone()] {
+                        area_events[area].push(event.clone());
+                    } else {
+                        area_events.insert(area.clone(), vec![event.clone()]);
+                    }
+                }
+            }
+
+            // Add events to each area and announce them
+            for (mut area, events) in area_events {
+                for event in events {
                     area.events.push(event.clone());
+
                     add_area_message(
                         area.area.as_str(),
                         &self.identifier,
-                    format!("{}", GameOutput::AreaEvent(event.clone(), Area::from_str(&area.area).unwrap()))
-                    ).expect("");
+                        format!("{}", GameOutput::AreaEvent(event.clone(), Area::from_str(&area.area).unwrap()))
+                    ).expect("Failed to add area event message");
                 }
             }
         }
+    }
 
+    /// Runs the tributes' logic for the current cycle.
+    async fn run_tribute_cycle(&mut self, day: bool, rng: &mut SmallRng) {
         // Shuffle the tributes
-        self.tributes.shuffle(&mut rng);
-        let mut updated_tributes: Vec<Tribute> = vec![];
+        let mut tributes = self.tributes.clone();
+        tributes.shuffle(rng);
 
-        for mut tribute in self.tributes.clone() {
+        let mut updated_tributes = Vec::with_capacity(tributes.len());
+
+        for mut tribute in tributes {
             // Non-alive tributes should be skipped.
             if !tribute.is_alive() {
                 tribute.status = TributeStatus::Dead;
@@ -348,22 +356,60 @@ impl Game {
             }
 
             // Trigger day or night cycles for the tribute
-            match (self.day, day) {
-                (Some(1), true) => {
-                    tribute = tribute.do_day_night(Some(Action::Move(None)), Some(0.5), day, self).await;
-                }
-                (Some(3), true) => {
-                    tribute.do_day_night(Some(Action::Move(Some(Area::Cornucopia))), Some(0.75), day, self).await;
-                }
-                (_, _) => {
-                    tribute = tribute.do_day_night(None, None, day, self).await;
-                }
-            }
-            updated_tributes.push(tribute);
+            let (action, move_chance) = match (self.day, day) {
+                (Some(1), true) => (Some(Action::Move(None)), Some(0.5)),
+                (Some(3), true) => (Some(Action::Move(Some(Area::Cornucopia))), Some(0.75)),
+                (_, _) => (None, None),
+            };
+
+            let processed_tribute = tribute.do_day_night(action, move_chance, day, self).await;
+            updated_tributes.push(processed_tribute);
         }
 
         // Update the tributes in the game
         self.tributes = updated_tributes;
+    }
+
+    /// Runs a cycle of the game, either day or night.
+    /// 1. Announce area events.
+    /// 2. Open an area if there are no open areas.
+    /// 3. Trigger any events for this cycle if we're past the first three days.
+    /// 4. Trigger Feast Day events.
+    /// 5. Close more areas by spawning more events if the tributes are getting low.
+    /// 6. Run the tribute cycle.
+    /// 7. Update the tributes in the game.
+    async fn do_a_cycle(&mut self, day: bool) {
+        let mut rng = rand::rngs::SmallRng::from_entropy();
+
+        // Announce area events
+        self.announce_area_events();
+
+        // If there are no open areas, we need to open one.
+        self.ensure_open_area();
+
+        // Trigger any events for this cycle
+        self.trigger_cycle_events(day, &mut rng);
+
+        // Day 3 is Feast Day, refill the Cornucopia
+        if self.day == Some(3) && day {
+            let area = self.areas.iter_mut()
+                .find(|a| a.area == *"Cornucopia")
+                .expect("Cannot find Cornucopia");
+            for _ in rng.gen_range(1..=2) {
+                area.add_item(Item::new_random_weapon());
+            }
+            for _ in rng.gen_range(1..=2) {
+                area.add_item(Item::new_random_shield());
+            }
+            for _ in rng.gen_range(1..=4) {
+                area.add_item(Item::new_random_consumable());
+            }
+        }
+
+        // If the tribute count is low, constrain them by closing areas.
+        self.constrain_areas(&mut rng);
+
+        self.run_tribute_cycle(day, &mut rng).await;
     }
 
     /// Any tributes who have died in the current cycle will be moved to the "dead" list,

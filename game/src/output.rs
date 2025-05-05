@@ -74,6 +74,7 @@ pub enum GameOutput {
     AreaOpen(Area),
     TrappedInArea(Tribute, Area),
     DiedInArea(Tribute, Area),
+    TributeDeath(Tribute),
 }
 
 impl Display for GameOutput {
@@ -274,6 +275,9 @@ impl Display for GameOutput {
             GameOutput::DiedInArea(tribute, area) => {
                 let area_name = area.to_string().replace("The ", "");
                 write!(f, "💥 {} died in the {}.", tribute.name, area_name)
+            }
+            GameOutput::TributeDeath(tribute) => {
+                write!(f, "⚰️ {} has died.", tribute.name)
             }
         }
     }

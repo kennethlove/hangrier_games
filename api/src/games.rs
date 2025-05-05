@@ -394,11 +394,11 @@ RETURN count(
                     _ => {
                         if let Some(mut game) = get_full_game(identifier).await {
                             // Run day
-                            let mut game = game.run_day_night_cycle(true).await;
+                            game.run_day_night_cycle(true).await;
                             save_game(&game).await;
 
                             // Run night
-                            let game = game.run_day_night_cycle(false).await;
+                            game.run_day_night_cycle(false).await;
                             save_game(&game).await;
 
                             (StatusCode::OK, Json(GameResponse { game: Some(game) })).into_response()
@@ -764,7 +764,6 @@ LET $winner = (
         RETURN ""
     END
 );
-
 
 SELECT
     identifier,

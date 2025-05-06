@@ -105,8 +105,8 @@ impl Game {
     }
 
     /// Returns a random area from the game.
-    fn random_area(&self) -> Option<AreaDetails> {
-        self.areas.choose(&mut rand::thread_rng()).cloned()
+    fn random_area(&mut self) -> Option<&mut AreaDetails> {
+        self.areas.choose_mut(&mut rand::thread_rng())
     }
 
     /// Returns a random open area from the game.
@@ -119,7 +119,7 @@ impl Game {
 
     /// Checks if the game has concluded (i.e., if there is a winner or if all tributes are dead).
     /// If concluded, it updates the game status, posts the final messages, and returns the game.
-    fn check_game_state(&mut self) {
+    fn check_for_winner(&mut self) {
         if let Some(winner) = self.winner() {
             add_game_message(
                 self.identifier.as_str(),
@@ -187,7 +187,6 @@ impl Game {
             self.identifier.as_str(),
             format!("{}", GameOutput::TributesLeft(self.living_tributes().len() as u32))
         ).expect("");
-
     }
 
     /// Announces the end of a cycle
@@ -222,7 +221,7 @@ impl Game {
     pub async fn run_day_night_cycle(&mut self, day: bool) {
         // Check if the game is over, and if so, end it.
         // This will also post the final messages.
-        self.check_game_state();
+        self.check_for_winner();
 
         // Prepare the game for a new cycle
         self.prepare_cycle(day);
@@ -248,14 +247,14 @@ impl Game {
                     &area.area,
                     &self.identifier,
                     format!("{}", GameOutput::AreaClose(Area::from_str(&area.area).unwrap()))
-                ).expect("");
+                ).expect("Failed to add area close message");
 
                 for event in &area.events {
                     add_area_message(
                         &area.area,
                         &self.identifier,
                         format!("{}", GameOutput::AreaEvent(event.clone(), Area::from_str(&area.area).unwrap()))
-                    ).expect("");
+                    ).expect("Failed to add area event message");
                 }
             }
         }
@@ -264,7 +263,7 @@ impl Game {
     /// Ensures at least one area is open. If not, opens a random area by clearing its events.
     fn ensure_open_area(&mut self) {
         if self.random_open_area().is_none() {
-            if let Some(mut area) = self.random_area() {
+            if let Some(area) = self.random_area() {
                 area.events.clear();
             }
         }
@@ -301,13 +300,13 @@ impl Game {
             let area = self.areas.iter_mut()
                 .find(|a| a.area == *"Cornucopia")
                 .expect("Cannot find Cornucopia");
-            for _ in rng.gen_range(1..=2) {
+            for _ in 0..rng.gen_range(1..=2) {
                 area.add_item(Item::new_random_weapon());
             }
-            for _ in rng.gen_range(1..=2) {
+            for _ in 0..rng.gen_range(1..=2) {
                 area.add_item(Item::new_random_shield());
             }
-            for _ in rng.gen_range(1..=4) {
+            for _ in 0..rng.gen_range(1..=4) {
                 area.add_item(Item::new_random_consumable());
             }
         }
@@ -319,29 +318,32 @@ impl Game {
     fn constrain_areas(&mut self, rng: &mut SmallRng) {
         let tribute_count = self.living_tributes().len() as u32;
         let odds = tribute_count as f64 / 24.0;
-        let mut area_events: HashMap<AreaDetails, Vec<AreaEvent>> = HashMap::new();
+        let mut area_events: HashMap<String, (AreaDetails, Vec<AreaEvent>)> = HashMap::new();
 
         if (1u32..8u32).contains(&tribute_count) {
             // If there is an open area, close it.
-            if let Some(mut area) = self.random_open_area() {
+            if let Some(area) = self.random_open_area() {
                 let event = AreaEvent::random();
-                area_events.insert(area.clone(), vec![event.clone()]);
+                area_events.insert(area.area.clone(), (area.clone(), vec![event.clone()]));
             }
 
             if rng.gen_bool(odds) {
                 // Assuming there's still an open area.
-                if let Some(mut area) = self.random_open_area() {
+                if let Some(area) = self.random_open_area() {
                     let event = AreaEvent::random();
-                    if area_events[area.clone()] {
-                        area_events[area].push(event.clone());
+                    let area_name = area.area.clone();
+                    if area_events.get(&area_name.clone()).is_some() {
+                        let mut events = area_events[&area_name.clone()].1.clone();
+                        events.push(event.clone());
+                        area_events.insert(area_name, (area.clone(), events));
                     } else {
-                        area_events.insert(area.clone(), vec![event.clone()]);
+                        area_events.insert(area_name, (area.clone(), vec![event.clone()]));
                     }
                 }
             }
 
             // Add events to each area and announce them
-            for (mut area, events) in area_events {
+            for (_area_name, (mut area, events)) in area_events {
                 for event in events {
                     area.events.push(event.clone());
 
@@ -448,6 +450,7 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
+    use crate::messages::get_all_messages;
     use super::*;
 
     fn create_test_game_with_tributes(tributes: Vec<Tribute>) -> Game {
@@ -563,7 +566,7 @@ mod tests {
         assert_eq!(game.living_tributes().len(), 1);
         assert_eq!(game.winner(), Some(winner_tribute.clone()));
 
-        game.check_game_state();
+        game.check_for_winner();
 
         // Game should be finished
         assert_eq!(game.status, GameStatus::Finished);
@@ -579,7 +582,7 @@ mod tests {
         assert!(game.living_tributes().is_empty());
         assert!(game.winner().is_none());
 
-        game.check_game_state();
+        game.check_for_winner();
 
         // Game should be finished
         assert_eq!(game.status, GameStatus::Finished);
@@ -596,33 +599,116 @@ mod tests {
         assert_eq!(game.living_tributes().len(), 2);
         assert!(game.winner().is_none());
 
-        game.check_game_state();
+        game.check_for_winner();
 
         // Game should be finished
         assert_eq!(game.status, starting_state);
     }
 
     #[test]
-    fn test_prepare_cycle() {}
+    fn test_prepare_cycle() {
+        let mut game = Game::new("Test Game");
+        let area = AreaDetails::new(Some("Lake".to_string()), Area::North);
+        let event = AreaEvent::random();
+        game.day = Some(1);
+        game.areas.push(area);
+        game.areas[0].events.push(event.clone());
+        game.prepare_cycle(true);
+        assert_eq!(game.day, Some(2));
+        assert_eq!(game.areas[0].events.len(), 0);
+
+        game.areas[0].events.push(event.clone());
+        game.prepare_cycle(false);
+        // Night cycle shouldn't advance the game day.
+        assert_eq!(game.day, Some(2));
+        assert_eq!(game.areas[0].events.len(), 0);
+    }
 
     #[test]
-    fn test_announce_cycle_start() {}
+    fn test_announce_cycle_start() {
+        let tribute1 = create_tribute("Tribute1", true);
+        let tribute2 = create_tribute("Tribute2", true);
+        let mut game = create_test_game_with_tributes(vec![tribute1.clone(), tribute2.clone()]);
+        game.day = Some(1);
+
+        clear_messages().unwrap();
+        game.announce_cycle_start(true);
+        let messages = get_all_messages().unwrap();
+        // Game day 1 message
+        // Day start message
+        // Living tributes message
+        assert_eq!(messages.len(), 3);
+        clear_messages().unwrap();
+    }
 
     #[test]
-    fn test_announce_cycle_end() {}
+    fn test_announce_cycle_end() {
+        let tribute1 = create_tribute("Tribute1", true);
+        let mut tribute2 = create_tribute("Tribute2", false);
+        tribute2.set_status(TributeStatus::RecentlyDead);
+        let mut game = create_test_game_with_tributes(vec![tribute1.clone(), tribute2.clone()]);
+        game.day = Some(1);
+
+        clear_messages().unwrap();
+        game.announce_cycle_end(true);
+        let messages = get_all_messages().unwrap();
+        // Living tributes message
+        // Tribute 2 death message
+        // Game day end message
+        assert_eq!(messages.len(), 3);
+        clear_messages().unwrap();
+    }
 
     #[test]
-    fn test_announce_area_events() {}
+    fn test_announce_area_events() {
+        let mut game = Game::new("Test Game");
+        let mut area = AreaDetails::new(Some("Lake".to_string()), Area::North);
+        area.events.push(AreaEvent::random());
+        area.events.push(AreaEvent::random());
+        game.areas.push(area);
+
+        assert!(!game.areas[0].is_open());
+
+        clear_messages().unwrap();
+        game.announce_area_events();
+        let messages = get_all_messages().unwrap();
+        // Area closed message
+        // Area event message
+        // Area event message
+        dbg!(&messages);
+        assert_eq!(messages.len(), 3);
+        clear_messages().unwrap();
+    }
 
     #[test]
-    fn test_ensure_open_area() {}
+    fn test_ensure_open_area() {
+        let mut game = Game::new("Test Game");
+        let area1 = AreaDetails::new(Some("Lake".to_string()), Area::North);
+        let area2 = AreaDetails::new(Some("Forest".to_string()), Area::South);
+        game.areas.push(area1);
+        game.areas.push(area2);
+
+        assert!(game.random_open_area().is_some());
+
+        // Close the areas
+        game.areas[0].events.push(AreaEvent::random());
+        game.areas[1].events.push(AreaEvent::random());
+
+        assert!(game.random_open_area().is_none());
+
+        game.ensure_open_area();
+        assert!(game.random_open_area().is_some());
+        clear_messages().unwrap();
+    }
 
     #[test]
-    fn test_trigger_cycle_events() {}
+    fn test_trigger_cycle_events() { }
 
     #[test]
-    fn test_constrain_areas() {}
+    fn test_constrain_areas() {
+
+    }
 
     #[tokio::test]
-    fn test_run_tribute_cycle() {}
+    async fn test_run_tribute_cycle() {}
 }

@@ -6,7 +6,7 @@ pub mod statuses;
 use crate::areas::events::AreaEvent;
 use crate::areas::{Area, AreaDetails};
 use crate::games::Game;
-use crate::items::OwnsItems;
+use crate::items::{ItemError, OwnsItems};
 use crate::items::{Attribute, Item};
 use crate::messages::add_tribute_message;
 use crate::output::GameOutput;
@@ -21,7 +21,6 @@ use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use statuses::TributeStatus;
 use std::cmp::{Ordering, PartialEq};
-use std::collections::HashMap;
 use std::str::FromStr;
 use tracing::info;
 use uuid::Uuid;
@@ -67,21 +66,38 @@ impl Default for Tribute {
 impl OwnsItems for Tribute {
     fn add_item(&mut self, item: Item) { self.items.push(item); }
 
-    fn use_item(&mut self, item: Item) -> Option<Item> {
-        let used_item = self.items.iter_mut().find(|i| *i == &item);
-
-        if let Some(used_item) = used_item {
-            used_item.quantity = used_item.quantity.saturating_sub(1);
-            if used_item.quantity >= 1 {
-                Some(used_item.clone())
-            } else {
-                self.remove_item(item.clone());
-                None
-            }
-        } else { None }
+    fn has_item(&self, item: &Item) -> bool {
+        self.items.iter().any(|i| i == item)
     }
 
-    fn remove_item(&mut self, item: Item) { self.items.retain(|i| i != &item); }
+    fn use_item(&mut self, item: Item) -> Result<(), ItemError> {
+        let used_item = self.items
+            .iter_mut()
+            .find(|i| i.identifier == item.identifier);
+
+        if let Some(used_item) = used_item {
+            if used_item.quantity == 0 {
+                return Err(ItemError::ItemNotUsable);
+            }
+
+            used_item.quantity = used_item.quantity.saturating_sub(1);
+            if used_item.quantity == 0 {
+                self.remove_item(item)
+            } else { Ok(()) }
+        } else {
+            Err(ItemError::ItemNotFound)
+        }
+    }
+
+    fn remove_item(&mut self, item: Item) -> Result<(), ItemError> {
+        let index = self.items.iter().position(|i| i.identifier == item.identifier);
+        if let Some(index) = index {
+            self.items.remove(index);
+            Ok(())
+        } else {
+            Err(ItemError::ItemNotFound)
+        }
+    }
 }
 
 impl Tribute {
@@ -139,12 +155,14 @@ impl Tribute {
 
     /// Restores health.
     fn heals(&mut self, health: u32) {
-        self.attributes.health = std::cmp::min(100, self.attributes.health + health);
+        if self.is_alive() {
+            self.attributes.health = std::cmp::min(100, self.attributes.health + health);
+        }
     }
 
     /// Restores mental health.
-    fn heals_mental_damage(&mut self, health: u32) {
-        self.attributes.sanity = std::cmp::min(100, self.attributes.sanity + health);
+    fn heals_mental_damage(&mut self, sanity: u32) {
+        self.attributes.sanity = std::cmp::min(100, self.attributes.sanity + sanity);
     }
 
     /// Restores movement.
@@ -159,6 +177,7 @@ impl Tribute {
 
     /// Marks the tribute as dead and reveals them.
     pub fn dies(&mut self) {
+        self.attributes.health = 0;
         self.set_status(TributeStatus::Dead);
         self.attributes.is_hidden = false;
         self.items.clear();
@@ -175,7 +194,7 @@ impl Tribute {
     fn hides(&mut self) { self.attributes.is_hidden = true; }
 
     /// Tribute is lonely/homesick/etc., loses some sanity.
-    fn suffers(&mut self) {
+    fn misses_home(&mut self) {
         let loneliness = self.attributes.bravery as f64 / 100.0; // how lonely is the tribute?
 
         if loneliness.round() < 0.25 {
@@ -652,7 +671,7 @@ impl Tribute {
         }
 
         // Nighttime terror
-        if !day && self.is_alive() { self.suffers(); }
+        if !day && self.is_alive() { self.misses_home(); }
 
         if let Some(action) = suggested_action {
             self.brain.set_preferred_action(action, probability.unwrap());
@@ -753,7 +772,7 @@ impl Tribute {
                                 self.statistics.game.as_str(),
                                 format!("{}", GameOutput::TributeUseItem(self.clone(), item.clone())),
                             ).expect("");
-                            self.use_item(item.clone());
+                            // self.use_item(item.clone()).expect("Failed to use item");
                             info!(target: "api", "true, Items: {:?}", &self.items);
                             self.take_action(&action, None);
                         }
@@ -782,7 +801,7 @@ impl Tribute {
                                     self.statistics.game.as_str(),
                                     format!("{}", GameOutput::TributeUseItem(self.clone(), item.clone())),
                                 ).expect("");
-                                self.use_item(item.clone());
+                                self.use_item(item.clone()).expect("Failed to use item");
                                 self.take_action(&action, None);
                             }
                             false => {
@@ -838,7 +857,7 @@ impl Tribute {
             None
         } else {
             let item = items.choose(&mut rng).unwrap().clone();
-            if let Some(item) = area_details.use_item(item.clone()) {
+            if let Ok(()) = area_details.use_item(item.clone()) {
                 info!(target: "api", "Taking nearby item: {:?}", item);
                 self.add_item(item.clone());
 
@@ -870,7 +889,7 @@ impl Tribute {
             return false;
         }
 
-        if self.use_item(item.clone()).is_none() {
+        if self.use_item(item.clone()).is_err() {
             return false;
         }
 
@@ -1185,15 +1204,6 @@ impl Attributes {
             is_hidden: false,
         }
     }
-
-    pub fn as_map(&self) -> HashMap<String, String> {
-        let json = serde_json::to_value(self).unwrap();
-        let map: HashMap<String, serde_json::Value> = serde_json::from_value(json).unwrap();
-
-        map.into_iter()
-            .map(|(k, v)| (k, v.to_string().trim_matches('"').to_string()))
-            .collect()
-    }
 }
 
 #[cfg(test)]
@@ -1201,12 +1211,64 @@ mod tests {
     use super::*;
 
     #[test]
+    fn default() {
+        let tribute = Tribute::default();
+        assert_eq!(tribute.name, "Tribute".to_string());
+        assert_eq!(tribute.district, 0);
+        assert_eq!(tribute.avatar, None);
+    }
+
+    #[test]
     fn new() {
-        let tribute = Tribute::new("Katniss".to_string(), None, None);
-        assert!((50u32..=100).contains(&tribute.attributes.health));
-        assert!((50u32..=100).contains(&tribute.attributes.sanity));
-        assert_eq!(tribute.attributes.movement, 100);
+        let tribute = Tribute::new("Katniss".to_string(), Some(12), Some("avatar.png".to_string()));
+        assert_eq!(tribute.name, "Katniss".to_string());
+        assert_eq!(tribute.district, 12);
+        assert_eq!(tribute.avatar, Some("avatar.png".to_string()));
         assert_eq!(tribute.status, TributeStatus::Healthy);
+    }
+
+    #[test]
+    fn random() {
+        let tribute = Tribute::random();
+        assert!((1u32..=12u32).contains(&tribute.district));
+    }
+
+    #[test]
+    fn add_item() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        let item = Item::new_random_consumable();
+        tribute.add_item(item.clone());
+        assert_eq!(tribute.items.len(), 1);
+        assert_eq!(tribute.items[0], item);
+    }
+
+    #[test]
+    fn has_item() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        let item = Item::new_random_consumable();
+        tribute.add_item(item.clone());
+        assert!(tribute.has_item(&item));
+    }
+
+    #[test]
+    fn use_item() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        let mut item = Item::new_random_consumable(); // default quantity is 1
+        item.quantity = 1;
+        tribute.add_item(item.clone());
+        tribute.use_item(item).expect("Failed to use item");
+        assert_eq!(tribute.items.len(), 0);
+    }
+
+    #[test]
+    fn use_item_reusable() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        let mut item = Item::new_random_consumable();
+        item.quantity = 2;
+        tribute.add_item(item.clone());
+        assert_eq!(tribute.use_item(item.clone()), Ok(()));
+        assert_eq!(tribute.items.len(), 1);
+        assert_eq!(tribute.items[0].quantity, 1);
     }
 
     #[test]
@@ -1218,6 +1280,36 @@ mod tests {
     }
 
     #[test]
+    fn takes_no_physical_damage_when_dead() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.attributes.health = 0;
+        tribute.takes_physical_damage(10);
+        assert_eq!(tribute.attributes.health, 0);
+    }
+
+    #[test]
+    fn heals() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.attributes.health = 10;
+        tribute.heals(10);
+        assert_eq!(tribute.attributes.health, 20);
+    }
+
+    #[test]
+    fn does_not_heal_when_unalive() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.attributes.health = 0;
+
+        tribute.status = TributeStatus::RecentlyDead;
+        tribute.heals(10);
+        assert_eq!(tribute.attributes.health, 0);
+
+        tribute.status = TributeStatus::Dead;
+        tribute.heals(10);
+        assert_eq!(tribute.attributes.health, 0);
+    }
+
+    #[test]
     fn takes_mental_damage() {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         let mp = tribute.attributes.sanity.clone();
@@ -1226,10 +1318,136 @@ mod tests {
     }
 
     #[test]
-    fn is_hidden_true() {
+    fn takes_no_mental_damage_when_insane() {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
-        tribute.attributes.intelligence = 100;
-        tribute.attributes.is_hidden = true;
+        tribute.attributes.sanity = 0;
+        tribute.takes_mental_damage(10);
+        assert_eq!(tribute.attributes.sanity, 0);
+    }
+
+    #[test]
+    fn heals_mental_damage() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.attributes.sanity = 10;
+        tribute.heals_mental_damage(10);
+        assert_eq!(tribute.attributes.sanity, 20);
+    }
+
+    #[test]
+    fn short_rests() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.attributes.movement = 0;
+        tribute.short_rests();
+        assert_eq!(tribute.attributes.movement, 100);
+    }
+
+    #[test]
+    fn long_rests() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.attributes.movement = 0;
+        tribute.attributes.health = 5;
+        tribute.attributes.sanity = 5;
+        tribute.long_rests();
+        assert_eq!(tribute.attributes.movement, 100);
+        assert_eq!(tribute.attributes.health, 10);
+        assert_eq!(tribute.attributes.sanity, 10);
+    }
+
+    #[test]
+    fn dies() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.dies();
+        assert_eq!(tribute.attributes.health, 0);
+        assert_eq!(tribute.status, TributeStatus::Dead);
+        assert!(tribute.items.is_empty());
+        assert!(tribute.is_visible());
+    }
+
+    #[test]
+    fn is_alive() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        assert!(tribute.is_alive());
+        tribute.dies();
+        assert!(!tribute.is_alive());
+    }
+
+    #[test]
+    fn hides() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.hides();
+        assert!(tribute.attributes.is_hidden);
         assert!(!tribute.is_visible());
+    }
+
+    #[test]
+    fn misses_home() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.attributes.bravery = 2;
+        tribute.attributes.sanity = 50;
+        tribute.misses_home();
+        assert_eq!(tribute.attributes.sanity, 48);
+
+        tribute.attributes.sanity = 20;
+        tribute.misses_home();
+        assert_eq!(tribute.attributes.sanity, 16);
+    }
+}
+
+#[cfg(test)]
+mod statistics {
+    use super::Statistics;
+
+    #[test]
+    fn default() {
+        let stats = Statistics::default();
+        assert_eq!(stats.day_killed, None);
+        assert_eq!(stats.killed_by, None);
+        assert_eq!(stats.kills, 0);
+        assert_eq!(stats.wins, 0);
+        assert_eq!(stats.defeats, 0);
+        assert_eq!(stats.draws, 0);
+        assert_eq!(stats.game, "".to_string());
+    }
+
+}
+
+#[cfg(test)]
+mod attributes {
+    use super::Attributes;
+
+    #[test]
+    fn default() {
+        let attributes = Attributes::default();
+        assert_eq!(attributes.health, 100);
+        assert_eq!(attributes.sanity, 100);
+        assert_eq!(attributes.movement, 100);
+        assert_eq!(attributes.strength, 50);
+        assert_eq!(attributes.defense, 50);
+        assert_eq!(attributes.bravery, 100);
+        assert_eq!(attributes.loyalty, 100);
+        assert_eq!(attributes.speed, 100);
+        assert_eq!(attributes.dexterity, 100);
+        assert_eq!(attributes.intelligence, 100);
+        assert_eq!(attributes.persuasion, 100);
+        assert_eq!(attributes.luck, 100);
+        assert!(!attributes.is_hidden);
+    }
+
+    #[test]
+    fn new() {
+        let attributes = Attributes::new();
+        assert!(attributes.health >= 50 && attributes.health <= 100);
+        assert!(attributes.sanity >= 50 && attributes.sanity <= 100);
+        assert_eq!(attributes.movement, 100);
+        assert!(attributes.strength >= 1 && attributes.strength <= 50);
+        assert!(attributes.defense >= 1 && attributes.defense <= 50);
+        assert!(attributes.bravery >= 1 && attributes.bravery <= 100);
+        assert!(attributes.loyalty >= 1 && attributes.loyalty <= 100);
+        assert!(attributes.speed >= 1 && attributes.speed <= 100);
+        assert!(attributes.dexterity >= 1 && attributes.dexterity <= 100);
+        assert!(attributes.intelligence >= 1 && attributes.intelligence <= 100);
+        assert!(attributes.persuasion >= 1 && attributes.persuasion <= 100);
+        assert!(attributes.luck >= 1 && attributes.luck <= 100);
+        assert!(!attributes.is_hidden);
     }
 }

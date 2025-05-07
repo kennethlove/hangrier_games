@@ -1,7 +1,7 @@
 pub mod events;
 
 use crate::areas::events::AreaEvent;
-use crate::items::Item;
+use crate::items::{Item, ItemError};
 use crate::items::OwnsItems;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
@@ -78,7 +78,11 @@ impl OwnsItems for AreaDetails {
         self.items.push(item);
     }
 
-    fn use_item(&mut self, item: Item) -> Option<Item> {
+    fn has_item(&self, item: &Item) -> bool {
+        self.items.iter().any(|i| i == item)
+    }
+
+    fn use_item(&mut self, item: Item) -> Result<(), ItemError> {
         let index = self.items.iter().position(|i| *i == item);
         let mut used_item = self.items.swap_remove(index.unwrap());
 
@@ -89,13 +93,15 @@ impl OwnsItems for AreaDetails {
             if used_item.quantity == 0 {
                 self.remove_item(used_item);
             }
-            return Some(item)
+            Ok(())
+        } else {
+            Err(ItemError::ItemNotFound)
         }
-        None
     }
 
-    fn remove_item(&mut self, item: Item) {
+    fn remove_item(&mut self, item: Item) -> Result<(), ItemError> {
         self.items.retain(|i| *i.identifier != item.identifier);
+        Ok(())
     }
 }
 

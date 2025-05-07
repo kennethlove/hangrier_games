@@ -6,12 +6,22 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
 use strum::{EnumIter, IntoEnumIterator};
+use thiserror::Error;
 use uuid::Uuid;
+
+#[derive(Debug, Clone, PartialEq, Error)]
+pub enum ItemError {
+    #[error("Item not found")]
+    ItemNotFound,
+    #[error("Item not usable")]
+    ItemNotUsable,
+}
 
 pub trait OwnsItems {
     fn add_item(&mut self, item: Item);
-    fn use_item(&mut self, item: Item) -> Option<Item>;
-    fn remove_item(&mut self, item: Item);
+    fn has_item(&self, item: &Item) -> bool;
+    fn use_item(&mut self, item: Item) -> Result<(), ItemError>;
+    fn remove_item(&mut self, item: Item) -> Result<(), ItemError>;
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

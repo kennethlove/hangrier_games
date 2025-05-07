@@ -9,7 +9,7 @@ use crate::tributes::actions::Action;
 use crate::tributes::events::TributeEvent;
 use crate::tributes::statuses::TributeStatus;
 use crate::tributes::Tribute;
-use rand::prelude::{IteratorRandom, SliceRandom};
+use rand::prelude::SliceRandom;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use shared::GameStatus;
@@ -111,10 +111,26 @@ impl Game {
 
     /// Returns a random open area from the game.
     fn random_open_area(&self) -> Option<AreaDetails> {
-        self.areas.iter()
-            .filter(|a| a.is_open())
+        self.open_areas()
             .choose(&mut rand::thread_rng())
             .cloned()
+    }
+
+    /// Returns a vec of open areas.
+    fn open_areas(&self) -> Vec<AreaDetails> {
+        self.areas.iter()
+            .filter(|a| a.is_open())
+            .cloned()
+            .collect()
+    }
+
+    /// Returns a vec of closed areas.
+    #[allow(dead_code)]
+    fn closed_areas(&self) -> Vec<AreaDetails> {
+        self.areas.iter()
+            .filter(|a| !a.is_open())
+            .cloned()
+            .collect()
     }
 
     /// Checks if the game has concluded (i.e., if there is a winner or if all tributes are dead).
@@ -343,7 +359,7 @@ impl Game {
             }
 
             // Add events to each area and announce them
-            for (_area_name, (mut area, events)) in area_events {
+            for (_area_name, (mut area, events)) in area_events.clone() {
                 for event in events {
                     area.events.push(event.clone());
 
@@ -352,6 +368,13 @@ impl Game {
                         &self.identifier,
                         format!("{}", GameOutput::AreaEvent(event.clone(), Area::from_str(&area.area).unwrap()))
                     ).expect("Failed to add area event message");
+                }
+            }
+
+            // Update the areas with the new events
+            for area in self.areas.iter_mut() {
+                if area_events.contains_key(&area.area) {
+                    area.events.extend(area_events[&area.area].1.clone());
                 }
             }
         }
@@ -662,7 +685,7 @@ mod tests {
     #[test]
     fn test_announce_area_events() {
         let mut game = Game::new("Test Game");
-        let mut area = AreaDetails::new(Some("Lake".to_string()), Area::North);
+        let mut area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
         area.events.push(AreaEvent::random());
         area.events.push(AreaEvent::random());
         game.areas.push(area);
@@ -675,7 +698,6 @@ mod tests {
         // Area closed message
         // Area event message
         // Area event message
-        dbg!(&messages);
         assert_eq!(messages.len(), 3);
         clear_messages().unwrap();
     }
@@ -706,9 +728,64 @@ mod tests {
 
     #[test]
     fn test_constrain_areas() {
+        let mut game = Game::new("Test Game");
+        let area1 = AreaDetails::new(Some("Lake".to_string()), Area::North);
+        let area2 = AreaDetails::new(Some("Forest".to_string()), Area::South);
+        game.areas.push(area1);
+        game.areas.push(area2);
 
+        // Add tributes to the game
+        let tribute1 = create_tribute("Tribute1", true);
+        let tribute2 = create_tribute("Tribute2", true);
+        game.tributes.push(tribute1.clone());
+        game.tributes.push(tribute2.clone());
+
+        // Constrain areas
+        let mut rng = SmallRng::from_entropy();
+        game.constrain_areas(&mut rng);
+
+        // Check if at least one area is closed
+        assert!(game.random_open_area().is_some());
+        assert_eq!(game.open_areas().len(), 1);
+        assert_eq!(game.closed_areas().len(), 1);
     }
 
     #[tokio::test]
-    async fn test_run_tribute_cycle() {}
+    async fn test_run_tribute_cycle() {
+        // Add tributes
+        let tribute1 = create_tribute("Tribute1", true);
+        let tribute2 = create_tribute("Tribute2", true);
+
+        let mut game = create_test_game_with_tributes(vec![tribute1.clone(), tribute2.clone()]);
+        let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
+        game.areas.push(area);
+
+        // Run the tribute cycle
+        let mut rng = SmallRng::from_entropy();
+        game.run_tribute_cycle(true, &mut rng).await;
+
+        // Check if the tributes are updated correctly
+        let new_tribute1 = game.tributes[0].clone();
+        let new_tribute2 = game.tributes[1].clone();
+        assert_ne!(tribute1, new_tribute1);
+        assert_ne!(tribute2, new_tribute2);
+    }
+
+    #[test]
+    fn test_open_and_closed_areas() {
+        let mut game = Game::new("Test Game");
+        let area1 = AreaDetails::new(Some("Lake".to_string()), Area::North);
+        let area2 = AreaDetails::new(Some("Forest".to_string()), Area::South);
+        game.areas.push(area1);
+        game.areas.push(area2);
+
+        assert_eq!(game.open_areas().len(), 2);
+        assert!(game.closed_areas().is_empty());
+
+        // Close one area
+        game.areas[0].events.push(AreaEvent::random());
+
+        assert_eq!(game.open_areas().len(), 1);
+        assert_eq!(game.closed_areas().len(), 1);
+    }
 }

@@ -991,7 +991,7 @@ impl Tribute {
     fn apply_area_effects(&mut self, game: &Game) {
         let area_details = game.areas.iter()
             .find(|a| a.area == self.area.to_string())
-            .expect("Area not found");
+            .expect(&format!("Area not found, {}", self.area.to_string()));
 
         for event in &area_details.events {
             match event {

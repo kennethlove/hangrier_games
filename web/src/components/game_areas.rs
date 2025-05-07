@@ -63,7 +63,7 @@ pub fn GameAreaList(game: DisplayGame) -> Element {
                     }
                     for area in areas {
                         li {
-                            "data-open": area.open(),
+                            "data-open": area.is_open(),
                             class: r#"
                             border
                             p-2
@@ -96,7 +96,7 @@ pub fn GameAreaList(game: DisplayGame) -> Element {
                                     "{area.name}"
                                 }
                                 div {
-                                    if area.open() {
+                                    if area.is_open() {
                                         LockOpenIcon {
                                             class: r#"
                                             size-4

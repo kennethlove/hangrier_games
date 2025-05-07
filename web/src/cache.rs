@@ -1,14 +1,14 @@
 use game::areas::AreaDetails;
-use game::games::{DisplayGame, Game};
+use game::games::Game;
 use game::messages::GameMessage;
 use game::tributes::Tribute;
-use shared::{AuthenticatedUser, TributeKey};
+use shared::{AuthenticatedUser, DisplayGame, TributeKey};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum QueryKey {
     AllGames,
     DisplayGame(String),
-    DisplayGames,
+    _DisplayGames,
     Game(String),
     Games,
     Tributes(String),

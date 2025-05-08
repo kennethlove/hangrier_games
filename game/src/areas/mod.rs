@@ -1,8 +1,8 @@
 pub mod events;
 
 use crate::areas::events::AreaEvent;
-use crate::items::{Item, ItemError};
 use crate::items::OwnsItems;
+use crate::items::{Item, ItemError};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
@@ -150,7 +150,7 @@ mod tests {
         let item = Item::new_random_weapon();
         area_details.add_item(item.clone());
         assert!(area_details.items.contains(&item));
-        area_details.remove_item(item.clone());
+        area_details.remove_item(item.clone()).unwrap();
         assert!(!area_details.items.contains(&item));
     }
 

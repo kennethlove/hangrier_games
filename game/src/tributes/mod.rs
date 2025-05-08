@@ -6,8 +6,8 @@ pub mod statuses;
 use crate::areas::events::AreaEvent;
 use crate::areas::{Area, AreaDetails};
 use crate::games::Game;
-use crate::items::{ItemError, OwnsItems};
 use crate::items::{Attribute, Item};
+use crate::items::{ItemError, OwnsItems};
 use crate::messages::add_tribute_message;
 use crate::output::GameOutput;
 use crate::tributes::events::TributeEvent;
@@ -191,7 +191,12 @@ impl Tribute {
     }
 
     /// Hides the tribute from view.
-    fn hides(&mut self) { self.attributes.is_hidden = true; }
+    fn hides(&mut self) -> bool {
+        let mut rng = SmallRng::from_entropy();
+        let hidden = rng.gen_bool(self.attributes.intelligence as f64 / 100.0);
+        self.attributes.is_hidden = hidden;
+        hidden
+    }
 
     /// Tribute is lonely/homesick/etc., loses some sanity.
     fn misses_home(&mut self) {
@@ -365,13 +370,7 @@ impl Tribute {
     }
 
     pub fn is_visible(&self) -> bool {
-        let is_hidden = self.attributes.is_hidden;
-        if is_hidden {
-            let mut rng = SmallRng::from_entropy();
-            !rng.gen_bool(self.attributes.intelligence as f64 / 100.0)
-        } else {
-            true
-        }
+        !self.attributes.is_hidden
     }
 
     async fn travels(&self, closed_areas: Vec<Area>, suggested_area: Option<Area>) -> TravelResult {
@@ -1372,11 +1371,22 @@ mod tests {
     }
 
     #[test]
-    fn hides() {
+    fn hides_success() {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.attributes.intelligence = 100; // So the hiding is always successful
         tribute.hides();
         assert!(tribute.attributes.is_hidden);
         assert!(!tribute.is_visible());
+    }
+
+    #[test]
+    fn hides_fail() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.attributes.intelligence = 0;
+        let hidden = tribute.hides();
+        dbg!(&hidden);
+        assert!(!tribute.attributes.is_hidden);
+        assert!(tribute.is_visible());
     }
 
     #[test]
@@ -1390,6 +1400,16 @@ mod tests {
         tribute.attributes.sanity = 20;
         tribute.misses_home();
         assert_eq!(tribute.attributes.sanity, 16);
+    }
+
+    #[test]
+    fn is_visible() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.attributes.intelligence = 100; // guaranteed hide
+        assert!(tribute.is_visible());
+
+        tribute.hides();
+        assert!(!tribute.is_visible());
     }
 }
 

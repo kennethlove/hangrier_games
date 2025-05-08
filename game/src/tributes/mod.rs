@@ -25,6 +25,27 @@ use std::str::FromStr;
 use tracing::info;
 use uuid::Uuid;
 
+/// Damage constants
+const WOUNDED_DAMAGE: u32 = 1;
+const SICK_STRENGTH_REDUCTION: u32 = 1;
+const SICK_SPEED_REDUCTION: u32 = 1;
+const ELECTROCUTED_DAMAGE: u32 = 20;
+const FROZEN_SPEED_REDUCTION: u32 = 1;
+const OVERHEATED_SPEED_REDUCTION: u32 = 1;
+const DEHYDRATED_STRENGTH_REDUCTION: u32 = 1;
+const STARVING_STRENGTH_REDUCTION: u32 = 1;
+const POISONED_MENTAL_DAMAGE: u32 = 5;
+const BROKEN_BONE_LEG_SPEED_REDUCTION: u32 = 10;
+const BROKEN_BONE_ARM_STRENGTH_REDUCTION: u32 = 5;
+const BROKEN_BONE_SKULL_INTELLIGENCE_REDUCTION: u32 = 5;
+const BROKEN_BONE_RIB_DEXTERITY_REDUCTION: u32 = 5;
+const INFECTED_DAMAGE: u32 = 2;
+const INFECTED_MENTAL_DAMAGE: u32 = 5;
+const DROWNED_DAMAGE: u32 = 2;
+const DROWNED_MENTAL_DAMAGE: u32 = 2;
+const BURNED_DAMAGE: u32 = 5;
+const BURIED_SPEED_REDUCTION: u32 = 5;
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Tribute {
     /// Identifier
@@ -151,6 +172,27 @@ impl Tribute {
     /// Reduces mental health.
     fn takes_mental_damage(&mut self, damage: u32) {
         self.attributes.sanity = self.attributes.sanity.saturating_sub(damage);
+    }
+
+    /// Reduces attack strength.
+    fn reduce_strength(&mut self, amount: u32) {
+        self.attributes.strength = self.attributes.strength.saturating_sub(amount).max(1);
+    }
+
+    /// Reduces movement speed.
+    fn reduce_speed(&mut self, amount: u32) {
+        self.attributes.speed = self.attributes.speed.saturating_sub(amount).max(1);
+    }
+
+    /// Reduces intelligence which affects decision making and hiding.
+    fn reduce_intelligence(&mut self, amount: u32) {
+        self.attributes.intelligence = self.attributes.intelligence.saturating_sub(amount).max(1);
+    }
+
+    /// Reduces dexterity which currently affects nothing.
+    /// TODO: Use dexterity for something.
+    fn reduce_dexterity(&mut self, amount: u32) {
+        self.attributes.dexterity = self.attributes.dexterity.saturating_sub(amount).max(1);
     }
 
     /// Restores health.
@@ -462,91 +504,76 @@ impl Tribute {
         }
     }
 
+    /// Applies any effects from elsewhere in the game to the tribute.
+    /// This may result in status or attribute changes.
     fn process_status(&mut self, game: &Game) {
         // First, apply any area events for the current area
         self.apply_area_effects(game);
 
-        match self.status.clone() {
-            TributeStatus::Wounded => {
-                self.takes_physical_damage(1);
-            }
+        match &self.status {
+            // TODO: Add more variation to effects.
+            TributeStatus::Wounded => { self.takes_physical_damage(WOUNDED_DAMAGE); }
             TributeStatus::Sick => {
-                self.attributes.strength = std::cmp::max(1, self.attributes.strength - 1);
-                self.attributes.speed = std::cmp::max(1, self.attributes.speed - 1);
+                self.reduce_strength(SICK_STRENGTH_REDUCTION);
+                self.reduce_speed(SICK_SPEED_REDUCTION);
             }
-            TributeStatus::Electrocuted => {
-                self.takes_physical_damage(20);
-            }
-            TributeStatus::Frozen => {
-                self.attributes.speed = std::cmp::max(1, self.attributes.speed - 1);
-            }
-            TributeStatus::Overheated => {
-                self.attributes.speed = std::cmp::max(1, self.attributes.speed - 1);
-            }
-            TributeStatus::Dehydrated => {
-                self.attributes.strength = std::cmp::max(1, self.attributes.strength - 1);
-            }
-            TributeStatus::Starving => {
-                self.attributes.strength = std::cmp::max(1, self.attributes.strength - 1);
-            }
-            TributeStatus::Poisoned => {
-                self.takes_mental_damage(5);
-            }
+            TributeStatus::Electrocuted => { self.takes_physical_damage(ELECTROCUTED_DAMAGE); }
+            TributeStatus::Frozen => { self.reduce_speed(FROZEN_SPEED_REDUCTION); }
+            TributeStatus::Overheated => { self.reduce_speed(OVERHEATED_SPEED_REDUCTION); }
+            TributeStatus::Dehydrated => { self.reduce_strength(DEHYDRATED_STRENGTH_REDUCTION); }
+            TributeStatus::Starving => { self.reduce_strength(STARVING_STRENGTH_REDUCTION); }
+            TributeStatus::Poisoned => { self.takes_mental_damage(POISONED_MENTAL_DAMAGE); }
             TributeStatus::Broken => {
                 // die roll for which bone breaks
                 let bone = thread_rng().gen_range(0..4);
                 match bone {
-                    0 => {
-                        // Leg
-                        self.attributes.speed = std::cmp::max(1, self.attributes.speed - 5);
-                    }
-                    1 => {
-                        // Arm
-                        self.attributes.strength = std::cmp::max(1, self.attributes.strength - 5);
-                    }
-                    2 => {
-                        // Skull
-                        self.attributes.intelligence =
-                            std::cmp::max(1, self.attributes.intelligence - 5);
-                    }
-                    _ => {
-                        // Rib
-                        self.attributes.dexterity = std::cmp::max(1, self.attributes.dexterity - 5);
-                    }
+                    // Leg
+                    0 => self.reduce_speed(BROKEN_BONE_LEG_SPEED_REDUCTION),
+                    // Arm
+                    1 => self.reduce_strength(BROKEN_BONE_ARM_STRENGTH_REDUCTION),
+                    // Skull
+                    2 => self.reduce_speed(BROKEN_BONE_SKULL_INTELLIGENCE_REDUCTION),
+                    // Rib
+                    _ => self.reduce_dexterity(BROKEN_BONE_RIB_DEXTERITY_REDUCTION),
                 }
             }
             TributeStatus::Infected => {
-                self.takes_physical_damage(2);
-                self.takes_mental_damage(2);
+                self.takes_physical_damage(INFECTED_DAMAGE);
+                self.takes_mental_damage(INFECTED_MENTAL_DAMAGE);
             }
             TributeStatus::Drowned => {
-                self.takes_physical_damage(2);
-                self.takes_mental_damage(2);
+                self.takes_physical_damage(DROWNED_DAMAGE);
+                self.takes_mental_damage(DROWNED_MENTAL_DAMAGE);
             }
             TributeStatus::Mauled(animal) => {
                 let number_of_animals = thread_rng().gen_range(2..=5);
                 let damage = animal.damage() * number_of_animals;
-                self.takes_physical_damage(damage as u32);
+                self.takes_physical_damage(damage);
             }
             TributeStatus::Burned => {
-                self.takes_physical_damage(5);
+                self.takes_physical_damage(BURNED_DAMAGE);
             }
-            _ => {}
+            TributeStatus::Buried => {
+                self.reduce_speed(BURIED_SPEED_REDUCTION);
+            }
+            TributeStatus::Healthy | TributeStatus::RecentlyDead | TributeStatus::Dead => {}
         }
 
         self.events.clear();
 
         if self.attributes.health == 0 {
-            add_tribute_message(
-                self.identifier.as_str(),
-                self.statistics.game.as_str(),
-                format!("{}", GameOutput::TributeDiesFromStatus(self.clone(), self.status.clone())),
-            ).expect("");
-            self.statistics.killed_by = Some(self.status.to_string());
+            let killer = self.status.clone();
+            self.try_log_action(
+                GameOutput::TributeDiesFromStatus(self.clone(), killer.clone()),
+                "dies from status"
+            );
+            self.statistics.killed_by = Some(killer.to_string());
             self.status = TributeStatus::RecentlyDead;
         }
     }
 
+    /// Applies the effects of a tribute event on a tribute.
+    // TODO: Use it or lose it
     pub async fn handle_event(&mut self, tribute_event: TributeEvent) {
         match tribute_event {
             TributeEvent::AnimalAttack(ref animal) => {
@@ -808,7 +835,8 @@ impl Tribute {
             5 | 6 => 1.0 / 20.0,
             7 | 8 => 1.0 / 25.0,
             9 | 10 => 1.0 / 30.0,
-            _ => 1.0 / 50.0,
+            11 | 12 => 1.0 / 50.0,
+            _ => 1.0, // Mainly for testing/debugging purposes
         };
 
         if SmallRng::from_entropy().gen_bool(chance) { Some(Item::new_random_consumable()) } else { None }
@@ -985,6 +1013,7 @@ impl Tribute {
 
     pub fn set_status(&mut self, status: TributeStatus) { self.status = status; }
 
+    /// Applies statuses to the tribute based on events in the current area.
     fn apply_area_effects(&mut self, game: &Game) {
         let area_details = game.areas.iter()
             .find(|a| a.area == self.area.to_string())
@@ -1205,7 +1234,9 @@ impl Attributes {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
     use crate::areas::Area::{Cornucopia, East, North, South, West};
+    use crate::threats::animals::Animal;
     use super::*;
 
     #[test]
@@ -1459,6 +1490,125 @@ mod tests {
         let open_area = AreaDetails::new(Some("Forest".to_string()), Cornucopia);
         let result = tribute.travels(vec![East, South], Some(Cornucopia)).await;
         assert_eq!(result, TravelResult::Success(Area::from_str(open_area.area.as_str()).unwrap()));
+    }
+
+    #[rstest]
+    #[case(TributeStatus::Wounded)]
+    #[case(TributeStatus::Sick)]
+    #[case(TributeStatus::Electrocuted)]
+    #[case(TributeStatus::Frozen)]
+    #[case(TributeStatus::Overheated)]
+    #[case(TributeStatus::Dehydrated)]
+    #[case(TributeStatus::Starving)]
+    #[case(TributeStatus::Poisoned)]
+    #[case(TributeStatus::Broken)]
+    #[case(TributeStatus::Buried)]
+    #[case(TributeStatus::Burned)]
+    #[case(TributeStatus::Drowned)]
+    #[case(TributeStatus::Infected)]
+    fn process_status(#[case] status: TributeStatus) {
+        let mut game = Game::default();
+        game.areas.push(AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia));
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.status = status;
+        let clone = tribute.clone();
+
+        tribute.process_status(&game);
+        assert_ne!(clone, tribute);
+    }
+
+    #[test]
+    fn process_status_mauled() {
+        let mut game = Game::default();
+        let bear = Animal::Bear;
+        game.areas.push(AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia));
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        let hp = tribute.attributes.health;
+        tribute.status = TributeStatus::Mauled(bear.clone());
+
+        tribute.process_status(&game);
+        assert!(hp - bear.damage() >= tribute.attributes.health);
+    }
+
+    #[rstest]
+    #[case(TributeStatus::Healthy)]
+    #[case(TributeStatus::RecentlyDead)]
+    #[case(TributeStatus::Dead)]
+    fn process_status_no_effect(#[case] status: TributeStatus) {
+        let mut game = Game::default();
+        game.areas.push(AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia));
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.status = status;
+        let clone = tribute.clone();
+
+        tribute.process_status(&game);
+        assert_eq!(clone, tribute);
+    }
+
+    #[test]
+    fn process_status_dies() {
+        let mut game = Game::default();
+        game.areas.push(AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia));
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.status = TributeStatus::Wounded;
+        tribute.attributes.health = 1;
+
+        tribute.process_status(&game);
+        assert_eq!(TributeStatus::RecentlyDead, tribute.status);
+    }
+
+    #[rstest]
+    #[case(AreaEvent::Wildfire, TributeStatus::Burned)]
+    #[case(AreaEvent::Flood, TributeStatus::Drowned)]
+    #[case(AreaEvent::Earthquake, TributeStatus::Buried)]
+    #[case(AreaEvent::Avalanche, TributeStatus::Buried)]
+    #[case(AreaEvent::Blizzard, TributeStatus::Frozen)]
+    #[case(AreaEvent::Landslide, TributeStatus::Buried)]
+    #[case(AreaEvent::Heatwave, TributeStatus::Overheated)]
+    fn apply_area_effects(#[case] event: AreaEvent, #[case] status: TributeStatus) {
+        let mut game = Game::default();
+        let mut area_details = AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia);
+        let area = Area::from_str(area_details.area.as_str()).unwrap();
+        area_details.events.push(event);
+        game.areas.push(area_details.clone());
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.area = area.clone();
+
+        tribute.apply_area_effects(&game);
+        assert_eq!(tribute.status, status);
+    }
+
+    #[test]
+    fn process_status_from_area_event() {
+        let mut game = Game::default();
+        let mut area_details = AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia);
+        let area = Area::from_str(area_details.area.as_str()).unwrap();
+        let event = AreaEvent::Wildfire;
+        area_details.events.push(event);
+        game.areas.push(area_details.clone());
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.area = area.clone();
+
+        tribute.process_status(&game);
+        assert_eq!(tribute.status, TributeStatus::Burned);
+    }
+
+    #[tokio::test]
+    async fn receive_patron_gift() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        let gift = tribute.receive_patron_gift().await;
+        assert!(gift.is_some());
+    }
+
+    #[test]
+    fn take_action() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        let action = Action::Attack;
+        let target = Some(Tribute::new("Peeta".to_string(), None, None));
+        tribute.take_action(&action, target.as_ref());
+        assert_eq!(tribute.brain.previous_actions.len(), 1);
+        assert_eq!(tribute.brain.previous_actions[0].action, action);
+        assert_eq!(tribute.brain.previous_actions[0].target, target);
     }
 }
 

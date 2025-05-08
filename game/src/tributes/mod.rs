@@ -28,6 +28,8 @@ use uuid::Uuid;
 /// Consts
 const DEFAULT_HEAL: u32 = 5;
 const DEFAULT_MENTAL_HEAL: u32 = 5;
+const SANITY_BREAK_LEVEL: u32 = 9;
+const LOYALTY_BREAK_LEVEL: f64 = 0.25;
 
 /// Damages
 const WOUNDED_DAMAGE: u32 = 1;
@@ -979,47 +981,91 @@ impl Tribute {
             .collect()
     }
 
-    /// Pick an appropriate target from nearby tributes
+    /// Pick an appropriate target from nearby tributes prioritizing targets as follows:
+    /// (for the purposes of this function, "nearby" means in the same area and "ally" means
+    /// from the same district)
+    /// 1. If there are enemy tributes nearby, target them.
+    /// 2. If there are no enemies and the tribute is feeling suicidal, target self.
+    /// 3. If there are no enemies nearby, but they exist elsewhere, target no one.
+    /// 4. If there are no enemies nearby and no enemies left in the game:
+    /// 4a. If loyalty is low, target ally.
+    /// 4b. Otherwise, target no one.
     async fn pick_target(&self, game: &mut Game) -> Option<Tribute> {
-        let tributes: Vec<Tribute> = game
+        // Get a list of visible tributes in the same area, excluding self.
+        let mut targets_in_area: Vec<Tribute> = game
             .living_tributes()
             .iter()
             .filter(|t| t.area == self.area)
+            .filter(|t| t.is_visible())
+            .filter(|t| t.identifier != self.identifier)
             .cloned()
             .collect();
 
-        match tributes.len() {
-            0 => {
-                // there are no other targets
-                match self.attributes.sanity {
-                    0..=9 => {
-                        // attempt suicide
-                        add_tribute_message(
-                            self.identifier.as_str(),
-                            self.statistics.game.as_str(),
-                            format!("{}", GameOutput::TributeSuicide(self.clone())),
-                        ).expect("");
-                        Some(self.clone())
-                    }
-                    _ => None, // Attack no one
+        // If there are no targets, check if the tribute is feeling suicidal.
+        if targets_in_area.is_empty() {
+            match self.attributes.sanity {
+                0..=SANITY_BREAK_LEVEL => {
+                    // attempt suicide
+                    self.try_log_action(
+                        GameOutput::TributeSuicide(self.clone()),
+                        "suicide"
+                    );
+                    Some(self.clone())
                 }
+                _ => None, // Attack no one
             }
-            _ => {
-                // there ARE targets
-                let enemies: Vec<Tribute> = tributes
-                    .iter()
-                    .filter(|t| t.district != self.district && t.is_visible())
-                    .cloned()
-                    .collect();
+        } else {
+            let enemies: Vec<Tribute> = targets_in_area
+                .iter()
+                .filter(|t| t.district != self.district)
+                .cloned()
+                .collect();
 
-                match enemies.len() {
-                    0 => None,                           // No enemies means no attack
-                    1 => Some(enemies.first()?.clone()), // Easy choice
-                    _ => {
-                        let mut rng = SmallRng::from_entropy();
-                        let enemy = enemies.choose(&mut rng)?;
-                        Some(enemy.clone())
+            match enemies.len() {
+                0 => { // No enemies, check for a "friend"
+                    // If there are two of us in the area
+                    if targets_in_area.len() == 1 {
+                        let target = targets_in_area.pop().unwrap();
+                        // And we're the only two left in the game
+                        if game.living_tributes().len() == 2 {
+                            // Kill the other tribute
+                            self.try_log_action(
+                                GameOutput::TributeBetrayal(self.clone(), target.clone()),
+                                "betrayal"
+                            );
+                            Some(target.clone())
+                        } else {
+                            // Otherwise, how loyal am I?
+                            let loyalty = self.attributes.loyalty as f64 / 100.0;
+                            if loyalty < LOYALTY_BREAK_LEVEL {
+                                // Kill the other tribute
+                                self.try_log_action(
+                                    GameOutput::TributeForcedBetrayal(self.clone(), target.clone()),
+                                    "forced betrayal"
+                                );
+                                Some(target.clone())
+                            } else {
+                                // Otherwise, don't attack
+                                self.try_log_action(
+                                    GameOutput::NoOneToAttack(self.clone()),
+                                    "no one to target"
+                                );
+                                None
+                            }
+                        }
+                    } else {
+                        self.try_log_action(
+                            GameOutput::AllAlone(self.clone()),
+                            "all alone when trying to find a target"
+                        );
+                        None
                     }
+                },
+                1 => Some(enemies.first()?.clone()), // Easy choice
+                _ => {
+                    let mut rng = SmallRng::from_entropy();
+                    let enemy = enemies.choose(&mut rng)?;
+                    Some(enemy.clone())
                 }
             }
         }
@@ -1707,6 +1753,120 @@ mod tests {
         tribute.items.push(item1.clone());
         tribute.items.push(item2.clone());
         assert_eq!(tribute.consumables().len(), 1);
+    }
+
+    /// The tributes are from different districts and are in the same area.
+    #[tokio::test]
+    async fn pick_target() {
+        let mut game = Game::default();
+        let cornucopia = AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia);
+        game.areas.push(cornucopia.clone());
+
+        let mut katniss = Tribute::new("Katniss".to_string(), Some(1), None);
+        katniss.area = Cornucopia;
+
+        let mut peeta = Tribute::new("Peeta".to_string(), Some(2), None);
+        peeta.area = Cornucopia;
+
+        game.tributes.extend_from_slice([katniss.clone(), peeta.clone()].as_ref());
+
+        let target = katniss.pick_target(&mut game).await;
+
+        assert_eq!(target, Some(peeta.clone()));
+    }
+
+    /// The actor is the only tribute in the area.
+    /// Their sanity is low, so they should attempt suicide.
+    #[tokio::test]
+    async fn pick_target_suicide() {
+        let mut game = Game::default();
+        let cornucopia = AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia);
+        game.areas.push(cornucopia.clone());
+
+        let mut katniss = Tribute::new("Katniss".to_string(), Some(1), None);
+        katniss.area = Cornucopia;
+        katniss.attributes.sanity = 5;
+
+        game.tributes.push(katniss.clone());
+
+        let target = katniss.pick_target(&mut game).await;
+
+        assert_eq!(target, Some(katniss.clone()));
+    }
+
+    /// No enemies are in the current area, only allies. Other enemies exist elsewhere.
+    /// The actor's loyalty is high, so they should NOT attack their ally.
+    #[tokio::test]
+    async fn pick_target_no_enemies_not_final_two() {
+        let mut game = Game::default();
+        let cornucopia = AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia);
+        let north = AreaDetails::new(Some("North".to_string()), North);
+        game.areas.push(cornucopia.clone());
+        game.areas.push(north.clone());
+
+        let mut katniss = Tribute::new("Katniss".to_string(), Some(1), None);
+        katniss.area = Cornucopia;
+        katniss.attributes.loyalty = 95;
+
+        let mut peeta = Tribute::new("Peeta".to_string(), Some(1), None);
+        peeta.area = Cornucopia;
+
+        let mut rue = Tribute::new("Rue".to_string(), Some(2), None);
+        rue.area = North;
+
+        game.tributes.extend_from_slice([katniss.clone(), peeta.clone(), rue.clone()].as_ref());
+
+        let target = katniss.pick_target(&mut game).await;
+
+        assert_eq!(target, None);
+    }
+
+    /// No enemies are in the current area, only allies. Other enemies exist elsewhere.
+    /// The actor's loyalty is low, so they should attack their ally.
+    #[tokio::test]
+    async fn pick_target_no_enemies_not_final_two_disloyal() {
+        let mut game = Game::default();
+        let cornucopia = AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia);
+        let north = AreaDetails::new(Some("North".to_string()), North);
+        game.areas.push(cornucopia.clone());
+        game.areas.push(north.clone());
+
+        let mut katniss = Tribute::new("Katniss".to_string(), Some(1), None);
+        katniss.area = Cornucopia;
+        katniss.attributes.loyalty = 2;
+
+        let mut peeta = Tribute::new("Peeta".to_string(), Some(1), None);
+        peeta.area = Cornucopia;
+
+        let mut rue = Tribute::new("Rue".to_string(), Some(2), None);
+        rue.area = North;
+
+        game.tributes.extend_from_slice([katniss.clone(), peeta.clone(), rue.clone()].as_ref());
+
+        let target = katniss.pick_target(&mut game).await;
+
+        assert_eq!(target, Some(peeta));
+    }
+
+    /// No enemies are in the current area, only allies. No other enemies exist.
+    /// The actor should attack their ally.
+    #[tokio::test]
+    async fn pick_target_no_enemies_final_two() {
+        let mut game = Game::default();
+        let cornucopia = AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia);
+        game.areas.push(cornucopia.clone());
+
+        let mut katniss = Tribute::new("Katniss".to_string(), Some(1), None);
+        katniss.area = Cornucopia;
+
+        let mut peeta = Tribute::new("Peeta".to_string(), Some(1), None);
+        peeta.area = Cornucopia;
+
+        game.tributes.extend_from_slice([katniss.clone(), peeta.clone()].as_ref());
+
+        let target = katniss.pick_target(&mut game).await;
+
+        assert_eq!(target, Some(peeta));
     }
 }
 

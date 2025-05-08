@@ -76,6 +76,10 @@ pub enum GameOutput {
     DiedInArea(Tribute, Area),
     TributeDeath(Tribute),
     TributeTravelNoOptions(Tribute, Area),
+    TributeBetrayal(Tribute, Tribute),
+    TributeForcedBetrayal(Tribute, Tribute),
+    NoOneToAttack(Tribute),
+    AllAlone(Tribute),
 }
 
 impl Display for GameOutput {
@@ -282,6 +286,18 @@ impl Display for GameOutput {
             }
             GameOutput::TributeDeath(tribute) => {
                 write!(f, "⚰️ {} has died.", tribute.name)
+            }
+            GameOutput::TributeBetrayal(tribute, target) => {
+                write!(f, "💔 {} betrays {}!", tribute.name, target.name)
+            }
+            GameOutput::TributeForcedBetrayal(tribute, target) => {
+                write!(f, "💔💔 {} is forced to betray {}!", tribute.name, target.name)
+            }
+            GameOutput::NoOneToAttack(tribute) => {
+                write!(f, "🤷 {} has no one to attack!", tribute.name)
+            }
+            GameOutput::AllAlone(tribute) => {
+                write!(f, "😢 {} is all alone!", tribute.name)
             }
         }
     }

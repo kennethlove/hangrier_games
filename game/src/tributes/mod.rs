@@ -532,7 +532,7 @@ impl Tribute {
                     // Arm
                     1 => self.reduce_strength(BROKEN_BONE_ARM_STRENGTH_REDUCTION),
                     // Skull
-                    2 => self.reduce_speed(BROKEN_BONE_SKULL_INTELLIGENCE_REDUCTION),
+                    2 => self.reduce_intelligence(BROKEN_BONE_SKULL_INTELLIGENCE_REDUCTION),
                     // Rib
                     _ => self.reduce_dexterity(BROKEN_BONE_RIB_DEXTERITY_REDUCTION),
                 }
@@ -849,17 +849,16 @@ impl Tribute {
             .push(TributeAction::new(action.clone(), target.cloned()));
     }
 
-    /// Take item from area
+    /// Take an item from the current area
     fn take_nearby_item(&mut self, game: &mut Game) -> Option<Item> {
         let mut rng = SmallRng::from_entropy();
         let area_index = game.areas.iter().position(|a| {
             a.area == self.area.to_string()
         }).expect("Area not found");
-        let mut area_details = game.areas.swap_remove(area_index);
+        let area_details: &mut AreaDetails = game.areas.get_mut(area_index)?;
 
         let items = area_details.items.clone();
         if items.is_empty() {
-            game.areas.push(area_details);
             None
         } else {
             let item = items.choose(&mut rng).unwrap().clone();
@@ -867,11 +866,8 @@ impl Tribute {
                 info!(target: "api", "Taking nearby item: {:?}", item);
                 self.add_item(item.clone());
 
-                game.areas.push(area_details);
-
                 return Some(item.clone());
             }
-            game.areas.push(area_details);
             None
         }
     }
@@ -1413,8 +1409,7 @@ mod tests {
     fn hides_fail() {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         tribute.attributes.intelligence = 0;
-        let hidden = tribute.hides();
-        dbg!(&hidden);
+        tribute.hides();
         assert!(!tribute.attributes.is_hidden);
         assert!(tribute.is_visible());
     }
@@ -1610,6 +1605,25 @@ mod tests {
         assert_eq!(tribute.brain.previous_actions[0].action, action);
         assert_eq!(tribute.brain.previous_actions[0].target, target);
     }
+
+    #[test]
+    fn take_nearby_item() {
+        let mut game = Game::default();
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        let mut area_details = AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia);
+        let item = Item::new_random_consumable();
+        area_details.items.push(item.clone());
+        game.areas.push(area_details.clone());
+        assert_eq!(game.areas.len(), 1);
+        assert_eq!(tribute.items.len(), 0);
+
+        tribute.take_nearby_item(&mut game);
+        assert_eq!(tribute.items.len(), 1);
+        assert_eq!(tribute.items[0], item);
+        assert_eq!(game.areas.len(), 1);
+        assert_eq!(game.areas.get(0).unwrap().items.len(), 0);
+    }
+
 }
 
 #[cfg(test)]

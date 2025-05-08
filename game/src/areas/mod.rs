@@ -84,24 +84,25 @@ impl OwnsItems for AreaDetails {
 
     fn use_item(&mut self, item: Item) -> Result<(), ItemError> {
         let index = self.items.iter().position(|i| *i == item);
-        let mut used_item = self.items.swap_remove(index.unwrap());
+        let used_item = self.items.swap_remove(index.unwrap());
 
         if used_item.quantity > 0 {
-            let item = used_item.clone();
-            used_item.quantity = used_item.quantity.saturating_sub(1);
-
-            if used_item.quantity == 0 {
-                self.remove_item(used_item);
-            }
             Ok(())
+        } else if used_item.quantity == 0  {
+            Err(ItemError::ItemNotFound)
         } else {
             Err(ItemError::ItemNotFound)
         }
     }
 
     fn remove_item(&mut self, item: Item) -> Result<(), ItemError> {
-        self.items.retain(|i| *i.identifier != item.identifier);
-        Ok(())
+        let index = self.items.iter().position(|i| i.identifier == item.identifier);
+        if let Some(index) = index {
+            self.items.remove(index);
+            Ok(())
+        } else {
+            Err(ItemError::ItemNotFound)
+        }
     }
 }
 

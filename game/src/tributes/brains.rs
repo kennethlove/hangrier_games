@@ -64,7 +64,7 @@ impl Brain {
         }
 
         // Does the tribute have items?
-        if !tribute.consumable_items().is_empty() {
+        if !tribute.consumables().is_empty() {
             // Use an item
             return Action::UseItem(None);
         }

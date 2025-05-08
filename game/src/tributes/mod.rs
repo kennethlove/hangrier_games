@@ -801,7 +801,7 @@ impl Tribute {
             }
             Action::UseItem(None) => {
                 // Get consumable items
-                let mut items = self.consumable_items();
+                let mut items = self.consumables();
                 if items.is_empty() {
                     self.long_rests();
                     self.take_action(&Action::Rest, None);
@@ -834,7 +834,7 @@ impl Tribute {
             }
             Action::UseItem(item) => {
                 info!(target: "api", "Using item");
-                let items = self.consumable_items();
+                let items = self.consumables();
                 if let Some(item) = item {
                     if items.contains(item) {
                         match self.use_consumable(item.clone()) {
@@ -911,7 +911,7 @@ impl Tribute {
 
     /// Use consumable item from inventory
     fn use_consumable(&mut self, chosen_item: Item) -> Result<(), ItemError> {
-        let items = self.consumable_items();
+        let items = self.consumables();
         let item: Item;
 
         // If the tribute has the item...
@@ -962,7 +962,7 @@ impl Tribute {
     }
 
     /// Which items are marked as shields?
-    fn defensive_items(&self) -> Vec<Item> {
+    fn shields(&self) -> Vec<Item> {
         self.available_items()
             .iter()
             .filter(|i| i.is_defensive())
@@ -971,7 +971,7 @@ impl Tribute {
     }
 
     /// Which items are marked as consumable?
-    pub fn consumable_items(&self) -> Vec<Item> {
+    pub fn consumables(&self) -> Vec<Item> {
         self.available_items()
             .iter()
             .filter(|i| i.is_consumable())
@@ -1117,7 +1117,7 @@ async fn attack_contest(attacker: &mut Tribute, target: &Tribute) -> AttackResul
     let mut defense_roll: i32 = target.attributes.defense as i32; // Add defense
 
     // If the defender has a shield, use it
-    if let Some(shield) = target.defensive_items().iter_mut().last() {
+    if let Some(shield) = target.shields().iter_mut().last() {
         defense_roll += shield.effect; // Add shield defense
         shield.quantity = shield.quantity.saturating_sub(1);
         if shield.quantity == 0 {
@@ -1669,6 +1669,45 @@ mod tests {
         assert!(tribute.use_consumable(health_potion.clone()).is_err());
     }
 
+    #[test]
+    fn available_items() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        let item1 = Item::new("Health Potion", ItemType::Consumable, 1, Attribute::Health, 1);
+        let item2 = Item::new("Sword", ItemType::Weapon, 0, Attribute::Strength, 5);
+        tribute.items.push(item1.clone());
+        tribute.items.push(item2.clone());
+        assert_eq!(tribute.available_items().len(), 1);
+    }
+
+    #[test]
+    fn weapons() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        let item1 = Item::new("Health Potion", ItemType::Consumable, 1, Attribute::Health, 1);
+        let item2 = Item::new("Sword", ItemType::Weapon, 1, Attribute::Strength, 5);
+        tribute.items.push(item1.clone());
+        tribute.items.push(item2.clone());
+        assert_eq!(tribute.weapons().len(), 1);
+    }
+
+    #[test]
+    fn shields() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        let item1 = Item::new("Health Potion", ItemType::Consumable, 1, Attribute::Health, 1);
+        let item2 = Item::new("Shield", ItemType::Weapon, 1, Attribute::Defense, 5);
+        tribute.items.push(item1.clone());
+        tribute.items.push(item2.clone());
+        assert_eq!(tribute.shields().len(), 1);
+    }
+
+    #[test]
+    fn consumables() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        let item1 = Item::new("Health Potion", ItemType::Consumable, 1, Attribute::Health, 1);
+        let item2 = Item::new("Sword", ItemType::Weapon, 1, Attribute::Strength, 5);
+        tribute.items.push(item1.clone());
+        tribute.items.push(item2.clone());
+        assert_eq!(tribute.consumables().len(), 1);
+    }
 }
 
 #[cfg(test)]

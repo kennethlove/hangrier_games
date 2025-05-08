@@ -300,7 +300,7 @@ impl Tribute {
 
     /// Tribute attacks another tribute
     /// Potentially fatal to either tribute
-    async fn attacks(&mut self, target: &mut Tribute, rng: &mut impl Rng) -> AttackOutcome {
+    fn attacks(&mut self, target: &mut Tribute, rng: &mut impl Rng) -> AttackOutcome {
         // Is the tribute attempting suicide?
         if self == target {
             self.try_log_action(
@@ -684,7 +684,7 @@ impl Tribute {
             self.brain.set_preferred_action(action, probability.unwrap());
         }
 
-        let rng = SmallRng::from_entropy();
+        let mut rng = SmallRng::from_entropy();
 
         let mut brain = self.brain.clone();
         let action = brain.act(self, number_of_nearby_tributes);
@@ -727,7 +727,7 @@ impl Tribute {
                 if let Some(mut target) = self.pick_target(game).await {
                     if target.is_visible() {
                         if let AttackOutcome::Kill(mut attacker, mut target) =
-                            self.attacks(&mut target, rng).await
+                            self.attacks(&mut target, &mut rng)
                         {
                             if attacker.attributes.health == 0 {
                                 attacker.dies();
@@ -1661,6 +1661,7 @@ mod tests {
     #[test]
     fn use_consumable() {
         let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.attributes.health = 10;
         let clone = tribute.clone();
         let health_potion = Item::new("Health Potion", ItemType::Consumable, 1, Attribute::Health, 1);
         tribute.items.push(health_potion.clone());
@@ -1908,23 +1909,75 @@ mod tests {
         assert_eq!(result, AttackResult::Miss);
     }
 
-    #[tokio::test]
-    async fn attacks_self() {
+    #[test]
+    fn attacks_self() {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         let mut target = attacker.clone();
+        let mut rng = SmallRng::from_entropy();
 
-        let outcome = attacker.attacks(&mut target).await;
+        let outcome = attacker.attacks(&mut target, &mut rng);
         assert_eq!(outcome, AttackOutcome::Wound(attacker, target));
     }
 
-    #[tokio::test]
-    async fn attacks_self_suicide() {
+    #[test]
+    fn attacks_self_suicide() {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         attacker.attributes.strength = 100;
         let mut target = attacker.clone();
+        let mut rng = SmallRng::from_entropy();
 
-        let outcome = attacker.attacks(&mut target).await;
+        let outcome = attacker.attacks(&mut target, &mut rng);
         assert_eq!(outcome, AttackOutcome::Kill(attacker, target));
+    }
+
+    #[test]
+    fn attacks_wound() {
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut target = Tribute::new("Peeta".to_string(), None, None);
+
+        attacker.attributes.strength = 25;
+        target.attributes.defense = 20;
+
+        let mut seeded_rng = SmallRng::seed_from_u64(42);
+
+        let result = attacker.attacks(&mut target, &mut seeded_rng);
+        assert_eq!(result, AttackOutcome::Wound(attacker.clone(), target.clone()));
+        assert_eq!(attacker.statistics.wins, 1);
+        assert_eq!(target.statistics.defeats, 1);
+    }
+
+    #[test]
+    fn attacks_kill() {
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut target = Tribute::new("Peeta".to_string(), None, None);
+        target.attributes.health = 1;
+
+        attacker.attributes.strength = 25;
+        target.attributes.defense = 2;
+
+        let mut seeded_rng = SmallRng::seed_from_u64(42);
+
+        let result = attacker.attacks(&mut target, &mut seeded_rng);
+        assert_eq!(result, AttackOutcome::Kill(attacker.clone(), target.clone()));
+        assert_eq!(target.status, TributeStatus::RecentlyDead);
+        assert_eq!(target.statistics.killed_by, Some(attacker.name));
+    }
+
+    #[test]
+    fn attacks_miss() {
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut target = Tribute::new("Peeta".to_string(), None, None);
+        target.attributes.health = 1;
+
+        attacker.attributes.strength = 23;
+        target.attributes.defense = 20;
+
+        let mut seeded_rng = SmallRng::seed_from_u64(42);
+
+        let result = attacker.attacks(&mut target, &mut seeded_rng);
+        assert_eq!(result, AttackOutcome::Miss(attacker.clone(), target.clone()));
+        assert_eq!(attacker.statistics.draws, 1);
+        assert_eq!(target.statistics.draws, 1);
     }
 }
 

@@ -30,6 +30,7 @@ const DEFAULT_HEAL: u32 = 5;
 const DEFAULT_MENTAL_HEAL: u32 = 5;
 const SANITY_BREAK_LEVEL: u32 = 9;
 const LOYALTY_BREAK_LEVEL: f64 = 0.25;
+const DECISIVE_WIN_MULTIPLIER: f64 = 1.5;
 
 /// Damages
 const WOUNDED_DAMAGE: u32 = 1;
@@ -299,7 +300,7 @@ impl Tribute {
 
     /// Tribute attacks another tribute
     /// Potentially fatal to either tribute
-    async fn attacks(&mut self, target: &mut Tribute) -> AttackOutcome {
+    async fn attacks(&mut self, target: &mut Tribute, rng: &mut impl Rng) -> AttackOutcome {
         // Is the tribute attempting suicide?
         if self == target {
             self.try_log_action(
@@ -331,7 +332,7 @@ impl Tribute {
         }
 
         // `self` is the attacker
-        match attack_contest(self, target).await {
+        match attack_contest(self, target, rng) {
             AttackResult::AttackerWins => {
                 target.takes_physical_damage(self.attributes.strength);
                 target.statistics.defeats += 1;
@@ -683,6 +684,8 @@ impl Tribute {
             self.brain.set_preferred_action(action, probability.unwrap());
         }
 
+        let rng = SmallRng::from_entropy();
+
         let mut brain = self.brain.clone();
         let action = brain.act(self, number_of_nearby_tributes);
 
@@ -724,7 +727,7 @@ impl Tribute {
                 if let Some(mut target) = self.pick_target(game).await {
                     if target.is_visible() {
                         if let AttackOutcome::Kill(mut attacker, mut target) =
-                            self.attacks(&mut target).await
+                            self.attacks(&mut target, rng).await
                         {
                             if attacker.attributes.health == 0 {
                                 attacker.dies();
@@ -1098,13 +1101,13 @@ fn apply_violence_stress(tribute: &mut Tribute) {
 }
 
 /// Generate attack data for each tribute.
-/// Each rolls a d20 to decide basic attack/defense value.
+/// Each rolls a d20 to decide a basic attack / defense value.
 /// Strength and any weapon are added to the attack roll.
 /// Defense and any shield are added to the defense roll.
-/// If eiter roll is more than 1.5x the other, that triggers a "decisive" victory.
-async fn attack_contest(attacker: &mut Tribute, target: &Tribute) -> AttackResult {
-    // Get attack roll + strength modifier
-    let mut attack_roll: i32 = thread_rng().gen_range(1..=20); // Base roll
+/// If either roll is more than 1.5x the other, that triggers a "decisive" victory.
+fn attack_contest(attacker: &mut Tribute, target: &mut Tribute, rng: &mut impl Rng) -> AttackResult {
+    // Get attack roll and strength modifier
+    let mut attack_roll: i32 = rng.gen_range(1..=20); // Base roll
     attack_roll += attacker.attributes.strength as i32; // Add strength
 
     // If the attacker has a weapon, use it
@@ -1112,34 +1115,39 @@ async fn attack_contest(attacker: &mut Tribute, target: &Tribute) -> AttackResul
         attack_roll += weapon.effect; // Add weapon damage
         weapon.quantity = weapon.quantity.saturating_sub(1);
         if weapon.quantity == 0 {
-            add_tribute_message(
-                attacker.identifier.as_str(),
-                attacker.statistics.game.as_str(),
-                format!("{}", GameOutput::WeaponBreak(attacker.clone(), weapon.clone())),
-            ).expect("");
+            attacker.try_log_action(
+                GameOutput::WeaponBreak(attacker.clone(), weapon.clone()),
+                "weapon break"
+            );
+            if let Err(err) = attacker.remove_item(weapon) {
+                eprintln!("Failed to remove weapon: {}", err);
+            }
         }
     }
 
-    // Get defense roll + defense modifier
-    let mut defense_roll: i32 = target.attributes.defense as i32; // Add defense
+    // Get defense roll and defense modifier
+    let mut defense_roll: i32 = rng.gen_range(1..=20); // Base roll
+    defense_roll += target.attributes.defense as i32; // Add defense
 
     // If the defender has a shield, use it
     if let Some(shield) = target.shields().iter_mut().last() {
         defense_roll += shield.effect; // Add shield defense
         shield.quantity = shield.quantity.saturating_sub(1);
         if shield.quantity == 0 {
-            add_tribute_message(
-                target.identifier.as_str(),
-                target.statistics.game.as_str(),
-                format!("{}", GameOutput::WeaponBreak(target.clone(), shield.clone())),
-            ).expect("");
+            target.try_log_action(
+                GameOutput::ShieldBreak(target.clone(), shield.clone()),
+                "shield break"
+            );
+            if let Err(err) = target.remove_item(shield) {
+                eprintln!("Failed to remove shield: {}", err);
+            };
         }
     }
 
-    // Compare attack vs defense
+    // Compare attack vs. defense
     match attack_roll.cmp(&defense_roll) {
         Ordering::Less => { // If the defender wins
-            let difference = defense_roll as f64 - (attack_roll as f64 * 1.5);
+            let difference = defense_roll as f64 - (attack_roll as f64 * DECISIVE_WIN_MULTIPLIER);
             if difference > 0.0 {
                 // Defender wins significantly
                 AttackResult::DefenderWinsDecisively
@@ -1149,7 +1157,7 @@ async fn attack_contest(attacker: &mut Tribute, target: &Tribute) -> AttackResul
         }
         Ordering::Equal => AttackResult::Miss, // If they tie
         Ordering::Greater => { // If the attacker wins
-            let difference = attack_roll as f64 - (defense_roll as f64 * 1.5);
+            let difference = attack_roll as f64 - (defense_roll as f64 * DECISIVE_WIN_MULTIPLIER);
 
             if difference > 0.0 {
                 // Attacker wins significantly
@@ -1828,6 +1836,76 @@ mod tests {
         let target = katniss.pick_target(&mut game).await;
 
         assert_eq!(target, Some(peeta));
+    }
+
+    #[test]
+    fn attack_contest_win() {
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut target = Tribute::new("Peeta".to_string(), None, None);
+
+        attacker.attributes.strength = 10;
+        target.attributes.defense = 5;
+
+        let mut seeded_rng = SmallRng::seed_from_u64(42);
+
+        let result = attack_contest(&mut attacker, &mut target, &mut seeded_rng);
+        assert_eq!(result, AttackResult::AttackerWins);
+    }
+
+    #[test]
+    fn attack_contest_win_decisively() {
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut target = Tribute::new("Peeta".to_string(), None, None);
+
+        attacker.attributes.strength = 15;
+        target.attributes.defense = 0;
+
+        let mut seeded_rng = SmallRng::seed_from_u64(42);
+
+        let result = attack_contest(&mut attacker, &mut target, &mut seeded_rng);
+        assert_eq!(result, AttackResult::AttackerWinsDecisively);
+    }
+
+    #[test]
+    fn attack_contest_lose() {
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut target = Tribute::new("Peeta".to_string(), None, None);
+
+        attacker.attributes.strength = 15;
+        target.attributes.defense = 20;
+
+        let mut seeded_rng = SmallRng::seed_from_u64(42);
+
+        let result = attack_contest(&mut attacker, &mut target, &mut seeded_rng);
+        assert_eq!(result, AttackResult::DefenderWins);
+    }
+
+    #[test]
+    fn attack_contest_lose_decisively() {
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut target = Tribute::new("Peeta".to_string(), None, None);
+
+        attacker.attributes.strength = 1;
+        target.attributes.defense = 20;
+
+        let mut seeded_rng = SmallRng::seed_from_u64(42);
+
+        let result = attack_contest(&mut attacker, &mut target, &mut seeded_rng);
+        assert_eq!(result, AttackResult::DefenderWinsDecisively);
+    }
+
+    #[test]
+    fn attack_contest_draw() {
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut target = Tribute::new("Peeta".to_string(), None, None);
+
+        attacker.attributes.strength = 23; // Magic number to make the final scores even
+        target.attributes.defense = 20;
+
+        let mut seeded_rng = SmallRng::seed_from_u64(42);
+
+        let result = attack_contest(&mut attacker, &mut target, &mut seeded_rng);
+        assert_eq!(result, AttackResult::Miss);
     }
 
     #[tokio::test]

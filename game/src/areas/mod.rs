@@ -82,8 +82,8 @@ impl OwnsItems for AreaDetails {
         self.items.iter().any(|i| i == item)
     }
 
-    fn use_item(&mut self, item: Item) -> Result<(), ItemError> {
-        let index = self.items.iter().position(|i| *i == item);
+    fn use_item(&mut self, item: &Item) -> Result<(), ItemError> {
+        let index = self.items.iter().position(|i| i == item);
         let used_item = self.items.swap_remove(index.unwrap());
 
         if used_item.quantity > 0 {
@@ -95,7 +95,7 @@ impl OwnsItems for AreaDetails {
         }
     }
 
-    fn remove_item(&mut self, item: Item) -> Result<(), ItemError> {
+    fn remove_item(&mut self, item: &Item) -> Result<(), ItemError> {
         let index = self.items.iter().position(|i| i.identifier == item.identifier);
         if let Some(index) = index {
             self.items.remove(index);
@@ -151,7 +151,7 @@ mod tests {
         let item = Item::new_random_weapon();
         area_details.add_item(item.clone());
         assert!(area_details.items.contains(&item));
-        area_details.remove_item(item.clone()).unwrap();
+        area_details.remove_item(&item).unwrap();
         assert!(!area_details.items.contains(&item));
     }
 

@@ -25,7 +25,11 @@ use std::str::FromStr;
 use tracing::info;
 use uuid::Uuid;
 
-/// Damage constants
+/// Consts
+const DEFAULT_HEAL: u32 = 5;
+const DEFAULT_MENTAL_HEAL: u32 = 5;
+
+/// Damages
 const WOUNDED_DAMAGE: u32 = 1;
 const SICK_STRENGTH_REDUCTION: u32 = 1;
 const SICK_SPEED_REDUCTION: u32 = 1;
@@ -45,6 +49,20 @@ const DROWNED_DAMAGE: u32 = 2;
 const DROWNED_MENTAL_DAMAGE: u32 = 2;
 const BURNED_DAMAGE: u32 = 5;
 const BURIED_SPEED_REDUCTION: u32 = 5;
+
+/// Attributes
+const MAX_HEALTH: u32 = 100;
+const MAX_SANITY: u32 = 100;
+const MAX_MOVEMENT: u32 = 100;
+const MAX_STRENGTH: u32 = 50;
+const MAX_DEFENSE: u32 = 50;
+const MAX_BRAVERY: u32 = 100;
+const MAX_LOYALTY: u32 = 100;
+const MAX_SPEED: u32 = 100;
+const MAX_DEXTERITY: u32 = 100;
+const MAX_INTELLIGENCE: u32 = 100;
+const MAX_PERSUASION: u32 = 100;
+const MAX_LUCK: u32 = 100;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Tribute {
@@ -91,7 +109,7 @@ impl OwnsItems for Tribute {
         self.items.iter().any(|i| i == item)
     }
 
-    fn use_item(&mut self, item: Item) -> Result<(), ItemError> {
+    fn use_item(&mut self, item: &Item) -> Result<(), ItemError> {
         let used_item = self.items
             .iter_mut()
             .find(|i| i.identifier == item.identifier);
@@ -110,7 +128,7 @@ impl OwnsItems for Tribute {
         }
     }
 
-    fn remove_item(&mut self, item: Item) -> Result<(), ItemError> {
+    fn remove_item(&mut self, item: &Item) -> Result<(), ItemError> {
         let index = self.items.iter().position(|i| i.identifier == item.identifier);
         if let Some(index) = index {
             self.items.remove(index);
@@ -179,14 +197,34 @@ impl Tribute {
         self.attributes.strength = self.attributes.strength.saturating_sub(amount).max(1);
     }
 
+    /// Increases attack strength.
+    fn increase_strength(&mut self, amount: u32) {
+        self.attributes.strength = self.attributes.strength.saturating_add(amount).min(MAX_STRENGTH);
+    }
+
     /// Reduces movement speed.
     fn reduce_speed(&mut self, amount: u32) {
         self.attributes.speed = self.attributes.speed.saturating_sub(amount).max(1);
     }
 
+    /// Increases movement speed.
+    fn increase_speed(&mut self, amount: u32) {
+        self.attributes.speed = self.attributes.speed.saturating_add(amount).min(MAX_SPEED);
+    }
+
     /// Reduces intelligence which affects decision making and hiding.
     fn reduce_intelligence(&mut self, amount: u32) {
         self.attributes.intelligence = self.attributes.intelligence.saturating_sub(amount).max(1);
+    }
+
+    /// Increases bravery which affects decision making.
+    fn increase_bravery(&mut self, amount: u32) {
+        self.attributes.bravery = self.attributes.bravery.saturating_add(amount).min(MAX_BRAVERY);
+    }
+
+    /// Increases movement
+    fn increase_movement(&mut self, amount: u32) {
+        self.attributes.movement = self.attributes.movement.saturating_add(amount).min(MAX_MOVEMENT);
     }
 
     /// Reduces dexterity which currently affects nothing.
@@ -198,23 +236,23 @@ impl Tribute {
     /// Restores health.
     fn heals(&mut self, health: u32) {
         if self.is_alive() {
-            self.attributes.health = std::cmp::min(100, self.attributes.health + health);
+            self.attributes.health = self.attributes.health.saturating_add(health).min(MAX_HEALTH);
         }
     }
 
     /// Restores mental health.
     fn heals_mental_damage(&mut self, sanity: u32) {
-        self.attributes.sanity = std::cmp::min(100, self.attributes.sanity + sanity);
+        self.attributes.sanity = self.attributes.sanity.saturating_add(sanity).min(MAX_SANITY);
     }
 
     /// Restores movement.
-    fn short_rests(&mut self) { self.attributes.movement = 100; }
+    fn short_rests(&mut self) { self.attributes.movement = MAX_MOVEMENT; }
 
     /// Restores movement, some health, and some sanity
     fn long_rests(&mut self) {
         self.short_rests();
-        self.heals(5);
-        self.heals_mental_damage(5);
+        self.heals(DEFAULT_HEAL);
+        self.heals_mental_damage(DEFAULT_MENTAL_HEAL);
     }
 
     /// Marks the tribute as dead and reveals them.
@@ -771,7 +809,7 @@ impl Tribute {
                     // Use random item
                     let item = items.choose_mut(&mut thread_rng()).unwrap();
                     match self.use_consumable(item.clone()) {
-                        true => {
+                        Ok(()) => {
                             add_tribute_message(
                                 self.identifier.as_str(),
                                 self.statistics.game.as_str(),
@@ -781,7 +819,7 @@ impl Tribute {
                             info!(target: "api", "true, Items: {:?}", &self.items);
                             self.take_action(&action, None);
                         }
-                        false => {
+                        Err(_) => {
                             add_tribute_message(
                                 self.identifier.as_str(),
                                 self.statistics.game.as_str(),
@@ -800,16 +838,16 @@ impl Tribute {
                 if let Some(item) = item {
                     if items.contains(item) {
                         match self.use_consumable(item.clone()) {
-                            true => {
+                            Ok(()) => {
                                 add_tribute_message(
                                     self.identifier.as_str(),
                                     self.statistics.game.as_str(),
                                     format!("{}", GameOutput::TributeUseItem(self.clone(), item.clone())),
                                 ).expect("");
-                                self.use_item(item.clone()).expect("Failed to use item");
+                                self.use_item(item).expect("Failed to use item");
                                 self.take_action(&action, None);
                             }
-                            false => {
+                            Err(_) => {
                                 add_tribute_message(
                                     self.identifier.as_str(),
                                     self.statistics.game.as_str(),
@@ -862,8 +900,7 @@ impl Tribute {
             None
         } else {
             let item = items.choose(&mut rng).unwrap().clone();
-            if let Ok(()) = area_details.use_item(item.clone()) {
-                info!(target: "api", "Taking nearby item: {:?}", item);
+            if let Ok(()) = area_details.use_item(&item) {
                 self.add_item(item.clone());
 
                 return Some(item.clone());
@@ -873,56 +910,37 @@ impl Tribute {
     }
 
     /// Use consumable item from inventory
-    fn use_consumable(&mut self, chosen_item: Item) -> bool {
+    fn use_consumable(&mut self, chosen_item: Item) -> Result<(), ItemError> {
         let items = self.consumable_items();
+        let item: Item;
 
-        #[allow(unused_assignments)]
-        let mut item = items.iter().last().unwrap().clone();
         // If the tribute has the item...
-        if let Some(selected_item) = items
-            .iter()
-            .filter(|i| i.identifier == chosen_item.identifier)
-            .next_back()
-        {
-            // select it
-            item = selected_item.clone();
-        } else {
-            // otherwise, quit because you can't use an item you don't have
-            return false;
+        match items.iter().find(|i| i.identifier == chosen_item.identifier) {
+            Some(selected_item) => {
+                // select it
+                item = selected_item.clone();
+            }
+            None => {
+                // otherwise, quit because you can't use an item you don't have
+                return Err(ItemError::ItemNotFound);
+            }
         }
 
-        if self.use_item(item.clone()).is_err() {
-            return false;
+        if self.use_item(&item).is_err() {
+            return Err(ItemError::ItemNotUsable);
         }
 
         // Apply item effect
         match item.attribute {
-            Attribute::Health => {
-                self.heals(item.effect as u32);
-            }
-            Attribute::Sanity => {
-                self.heals_mental_damage(item.effect as u32);
-            }
-            Attribute::Movement => {
-                self.attributes.movement =
-                    std::cmp::min(100, self.attributes.movement as i32 + item.effect) as u32;
-            }
-            Attribute::Bravery => {
-                self.attributes.bravery =
-                    std::cmp::min(100, self.attributes.bravery as i32 + item.effect) as u32;
-            }
-            Attribute::Speed => {
-                self.attributes.speed =
-                    std::cmp::min(100, self.attributes.speed as i32 + item.effect) as u32;
-            }
-            Attribute::Strength => {
-                self.attributes.strength =
-                    std::cmp::min(50, self.attributes.strength as i32 + item.effect) as u32;
-            }
-            _ => (),
+            Attribute::Health => self.heals(item.effect as u32),
+            Attribute::Sanity => self.heals_mental_damage(item.effect as u32),
+            Attribute::Movement => self.increase_movement(item.effect as u32),
+            Attribute::Bravery => self.increase_bravery(item.effect as u32),
+            Attribute::Speed => self.increase_speed(item.effect as u32),
+            Attribute::Strength => self.increase_strength(item.effect as u32),
+            _ => return Err(ItemError::InvalidAttribute),
         }
-
-        true
+        Ok(())
     }
 
     /// What items does the tribute have?
@@ -1211,18 +1229,18 @@ impl Attributes {
         let mut rng = SmallRng::from_entropy();
 
         Self {
-            health: rng.gen_range(50..=100),
-            sanity: rng.gen_range(50..=100),
-            movement: 100,
-            strength: rng.gen_range(1..=50),
-            defense: rng.gen_range(1..=50),
-            bravery: rng.gen_range(1..=100),
-            loyalty: rng.gen_range(1..=100),
-            speed: rng.gen_range(1..=100),
-            dexterity: rng.gen_range(1..=100),
-            intelligence: rng.gen_range(1..=100),
-            persuasion: rng.gen_range(1..=100),
-            luck: rng.gen_range(1..=100),
+            health: rng.gen_range(50..=MAX_HEALTH),
+            sanity: rng.gen_range(50..=MAX_SANITY),
+            movement: MAX_MOVEMENT,
+            strength: rng.gen_range(1..=MAX_STRENGTH),
+            defense: rng.gen_range(1..=MAX_DEFENSE),
+            bravery: rng.gen_range(1..=MAX_BRAVERY),
+            loyalty: rng.gen_range(1..=MAX_LOYALTY),
+            speed: rng.gen_range(1..=MAX_SPEED),
+            dexterity: rng.gen_range(1..=MAX_DEXTERITY),
+            intelligence: rng.gen_range(1..=MAX_INTELLIGENCE),
+            persuasion: rng.gen_range(1..=MAX_PERSUASION),
+            luck: rng.gen_range(1..=MAX_LUCK),
             is_hidden: false,
         }
     }
@@ -1232,6 +1250,7 @@ impl Attributes {
 mod tests {
     use rstest::rstest;
     use crate::areas::Area::{Cornucopia, East, North, South, West};
+    use crate::items::ItemType;
     use crate::threats::animals::Animal;
     use super::*;
 
@@ -1281,7 +1300,7 @@ mod tests {
         let mut item = Item::new_random_consumable(); // default quantity is 1
         item.quantity = 1;
         tribute.add_item(item.clone());
-        tribute.use_item(item).expect("Failed to use item");
+        tribute.use_item(&item).expect("Failed to use item");
         assert_eq!(tribute.items.len(), 0);
     }
 
@@ -1291,7 +1310,7 @@ mod tests {
         let mut item = Item::new_random_consumable();
         item.quantity = 2;
         tribute.add_item(item.clone());
-        assert_eq!(tribute.use_item(item.clone()), Ok(()));
+        assert_eq!(tribute.use_item(&item), Ok(()));
         assert_eq!(tribute.items.len(), 1);
         assert_eq!(tribute.items[0].quantity, 1);
     }
@@ -1622,6 +1641,32 @@ mod tests {
         assert_eq!(tribute.items[0], item);
         assert_eq!(game.areas.len(), 1);
         assert_eq!(game.areas.get(0).unwrap().items.len(), 0);
+    }
+
+    #[test]
+    fn use_consumable() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        let clone = tribute.clone();
+        let health_potion = Item::new("Health Potion", ItemType::Consumable, 1, Attribute::Health, 1);
+        tribute.items.push(health_potion.clone());
+        assert!(tribute.use_consumable(health_potion.clone()).is_ok());
+        assert_eq!(tribute.items.len(), 0);
+        assert_ne!(clone, tribute);
+        assert_eq!(clone.attributes.health + 1, tribute.attributes.health);
+    }
+
+    #[test]
+    fn use_consumable_fail_item_not_found() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        let health_potion = Item::new("Health Potion", ItemType::Consumable, 1, Attribute::Health, 1);
+        assert!(tribute.use_consumable(health_potion.clone()).is_err());
+    }
+
+    #[test]
+    fn use_consumable_fail_item_not_available() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        let health_potion = Item::new("Health Potion", ItemType::Consumable, 0, Attribute::Health, 1);
+        assert!(tribute.use_consumable(health_potion.clone()).is_err());
     }
 
 }

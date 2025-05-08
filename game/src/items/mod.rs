@@ -15,13 +15,15 @@ pub enum ItemError {
     ItemNotFound,
     #[error("Item not usable")]
     ItemNotUsable,
+    #[error("Item affects an invalid attribute")]
+    InvalidAttribute,
 }
 
 pub trait OwnsItems {
     fn add_item(&mut self, item: Item);
     fn has_item(&self, item: &Item) -> bool;
-    fn use_item(&mut self, item: Item) -> Result<(), ItemError>;
-    fn remove_item(&mut self, item: Item) -> Result<(), ItemError>;
+    fn use_item(&mut self, item: &Item) -> Result<(), ItemError>;
+    fn remove_item(&mut self, item: &Item) -> Result<(), ItemError>;
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

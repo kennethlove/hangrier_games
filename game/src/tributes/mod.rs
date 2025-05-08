@@ -302,28 +302,31 @@ impl Tribute {
     async fn attacks(&mut self, target: &mut Tribute) -> AttackOutcome {
         // Is the tribute attempting suicide?
         if self == target {
-            add_tribute_message(
-                &self.identifier,
-                &self.statistics.game,
-                format!("{}", GameOutput::TributeSelfHarm(self.clone()))
-            ).expect("");
+            self.try_log_action(
+                GameOutput::TributeSelfHarm(self.clone()),
+                "self-harm"
+            );
 
             // Attack always succeeds
             target.takes_physical_damage(self.attributes.strength);
 
-            add_tribute_message(
-                &self.identifier,
-                &self.statistics.game,
-                format!("{}", GameOutput::TributeAttackWin(self.clone(), target.clone()))
-            ).expect("");
+            self.try_log_action(
+                GameOutput::TributeAttackWin(self.clone(), target.clone()),
+                "attack against self"
+            );
 
             if target.attributes.health > 0 {
-                add_tribute_message(
-                    &self.identifier,
-                    &self.statistics.game,
-                    format!("{}", GameOutput::TributeAttackWound(self.clone(), target.clone()))
-                ).expect("");
+                self.try_log_action(
+                    GameOutput::TributeAttackWound(self.clone(), target.clone()),
+                    "wounded self"
+                );
                 return AttackOutcome::Wound(self.clone(), target.clone());
+            } else {
+                self.try_log_action(
+                    GameOutput::TributeSuicide(self.clone()),
+                    "successful suicide"
+                );
+                return AttackOutcome::Kill(self.clone(), target.clone());
             }
         }
 
@@ -334,20 +337,10 @@ impl Tribute {
                 target.statistics.defeats += 1;
                 self.statistics.wins += 1;
 
-                add_tribute_message(
-                    self.identifier.as_str(),
-                    self.statistics.game.as_str(),
-                    format!("{}", GameOutput::TributeAttackWin(self.clone(), target.clone()))
-                ).expect("");
-
-                if target.attributes.health > 0 {
-                    add_tribute_message(
-                        self.identifier.as_str(),
-                        self.statistics.game.as_str(),
-                        format!("{}", GameOutput::TributeAttackWound(self.clone(), target.clone()))
-                    ).expect("");
-                    return AttackOutcome::Wound(self.clone(), target.clone());
-                }
+                self.try_log_action(
+                    GameOutput::TributeAttackWin(self.clone(), target.clone()),
+                    "attack win"
+                );
             }
             AttackResult::AttackerWinsDecisively => {
                 // Take double damage
@@ -355,40 +348,20 @@ impl Tribute {
                 target.statistics.defeats += 1;
                 self.statistics.wins += 1;
 
-                add_tribute_message(
-                    self.identifier.as_str(),
-                    self.statistics.game.as_str(),
-                    format!("{}", GameOutput::TributeAttackWinExtra(self.clone(), target.clone()))
-                ).expect("");
-
-                if target.attributes.health > 0 {
-                    add_tribute_message(
-                        self.identifier.as_str(),
-                        self.statistics.game.as_str(),
-                        format!("{}", GameOutput::TributeAttackWound(self.clone(), target.clone()))
-                    ).expect("");
-                    return AttackOutcome::Wound(self.clone(), target.clone());
-                }
+                self.try_log_action(
+                    GameOutput::TributeAttackWinExtra(self.clone(), target.clone()),
+                    "attack win extra"
+                );
             }
             AttackResult::DefenderWins => {
                 self.takes_physical_damage(target.attributes.strength);
                 self.statistics.defeats += 1;
                 target.statistics.wins += 1;
 
-                add_tribute_message(
-                    self.identifier.as_str(),
-                    self.statistics.game.as_str(),
-                    format!("{}", GameOutput::TributeAttackLose(self.clone(), target.clone()))
-                ).expect("");
-
-                if self.attributes.health > 0 {
-                    add_tribute_message(
-                        self.identifier.as_str(),
-                        self.statistics.game.as_str(),
-                        format!("{}", GameOutput::TributeAttackWound(target.clone(), self.clone()))
-                    ).expect("");
-                    return AttackOutcome::Wound(target.clone(), self.clone());
-                }
+                self.try_log_action(
+                    GameOutput::TributeAttackLose(self.clone(), target.clone()),
+                    "attack lose"
+                );
             }
             AttackResult::DefenderWinsDecisively => {
                 self.takes_physical_damage(target.attributes.strength * 2);
@@ -396,27 +369,16 @@ impl Tribute {
                 target.statistics.wins += 1;
 
 
-                add_tribute_message(
-                    self.identifier.as_str(),
-                    self.statistics.game.as_str(),
-                    format!("{}", GameOutput::TributeAttackLoseExtra(self.clone(), target.clone()))
-                ).expect("");
-
-                if self.attributes.health > 0 {
-                    add_tribute_message(
-                        self.identifier.as_str(),
-                        self.statistics.game.as_str(),
-                        format!("{}", GameOutput::TributeAttackWound(target.clone(), self.clone()))
-                    ).expect("");
-                    return AttackOutcome::Wound(target.clone(), self.clone());
-                }
+                self.try_log_action(
+                    GameOutput::TributeAttackLoseExtra(self.clone(), target.clone()),
+                    "attack lose extra"
+                );
             }
             AttackResult::Miss => {
-                add_tribute_message(
-                    self.identifier.as_str(),
-                    self.statistics.game.as_str(),
-                    format!("{}", GameOutput::TributeAttackMiss(self.clone(), target.clone()))
-                ).expect("");
+                self.try_log_action(
+                    GameOutput::TributeAttackMiss(self.clone(), target.clone()),
+                    "missed attack"
+                );
                 self.statistics.draws += 1;
                 target.statistics.draws += 1;
 
@@ -425,34 +387,33 @@ impl Tribute {
         };
 
         if self.attributes.health == 0 {
-            // Attacker was killed by target
-            add_tribute_message(
-                self.identifier.as_str(),
-                self.statistics.game.as_str(),
-                format!("{}", GameOutput::TributeAttackDied(self.clone(), target.clone()))
-            ).expect("");
-
+            // Target killed attacker
             self.statistics.killed_by = Some(target.name.clone());
             self.status = TributeStatus::RecentlyDead;
+
+            self.try_log_action(
+                GameOutput::TributeAttackDied(self.clone(), target.clone()),
+                "attacker died"
+            );
+
             AttackOutcome::Kill(target.clone(), self.clone())
         } else if target.attributes.health == 0 {
-            // Target was killed by attacker
-            add_tribute_message(
-                self.identifier.as_str(),
-                self.statistics.game.as_str(),
-                format!("{}", GameOutput::TributeAttackSuccessKill(self.clone(), target.clone()))
-            ).expect("");
-
+            // Attacker killed Target
             target.statistics.killed_by = Some(self.name.clone());
             target.status = TributeStatus::RecentlyDead;
+
+            self.try_log_action(
+                GameOutput::TributeAttackSuccessKill(self.clone(), target.clone()),
+                "killed target"
+            );
+
             AttackOutcome::Kill(self.clone(), target.clone())
         } else {
-            add_tribute_message(
-                self.identifier.as_str(),
-                self.statistics.game.as_str(),
-                format!("{}", GameOutput::TributeAttackMiss(self.clone(), target.clone()))
-            ).expect("");
-            AttackOutcome::Miss(self.clone(), target.clone())
+            self.try_log_action(
+                GameOutput::TributeAttackWound(self.clone(), target.clone()),
+                "wounded target"
+            );
+            AttackOutcome::Wound(self.clone(), target.clone())
         }
     }
 
@@ -1867,6 +1828,25 @@ mod tests {
         let target = katniss.pick_target(&mut game).await;
 
         assert_eq!(target, Some(peeta));
+    }
+
+    #[tokio::test]
+    async fn attacks_self() {
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut target = attacker.clone();
+
+        let outcome = attacker.attacks(&mut target).await;
+        assert_eq!(outcome, AttackOutcome::Wound(attacker, target));
+    }
+
+    #[tokio::test]
+    async fn attacks_self_suicide() {
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        attacker.attributes.strength = 100;
+        let mut target = attacker.clone();
+
+        let outcome = attacker.attacks(&mut target).await;
+        assert_eq!(outcome, AttackOutcome::Kill(attacker, target));
     }
 }
 

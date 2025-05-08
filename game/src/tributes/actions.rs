@@ -69,7 +69,7 @@ pub enum AttackResult {
     Miss,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum AttackOutcome {
     Kill(Tribute, Tribute),
     Wound(Tribute, Tribute),

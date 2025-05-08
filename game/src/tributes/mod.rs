@@ -373,112 +373,97 @@ impl Tribute {
         !self.attributes.is_hidden
     }
 
+    /// Moves a tribute to a new area.
+    /// If the tribute has no movement, they cannot move.
+    /// If the tribute is already in the suggested area, they stay put.
+    /// If the tribute has low movement, they can only move to the suggested area or stay put.
+    /// If the tribute has high movement, they can move to any open neighbor or the suggested area.
     async fn travels(&self, closed_areas: Vec<Area>, suggested_area: Option<Area>) -> TravelResult {
         let mut rng = SmallRng::from_entropy();
-        let area = self.area.clone();
-        let mut new_area: Option<Area> = None;
+        // Where is the tribute?
+        let current_area = self.area.clone();
 
-        if let Some(suggestion) = suggested_area {
-            if closed_areas.contains(&suggestion) {
-                new_area = None;
-            } else {
-                new_area = Some(suggestion);
-            }
-        }
-
-        if new_area.is_some() && new_area == Some(area.clone()) {
+        // 1. Can the tribute move at all?
+        if self.attributes.movement == 0 {
             add_tribute_message(
                 self.identifier.as_str(),
                 self.statistics.game.as_str(),
-                format!("{}", GameOutput::TributeTravelAlreadyThere(self.clone(), new_area.clone().unwrap())),
-            ).expect("");
+                format!("{}", GameOutput::TributeTravelTooTired(self.clone(), current_area.clone())),
+            ).expect("Failed to add too tired message.");
             return TravelResult::Failure;
         }
 
-        let handle_suggested_area = async || -> TravelResult {
-            if let Some(new_area) = new_area {
-                add_tribute_message(
-                    self.identifier.as_str(),
-                    self.statistics.game.as_str(),
-                    format!("{}", GameOutput::TributeTravel(self.clone(), area.clone(), new_area.clone())),
-                ).expect("");
-                return TravelResult::Success(new_area);
-            }
-            TravelResult::Failure
-        };
-
-        match self.attributes.movement {
-            // No movement left, can't move
-            0 => {
-                add_tribute_message(
-                    self.identifier.as_str(),
-                    self.statistics.game.as_str(),
-                    format!("{}", GameOutput::TributeTravelTooTired(self.clone(), area.clone())),
-                ).expect("");
-                TravelResult::Failure
-            }
-            // Low movement, can only move to suggested area
-            1..=10 => match handle_suggested_area().await {
-                TravelResult::Success(area) => TravelResult::Success(area),
-                TravelResult::Failure => {
+        // 2. Determine the target area based on suggestion and validity.
+        let mut target_area: Option<Area> = None;
+        if let Some(suggestion) = suggested_area {
+            if !closed_areas.contains(&suggestion) {
+                if suggestion == current_area {
                     add_tribute_message(
                         self.identifier.as_str(),
                         self.statistics.game.as_str(),
-                        format!("{}", GameOutput::TributeTravelTooTired(self.clone(), area.clone())),
-                    ).expect("");
+                        format!("{}", GameOutput::TributeTravelAlreadyThere(self.clone(), suggestion)),
+                    ).expect("Failed to add already there message.");
+                    return TravelResult::Failure;
+                }
+                target_area = Some(suggestion);
+            }
+        }
+
+        // 3. Handle movement based on tribute's movement attribute.
+        match self.attributes.movement {
+            // Low movement: can only move to suggested_area if it's valid and set.
+            1..=10 => {
+                if let Some(new_area) = target_area {
+                    add_tribute_message(
+                        self.identifier.as_str(),
+                        self.statistics.game.as_str(),
+                        format!("{}", GameOutput::TributeTravel(self.clone(), current_area.clone(), new_area.clone())),
+                    ).expect("Failed to add travel message.");
+                    TravelResult::Success(new_area)
+                } else {
+                    add_tribute_message(
+                        self.identifier.as_str(),
+                        self.statistics.game.as_str(),
+                        format!("{}", GameOutput::TributeTravelTooTired(self.clone(), current_area.clone())),
+                    ).expect("Failed to add too tired message.");
                     TravelResult::Failure
                 }
-            },
-            // High movement, can move to any open neighbor or the suggested area
+            }
+            // High movement: can move to any open neighbor or the suggested area.
             _ => {
-                if let TravelResult::Success(area) = handle_suggested_area().await {
-                    return TravelResult::Success(area);
+                if let Some(new_area) = target_area {
+                    add_tribute_message(
+                        self.identifier.as_str(),
+                        self.statistics.game.as_str(),
+                        format!("{}", GameOutput::TributeTravel(self.clone(), current_area.clone(), new_area.clone())),
+                    ).expect("Failed to add travel message.");
+                    return TravelResult::Success(new_area)
                 }
 
-                // let neighbors = area.clone().unwrap().neighbors;
-                let neighbors: Vec<Area> = area.clone().neighbors();
-                for _area in &neighbors {
-                    // If the tribute has more loyalty than not
-                    if self.attributes.loyalty >= 50 {
-                        // TODO: revisit this
-                        // If a neighboring area has a living district-mate
-                        // if area
-                        //     .living_tributes()
-                        //     .iter()
-                        //     .filter(|t| t.district == self.district)
-                        //     .count()
-                        //     > 0
-                        // {
-                        //     println!("{}", GameMessage::TributeTravelFollow(self.clone(), area.clone()));
-                        //     return TravelResult::Success(area.clone());
-                        // }
-                    }
+                let neighbors = current_area.neighbors();
+                let available_neighbors: Vec<Area> = neighbors
+                    .into_iter()
+                    .filter(|area| area != &current_area && !closed_areas.contains(area))
+                    .collect();
+
+                if available_neighbors.is_empty() {
+                    add_tribute_message(
+                        self.identifier.as_str(),
+                        self.statistics.game.as_str(),
+                        format!("{}", GameOutput::TributeTravelNoOptions(self.clone(), current_area.clone()))
+                    ).expect("Failed to add travel stay message.");
+                    return TravelResult::Success(current_area.clone())
                 }
 
-                let mut count = 0;
-                let new_area = loop {
-                    let new_area = neighbors.choose(&mut rng).unwrap();
-                    if new_area == &area.clone() || closed_areas.contains(new_area) {
-                        count += 1;
+                // TODO: Loyalty bit goes here
 
-                        if count == 10 {
-                            add_tribute_message(
-                                self.identifier.as_str(),
-                                self.statistics.game.as_str(),
-                                format!("{}", GameOutput::TributeTravelStay(self.clone(), area.clone())),
-                            ).expect("");
-                            return TravelResult::Success(area.clone());
-                        }
-                        continue;
-                    }
-                    break new_area.clone();
-                };
+                let chosen_neighbor = available_neighbors.choose(&mut rng).unwrap();
                 add_tribute_message(
                     self.identifier.as_str(),
                     self.statistics.game.as_str(),
-                    format!("{}", GameOutput::TributeTravel(self.clone(), area.clone(), new_area.clone())),
-                ).expect("");
-                TravelResult::Success(new_area)
+                    format!("{}", GameOutput::TributeTravel(self.clone(), current_area.clone(), chosen_neighbor.clone()))
+                ).expect("Failed to add travel message.");
+                TravelResult::Success(chosen_neighbor.clone())
             }
         }
     }
@@ -1025,7 +1010,7 @@ impl Tribute {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TravelResult {
     Success(Area),
     Failure,
@@ -1207,6 +1192,7 @@ impl Attributes {
 
 #[cfg(test)]
 mod tests {
+    use crate::areas::Area::{Cornucopia, East, North, South, West};
     use super::*;
 
     #[test]
@@ -1410,6 +1396,56 @@ mod tests {
 
         tribute.hides();
         assert!(!tribute.is_visible());
+    }
+
+    #[tokio::test]
+    async fn travels_success() {
+        let tribute = Tribute::new("Katniss".to_string(), None, None);
+        let open_area = AreaDetails::new(Some("Forest".to_string()), Cornucopia);
+        let result = tribute.travels(vec![East, South, North, West], None).await;
+        assert_eq!(result, TravelResult::Success(Area::from_str(open_area.area.as_str()).unwrap()));
+    }
+
+    #[tokio::test]
+    async fn travels_fail_no_movement() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.attributes.movement = 0;
+        let result = tribute.travels(vec![], None).await;
+        assert_eq!(result, TravelResult::Failure);
+    }
+
+    #[tokio::test]
+    async fn travels_fail_already_there() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.area = North;
+        let result = tribute.travels(vec![Cornucopia, East, West, South], Some(North)).await;
+        assert_eq!(result, TravelResult::Failure);
+    }
+
+    #[tokio::test]
+    async fn travels_fail_low_movement_no_suggestion() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.attributes.movement = 5;
+        let result = tribute.travels(vec![Cornucopia, East, West, North], None).await;
+        assert_eq!(result, TravelResult::Failure);
+    }
+
+    #[tokio::test]
+    async fn travels_fail_low_movement_suggestion() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.attributes.movement = 5;
+        let result = tribute.travels(vec![Cornucopia, East, West, North], Some(North)).await;
+        assert_eq!(result, TravelResult::Failure);
+    }
+
+    #[tokio::test]
+    async fn travels_success_low_movement_suggestion() {
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.area = North;
+        tribute.attributes.movement = 5;
+        let open_area = AreaDetails::new(Some("Forest".to_string()), Cornucopia);
+        let result = tribute.travels(vec![East, South], Some(Cornucopia)).await;
+        assert_eq!(result, TravelResult::Success(Area::from_str(open_area.area.as_str()).unwrap()));
     }
 }
 

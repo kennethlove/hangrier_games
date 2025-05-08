@@ -75,6 +75,7 @@ pub enum GameOutput {
     TrappedInArea(Tribute, Area),
     DiedInArea(Tribute, Area),
     TributeDeath(Tribute),
+    TributeTravelNoOptions(Tribute, Area),
 }
 
 impl Display for GameOutput {
@@ -148,6 +149,9 @@ impl Display for GameOutput {
             }
             GameOutput::TributeTravelStay(tribute, area) => {
                 write!(f, "🪑 {} stays in {}", tribute.name, area)
+            }
+            GameOutput::TributeTravelNoOptions(tribute, area) => {
+                write!(f, "📍 {} has nowhere to go, stays in {}", tribute.name, area)
             }
             GameOutput::TributeBleeds(tribute) => {
                 write!(f, "🩸 {} bleeds from their wounds.", tribute.name)

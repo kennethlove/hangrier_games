@@ -198,6 +198,11 @@ impl Tribute {
         hidden
     }
 
+    /// Helper function to see if the tribute is hidden
+    pub fn is_visible(&self) -> bool {
+        !self.attributes.is_hidden
+    }
+
     /// Tribute is lonely/homesick/etc., loses some sanity.
     fn misses_home(&mut self) {
         let loneliness = self.attributes.bravery as f64 / 100.0; // how lonely is the tribute?
@@ -369,10 +374,6 @@ impl Tribute {
         }
     }
 
-    pub fn is_visible(&self) -> bool {
-        !self.attributes.is_hidden
-    }
-
     /// Moves a tribute to a new area.
     /// If the tribute has no movement, they cannot move.
     /// If the tribute is already in the suggested area, they stay put.
@@ -385,11 +386,10 @@ impl Tribute {
 
         // 1. Can the tribute move at all?
         if self.attributes.movement == 0 {
-            add_tribute_message(
-                self.identifier.as_str(),
-                self.statistics.game.as_str(),
-                format!("{}", GameOutput::TributeTravelTooTired(self.clone(), current_area.clone())),
-            ).expect("Failed to add too tired message.");
+            self.try_log_action(
+                GameOutput::TributeTravelTooTired(self.clone(), current_area.clone()),
+                "too tired"
+            );
             return TravelResult::Failure;
         }
 
@@ -398,11 +398,10 @@ impl Tribute {
         if let Some(suggestion) = suggested_area {
             if !closed_areas.contains(&suggestion) {
                 if suggestion == current_area {
-                    add_tribute_message(
-                        self.identifier.as_str(),
-                        self.statistics.game.as_str(),
-                        format!("{}", GameOutput::TributeTravelAlreadyThere(self.clone(), suggestion)),
-                    ).expect("Failed to add already there message.");
+                    self.try_log_action(
+                        GameOutput::TributeTravelAlreadyThere(self.clone(), suggestion.clone()),
+                        "already there"
+                    );
                     return TravelResult::Failure;
                 }
                 target_area = Some(suggestion);
@@ -414,29 +413,26 @@ impl Tribute {
             // Low movement: can only move to suggested_area if it's valid and set.
             1..=10 => {
                 if let Some(new_area) = target_area {
-                    add_tribute_message(
-                        self.identifier.as_str(),
-                        self.statistics.game.as_str(),
-                        format!("{}", GameOutput::TributeTravel(self.clone(), current_area.clone(), new_area.clone())),
-                    ).expect("Failed to add travel message.");
+                    self.try_log_action(
+                        GameOutput::TributeTravel(self.clone(), current_area.clone(), new_area.clone()),
+                        "travel"
+                    );
                     TravelResult::Success(new_area)
                 } else {
-                    add_tribute_message(
-                        self.identifier.as_str(),
-                        self.statistics.game.as_str(),
-                        format!("{}", GameOutput::TributeTravelTooTired(self.clone(), current_area.clone())),
-                    ).expect("Failed to add too tired message.");
+                    self.try_log_action(
+                        GameOutput::TributeTravelTooTired(self.clone(), current_area.clone()),
+                        "too tired"
+                    );
                     TravelResult::Failure
                 }
             }
             // High movement: can move to any open neighbor or the suggested area.
             _ => {
                 if let Some(new_area) = target_area {
-                    add_tribute_message(
-                        self.identifier.as_str(),
-                        self.statistics.game.as_str(),
-                        format!("{}", GameOutput::TributeTravel(self.clone(), current_area.clone(), new_area.clone())),
-                    ).expect("Failed to add travel message.");
+                    self.try_log_action(
+                        GameOutput::TributeTravel(self.clone(), current_area.clone(), new_area.clone()),
+                        "travel"
+                    );
                     return TravelResult::Success(new_area)
                 }
 
@@ -447,22 +443,20 @@ impl Tribute {
                     .collect();
 
                 if available_neighbors.is_empty() {
-                    add_tribute_message(
-                        self.identifier.as_str(),
-                        self.statistics.game.as_str(),
-                        format!("{}", GameOutput::TributeTravelNoOptions(self.clone(), current_area.clone()))
-                    ).expect("Failed to add travel stay message.");
+                    self.try_log_action(
+                        GameOutput::TributeTravelNoOptions(self.clone(), current_area.clone()),
+                        "no options"
+                    );
                     return TravelResult::Success(current_area.clone())
                 }
 
                 // TODO: Loyalty bit goes here
 
                 let chosen_neighbor = available_neighbors.choose(&mut rng).unwrap();
-                add_tribute_message(
-                    self.identifier.as_str(),
-                    self.statistics.game.as_str(),
-                    format!("{}", GameOutput::TributeTravel(self.clone(), current_area.clone(), chosen_neighbor.clone()))
-                ).expect("Failed to add travel message.");
+                self.try_log_action(
+                    GameOutput::TributeTravel(self.clone(), current_area.clone(), chosen_neighbor.clone()),
+                    "travel"
+                );
                 TravelResult::Success(chosen_neighbor.clone())
             }
         }
@@ -1006,6 +1000,25 @@ impl Tribute {
                 AreaEvent::Landslide => self.set_status(TributeStatus::Buried),
                 AreaEvent::Heatwave => self.set_status(TributeStatus::Overheated),
             }
+        }
+    }
+
+    /// Helper to attempt to add a tribute message, logging a warning on failure.
+    /// The success of this function does not affect the outcome of the calling method.
+    fn try_log_action(&self, game_event_output: impl std::fmt::Display, action_description: &str) {
+        let content = format!("{}", game_event_output);
+
+        if let Err(e) = add_tribute_message(
+            self.identifier.as_str(),
+            self.statistics.game.as_str(),
+            content,
+        ) {
+            tracing::warn!(
+                target: "game::tribute",
+                "Failed to log action: {}. Error: {}",
+                action_description,
+                e
+            );
         }
     }
 }

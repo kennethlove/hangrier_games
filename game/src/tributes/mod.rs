@@ -16,7 +16,6 @@ use fake::faker::name::raw::*;
 use fake::locales::*;
 use fake::Fake;
 use rand::prelude::*;
-use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use statuses::TributeStatus;
 use std::cmp::{Ordering, PartialEq};
@@ -554,7 +553,7 @@ impl Tribute {
                 self.takes_mental_damage(DROWNED_MENTAL_DAMAGE);
             }
             TributeStatus::Mauled(animal) => {
-                let number_of_animals = thread_rng().gen_range(2..=5);
+                let number_of_animals = rng.gen_range(2..=5);
                 let damage = animal.damage() * number_of_animals;
                 self.takes_physical_damage(damage);
             }
@@ -1260,12 +1259,21 @@ impl Attributes {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-    use rstest::rstest;
+    use rand::prelude::SmallRng;
+    use rand::SeedableRng;
+    use rstest::{fixture, rstest};
     use crate::areas::Area::{Cornucopia, East, North, South, West};
+    use crate::areas::events::AreaEvent;
+    use crate::areas::{Area, AreaDetails};
     use crate::games::Game;
-    use crate::items::ItemType;
+    use crate::items::{Attribute, Item, ItemType, OwnsItems};
     use crate::threats::animals::Animal;
-    use super::*;
+    use crate::tributes::actions::{Action, AttackOutcome, AttackResult};
+    use crate::tributes::statuses::TributeStatus;
+    use crate::tributes::{attack_contest, TravelResult, Tribute};
+
+    #[fixture]
+    fn tribute() -> Tribute { Tribute::random() }
 
     #[test]
     fn default() {
@@ -1290,26 +1298,23 @@ mod tests {
         assert!((1u32..=12u32).contains(&tribute.district));
     }
 
-    #[test]
-    fn add_item() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn add_item(mut tribute: Tribute) {
         let item = Item::new_random_consumable();
         tribute.add_item(item.clone());
         assert_eq!(tribute.items.len(), 1);
         assert_eq!(tribute.items[0], item);
     }
 
-    #[test]
-    fn has_item() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn has_item(mut tribute: Tribute) {
         let item = Item::new_random_consumable();
         tribute.add_item(item.clone());
         assert!(tribute.has_item(&item));
     }
 
-    #[test]
-    fn use_item() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn use_item(mut tribute: Tribute) {
         let mut item = Item::new_random_consumable(); // default quantity is 1
         item.quantity = 1;
         tribute.add_item(item.clone());
@@ -1317,9 +1322,8 @@ mod tests {
         assert_eq!(tribute.items.len(), 0);
     }
 
-    #[test]
-    fn use_item_reusable() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn use_item_reusable(mut tribute: Tribute) {
         let mut item = Item::new_random_consumable();
         item.quantity = 2;
         tribute.add_item(item.clone());
@@ -1328,33 +1332,29 @@ mod tests {
         assert_eq!(tribute.items[0].quantity, 1);
     }
 
-    #[test]
-    fn takes_physical_damage() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn takes_physical_damage(mut tribute: Tribute) {
         let hp = tribute.attributes.health.clone();
         tribute.takes_physical_damage(10);
         assert_eq!(tribute.attributes.health, hp - 10);
     }
 
-    #[test]
-    fn takes_no_physical_damage_when_dead() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn takes_no_physical_damage_when_dead(mut tribute: Tribute) {
         tribute.attributes.health = 0;
         tribute.takes_physical_damage(10);
         assert_eq!(tribute.attributes.health, 0);
     }
 
-    #[test]
-    fn heals() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn heals(mut tribute: Tribute) {
         tribute.attributes.health = 10;
         tribute.heals(10);
         assert_eq!(tribute.attributes.health, 20);
     }
 
-    #[test]
-    fn does_not_heal_when_unalive() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn does_not_heal_when_dead(mut tribute: Tribute) {
         tribute.attributes.health = 0;
 
         tribute.status = TributeStatus::RecentlyDead;
@@ -1366,41 +1366,36 @@ mod tests {
         assert_eq!(tribute.attributes.health, 0);
     }
 
-    #[test]
-    fn takes_mental_damage() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn takes_mental_damage(mut tribute: Tribute) {
         let mp = tribute.attributes.sanity.clone();
         tribute.takes_mental_damage(10);
         assert_eq!(tribute.attributes.sanity, mp - 10);
     }
 
-    #[test]
-    fn takes_no_mental_damage_when_insane() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn takes_no_mental_damage_when_insane(mut tribute: Tribute) {
         tribute.attributes.sanity = 0;
         tribute.takes_mental_damage(10);
         assert_eq!(tribute.attributes.sanity, 0);
     }
 
-    #[test]
-    fn heals_mental_damage() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn heals_mental_damage(mut tribute: Tribute) {
         tribute.attributes.sanity = 10;
         tribute.heals_mental_damage(10);
         assert_eq!(tribute.attributes.sanity, 20);
     }
 
-    #[test]
-    fn short_rests() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn short_rests(mut tribute: Tribute) {
         tribute.attributes.movement = 0;
         tribute.short_rests();
         assert_eq!(tribute.attributes.movement, 100);
     }
 
-    #[test]
-    fn long_rests() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn long_rests(mut tribute: Tribute) {
         tribute.attributes.movement = 0;
         tribute.attributes.health = 5;
         tribute.attributes.sanity = 5;
@@ -1410,9 +1405,8 @@ mod tests {
         assert_eq!(tribute.attributes.sanity, 10);
     }
 
-    #[test]
-    fn dies() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn dies(mut tribute: Tribute) {
         tribute.dies();
         assert_eq!(tribute.attributes.health, 0);
         assert_eq!(tribute.status, TributeStatus::Dead);
@@ -1420,35 +1414,31 @@ mod tests {
         assert!(tribute.is_visible());
     }
 
-    #[test]
-    fn is_alive() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn is_alive(mut tribute: Tribute) {
         assert!(tribute.is_alive());
         tribute.dies();
         assert!(!tribute.is_alive());
     }
 
-    #[test]
-    fn hides_success() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn hides_success(mut tribute: Tribute) {
         tribute.attributes.intelligence = 100; // So the hiding is always successful
         tribute.hides();
         assert!(tribute.attributes.is_hidden);
         assert!(!tribute.is_visible());
     }
 
-    #[test]
-    fn hides_fail() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn hides_fail(mut tribute: Tribute) {
         tribute.attributes.intelligence = 0;
         tribute.hides();
         assert!(!tribute.attributes.is_hidden);
         assert!(tribute.is_visible());
     }
 
-    #[test]
-    fn misses_home() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn misses_home(mut tribute: Tribute) {
         tribute.attributes.bravery = 2;
         tribute.attributes.sanity = 50;
         tribute.misses_home();
@@ -1459,9 +1449,8 @@ mod tests {
         assert_eq!(tribute.attributes.sanity, 16);
     }
 
-    #[test]
-    fn is_visible() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn is_visible(mut tribute: Tribute) {
         tribute.attributes.intelligence = 100; // guaranteed hide
         assert!(tribute.is_visible());
 
@@ -1469,49 +1458,49 @@ mod tests {
         assert!(!tribute.is_visible());
     }
 
+    #[rstest]
     #[tokio::test]
-    async fn travels_success() {
-        let tribute = Tribute::new("Katniss".to_string(), None, None);
+    async fn travels_success(tribute: Tribute) {
         let open_area = AreaDetails::new(Some("Forest".to_string()), Cornucopia);
         let result = tribute.travels(vec![East, South, North, West], None).await;
         assert_eq!(result, TravelResult::Success(Area::from_str(open_area.area.as_str()).unwrap()));
     }
 
+    #[rstest]
     #[tokio::test]
-    async fn travels_fail_no_movement() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    async fn travels_fail_no_movement(mut tribute: Tribute) {
         tribute.attributes.movement = 0;
         let result = tribute.travels(vec![], None).await;
         assert_eq!(result, TravelResult::Failure);
     }
 
+    #[rstest]
     #[tokio::test]
-    async fn travels_fail_already_there() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    async fn travels_fail_already_there(mut tribute: Tribute) {
         tribute.area = North;
         let result = tribute.travels(vec![Cornucopia, East, West, South], Some(North)).await;
         assert_eq!(result, TravelResult::Failure);
     }
 
+    #[rstest]
     #[tokio::test]
-    async fn travels_fail_low_movement_no_suggestion() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    async fn travels_fail_low_movement_no_suggestion(mut tribute: Tribute) {
         tribute.attributes.movement = 5;
         let result = tribute.travels(vec![Cornucopia, East, West, North], None).await;
         assert_eq!(result, TravelResult::Failure);
     }
 
+    #[rstest]
     #[tokio::test]
-    async fn travels_fail_low_movement_suggestion() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    async fn travels_fail_low_movement_suggestion(mut tribute: Tribute) {
         tribute.attributes.movement = 5;
         let result = tribute.travels(vec![Cornucopia, East, West, North], Some(North)).await;
         assert_eq!(result, TravelResult::Failure);
     }
 
+    #[rstest]
     #[tokio::test]
-    async fn travels_success_low_movement_suggestion() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    async fn travels_success_low_movement_suggestion(mut tribute: Tribute) {
         tribute.area = North;
         tribute.attributes.movement = 5;
         let open_area = AreaDetails::new(Some("Forest".to_string()), Cornucopia);
@@ -1533,10 +1522,9 @@ mod tests {
     #[case(TributeStatus::Burned)]
     #[case(TributeStatus::Drowned)]
     #[case(TributeStatus::Infected)]
-    fn process_status(#[case] status: TributeStatus) {
+    fn process_status(mut tribute: Tribute, #[case] status: TributeStatus) {
         let mut game = Game::default();
         game.areas.push(AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia));
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         tribute.status = status;
         let clone = tribute.clone();
         let mut rng = SmallRng::from_entropy();
@@ -1545,14 +1533,14 @@ mod tests {
         assert_ne!(clone, tribute);
     }
 
-    #[test]
-    fn process_status_mauled() {
+    #[rstest]
+    fn process_status_mauled(mut tribute: Tribute) {
         let mut rng = SmallRng::from_entropy();
         let mut game = Game::default();
         let bear = Animal::Bear;
-        game.areas.push(AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia));
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         let hp = tribute.attributes.health;
+
+        game.areas.push(AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia));
         tribute.status = TributeStatus::Mauled(bear.clone());
 
         tribute.process_status(&game.areas[0], &mut rng);
@@ -1563,11 +1551,10 @@ mod tests {
     #[case(TributeStatus::Healthy)]
     #[case(TributeStatus::RecentlyDead)]
     #[case(TributeStatus::Dead)]
-    fn process_status_no_effect(#[case] status: TributeStatus) {
+    fn process_status_no_effect(mut tribute: Tribute, #[case] status: TributeStatus) {
         let mut rng = SmallRng::from_entropy();
         let mut game = Game::default();
         game.areas.push(AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia));
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         tribute.status = status;
         let clone = tribute.clone();
 
@@ -1575,12 +1562,11 @@ mod tests {
         assert_eq!(clone, tribute);
     }
 
-    #[test]
-    fn process_status_dies() {
+    #[rstest]
+    fn process_status_dies(mut tribute: Tribute) {
         let mut rng = SmallRng::from_entropy();
         let mut game = Game::default();
         game.areas.push(AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia));
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         tribute.status = TributeStatus::Wounded;
         tribute.attributes.health = 1;
 
@@ -1596,21 +1582,20 @@ mod tests {
     #[case(AreaEvent::Blizzard, TributeStatus::Frozen)]
     #[case(AreaEvent::Landslide, TributeStatus::Buried)]
     #[case(AreaEvent::Heatwave, TributeStatus::Overheated)]
-    fn apply_area_effects(#[case] event: AreaEvent, #[case] status: TributeStatus) {
+    fn apply_area_effects(mut tribute: Tribute, #[case] event: AreaEvent, #[case] status: TributeStatus) {
         let mut game = Game::default();
         let mut area_details = AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia);
         let area = Area::from_str(area_details.area.as_str()).unwrap();
         area_details.events.push(event);
         game.areas.push(area_details.clone());
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         tribute.area = area.clone();
 
         tribute.apply_area_effects(&game.areas[0]);
         assert_eq!(tribute.status, status);
     }
 
-    #[test]
-    fn process_status_from_area_event() {
+    #[rstest]
+    fn process_status_from_area_event(mut tribute: Tribute) {
         let mut rng = SmallRng::from_entropy();
         let mut game = Game::default();
         let mut area_details = AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia);
@@ -1618,35 +1603,34 @@ mod tests {
         let event = AreaEvent::Wildfire;
         area_details.events.push(event);
         game.areas.push(area_details.clone());
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         tribute.area = area.clone();
 
         tribute.process_status(&game.areas[0], &mut rng);
         assert_eq!(tribute.status, TributeStatus::Burned);
     }
 
+    #[rstest]
     #[tokio::test]
-    async fn receive_patron_gift() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    async fn receive_patron_gift(mut tribute: Tribute) {
         let gift = tribute.receive_patron_gift().await;
         assert!(gift.is_some());
     }
 
-    #[test]
-    fn take_action() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn take_action(
+        mut tribute: Tribute,
+        tribute2: Tribute,
+    ) {
         let action = Action::Attack;
-        let target = Some(Tribute::new("Peeta".to_string(), None, None));
-        tribute.take_action(&action, target.as_ref());
+        tribute.take_action(&action, Some(&tribute2));
         assert_eq!(tribute.brain.previous_actions.len(), 1);
         assert_eq!(tribute.brain.previous_actions[0].action, action);
-        assert_eq!(tribute.brain.previous_actions[0].target, target);
+        assert_eq!(tribute.brain.previous_actions[0].target, Some(tribute2));
     }
 
-    #[test]
-    fn take_nearby_item() {
+    #[rstest]
+    fn take_nearby_item(mut tribute: Tribute) {
         let mut game = Game::default();
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
         let mut area_details = AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia);
         let item = Item::new_random_consumable();
         area_details.items.push(item.clone());
@@ -1661,9 +1645,8 @@ mod tests {
         assert_eq!(game.areas.get(0).unwrap().items.len(), 0);
     }
 
-    #[test]
-    fn use_consumable() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn use_consumable(mut tribute: Tribute) {
         tribute.attributes.health = 10;
         let clone = tribute.clone();
         let health_potion = Item::new("Health Potion", ItemType::Consumable, 1, Attribute::Health, 1);
@@ -1674,23 +1657,20 @@ mod tests {
         assert_eq!(clone.attributes.health + 1, tribute.attributes.health);
     }
 
-    #[test]
-    fn use_consumable_fail_item_not_found() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn use_consumable_fail_item_not_found(mut tribute: Tribute) {
         let health_potion = Item::new("Health Potion", ItemType::Consumable, 1, Attribute::Health, 1);
         assert!(tribute.use_consumable(health_potion.clone()).is_err());
     }
 
-    #[test]
-    fn use_consumable_fail_item_not_available() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn use_consumable_fail_item_not_available(mut tribute: Tribute) {
         let health_potion = Item::new("Health Potion", ItemType::Consumable, 0, Attribute::Health, 1);
         assert!(tribute.use_consumable(health_potion.clone()).is_err());
     }
 
-    #[test]
-    fn available_items() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn available_items(mut tribute: Tribute) {
         let item1 = Item::new("Health Potion", ItemType::Consumable, 1, Attribute::Health, 1);
         let item2 = Item::new("Sword", ItemType::Weapon, 0, Attribute::Strength, 5);
         tribute.items.push(item1.clone());
@@ -1698,9 +1678,8 @@ mod tests {
         assert_eq!(tribute.available_items().len(), 1);
     }
 
-    #[test]
-    fn weapons() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn weapons(mut tribute: Tribute) {
         let item1 = Item::new("Health Potion", ItemType::Consumable, 1, Attribute::Health, 1);
         let item2 = Item::new("Sword", ItemType::Weapon, 1, Attribute::Strength, 5);
         tribute.items.push(item1.clone());
@@ -1708,9 +1687,8 @@ mod tests {
         assert_eq!(tribute.weapons().len(), 1);
     }
 
-    #[test]
-    fn shields() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn shields(mut tribute: Tribute) {
         let item1 = Item::new("Health Potion", ItemType::Consumable, 1, Attribute::Health, 1);
         let item2 = Item::new("Shield", ItemType::Weapon, 1, Attribute::Defense, 5);
         tribute.items.push(item1.clone());
@@ -1718,9 +1696,8 @@ mod tests {
         assert_eq!(tribute.shields().len(), 1);
     }
 
-    #[test]
-    fn consumables() {
-        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+    #[rstest]
+    fn consumables(mut tribute: Tribute) {
         let item1 = Item::new("Health Potion", ItemType::Consumable, 1, Attribute::Health, 1);
         let item2 = Item::new("Sword", ItemType::Weapon, 1, Attribute::Strength, 5);
         tribute.items.push(item1.clone());
@@ -1729,16 +1706,20 @@ mod tests {
     }
 
     /// The tributes are from different districts and are in the same area.
+    #[rstest]
     #[tokio::test]
-    async fn pick_target() {
+    async fn pick_target(
+        mut katniss: Tribute,
+        mut peeta: Tribute
+    ) {
         let mut game = Game::default();
         let cornucopia = AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia);
         game.areas.push(cornucopia.clone());
 
-        let mut katniss = Tribute::new("Katniss".to_string(), Some(1), None);
+        katniss.district = 11;
         katniss.area = Cornucopia;
 
-        let mut peeta = Tribute::new("Peeta".to_string(), Some(2), None);
+        peeta.district = 10;
         peeta.area = Cornucopia;
 
         game.tributes.extend_from_slice([katniss.clone(), peeta.clone()].as_ref());

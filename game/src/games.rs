@@ -452,6 +452,7 @@ impl Game {
             let tribute_items: Vec<Item> = self.tributes[i].items.clone();
 
             if self.tributes[i].status == TributeStatus::RecentlyDead {
+                self.tributes[i].statistics.day_killed = self.day;
                 let tribute_area = self.tributes[i].area.clone();
 
                 if let Some(area) = self.get_area_details_mut(tribute_area) {

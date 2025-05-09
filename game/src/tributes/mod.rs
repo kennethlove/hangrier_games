@@ -334,54 +334,49 @@ impl Tribute {
         // `self` is the attacker
         match attack_contest(self, target, rng) {
             AttackResult::AttackerWins => {
-                target.takes_physical_damage(self.attributes.strength);
-                target.statistics.defeats += 1;
-                self.statistics.wins += 1;
-
-                self.try_log_action(
+                apply_combat_results(
+                    self,
+                    target,
+                    self.attributes.strength,
                     GameOutput::TributeAttackWin(self.clone(), target.clone()),
                     "attack win"
                 );
             }
             AttackResult::AttackerWinsDecisively => {
-                // Take double damage
-                target.takes_physical_damage(self.attributes.strength * 2);
-                target.statistics.defeats += 1;
-                self.statistics.wins += 1;
-
-                self.try_log_action(
+                apply_combat_results(
+                    self,
+                    target,
+                    self.attributes.strength * 2, // double damage
                     GameOutput::TributeAttackWinExtra(self.clone(), target.clone()),
                     "attack win extra"
                 );
             }
             AttackResult::DefenderWins => {
-                self.takes_physical_damage(target.attributes.strength);
-                self.statistics.defeats += 1;
-                target.statistics.wins += 1;
-
-                self.try_log_action(
+                apply_combat_results(
+                    target,
+                    self,
+                    target.attributes.strength,
                     GameOutput::TributeAttackLose(self.clone(), target.clone()),
                     "attack lose"
                 );
             }
             AttackResult::DefenderWinsDecisively => {
-                self.takes_physical_damage(target.attributes.strength * 2);
-                self.statistics.defeats += 1;
-                target.statistics.wins += 1;
-
-
-                self.try_log_action(
+                apply_combat_results(
+                    target,
+                    self,
+                    target.attributes.strength * 2, // double damage
                     GameOutput::TributeAttackLoseExtra(self.clone(), target.clone()),
                     "attack lose extra"
                 );
             }
             AttackResult::Miss => {
+                self.statistics.draws += 1;
+                target.statistics.draws += 1;
+
                 self.try_log_action(
                     GameOutput::TributeAttackMiss(self.clone(), target.clone()),
                     "missed attack"
                 );
-                self.statistics.draws += 1;
-                target.statistics.draws += 1;
 
                 return AttackOutcome::Miss(self.clone(), target.clone());
             }
@@ -1169,6 +1164,19 @@ fn attack_contest(attacker: &mut Tribute, target: &mut Tribute, rng: &mut impl R
     }
 }
 
+fn apply_combat_results(
+    winner: &mut Tribute,
+    loser: &mut Tribute,
+    damage_to_loser: u32,
+    log_event: GameOutput,
+    log_description: &str,
+) {
+    loser.takes_physical_damage(damage_to_loser);
+    loser.statistics.defeats += 1;
+    winner.statistics.wins += 1;
+    winner.try_log_action(log_event, log_description);
+}
+
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct Statistics {
     /// What day, if any, were they killed?
@@ -1185,6 +1193,24 @@ pub struct Statistics {
     pub draws: u32,
     /// Which game do these stats relate to?
     pub game: String,
+}
+
+/// Update statistics for a pair of tributes based on the attack result
+pub fn update_stats(attacker: &mut Tribute, defender: &mut Tribute, result: AttackResult) {
+    match result {
+        AttackResult::AttackerWins | AttackResult::AttackerWinsDecisively => {
+            defender.statistics.defeats += 1;
+            attacker.statistics.wins += 1;
+        },
+        AttackResult::DefenderWins | AttackResult::DefenderWinsDecisively => {
+            attacker.statistics.defeats += 1;
+            defender.statistics.wins += 1;
+        },
+        AttackResult::Miss => {
+            attacker.statistics.draws += 1;
+            defender.statistics.draws += 1;
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

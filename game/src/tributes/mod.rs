@@ -694,8 +694,8 @@ impl Tribute {
             );
         }
 
-        let mut brain = self.brain.clone();
-        let action = brain.act(self, number_of_nearby_tributes);
+        let tribute = self.clone();
+        let action = self.brain.act(&tribute, number_of_nearby_tributes, &mut *rng);
 
         match &action {
             Action::Move(area) => match self.travels(closed_areas, area.clone()).await {
@@ -725,7 +725,7 @@ impl Tribute {
             // Try to attack another tribute
             Action::Attack => {
                 if let Some(mut target) = self.pick_target(targets, living_tributes_count).await {
-                    self.attacks(&mut target, rng);
+                    self.attacks(&mut target, &mut *rng);
                     self.take_action(&action, Some(&target));
                 } else {
                     self.take_action(&Action::Rest, None);
@@ -1961,9 +1961,12 @@ mod tests {
         let mut seeded_rng = SmallRng::seed_from_u64(42);
 
         let result = attacker.attacks(&mut target, &mut seeded_rng);
+
         assert_eq!(result, AttackOutcome::Kill(attacker.clone(), target.clone()));
         assert_eq!(target.status, TributeStatus::RecentlyDead);
         assert_eq!(target.statistics.killed_by, Some(attacker.name));
+        assert_eq!(target.status, TributeStatus::RecentlyDead);
+        assert_eq!(target.attributes.health, 0);
     }
 
     #[test]
@@ -2004,7 +2007,7 @@ mod tests {
             vec![],
             1,
             vec![tribute2],
-            2,
+            24,
             &mut rng
         ).await;
 

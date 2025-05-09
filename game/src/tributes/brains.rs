@@ -1,6 +1,6 @@
 use crate::tributes::actions::{Action, TributeAction};
 use crate::tributes::Tribute;
-use rand::{thread_rng, Rng};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -33,28 +33,27 @@ impl Brain {
 
     /// Decide on an action for the tribute to take
     /// First weighs any preferred actions, then decides based on current state
-    pub fn act(&mut self, tribute: &Tribute, nearby_tributes: usize) -> Action {
-        let action = self.decide_on_action(tribute, nearby_tributes);
+    pub fn act(&mut self, tribute: &Tribute, nearby_tributes: usize, rng: impl Rng) -> Action {
+        let action = self.decide_on_action(tribute, nearby_tributes, rng);
 
-        self.previous_actions
-            .push(TributeAction::new(action.clone(), None));
-
+        // self.previous_actions
+        //     .push(TributeAction::new(action.clone(), None));
+        //
         action
     }
 
     /// The AI for a tribute. Automatic decisions based on current state.
-    fn decide_on_action(&mut self, tribute: &Tribute, nearby_tributes: usize) -> Action {
+    fn decide_on_action(&mut self, tribute: &Tribute, nearby_tributes: usize, mut rng: impl Rng) -> Action {
+        if !tribute.is_alive() {
+            return Action::None;
+        }
         // if tribute.attributes.movement <= 0 {
         //     return Action::Rest;
         // }
 
         // If there is a preferred action, we should take it, assuming a positive roll
         if let Some(preferred_action) = self.preferred_action.clone() {
-            if thread_rng().gen_bool(self.preferred_action_percentage) {
-                self.previous_actions.push(TributeAction::new(
-                    self.preferred_action.clone().unwrap(),
-                    None,
-                ));
+            if rng.gen_bool(self.preferred_action_percentage) {
                 return preferred_action;
             }
         }
@@ -144,6 +143,8 @@ impl Brain {
 
 #[cfg(test)]
 mod tests {
+    use rand::rngs::SmallRng;
+    use rand::SeedableRng;
     use super::*;
     use crate::items::Item;
     use rstest::{fixture, rstest};
@@ -156,47 +157,53 @@ mod tests {
     #[rstest]
     fn decide_on_action_default(mut tribute: Tribute) {
         // If there are no enemies nearby, the tribute should move
-        let action = tribute.brain.act(&tribute.clone(), 0);
+        let mut rng = SmallRng::from_entropy();
+        let action = tribute.brain.act(&tribute.clone(), 0, &mut rng);
         assert_eq!(action, Action::Move(None));
     }
 
     #[rstest]
     fn decide_on_action_low_health(mut tribute: Tribute) {
         // If the tribute has low health, they should rest
+        let mut rng = SmallRng::from_entropy();
         tribute.attributes.health = 10;
-        let action = tribute.brain.act(&tribute.clone(), 2);
+        let action = tribute.brain.act(&tribute.clone(), 2, &mut rng);
         assert_eq!(action, Action::Move(None));
     }
 
     #[rstest]
     fn decide_on_action_no_health(mut tribute: Tribute) {
-        // If the tribute has low health, they should rest
+        // If the tribute has no health, they should do nothing
+        let mut rng = SmallRng::from_entropy();
         tribute.attributes.health = 0;
-        let action = tribute.brain.act(&tribute.clone(), 2);
+        let action = tribute.brain.act(&tribute.clone(), 2, &mut rng);
         assert_eq!(action, Action::None);
     }
 
     #[rstest]
     fn decide_on_action_no_movement_alone(mut tribute: Tribute) {
         // If the tribute has no movement and is alone, they should rest
+        let mut rng = SmallRng::from_entropy();
         tribute.attributes.movement = 0;
-        let action = tribute.brain.act(&tribute.clone(), 0);
+        let action = tribute.brain.act(&tribute.clone(), 0, &mut rng);
         assert_eq!(action, Action::Rest);
     }
 
     #[rstest]
     fn decide_on_action_no_movement_surrounded_low_health(mut tribute: Tribute) {
         // If the tribute has no movement and is not alone, they should hide
+        let mut rng = SmallRng::from_entropy();
         tribute.attributes.movement = 1;
         tribute.attributes.health = 10;
-        let action = tribute.brain.act(&tribute.clone(), 5);
+        let action = tribute.brain.act(&tribute.clone(), 5, &mut rng);
         assert_eq!(action, Action::Hide);
     }
 
     #[rstest]
     fn decide_on_action_enemies(mut tribute: Tribute) {
         // If there are enemies nearby, the tribute should attack
-        let action = tribute.brain.act(&tribute.clone(), 2);
+        let mut rng = SmallRng::from_entropy();
+        let action = tribute.brain.act(&tribute.clone(), 2, &mut rng);
         assert_eq!(action, Action::Attack);
     }
 
@@ -204,15 +211,17 @@ mod tests {
     fn decide_on_action_enemies_medium_health(mut tribute: Tribute) {
         // If there are enemies nearby, but the tribute is low on health
         // the tribute should hide
+        let mut rng = SmallRng::from_entropy();
         tribute.attributes.health = 20;
-        let action = tribute.brain.act(&tribute.clone(), 2);
+        let action = tribute.brain.act(&tribute.clone(), 2, &mut rng);
         assert_eq!(action, Action::Move(None));
     }
 
     #[rstest]
     fn decide_on_action_preferred_action(mut tribute: Tribute) {
+        let mut rng = SmallRng::from_entropy();
         tribute.brain.set_preferred_action(Action::Rest, 1.0);
-        let action = tribute.brain.act(&tribute.clone(), 0);
+        let action = tribute.brain.act(&tribute.clone(), 0, &mut rng);
         assert_eq!(action, Action::Rest);
     }
 
@@ -229,88 +238,99 @@ mod tests {
 
     #[rstest]
     fn prefer_to_use_item_if_available(mut tribute: Tribute) {
+        let mut rng = SmallRng::from_entropy();
         let item = Item::new_random_consumable();
         tribute.items.push(item.clone());
-        let action = tribute.brain.act(&tribute.clone(), 0);
+        let action = tribute.brain.act(&tribute.clone(), 0, &mut rng);
         assert_eq!(action, Action::UseItem(None));
     }
 
     #[rstest]
     fn prefer_to_hide_at_mid_health_and_visible(mut tribute: Tribute) {
+        let mut rng = SmallRng::from_entropy();
         tribute.attributes.health = 25;
-        let action = tribute.brain.act(&tribute.clone(), 0);
+        let action = tribute.brain.act(&tribute.clone(), 0, &mut rng);
         assert_eq!(action, Action::Hide);
     }
 
     #[rstest]
     fn prefer_to_move_at_mid_health_and_low_sanity(mut tribute: Tribute) {
+        let mut rng = SmallRng::from_entropy();
         tribute.attributes.health = 25;
         tribute.attributes.sanity = 15;
-        let action = tribute.brain.act(&tribute.clone(), 0);
+        let action = tribute.brain.act(&tribute.clone(), 0, &mut rng);
         assert_eq!(action, Action::Move(None));
     }
 
     #[rstest]
     fn decide_on_action_alone_healthy_no_movement(mut tribute: Tribute) {
+        let mut rng = SmallRng::from_entropy();
         tribute.attributes.movement = 0;
-        let action = tribute.brain.act(&tribute.clone(), 0);
+        let action = tribute.brain.act(&tribute.clone(), 0, &mut rng);
         assert_eq!(action, Action::Rest);
     }
 
     #[rstest]
     fn decide_on_action_surrounded_low_health_low_movement_low_sanity(mut tribute: Tribute) {
+        let mut rng = SmallRng::from_entropy();
         tribute.attributes.health = 10;
         tribute.attributes.movement = 0;
         tribute.attributes.sanity = 15;
-        let action = tribute.brain.act(&tribute.clone(), 3);
+        let action = tribute.brain.act(&tribute.clone(), 3, &mut rng);
         assert_eq!(action, Action::Attack);
     }
 
     #[rstest]
     fn decide_on_action_surrounded_low_health_low_sanity(mut tribute: Tribute) {
+        let mut rng = SmallRng::from_entropy();
         tribute.attributes.health = 15;
         tribute.attributes.sanity = 10;
-        let action = tribute.brain.act(&tribute.clone(), 3);
+        let action = tribute.brain.act(&tribute.clone(), 3, &mut rng);
         assert_eq!(action, Action::Attack);
     }
 
     #[rstest]
     fn decide_on_action_surrounded_hidden_low_health(mut tribute: Tribute) {
+        let mut rng = SmallRng::from_entropy();
         tribute.attributes.is_hidden = true;
         tribute.attributes.health = 10;
-        let action = tribute.brain.act(&tribute.clone(), 3);
+        let action = tribute.brain.act(&tribute.clone(), 3, &mut rng);
         assert_eq!(action, Action::None);
     }
 
     #[rstest]
     fn decide_on_action_surrounded_ok_health_low_sanity(mut tribute: Tribute) {
+        let mut rng = SmallRng::from_entropy();
         tribute.attributes.health = 25;
         tribute.attributes.sanity = 15;
-        let action = tribute.brain.act(&tribute.clone(), 3);
+        let action = tribute.brain.act(&tribute.clone(), 3, &mut rng);
         assert_eq!(action, Action::Attack);
     }
 
     #[rstest]
     fn decide_on_action_heavily_surrounded_normal_sanity_and_intelligence(mut tribute: Tribute) {
+        let mut rng = SmallRng::from_entropy();
         tribute.attributes.intelligence = 50;
         tribute.attributes.sanity = 50;
-        let action = tribute.brain.act(&tribute.clone(), 6);
+        let action = tribute.brain.act(&tribute.clone(), 6, &mut rng);
         assert_eq!(action, Action::Move(None));
     }
 
     #[rstest]
     fn decide_on_action_heavily_surrounded_low_sanity_and_intelligence(mut tribute: Tribute) {
+        let mut rng = SmallRng::from_entropy();
         tribute.attributes.intelligence = 20;
         tribute.attributes.sanity = 20;
-        let action = tribute.brain.act(&tribute.clone(), 6);
+        let action = tribute.brain.act(&tribute.clone(), 6, &mut rng);
         assert_eq!(action, Action::Hide);
     }
 
     #[rstest]
     fn decide_on_action_heavily_surrounded_no_sanity_and_intelligence(mut tribute: Tribute) {
+        let mut rng = SmallRng::from_entropy();
         tribute.attributes.intelligence = 10;
         tribute.attributes.sanity = 10;
-        let action = tribute.brain.act(&tribute.clone(), 6);
+        let action = tribute.brain.act(&tribute.clone(), 6, &mut rng);
         assert_eq!(action, Action::Attack);
     }
 }

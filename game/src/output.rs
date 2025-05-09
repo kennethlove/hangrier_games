@@ -1,17 +1,13 @@
-use crate::areas::events::AreaEvent;
-use crate::areas::Area;
 use crate::items::Item;
 use crate::threats::animals::Animal;
-use crate::tributes::events::TributeEvent;
-use crate::tributes::statuses::TributeStatus;
-use crate::tributes::Tribute;
 use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 use indefinite::indefinite;
 use indefinite::indefinite_capitalized;
 
 // Collection on strings to be used as output for the game
 #[allow(dead_code)]
-pub enum GameOutput {
+pub enum GameOutput<'a> {
     GameDayStart(u32),
     GameDayEnd(u32),
     FirstDayStart,
@@ -20,69 +16,69 @@ pub enum GameOutput {
     GameNightStart(u32),
     GameNightEnd(u32),
     DailyDeathAnnouncement(u32),
-    DeathAnnouncement(Tribute),
+    DeathAnnouncement(&'a str),
     NoOneWins,
-    TributeWins(Tribute),
-    TributeRest(Tribute),
-    TributeLongRest(Tribute),
-    TributeHide(Tribute),
-    TributeTravel(Tribute, Area, Area),
-    TributeTakeItem(Tribute, Item),
-    TributeCannotUseItem(Tribute, Item),
-    TributeUseItem(Tribute, Item),
-    TributeTravelTooTired(Tribute, Area),
-    TributeTravelAlreadyThere(Tribute, Area),
-    TributeTravelFollow(Tribute, Area),
-    TributeTravelStay(Tribute, Area),
-    TributeBleeds(Tribute),
-    TributeSick(Tribute),
-    TributeElectrocuted(Tribute),
-    TributeFrozen(Tribute),
-    TributeOverheated(Tribute),
-    TributeDehydrated(Tribute),
-    TributeStarving(Tribute),
-    TributePoisoned(Tribute),
-    TributeBrokenArm(Tribute),
-    TributeBrokenLeg(Tribute),
-    TributeInfected(Tribute),
-    TributeDrowned(Tribute),
-    TributeMauled(Tribute, u32, Animal, u32),
-    TributeBurned(Tribute),
-    TributeHorrified(Tribute, u32),
-    TributeSuffer(Tribute),
-    TributeSelfHarm(Tribute),
-    TributeSuicide(Tribute),
-    TributeAttackWin(Tribute, Tribute),
-    TributeAttackWinExtra(Tribute, Tribute),
-    TributeAttackWound(Tribute, Tribute),
-    TributeAttackLose(Tribute, Tribute),
-    TributeAttackLoseExtra(Tribute, Tribute),
-    TributeAttackMiss(Tribute, Tribute),
-    TributeAttackDied(Tribute, Tribute),
-    TributeAttackSuccessKill(Tribute, Tribute),
-    TributeAttackHidden(Tribute, Tribute),
-    TributeDiesFromStatus(Tribute, TributeStatus),
-    TributeDiesFromAreaEvent(Tribute, AreaEvent), // Died in area
-    TributeDiesFromTributeEvent(Tribute, TributeEvent),
-    TributeAlreadyDead(Tribute),
-    TributeDead(Tribute),
-    WeaponBreak(Tribute, Item),
-    ShieldBreak(Tribute, Item),
-    SponsorGift(Tribute, Item),
-    AreaEvent(AreaEvent, Area),
-    AreaClose(Area),
-    AreaOpen(Area),
-    TrappedInArea(Tribute, Area),
-    DiedInArea(Tribute, Area),
-    TributeDeath(Tribute),
-    TributeTravelNoOptions(Tribute, Area),
-    TributeBetrayal(Tribute, Tribute),
-    TributeForcedBetrayal(Tribute, Tribute),
-    NoOneToAttack(Tribute),
-    AllAlone(Tribute),
+    TributeWins(&'a str),
+    TributeRest(&'a str),
+    TributeLongRest(&'a str),
+    TributeHide(&'a str),
+    TributeTravel(&'a str, &'a str, &'a str),
+    TributeTakeItem(&'a str, &'a str),
+    TributeCannotUseItem(&'a str, &'a str),
+    TributeUseItem(&'a str, Item),
+    TributeTravelTooTired(&'a str, &'a str),
+    TributeTravelAlreadyThere(&'a str, &'a str),
+    TributeTravelFollow(&'a str, &'a str),
+    TributeTravelStay(&'a str, &'a str),
+    TributeBleeds(&'a str),
+    TributeSick(&'a str),
+    TributeElectrocuted(&'a str),
+    TributeFrozen(&'a str),
+    TributeOverheated(&'a str),
+    TributeDehydrated(&'a str),
+    TributeStarving(&'a str),
+    TributePoisoned(&'a str),
+    TributeBrokenArm(&'a str),
+    TributeBrokenLeg(&'a str),
+    TributeInfected(&'a str),
+    TributeDrowned(&'a str),
+    TributeMauled(&'a str, u32, &'a str, u32),
+    TributeBurned(&'a str),
+    TributeHorrified(&'a str, u32),
+    TributeSuffer(&'a str),
+    TributeSelfHarm(&'a str),
+    TributeSuicide(&'a str),
+    TributeAttackWin(&'a str, &'a str),
+    TributeAttackWinExtra(&'a str, &'a str),
+    TributeAttackWound(&'a str, &'a str),
+    TributeAttackLose(&'a str, &'a str),
+    TributeAttackLoseExtra(&'a str, &'a str),
+    TributeAttackMiss(&'a str, &'a str),
+    TributeAttackDied(&'a str, &'a str),
+    TributeAttackSuccessKill(&'a str, &'a str),
+    TributeAttackHidden(&'a str, &'a str),
+    TributeDiesFromStatus(&'a str, &'a str),
+    TributeDiesFromAreaEvent(&'a str, &'a str), // Died in area
+    TributeDiesFromTributeEvent(&'a str, &'a str),
+    TributeAlreadyDead(&'a str),
+    TributeDead(&'a str),
+    WeaponBreak(&'a str, &'a str),
+    ShieldBreak(&'a str, &'a str),
+    SponsorGift(&'a str, Item),
+    AreaEvent(&'a str, &'a str),
+    AreaClose(&'a str),
+    AreaOpen(&'a str),
+    TrappedInArea(&'a str, &'a str),
+    DiedInArea(&'a str, &'a str),
+    TributeDeath(&'a str),
+    TributeTravelNoOptions(&'a str, &'a str),
+    TributeBetrayal(&'a str, &'a str),
+    TributeForcedBetrayal(&'a str, &'a str),
+    NoOneToAttack(&'a str),
+    AllAlone(&'a str),
 }
 
-impl Display for GameOutput {
+impl <'a> Display for GameOutput<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
             GameOutput::GameDayStart(day_number) => {
@@ -110,194 +106,195 @@ impl Display for GameOutput {
                 write!(f, "=== 💀 Tributes dead: {} ===", death_count)
             }
             GameOutput::DeathAnnouncement(tribute) => {
-                write!(f, "=== 🪦 {} has died ===", tribute.name)
+                write!(f, "=== 🪦 {} has died ===", tribute)
             }
             GameOutput::NoOneWins => {
                 write!(f, "=== 🎭 No one wins! ===")
             }
             GameOutput::TributeWins(tribute) => {
-                write!(f, "=== 🏆 The winner is {} ===", tribute.name)
+                write!(f, "=== 🏆 The winner is {} ===", tribute)
             }
             GameOutput::TributeRest(tribute) => {
-                write!(f, "😪 {} rests", tribute.name)
+                write!(f, "😪 {} rests", tribute)
             }
             GameOutput::TributeLongRest(tribute) => {
-                write!(f, "💤 {} rests and recovers a little health and sanity", tribute.name)
+                write!(f, "💤 {} rests and recovers a little health and sanity", tribute)
             }
             GameOutput::TributeHide(tribute) => {
-                write!(f, "🫥 {} tries to hide", tribute.name)
+                write!(f, "🫥 {} tries to hide", tribute)
             }
             GameOutput::TributeTravel(tribute, area_a, area_b) => {
-                write!(f, "🚶 {} moves from {} to {}", tribute.name, area_a, area_b)
+                write!(f, "🚶 {} moves from {} to {}", tribute, area_a, area_b)
             }
             GameOutput::TributeTakeItem(tribute, item) => {
-                let object = indefinite(&item.name);
-                write!(f, "🔨 {} takes {}", tribute.name, object)
+                let object = indefinite(&item);
+                write!(f, "🔨 {} takes {}", tribute, object)
             }
             GameOutput::TributeCannotUseItem(tribute, item) => {
-                let object = indefinite(&item.name);
-                write!(f, "❌ {} cannot use {}", tribute.name, object)
+                let object = indefinite(&item);
+                write!(f, "❌ {} cannot use {}", tribute, object)
             }
             GameOutput::TributeUseItem(tribute, item) => {
                 let object = indefinite(&item.name);
-                write!(f, "💊 {} uses {}, gains {} {}", tribute.name, object, item.effect, item.attribute)
+                write!(f, "💊 {} uses {}, gains {} {}", tribute, object, item.effect, item.attribute)
             }
             GameOutput::TributeTravelTooTired(tribute, area) => {
-                write!(f, "😴 {} is too tired to move from {}, rests instead", tribute.name, area)
+                write!(f, "😴 {} is too tired to move from {}, rests instead", tribute, area)
             }
             GameOutput::TributeTravelAlreadyThere(tribute, area) => {
-                write!(f, "🤔 {} is already in the {}, stays put", tribute.name, area)
+                write!(f, "🤔 {} is already in the {}, stays put", tribute, area)
             }
             GameOutput::TributeTravelFollow(tribute, area) => {
-                write!(f, "🫡 {} follows their district mate to {}", tribute.name, area)
+                write!(f, "🫡 {} follows their district mate to {}", tribute, area)
             }
             GameOutput::TributeTravelStay(tribute, area) => {
-                write!(f, "🪑 {} stays in {}", tribute.name, area)
+                write!(f, "🪑 {} stays in {}", tribute, area)
             }
             GameOutput::TributeTravelNoOptions(tribute, area) => {
-                write!(f, "📍 {} has nowhere to go, stays in {}", tribute.name, area)
+                write!(f, "📍 {} has nowhere to go, stays in {}", tribute, area)
             }
             GameOutput::TributeBleeds(tribute) => {
-                write!(f, "🩸 {} bleeds from their wounds.", tribute.name)
+                write!(f, "🩸 {} bleeds from their wounds.", tribute)
             }
             GameOutput::TributeSick(tribute) => {
-                write!(f, "🤒 {} contracts dysentery, loses strength and speed", tribute.name)
+                write!(f, "🤒 {} contracts dysentery, loses strength and speed", tribute)
             }
             GameOutput::TributeElectrocuted(tribute) => {
-                write!(f, "🌩️ {} is struck by lightning, loses health", tribute.name)
+                write!(f, "🌩️ {} is struck by lightning, loses health", tribute)
             }
             GameOutput::TributeFrozen(tribute) => {
-                write!(f, "🥶 {} suffers from hypothermia, loses speed.", tribute.name)
+                write!(f, "🥶 {} suffers from hypothermia, loses speed.", tribute)
             }
             GameOutput::TributeOverheated(tribute) => {
-                write!(f, "🥵 {} suffers from heat stroke, loses speed.", tribute.name)
+                write!(f, "🥵 {} suffers from heat stroke, loses speed.", tribute)
             }
             GameOutput::TributeDehydrated(tribute) => {
-                write!(f, "🌵 {} is severely dehydrated, loses strength", tribute.name)
+                write!(f, "🌵 {} is severely dehydrated, loses strength", tribute)
             }
             GameOutput::TributeStarving(tribute) => {
-                write!(f, "🍴 {} is ravenously hungry, loses strength", tribute.name)
+                write!(f, "🍴 {} is ravenously hungry, loses strength", tribute)
             }
             GameOutput::TributePoisoned(tribute) => {
-                write!(f, "🧪 {} eats something poisonous, loses sanity", tribute.name)
+                write!(f, "🧪 {} eats something poisonous, loses sanity", tribute)
             }
             GameOutput::TributeBrokenArm(tribute) => {
-                write!(f, "🦴 {} injures their arm, loses strength.", tribute.name)
+                write!(f, "🦴 {} injures their arm, loses strength.", tribute)
             }
             GameOutput::TributeBrokenLeg(tribute) => {
-                write!(f, "🦴 {} injures their leg, loses speed.", tribute.name)
+                write!(f, "🦴 {} injures their leg, loses speed.", tribute)
             }
             GameOutput::TributeInfected(tribute) => {
-                write!(f, "🤢 {} gets an infection, loses health and sanity", tribute.name)
+                write!(f, "🤢 {} gets an infection, loses health and sanity", tribute)
             }
             GameOutput::TributeDrowned(tribute) => {
-                write!(f, "🏊 {} partially drowns, loses health and sanity", tribute.name)
+                write!(f, "🏊 {} partially drowns, loses health and sanity", tribute)
             }
             GameOutput::TributeMauled(tribute, count, animal, damage) => {
-                write!(f, "🐾 {} is attacked by {} {}, takes {} damage!", tribute.name, count, animal.plural(), damage)
+                let animal = Animal::from_str(animal).unwrap();
+                write!(f, "🐾 {} is attacked by {} {}, takes {} damage!", tribute, count, animal.plural(), damage)
             }
             GameOutput::TributeBurned(tribute) => {
-                write!(f, "🔥 {} gets burned, loses health", tribute.name)
+                write!(f, "🔥 {} gets burned, loses health", tribute)
             }
             GameOutput::TributeHorrified(tribute, damage) => {
-                write!(f, "😱 {} is horrified by the violence, loses {} sanity.", tribute.name, damage)
+                write!(f, "😱 {} is horrified by the violence, loses {} sanity.", tribute, damage)
             }
             GameOutput::TributeSuffer(tribute) => {
-                write!(f, "😭 {} suffers from loneliness and terror.", tribute.name)
+                write!(f, "😭 {} suffers from loneliness and terror.", tribute)
             }
             GameOutput::TributeSelfHarm(tribute) => {
-                write!(f, "🤦 {} tries to attack themself!", tribute.name)
+                write!(f, "🤦 {} tries to attack themself!", tribute)
             }
             GameOutput::TributeSuicide(tribute) => {
-                write!(f, "🪒 {} attempts suicide.", tribute.name)
+                write!(f, "🪒 {} attempts suicide.", tribute)
             }
             GameOutput::TributeAttackWin(tribute, target) => {
-                write!(f, "🔪 {} attacks {}, and wins!", tribute.name, target.name)
+                write!(f, "🔪 {} attacks {}, and wins!", tribute, target)
             }
             GameOutput::TributeAttackWinExtra(tribute, target) => {
-                write!(f, "🔪 {} attacks {}, and wins decisively!", tribute.name, target.name)
+                write!(f, "🔪 {} attacks {}, and wins decisively!", tribute, target)
             }
             GameOutput::TributeAttackWound(tribute, target) => {
-                write!(f, "🤕 {} wounds {}", tribute.name, target.name)
+                write!(f, "🤕 {} wounds {}", tribute, target)
             }
             GameOutput::TributeAttackLose(tribute, target) => {
-                write!(f, "🤣 {} attacks {}, but loses!", tribute.name, target.name)
+                write!(f, "🤣 {} attacks {}, but loses!", tribute, target)
             }
             GameOutput::TributeAttackLoseExtra(tribute, target) => {
-                write!(f, "🤣 {} attacks {}, but loses decisively!", tribute.name, target.name)
+                write!(f, "🤣 {} attacks {}, but loses decisively!", tribute, target)
             }
             GameOutput::TributeAttackMiss(tribute, target) => {
-                write!(f, "😰 {} attacks {}, but misses!", tribute.name, target.name)
+                write!(f, "😰 {} attacks {}, but misses!", tribute, target)
             }
             GameOutput::TributeAttackDied(tribute, target) => {
-                write!(f, "☠️ {} is killed by {}", tribute.name, target.name)
+                write!(f, "☠️ {} is killed by {}", tribute, target)
             }
             GameOutput::TributeAttackSuccessKill(tribute, target) => {
-                write!(f, "☠️ {} successfully kills {}", tribute.name, target.name)
+                write!(f, "☠️ {} successfully kills {}", tribute, target)
             }
             GameOutput::TributeAttackHidden(tribute, target) => {
-                write!(f, "🤔 {} can't attack {}, they're hidden", tribute.name, target.name)
+                write!(f, "🤔 {} can't attack {}, they're hidden", tribute, target)
             }
             GameOutput::TributeDiesFromStatus(tribute, status) => {
-                write!(f, "💀 {} dies from {}", tribute.name, status)
+                write!(f, "💀 {} dies from {}", tribute, status)
             }
             GameOutput::TributeDiesFromAreaEvent(tribute, area_event) => {
-                write!(f, "🪦 {} died in the {}.", tribute.name, area_event)
+                write!(f, "🪦 {} died in the {}.", tribute, area_event)
             }
             GameOutput::TributeDiesFromTributeEvent(tribute, tribute_event) => {
-                write!(f, "💀 {} dies by {}", tribute.name, tribute_event)
+                write!(f, "💀 {} dies by {}", tribute, tribute_event)
             }
             GameOutput::TributeAlreadyDead(tribute) => {
-                write!(f, "‼️ {} is already dead!", tribute.name)
+                write!(f, "‼️ {} is already dead!", tribute)
             }
             GameOutput::TributeDead(tribute) => {
-                write!(f, "❗️ {} is dead!", tribute.name)
+                write!(f, "❗️ {} is dead!", tribute)
             }
             GameOutput::WeaponBreak(tribute, weapon) => {
-                write!(f, "🗡️ {} breaks their {}", tribute.name, weapon.name)
+                write!(f, "🗡️ {} breaks their {}", tribute, weapon)
             }
             GameOutput::ShieldBreak(tribute, shield) => {
-                write!(f, "🛡️ {} breaks their {}", tribute.name, shield.name)
+                write!(f, "🛡️ {} breaks their {}", tribute, shield)
             }
             GameOutput::SponsorGift(tribute, item) => {
                 let object = indefinite(&item.name);
-                write!(f, "🎁 {} receives {} ({}x {} +{})", tribute.name, object, item.quantity, item.attribute, item.effect)
+                write!(f, "🎁 {} receives {} ({}x {} +{})", tribute, object, item.quantity, item.attribute, item.effect)
             }
             GameOutput::AreaEvent(area_event, area) => {
-                let area_name = area.to_string().replace("The ", "");
-                let event = indefinite_capitalized(&area_event.to_string());
+                let area_name = area.replace("The ", "");
+                let event = indefinite_capitalized(&area_event);
                 write!(f, "=== ⚠️ {} has occurred in the {} ===", event, area_name)
             }
             GameOutput::AreaClose(area) => {
-                let area_name = area.to_string().replace("The ", "");
+                let area_name = area.replace("The ", "");
                 write!(f, "=== 🔔 The {} is uninhabitable ===", area_name)
             }
             GameOutput::AreaOpen(area) => {
-                let area_name = area.to_string().replace("The ", "");
+                let area_name = area.replace("The ", "");
                 write!(f, "=== 🔔 The {} is habitable again ===", area_name)
             }
             GameOutput::TrappedInArea(tribute, area) => {
-                let area_name = area.to_string().replace("The ", "");
-                write!(f, "💥 {} is trapped in the {}.", tribute.name, area_name)
+                let area_name = area.replace("The ", "");
+                write!(f, "💥 {} is trapped in the {}.", tribute, area_name)
             }
             GameOutput::DiedInArea(tribute, area) => {
-                let area_name = area.to_string().replace("The ", "");
-                write!(f, "💥 {} died in the {}.", tribute.name, area_name)
+                let area_name = area.replace("The ", "");
+                write!(f, "💥 {} died in the {}.", tribute, area_name)
             }
             GameOutput::TributeDeath(tribute) => {
-                write!(f, "⚰️ {} has died.", tribute.name)
+                write!(f, "⚰️ {} has died.", tribute)
             }
             GameOutput::TributeBetrayal(tribute, target) => {
-                write!(f, "💔 {} betrays {}!", tribute.name, target.name)
+                write!(f, "💔 {} betrays {}!", tribute, target)
             }
             GameOutput::TributeForcedBetrayal(tribute, target) => {
-                write!(f, "💔💔 {} is forced to betray {}!", tribute.name, target.name)
+                write!(f, "💔💔 {} is forced to betray {}!", tribute, target)
             }
             GameOutput::NoOneToAttack(tribute) => {
-                write!(f, "🤷 {} has no one to attack!", tribute.name)
+                write!(f, "🤷 {} has no one to attack!", tribute)
             }
             GameOutput::AllAlone(tribute) => {
-                write!(f, "😢 {} is all alone!", tribute.name)
+                write!(f, "😢 {} is all alone!", tribute)
             }
         }
     }

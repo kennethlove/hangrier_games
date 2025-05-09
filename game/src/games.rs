@@ -139,7 +139,7 @@ impl Game {
         if let Some(winner) = self.winner() {
             add_game_message(
                 self.identifier.as_str(),
-                format!("{}", GameOutput::TributeWins(winner.clone()))
+                format!("{}", GameOutput::TributeWins(winner.name.as_str()))
             ).expect("Failed to add winner message");
             self.end();
         } else if self.living_tributes().is_empty() {
@@ -214,9 +214,10 @@ impl Game {
 
         // Announce tribute deaths
         for tribute in self.recently_dead_tributes() {
+            let name: &str = tribute.name.as_str();
             add_game_message(
                 self.identifier.as_str(),
-                format!("{}", GameOutput::TributeDeath(tribute.clone())),
+                format!("{}", GameOutput::DeathAnnouncement(name)),
             ).expect("Failed to add tribute death message");
         }
 
@@ -258,18 +259,20 @@ impl Game {
     /// Announces events in closed areas.
     fn announce_area_events(&self) {
         for area in &self.areas {
+            let area_name = area.area.clone();
             if !area.is_open() {
                 add_area_message(
                     &area.area,
                     &self.identifier,
-                    format!("{}", GameOutput::AreaClose(Area::from_str(&area.area).unwrap()))
+                    format!("{}", GameOutput::AreaClose(area_name.as_str()))
                 ).expect("Failed to add area close message");
 
                 for event in &area.events {
+                    let event_name = event.to_string();
                     add_area_message(
                         &area.area,
                         &self.identifier,
-                        format!("{}", GameOutput::AreaEvent(event.clone(), Area::from_str(&area.area).unwrap()))
+                        format!("{}", GameOutput::AreaEvent(event_name.as_str(), area_name.as_str()))
                     ).expect("Failed to add area event message");
                 }
             }
@@ -302,10 +305,12 @@ impl Game {
                 if rng.gen_bool(frequency) {
                     let area_event = AreaEvent::random();
                     area.events.push(area_event.clone());
+                    let event_name = area_event.to_string();
+                    let area_name = area.area.clone();
                     add_area_message(
                         area.area.as_str(),
                         &self.identifier,
-                        format!("{}", GameOutput::AreaEvent(area_event.clone(), Area::from_str(&area.area).unwrap()))
+                        format!("{}", GameOutput::AreaEvent(event_name.as_str(), area_name.as_str()))
                     ).expect("Failed to add area event message");
                 }
             }
@@ -362,11 +367,13 @@ impl Game {
             for (_area_name, (mut area, events)) in area_events.clone() {
                 for event in events {
                     area.events.push(event.clone());
+                    let event_name = event.to_string();
+                    let area_name = area.area.clone();
 
                     add_area_message(
                         area.area.as_str(),
                         &self.identifier,
-                        format!("{}", GameOutput::AreaEvent(event.clone(), Area::from_str(&area.area).unwrap()))
+                        format!("{}", GameOutput::AreaEvent(event_name.as_str(), area_name.as_str()))
                     ).expect("Failed to add area event message");
                 }
             }
@@ -384,7 +391,9 @@ impl Game {
     async fn run_tribute_cycle(&mut self, day: bool, rng: &mut SmallRng) {
         // Shuffle the tributes
         self.tributes.shuffle(rng);
-        let game = self.clone();
+        let closed_areas: Vec<Area> = self.closed_areas().clone().iter().map(|ad| Area::from_str(ad.area.as_str()).unwrap()).collect();
+        let living_tributes = self.living_tributes();
+        let living_tributes_count: usize = living_tributes.len();
 
         for tribute in self.tributes.iter_mut() {
             // Non-alive tributes should be skipped.
@@ -405,7 +414,30 @@ impl Game {
                 (_, _) => (None, None),
             };
 
-            tribute.do_day_night(action, move_chance, day, game.clone(), rng).await;
+            let area_details = self.areas.iter_mut()
+                .find(|a| a.area == tribute.area.to_string())
+                .expect("Cannot find area details");
+            let nearby_tributes_count = living_tributes.iter()
+                .filter(|t| t.area == tribute.area)
+                .count();
+            let targets: Vec<Tribute> = living_tributes.iter()
+                .filter(|t| t.area == tribute.area) // must be in the same area
+                .filter(|t| t.is_visible()) // must be visible
+                .filter(|t| t.identifier != tribute.identifier) // can't be self
+                .cloned()
+                .collect();
+
+            tribute.do_day_night(
+                action,
+                move_chance,
+                day,
+                area_details,
+                closed_areas.clone(),
+                nearby_tributes_count,
+                targets,
+                living_tributes_count,
+                rng
+            ).await;
         }
     }
 

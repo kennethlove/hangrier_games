@@ -34,10 +34,6 @@ impl Brain {
     /// Decide on an action for the tribute to take
     /// First weighs any preferred actions, then decides based on current state
     pub fn act(&mut self, tribute: &Tribute, nearby_tributes: usize) -> Action {
-        if tribute.attributes.health == 0 {
-            return Action::None;
-        }
-
         let action = self.decide_on_action(tribute, nearby_tributes);
 
         self.previous_actions

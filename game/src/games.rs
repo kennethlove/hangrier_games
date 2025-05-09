@@ -383,16 +383,13 @@ impl Game {
     /// Runs the tributes' logic for the current cycle.
     async fn run_tribute_cycle(&mut self, day: bool, rng: &mut SmallRng) {
         // Shuffle the tributes
-        let mut tributes = self.tributes.clone();
-        tributes.shuffle(rng);
+        self.tributes.shuffle(rng);
+        let game = self.clone();
 
-        let mut updated_tributes = Vec::with_capacity(tributes.len());
-
-        for mut tribute in tributes {
+        for tribute in self.tributes.iter_mut() {
             // Non-alive tributes should be skipped.
             if !tribute.is_alive() {
                 tribute.status = TributeStatus::Dead;
-                updated_tributes.push(tribute);
                 continue;
             }
 
@@ -408,12 +405,8 @@ impl Game {
                 (_, _) => (None, None),
             };
 
-            let processed_tribute = tribute.do_day_night(action, move_chance, day, self).await;
-            updated_tributes.push(processed_tribute);
+            tribute.do_day_night(action, move_chance, day, game.clone(), rng).await;
         }
-
-        // Update the tributes in the game
-        self.tributes = updated_tributes;
     }
 
     /// Runs a cycle of the game, either day or night.

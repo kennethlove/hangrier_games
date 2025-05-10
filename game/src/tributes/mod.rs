@@ -23,15 +23,18 @@ use tracing::info;
 use uuid::Uuid;
 
 /// Consts
+const DECISIVE_WIN_MULTIPLIER: f64 = 1.5;
+
+// Attributes
 const DEFAULT_HEAL: u32 = 5;
 const DEFAULT_MENTAL_HEAL: u32 = 5;
 const SANITY_BREAK_LEVEL: u32 = 9;
 const LOYALTY_BREAK_LEVEL: f64 = 0.25;
-const DECISIVE_WIN_MULTIPLIER: f64 = 1.5;
 const BASE_STRESS_NO_ENGAGEMENTS: f64 = 20.0;
-const STRESS_ENGAGEMENT_FACTOR: f64 = 100.0;
 const STRESS_SANITY_NORMALIZATION: f64 = 100.0;
 const STRESS_FINAL_DIVISOR: f64 = 2.0;
+const KILL_STRESS_CONTRIBUTION: f64 = 50.0;
+const NON_KILL_WIN_STRESS_CONTRIBUTION: f64 = 20.0;
 
 /// Damages
 const WOUNDED_DAMAGE: u32 = 1;
@@ -1044,18 +1047,30 @@ pub enum TravelResult {
 }
 
 fn calculate_violence_stress(kills: u32, wins: u32, current_sanity: u32) -> u32 {
-    let total_engagements = kills + wins;
+    let non_kill_wins = wins.saturating_sub(kills);
 
-    let calculated_stress = if total_engagements > 0 {
-        (STRESS_ENGAGEMENT_FACTOR / total_engagements as f64)
+    let calculated_stress_f64 = if wins > 0 {
+        // Calculate the stress potential based on kills and non-kill wins
+        let raw_stress_potential = (kills as f64 * KILL_STRESS_CONTRIBUTION)
+            + (non_kill_wins as f64 * NON_KILL_WIN_STRESS_CONTRIBUTION);
+
+        // Desensitize: the more total wins (violent encounters), the more this raw potential
+        // is "spread out" or reduced. This gives an average stressfulness per encounter.
+        let desensitized_stress_per_encounter = raw_stress_potential / wins as f64;
+
+        // Scale by the tribute's current sanity percentage and apply a final divisor.
+        // Lower sanity means less new stress from these types of events.
+        desensitized_stress_per_encounter
             * (current_sanity as f64 / STRESS_SANITY_NORMALIZATION)
             / STRESS_FINAL_DIVISOR
     } else {
+        // No wins (and therefore no kills), apply a base stress.
         BASE_STRESS_NO_ENGAGEMENTS
     };
 
-    let rounded_stress = calculated_stress.round();
+    let rounded_stress = calculated_stress_f64.round();
 
+    // Only apply stress if it's at least 1
     if rounded_stress >= 1.0 {
         rounded_stress as u32
     } else {
@@ -1284,7 +1299,7 @@ mod tests {
     use crate::threats::animals::Animal;
     use crate::tributes::actions::{AttackOutcome, AttackResult};
     use crate::tributes::statuses::TributeStatus;
-    use crate::tributes::{apply_violence_stress, attack_contest, calculate_violence_stress, EncounterContext, EnvironmentContext, TravelResult, Tribute, BASE_STRESS_NO_ENGAGEMENTS};
+    use crate::tributes::{apply_violence_stress, attack_contest, calculate_violence_stress, EncounterContext, EnvironmentContext, TravelResult, Tribute};
     use rand::prelude::SmallRng;
     use rand::SeedableRng;
     use rstest::{fixture, rstest};
@@ -2047,71 +2062,58 @@ mod tests {
         assert_eq!(clone, tribute1);
     }
 
-    #[test]
-    fn stress_calc_no_engagements_base_stress() {
-        assert_eq!(calculate_violence_stress(0, 0, 100), BASE_STRESS_NO_ENGAGEMENTS.round() as u32);
-        assert_eq!(calculate_violence_stress(0, 0, 50), BASE_STRESS_NO_ENGAGEMENTS.round() as u32);
-    }
-
-    #[test]
-    fn stress_calc_high_engagements_low_stress() {
-        // (100 / 100 engagements) * (100 sanity / 100) / 2 = 1 * 1 / 2 = 0.5, rounds to 1
-        assert_eq!(calculate_violence_stress(50, 50, 100), 1);
-    }
-
-    #[test]
-    fn stress_calc_low_engagements_high_sanity_high_stress() {
-        // (100 / 1 engagement) * (100 sanity / 100) / 2 = 100 * 1 / 2 = 50
-        assert_eq!(calculate_violence_stress(1, 0, 100), 50);
-    }
-
-    #[test]
-    fn stress_calc_low_engagements_low_sanity_reduced_stress() {
-        // (100 / 1 engagement) * (10 sanity / 100) / 2 = 100 * 0.1 / 2 = 5
-        assert_eq!(calculate_violence_stress(0, 1, 10), 5);
-    }
-
-    #[test]
-    fn stress_calc_rounds_to_zero() {
-        // (100 / 100 engagement) * (10 sanity / 100) / 2 = 1 * 0.1 / 2 = 0.05, rounds to 0
-        assert_eq!(calculate_violence_stress(100, 0, 10), 0);
-    }
-
-    #[test]
-    fn stress_calc_sanity_zero_results_in_zero_stress() {
-        // (100/ 10 engagements) * (0 sanity / 100) / 2 = 10 * 0 / 2 = 0
-        assert_eq!(calculate_violence_stress(5, 5, 0), 0);
+    #[rstest]
+    #[case(0, 0, 100, 20)] // BASE_STRESS_NO_ENGAGEMENTS.round() as u32
+    // Only kills (kills == wins)
+    #[case(1, 1, 100, 25)] // 1 kill, max sanity
+    #[case(3, 3, 100, 25)] // 3 kills, still averages out to 25 per kill
+    #[case(1, 1, 50, 13)] // 1 kill, medium sanity
+    #[case(1, 1, 10, 3)] // 1 kill, low sanity
+    #[case(1, 1, 0, 0)] // 1 kill, no sanity
+    // Only wins (kills == 0)
+    #[case(0, 1, 100, 10)] // 1 win, max sanity
+    #[case(0, 3, 100, 10)] // 3 wins, still averages out to 10 per win
+    #[case(0, 1, 50, 5)] // 1 win, medium sanity
+    #[case(0, 1, 10, 1)] // 1 win, low sanity
+    // Mixed kills and wins
+    #[case(1, 2, 100, 18)] // 1 kill, 2 wins, max sanity
+    #[case(2, 5, 100, 16)] // 2 kills, 5 wins, max sanity
+    #[case(2, 5, 50, 8)] // 2 kills, 5 wins, medium sanity
+    // High desensitization (many wins)
+    #[case(1, 10, 100, 12)] // 1 kill, 10 wins, max sanity
+    #[case(5, 20, 100, 14)] // 5 kills, 20 wins, medium sanity
+    // Zero stress due to low sanity
+    #[case(0, 1, 1, 0)] // 1 win, very low sanity
+    #[case(1, 50, 1, 0)] // High engagements, very low sanity
+    // Edge case
+    #[case(1, 0, 100, 20)] // Checks the `if wins > 0` check
+    fn stress_calc(
+        #[case] kills: u32,
+        #[case] wins: u32,
+        #[case] sanity: u32,
+        #[case] expected: u32,
+    ) {
+        assert_eq!(calculate_violence_stress(kills, wins, sanity), expected);
     }
 
     #[rstest]
-    fn apply_stress_deals_damage(mut tribute: Tribute) {
-        tribute.statistics.kills = 1;
-        tribute.statistics.wins = 1;
-        tribute.attributes.sanity = 100;
-        let initial_sanity = tribute.attributes.sanity;
+    #[case(1, 1, 100, 25)]
+    #[case(0, 1, 100, 10)]
+    #[case(1, 2, 100, 18)]
+    #[case(1, 0, 100, 20)]
+    fn apply_stress_deals_damage(
+        #[case] kills: u32,
+        #[case] wins: u32,
+        #[case] sanity: u32,
+        #[case] damage: u32,
+        mut tribute: Tribute,
+    ) {
+        tribute.statistics.kills = kills;
+        tribute.statistics.wins = wins;
+        tribute.attributes.sanity = sanity;
 
         apply_violence_stress(&mut tribute);
-        assert_eq!(tribute.attributes.sanity, initial_sanity - 25);
-    }
-
-    #[rstest]
-    fn apply_stress_no_damage(mut tribute: Tribute) {
-        tribute.statistics.kills = 100;
-        tribute.statistics.wins = 100;
-        tribute.attributes.sanity = 10;
-        let initial_sanity = tribute.attributes.sanity;
-
-        apply_violence_stress(&mut tribute);
-        assert_eq!(tribute.attributes.sanity, initial_sanity);
-    }
-
-    #[rstest]
-    fn apply_stress_base_damage_no_engagements(mut tribute: Tribute) {
-        let initial_sanity = tribute.attributes.sanity;
-        let expected_damage = BASE_STRESS_NO_ENGAGEMENTS.round() as u32;
-
-        apply_violence_stress(&mut tribute);
-        assert_eq!(tribute.attributes.sanity, initial_sanity - expected_damage);
+        assert_eq!(tribute.attributes.sanity, sanity - damage);
     }
 }
 

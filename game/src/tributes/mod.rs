@@ -675,7 +675,7 @@ impl Tribute {
         }
 
         // Any generous patrons this round?
-        if let Some(gift) = self.receive_patron_gift().await {
+        if let Some(gift) = self.receive_patron_gift(&mut *rng).await {
             self.add_item(gift.clone());
             self.try_log_action(
                 GameOutput::SponsorGift(self.name.as_str(), gift.clone()),
@@ -812,7 +812,7 @@ impl Tribute {
     }
 
     /// Receive a patron gift, broken down by district
-    async fn receive_patron_gift(&mut self) -> Option<Item> {
+    async fn receive_patron_gift(&mut self, mut rng: impl Rng) -> Option<Item> {
         // Gift from patrons?
         let chance = match self.district {
             1 | 2 => 1.0 / 10.0,
@@ -824,7 +824,7 @@ impl Tribute {
             _ => 1.0, // Mainly for testing/debugging purposes
         };
 
-        if SmallRng::from_entropy().gen_bool(chance) { Some(Item::new_random_consumable()) } else { None }
+        if rng.gen_bool(chance) { Some(Item::new_random_consumable()) } else { None }
     }
 
     /// Save the tribute's latest action
@@ -1258,12 +1258,8 @@ impl Attributes {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-    use rand::prelude::SmallRng;
-    use rand::SeedableRng;
-    use rstest::{fixture, rstest};
-    use crate::areas::Area::{Cornucopia, East, North, South, West};
     use crate::areas::events::AreaEvent;
+    use crate::areas::Area::{Cornucopia, East, North, South, West};
     use crate::areas::{Area, AreaDetails};
     use crate::games::Game;
     use crate::items::{Attribute, Item, ItemType, OwnsItems};
@@ -1271,9 +1267,16 @@ mod tests {
     use crate::tributes::actions::{Action, AttackOutcome, AttackResult};
     use crate::tributes::statuses::TributeStatus;
     use crate::tributes::{attack_contest, TravelResult, Tribute};
+    use rand::prelude::SmallRng;
+    use rand::SeedableRng;
+    use rstest::{fixture, rstest};
+    use std::str::FromStr;
 
     #[fixture]
     fn tribute() -> Tribute { Tribute::random() }
+
+    #[fixture]
+    fn target() -> Tribute { Tribute::random() }
 
     #[test]
     fn default() {
@@ -1612,20 +1615,22 @@ mod tests {
     #[rstest]
     #[tokio::test]
     async fn receive_patron_gift(mut tribute: Tribute) {
-        let gift = tribute.receive_patron_gift().await;
+        let rng = SmallRng::from_entropy();
+        tribute.district = 13;
+        let gift = tribute.receive_patron_gift(rng).await;
         assert!(gift.is_some());
     }
 
     #[rstest]
     fn take_action(
         mut tribute: Tribute,
-        tribute2: Tribute,
+        target: Tribute,
     ) {
         let action = Action::Attack;
-        tribute.take_action(&action, Some(&tribute2));
+        tribute.take_action(&action, Some(&target));
         assert_eq!(tribute.brain.previous_actions.len(), 1);
         assert_eq!(tribute.brain.previous_actions[0].action, action);
-        assert_eq!(tribute.brain.previous_actions[0].target, Some(tribute2));
+        assert_eq!(tribute.brain.previous_actions[0].target, Some(target));
     }
 
     #[rstest]
@@ -1709,24 +1714,24 @@ mod tests {
     #[rstest]
     #[tokio::test]
     async fn pick_target(
-        mut katniss: Tribute,
-        mut peeta: Tribute
+        mut tribute: Tribute,
+        mut target: Tribute
     ) {
         let mut game = Game::default();
         let cornucopia = AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia);
         game.areas.push(cornucopia.clone());
 
-        katniss.district = 11;
-        katniss.area = Cornucopia;
+        tribute.district = 11;
+        tribute.area = Cornucopia;
 
-        peeta.district = 10;
-        peeta.area = Cornucopia;
+        target.district = 10;
+        target.area = Cornucopia;
 
-        game.tributes.extend_from_slice([katniss.clone(), peeta.clone()].as_ref());
+        game.tributes.extend_from_slice([tribute.clone(), target.clone()].as_ref());
 
-        let target = katniss.pick_target(vec![peeta.clone()], 2).await;
+        let target = tribute.pick_target(vec![target.clone()], 2).await;
 
-        assert_eq!(target, Some(peeta.clone()));
+        assert_eq!(target, target.clone());
     }
 
     /// The actor is the only tribute in the area.

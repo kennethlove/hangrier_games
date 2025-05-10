@@ -30,6 +30,7 @@ pub struct Game {
     pub areas: Vec<AreaDetails>,
     #[serde(default)]
     pub tributes: Vec<Tribute>,
+    pub private: bool
 }
 
 impl Default for Game {
@@ -48,6 +49,7 @@ impl Default for Game {
             day: None,
             areas: vec![],
             tributes: vec![],
+            private: true
         }
     }
 }

@@ -185,7 +185,7 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                         title: "Inventory",
                         open: false,
                         ul {
-                            class: "flex flex-row gap-2 flew-wrap",
+                            class: "grid grid-cols-3 auto-cols-auto grid-flow-row gap-2",
                             for item in tribute.clone().items {
                                 li {
                                     class: "flex flex-row flex-wrap gap-2 items-center",

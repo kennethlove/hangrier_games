@@ -19,7 +19,6 @@ use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use statuses::TributeStatus;
 use std::cmp::{Ordering, PartialEq};
-use tracing::info;
 use uuid::Uuid;
 
 /// Consts

@@ -28,6 +28,10 @@ const DEFAULT_MENTAL_HEAL: u32 = 5;
 const SANITY_BREAK_LEVEL: u32 = 9;
 const LOYALTY_BREAK_LEVEL: f64 = 0.25;
 const DECISIVE_WIN_MULTIPLIER: f64 = 1.5;
+const BASE_STRESS_NO_ENGAGEMENTS: f64 = 20.0;
+const STRESS_ENGAGEMENT_FACTOR: f64 = 100.0;
+const STRESS_SANITY_NORMALIZATION: f64 = 100.0;
+const STRESS_FINAL_DIVISOR: f64 = 2.0;
 
 /// Damages
 const WOUNDED_DAMAGE: u32 = 1;
@@ -1039,21 +1043,40 @@ pub enum TravelResult {
     Failure,
 }
 
+fn calculate_violence_stress(kills: u32, wins: u32, current_sanity: u32) -> u32 {
+    let total_engagements = kills + wins;
+
+    let calculated_stress = if total_engagements > 0 {
+        (STRESS_ENGAGEMENT_FACTOR / total_engagements as f64)
+            * (current_sanity as f64 / STRESS_SANITY_NORMALIZATION)
+            / STRESS_FINAL_DIVISOR
+    } else {
+        BASE_STRESS_NO_ENGAGEMENTS
+    };
+
+    let rounded_stress = calculated_stress.round();
+
+    if rounded_stress >= 1.0 {
+        rounded_stress as u32
+    } else {
+        0
+    }
+}
+
 #[allow(dead_code)]
 fn apply_violence_stress(tribute: &mut Tribute) {
-    let kills = tribute.statistics.kills;
-    let wins = tribute.statistics.wins;
-    let sanity = tribute.attributes.sanity;
-    let mut terror = 20.0;
+    let stress_damage = calculate_violence_stress(
+        tribute.statistics.kills,
+        tribute.statistics.wins,
+        tribute.attributes.sanity,
+    );
 
-    if kills + wins > 0 {
-        terror = (100.0 / (kills + wins) as f64) * (sanity as f64 / 100.0) / 2.0;
-    }
-
-    if terror.round() > 0.0 {
-        // println!("{}", GameMessage::TributeHorrified(tribute.clone(), terror.round() as u32));
-        info!(target: "api::tribute", "{}", GameOutput::TributeHorrified(tribute.name.as_str(), terror.round() as u32));
-        tribute.takes_mental_damage(terror.round() as u32);
+    if stress_damage > 0 {
+        tribute.try_log_action(
+            GameOutput::TributeHorrified(tribute.name.as_str(), stress_damage),
+            "violence stress",
+        );
+        tribute.takes_mental_damage(stress_damage);
     }
 }
 
@@ -1261,7 +1284,7 @@ mod tests {
     use crate::threats::animals::Animal;
     use crate::tributes::actions::{AttackOutcome, AttackResult};
     use crate::tributes::statuses::TributeStatus;
-    use crate::tributes::{attack_contest, EncounterContext, EnvironmentContext, TravelResult, Tribute};
+    use crate::tributes::{apply_violence_stress, attack_contest, calculate_violence_stress, EncounterContext, EnvironmentContext, TravelResult, Tribute, BASE_STRESS_NO_ENGAGEMENTS};
     use rand::prelude::SmallRng;
     use rand::SeedableRng;
     use rstest::{fixture, rstest};
@@ -2022,6 +2045,73 @@ mod tests {
         ).await;
 
         assert_eq!(clone, tribute1);
+    }
+
+    #[test]
+    fn stress_calc_no_engagements_base_stress() {
+        assert_eq!(calculate_violence_stress(0, 0, 100), BASE_STRESS_NO_ENGAGEMENTS.round() as u32);
+        assert_eq!(calculate_violence_stress(0, 0, 50), BASE_STRESS_NO_ENGAGEMENTS.round() as u32);
+    }
+
+    #[test]
+    fn stress_calc_high_engagements_low_stress() {
+        // (100 / 100 engagements) * (100 sanity / 100) / 2 = 1 * 1 / 2 = 0.5, rounds to 1
+        assert_eq!(calculate_violence_stress(50, 50, 100), 1);
+    }
+
+    #[test]
+    fn stress_calc_low_engagements_high_sanity_high_stress() {
+        // (100 / 1 engagement) * (100 sanity / 100) / 2 = 100 * 1 / 2 = 50
+        assert_eq!(calculate_violence_stress(1, 0, 100), 50);
+    }
+
+    #[test]
+    fn stress_calc_low_engagements_low_sanity_reduced_stress() {
+        // (100 / 1 engagement) * (10 sanity / 100) / 2 = 100 * 0.1 / 2 = 5
+        assert_eq!(calculate_violence_stress(0, 1, 10), 5);
+    }
+
+    #[test]
+    fn stress_calc_rounds_to_zero() {
+        // (100 / 100 engagement) * (10 sanity / 100) / 2 = 1 * 0.1 / 2 = 0.05, rounds to 0
+        assert_eq!(calculate_violence_stress(100, 0, 10), 0);
+    }
+
+    #[test]
+    fn stress_calc_sanity_zero_results_in_zero_stress() {
+        // (100/ 10 engagements) * (0 sanity / 100) / 2 = 10 * 0 / 2 = 0
+        assert_eq!(calculate_violence_stress(5, 5, 0), 0);
+    }
+
+    #[rstest]
+    fn apply_stress_deals_damage(mut tribute: Tribute) {
+        tribute.statistics.kills = 1;
+        tribute.statistics.wins = 1;
+        tribute.attributes.sanity = 100;
+        let initial_sanity = tribute.attributes.sanity;
+
+        apply_violence_stress(&mut tribute);
+        assert_eq!(tribute.attributes.sanity, initial_sanity - 25);
+    }
+
+    #[rstest]
+    fn apply_stress_no_damage(mut tribute: Tribute) {
+        tribute.statistics.kills = 100;
+        tribute.statistics.wins = 100;
+        tribute.attributes.sanity = 10;
+        let initial_sanity = tribute.attributes.sanity;
+
+        apply_violence_stress(&mut tribute);
+        assert_eq!(tribute.attributes.sanity, initial_sanity);
+    }
+
+    #[rstest]
+    fn apply_stress_base_damage_no_engagements(mut tribute: Tribute) {
+        let initial_sanity = tribute.attributes.sanity;
+        let expected_damage = BASE_STRESS_NO_ENGAGEMENTS.round() as u32;
+
+        apply_violence_stress(&mut tribute);
+        assert_eq!(tribute.attributes.sanity, initial_sanity - expected_damage);
     }
 }
 

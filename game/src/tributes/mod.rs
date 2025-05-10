@@ -331,25 +331,26 @@ impl Tribute {
             );
 
             // Attack always succeeds
-            target.takes_physical_damage(self.attributes.strength);
+            self.takes_physical_damage(self.attributes.strength);
+            self.apply_violence_stress();
 
             self.try_log_action(
                 GameOutput::TributeAttackWin(self.name.as_str(), target.name.as_str()),
                 "attack against self"
             );
 
-            if target.attributes.health > 0 {
+            return if self.attributes.health > 0 {
                 self.try_log_action(
                     GameOutput::TributeAttackWound(self.name.as_str(), target.name.as_str()),
                     "wounded self"
                 );
-                return AttackOutcome::Wound(self.clone(), target.clone());
+                AttackOutcome::Wound(self.clone(), target.clone())
             } else {
                 self.try_log_action(
                     GameOutput::TributeSuicide(self.name.as_str()),
                     "successful suicide"
                 );
-                return AttackOutcome::Kill(self.clone(), target.clone());
+                AttackOutcome::Kill(self.clone(), target.clone())
             }
         }
 
@@ -1038,6 +1039,22 @@ impl Tribute {
             );
         }
     }
+
+    fn apply_violence_stress(&mut self) {
+        let stress_damage = calculate_violence_stress(
+            self.statistics.kills,
+            self.statistics.wins,
+            self.attributes.sanity,
+        );
+
+        if stress_damage > 0 {
+            self.try_log_action(
+                GameOutput::TributeHorrified(self.name.as_str(), stress_damage),
+                "violence stress",
+            );
+            self.takes_mental_damage(stress_damage);
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -1075,23 +1092,6 @@ fn calculate_violence_stress(kills: u32, wins: u32, current_sanity: u32) -> u32 
         rounded_stress as u32
     } else {
         0
-    }
-}
-
-#[allow(dead_code)]
-fn apply_violence_stress(tribute: &mut Tribute) {
-    let stress_damage = calculate_violence_stress(
-        tribute.statistics.kills,
-        tribute.statistics.wins,
-        tribute.attributes.sanity,
-    );
-
-    if stress_damage > 0 {
-        tribute.try_log_action(
-            GameOutput::TributeHorrified(tribute.name.as_str(), stress_damage),
-            "violence stress",
-        );
-        tribute.takes_mental_damage(stress_damage);
     }
 }
 
@@ -1176,6 +1176,7 @@ fn apply_combat_results(
     loser.takes_physical_damage(damage_to_loser);
     loser.statistics.defeats += 1;
     winner.statistics.wins += 1;
+    winner.apply_violence_stress();
     winner.try_log_action(log_event, log_description);
 }
 
@@ -1299,7 +1300,7 @@ mod tests {
     use crate::threats::animals::Animal;
     use crate::tributes::actions::{AttackOutcome, AttackResult};
     use crate::tributes::statuses::TributeStatus;
-    use crate::tributes::{apply_violence_stress, attack_contest, calculate_violence_stress, EncounterContext, EnvironmentContext, TravelResult, Tribute};
+    use crate::tributes::{attack_contest, calculate_violence_stress, EncounterContext, EnvironmentContext, TravelResult, Tribute};
     use rand::prelude::SmallRng;
     use rand::SeedableRng;
     use rstest::{fixture, rstest};
@@ -1922,11 +1923,14 @@ mod tests {
     #[test]
     fn attacks_self() {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        attacker.attributes.sanity = 50;
+        let sanity = 50;
         let mut target = attacker.clone();
         let mut rng = SmallRng::from_entropy();
 
         let outcome = attacker.attacks(&mut target, &mut rng);
-        assert_eq!(outcome, AttackOutcome::Wound(attacker, target));
+        assert_eq!(outcome, AttackOutcome::Wound(attacker.clone(), target));
+        assert!(attacker.attributes.sanity < sanity);
     }
 
     #[test]
@@ -1943,6 +1947,7 @@ mod tests {
     #[test]
     fn attacks_wound() {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let sanity = attacker.attributes.sanity;
         let mut target = Tribute::new("Peeta".to_string(), None, None);
 
         attacker.attributes.strength = 25;
@@ -1954,11 +1959,13 @@ mod tests {
         assert_eq!(result, AttackOutcome::Wound(attacker.clone(), target.clone()));
         assert_eq!(attacker.statistics.wins, 1);
         assert_eq!(target.statistics.defeats, 1);
+        assert!(attacker.attributes.sanity < sanity);
     }
 
     #[test]
     fn attacks_kill() {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let sanity = attacker.attributes.sanity;
         let mut target = Tribute::new("Peeta".to_string(), None, None);
         target.attributes.health = 1;
 
@@ -1974,6 +1981,7 @@ mod tests {
         assert_eq!(target.statistics.killed_by, Some(attacker.name));
         assert_eq!(target.status, TributeStatus::RecentlyDead);
         assert_eq!(target.attributes.health, 0);
+        assert!(attacker.attributes.sanity < sanity);
     }
 
     #[test]
@@ -2112,7 +2120,7 @@ mod tests {
         tribute.statistics.wins = wins;
         tribute.attributes.sanity = sanity;
 
-        apply_violence_stress(&mut tribute);
+        tribute.apply_violence_stress();
         assert_eq!(tribute.attributes.sanity, sanity - damage);
     }
 }

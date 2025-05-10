@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use crate::areas::events::AreaEvent;
 use crate::areas::{Area, AreaDetails};
 use crate::items::Item;
@@ -8,15 +7,16 @@ use crate::output::GameOutput;
 use crate::tributes::actions::Action;
 use crate::tributes::events::TributeEvent;
 use crate::tributes::statuses::TributeStatus;
-use crate::tributes::Tribute;
+use crate::tributes::{ActionSuggestion, EncounterContext, EnvironmentContext, Tribute};
 use rand::prelude::SliceRandom;
+use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use shared::GameStatus;
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::Index;
 use std::str::FromStr;
-use rand::rngs::SmallRng;
 use uuid::Uuid;
 
 /// Represents the current state of the game.
@@ -408,15 +408,21 @@ impl Game {
             }
 
             // Trigger day or night cycles for the tribute
-            let (action, move_chance) = match (self.day, day) {
-                (Some(1), true) => (Some(Action::Move(None)), Some(0.5)),
-                (Some(3), true) => (Some(Action::Move(Some(Area::Cornucopia))), Some(0.75)),
-                (_, _) => (None, None),
+            let action_suggestion = match (self.day, day) {
+                (Some(1), true) => Some(ActionSuggestion { action: Action::Move(None), probability: Some(0.5) }),
+                (Some(3), true) => Some(ActionSuggestion { action: Action::Move(Some(Area::Cornucopia)), probability: Some(0.75) }),
+                (_, _) => None,
             };
 
             let area_details = self.areas.iter_mut()
                 .find(|a| a.area == tribute.area.to_string())
                 .expect("Cannot find area details");
+            let environment_details = &mut EnvironmentContext {
+                is_day: day,
+                area_details,
+                closed_areas: &*closed_areas.clone(),
+            };
+
             let nearby_tributes_count = living_tributes.iter()
                 .filter(|t| t.area == tribute.area)
                 .count();
@@ -427,15 +433,16 @@ impl Game {
                 .cloned()
                 .collect();
 
-            tribute.do_day_night(
-                action,
-                move_chance,
-                day,
-                area_details,
-                closed_areas.clone(),
+            let encounter_context = EncounterContext {
                 nearby_tributes_count,
-                targets,
-                living_tributes_count,
+                potential_targets: targets,
+                total_living_tributes: living_tributes_count,
+            };
+
+            tribute.process_turn_phase(
+                action_suggestion,
+                environment_details,
+                encounter_context,
                 rng
             ).await;
         }
@@ -499,8 +506,8 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
-    use crate::messages::get_all_messages;
     use super::*;
+    use crate::messages::get_all_messages;
 
     fn create_test_game_with_tributes(tributes: Vec<Tribute>) -> Game {
         Game {

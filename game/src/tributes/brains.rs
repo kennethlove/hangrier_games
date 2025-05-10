@@ -1,11 +1,10 @@
-use crate::tributes::actions::{Action, TributeAction};
+use crate::tributes::actions::Action;
 use crate::tributes::Tribute;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Brain {
-    pub previous_actions: Vec<TributeAction>,
     pub preferred_action: Option<Action>,
     pub preferred_action_percentage: f64,
 }
@@ -13,7 +12,6 @@ pub struct Brain {
 impl Default for Brain {
     fn default() -> Self {
         Self {
-            previous_actions: Vec::new(),
             preferred_action: None,
             preferred_action_percentage: 0.0,
         }
@@ -143,10 +141,10 @@ impl Brain {
 
 #[cfg(test)]
 mod tests {
-    use rand::rngs::SmallRng;
-    use rand::SeedableRng;
     use super::*;
     use crate::items::Item;
+    use rand::rngs::SmallRng;
+    use rand::SeedableRng;
     use rstest::{fixture, rstest};
 
     #[fixture]

@@ -60,7 +60,7 @@ impl FromStr for Action {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum AttackResult {
     AttackerWins,
     AttackerWinsDecisively,
@@ -69,7 +69,7 @@ pub enum AttackResult {
     Miss,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum AttackOutcome {
     Kill(Tribute, Tribute),
     Wound(Tribute, Tribute),

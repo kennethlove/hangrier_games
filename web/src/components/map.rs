@@ -5,7 +5,7 @@ use std::collections::HashMap;
 #[component]
 pub fn Map(areas: Vec<AreaDetails>) -> Element {
     let map_areas: HashMap<String, bool> = areas.clone().into_iter().map(|area| {
-        (area.clone().area.to_string().to_lowercase(), area.is_open())
+        (area.clone().area.clone().unwrap().to_string().to_lowercase(), area.is_open())
     }).collect();
 
     rsx! {

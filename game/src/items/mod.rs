@@ -6,12 +6,24 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
 use strum::{EnumIter, IntoEnumIterator};
+use thiserror::Error;
 use uuid::Uuid;
+
+#[derive(Debug, Clone, PartialEq, Error)]
+pub enum ItemError {
+    #[error("Item not found")]
+    ItemNotFound,
+    #[error("Item not usable")]
+    ItemNotUsable,
+    #[error("Item affects an invalid attribute")]
+    InvalidAttribute,
+}
 
 pub trait OwnsItems {
     fn add_item(&mut self, item: Item);
-    fn use_item(&mut self, item: Item) -> Option<Item>;
-    fn remove_item(&mut self, item: Item);
+    fn has_item(&self, item: &Item) -> bool;
+    fn use_item(&mut self, item: &Item) -> Result<(), ItemError>;
+    fn remove_item(&mut self, item: &Item) -> Result<(), ItemError>;
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -64,7 +76,7 @@ impl Item {
     }
 
     pub fn new_random(name: Option<&str>) -> Item {
-        let mut rng = thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         let item_type = ItemType::random();
         let is_shield = rng.gen_bool(0.5);
@@ -88,7 +100,7 @@ impl Item {
     }
 
     pub fn new_weapon(name: &str) -> Item {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         let quantity = rng.gen_range(1..=2);
         let attribute = Attribute::Strength;
@@ -103,7 +115,7 @@ impl Item {
     }
 
     pub fn new_consumable(name: &str) -> Item {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         let quantity = 1;
         let attribute = Attribute::random();
@@ -113,19 +125,29 @@ impl Item {
             name,
             ItemType::Consumable,
             quantity,
-            attribute.unwrap(),
+            attribute,
             effect,
         )
     }
 
     pub fn new_random_consumable() -> Item {
-        let mut item = Item::new_consumable("NONE");
-        item.name = item.attribute.consumable_name();
-        item
+        let mut rng = SmallRng::from_entropy();
+        let attribute = Attribute::random();
+        let name = attribute.consumable_name();
+        let quantity = 1;
+        let effect = rng.gen_range(1..=10);
+
+        Item::new(
+            &name,
+            ItemType::Consumable,
+            quantity,
+            attribute,
+            effect,
+        )
     }
 
     pub fn new_shield(name: &str) -> Item {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         let item_type = ItemType::Weapon;
         let quantity = rng.gen_range(1..=3);
@@ -161,7 +183,7 @@ pub enum ItemType {
 
 impl ItemType {
     pub fn random() -> ItemType {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
         match rng.gen_bool(0.5) {
             true => ItemType::Consumable,
             false => ItemType::Weapon,
@@ -179,13 +201,13 @@ impl Display for ItemType {
 }
 
 impl FromStr for ItemType {
-    type Err = ();
+    type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "consumable" => Ok(ItemType::Consumable),
             "weapon" => Ok(ItemType::Weapon),
-            _ => Err(()),
+            _ => Err("Invalid item type".to_string()),
         }
     }
 }
@@ -194,17 +216,17 @@ impl FromStr for ItemType {
 pub enum Attribute {
     Health,   // Heals health
     Sanity,   // Heals sanity
-    Movement, // Increases movement
-    Bravery,  // Increases bravery
-    Speed,    // Increases speed
-    Strength, // Increases damage done, i.e. weapon
+    Movement, // Increase movement
+    Bravery,  // Increase bravery
+    Speed,    // Increase speed
+    Strength, // Increases damage done, i.e., weapon
     Defense,  // Reduces damage taken
 }
 
 impl Attribute {
-    pub fn random() -> Option<Attribute> {
-        let mut rng = rand::thread_rng();
-        Attribute::iter().choose(&mut rng)
+    pub fn random() -> Attribute {
+        let mut rng = SmallRng::from_entropy();
+        Attribute::iter().choose(&mut rng).unwrap()
     }
 }
 
@@ -215,9 +237,9 @@ pub trait ConsumableAttribute {
 impl ConsumableAttribute for Attribute {
     fn consumable_name(&self) -> String {
         match &self {
-            // restores health
+            // restore health
             Attribute::Health => { "health kit".to_string() }
-            // restores sanity
+            // restore sanity
             Attribute::Sanity => { "memento".to_string() }
             // move further
             Attribute::Movement => { "trail mix".to_string() }
@@ -305,6 +327,13 @@ mod tests {
     }
 
     #[test]
+    fn new_random_item_no_name() {
+        let item = Item::new_random(None);
+        assert!(!item.name.is_empty());
+        assert!((1..=3).contains(&item.quantity));
+    }
+
+    #[test]
     fn new_weapon() {
         let weapon = Item::new_weapon("Test weapon");
         assert_eq!(weapon.item_type, ItemType::Weapon);
@@ -379,8 +408,7 @@ mod tests {
     #[test]
     fn random_attribute() {
         let attribute = Attribute::random();
-        assert!(attribute.is_some());
-        assert!(Attribute::iter().find(|a| *a == attribute.clone().unwrap()).is_some());
+        assert!(Attribute::iter().find(|a| *a == attribute.clone()).is_some());
     }
 
     #[rstest]

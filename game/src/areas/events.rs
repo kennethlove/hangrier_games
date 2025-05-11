@@ -16,7 +16,7 @@ pub enum AreaEvent {
 }
 
 impl FromStr for AreaEvent {
-    type Err = ();
+    type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
@@ -27,7 +27,7 @@ impl FromStr for AreaEvent {
             "blizzard" => Ok(AreaEvent::Blizzard),
             "landslide" => Ok(AreaEvent::Landslide),
             "heatwave" => Ok(AreaEvent::Heatwave),
-            _ => Err(())
+            _ => Err("Invalid area event".to_string()),
         }
     }
 }

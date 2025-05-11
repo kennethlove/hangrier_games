@@ -1,8 +1,8 @@
 pub mod events;
 
 use crate::areas::events::AreaEvent;
-use crate::items::Item;
 use crate::items::OwnsItems;
+use crate::items::{Item, ItemError};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
@@ -36,16 +36,23 @@ impl PartialEq<&Area> for Area {
     }
 }
 
+impl Default for Area {
+    fn default() -> Self {
+        Area::Cornucopia
+    }
+}
+
 impl FromStr for Area {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
+            "cornucopia" => Ok(Area::Cornucopia),
             "north" => Ok(Area::North),
             "east" => Ok(Area::East),
             "south" => Ok(Area::South),
             "west" => Ok(Area::West),
-            _ => Ok(Area::Cornucopia)
+            _ => Err(format!("Invalid area: {}", s)),
         }
     }
 }
@@ -66,7 +73,7 @@ impl Area {
 pub struct AreaDetails {
     pub identifier: String,
     pub name: String,
-    pub area: String,
+    pub area: Option<Area>,
     #[serde(default)]
     pub items: Vec<Item>,
     #[serde(default)]
@@ -78,24 +85,31 @@ impl OwnsItems for AreaDetails {
         self.items.push(item);
     }
 
-    fn use_item(&mut self, item: Item) -> Option<Item> {
-        let index = self.items.iter().position(|i| *i == item);
-        let mut used_item = self.items.swap_remove(index.unwrap());
-
-        if used_item.quantity > 0 {
-            let item = used_item.clone();
-            used_item.quantity = used_item.quantity.saturating_sub(1);
-
-            if used_item.quantity == 0 {
-                self.remove_item(used_item);
-            }
-            return Some(item)
-        }
-        None
+    fn has_item(&self, item: &Item) -> bool {
+        self.items.iter().any(|i| i == item)
     }
 
-    fn remove_item(&mut self, item: Item) {
-        self.items.retain(|i| *i.identifier != item.identifier);
+    fn use_item(&mut self, item: &Item) -> Result<(), ItemError> {
+        let index = self.items.iter().position(|i| i == item);
+        let used_item = self.items.swap_remove(index.unwrap());
+
+        if used_item.quantity > 0 {
+            Ok(())
+        } else if used_item.quantity == 0  {
+            Err(ItemError::ItemNotFound)
+        } else {
+            Err(ItemError::ItemNotFound)
+        }
+    }
+
+    fn remove_item(&mut self, item: &Item) -> Result<(), ItemError> {
+        let index = self.items.iter().position(|i| i.identifier == item.identifier);
+        if let Some(index) = index {
+            self.items.remove(index);
+            Ok(())
+        } else {
+            Err(ItemError::ItemNotFound)
+        }
     }
 }
 
@@ -104,7 +118,7 @@ impl AreaDetails {
         Self {
             identifier: Uuid::new_v4().to_string(),
             name: name.unwrap_or(area.to_string()),
-            area: area.to_string(),
+            area: Some(area),
             items: vec![],
             events: vec![],
         }
@@ -144,7 +158,7 @@ mod tests {
         let item = Item::new_random_weapon();
         area_details.add_item(item.clone());
         assert!(area_details.items.contains(&item));
-        area_details.remove_item(item.clone());
+        area_details.remove_item(&item).unwrap();
         assert!(!area_details.items.contains(&item));
     }
 

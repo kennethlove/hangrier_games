@@ -385,7 +385,7 @@ RETURN count(
                 match dead_tribute_count {
                     Some(23) | Some(24) => {
                         DATABASE
-                            .query(r#"UPDATE $record_id SET status = $status"#)
+                            .query("UPDATE $record_id SET status = $status")
                             .bind(("record_id", record_id.clone()))
                             .bind(("status", GameStatus::Finished))
                             .await.expect("Failed to end game");
@@ -403,16 +403,16 @@ RETURN count(
 
                             (StatusCode::OK, Json(GameResponse { game: Some(game) })).into_response()
                         } else {
-                            (StatusCode::NOT_FOUND, Json(GameResponse::default())).into_response()
+                            StatusCode::NOT_FOUND.into_response()
                         }
                     }
                 }
             }
             GameStatus::Finished => {
-                (StatusCode::NO_CONTENT, Json(GameResponse::default())).into_response()
+                StatusCode::NO_CONTENT.into_response()
             }
         }
-    } else { (StatusCode::NOT_FOUND, Json(GameResponse::default())).into_response() }
+    } else { StatusCode::NOT_FOUND.into_response() }
 }
 
 async fn get_full_game(identifier: String) -> Option<Game> {
@@ -495,6 +495,7 @@ async fn save_game(game: &Game) -> Option<Game> {
             .await.expect("Failed to update tributes");
     }
 
+    tracing::debug!("Saving game: {}", saved_game.private);
     DATABASE
         .update::<Option<Game>>(game_identifier.clone())
         .content(saved_game)

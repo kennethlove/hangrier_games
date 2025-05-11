@@ -1,4 +1,4 @@
-use crate::tributes::{tribute_create, tribute_delete, tribute_detail, tribute_log, tribute_record_create, tribute_update, TributeOwns};
+use crate::tributes::{tribute_record_create, TributeOwns, TRIBUTES_ROUTER};
 use crate::DATABASE;
 use announcers::{summarize, summarize_stream};
 use axum::extract::Path;
@@ -37,10 +37,8 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
         .route("/{game_identifier}/publish", put(publish_game))
         .route("/{game_identifier}/summarize", get(game_summary))
         .route("/{game_identifier}/summarize/{day}", get(game_day_summary))
-        .route("/{game_identifier}/tributes", get(game_tributes).post(tribute_create))
-        .route("/{game_identifier}/tributes/{tribute_identifier}", get(tribute_detail).delete(tribute_delete).put(tribute_update))
-        .route("/{game_identifier}/tributes/{tribute_identifier}/log", get(tribute_log))
         .route("/{game_identifier}/unpublish", put(unpublish_game))
+        .nest("/{game_identifier}/tributes", TRIBUTES_ROUTER.clone())
 });
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -133,7 +131,7 @@ pub async fn game_create(Json(payload): Json<Game>) -> impl IntoResponse {
             payload.clone().identifier // Game to link to,
         ).await.expect("Failed to create game area");
 
-        for _ in 0..2 {
+        for _ in 0..3 {
             // Insert an item
             let new_item: Item = Item::new_random(None);
             let new_item_id: RecordId = RecordId::from(("item", &new_item.identifier));
@@ -468,9 +466,8 @@ async fn save_game(game: &Game) -> Option<Game> {
     for mut area in areas {
         let id = RecordId::from(("area", area.identifier.clone()));
         let items = area.items.clone();
+        let _ = save_area_items(items, id.clone()).await;
         area.items = vec![];
-
-        let _ = save_items(items, id.clone()).await;
 
         DATABASE
             .update::<Option<AreaDetails>>(id)
@@ -487,7 +484,7 @@ async fn save_game(game: &Game) -> Option<Game> {
         if !tribute.is_alive() { items.clear(); }
         tribute.items = vec![];
 
-        let _ = save_items(items, id.clone()).await;
+        let _ = save_tribute_items(items, id.clone()).await;
 
         DATABASE
             .update::<Option<Tribute>>(id)
@@ -495,18 +492,15 @@ async fn save_game(game: &Game) -> Option<Game> {
             .await.expect("Failed to update tributes");
     }
 
-    tracing::debug!("Saving game: {}", saved_game.private);
     DATABASE
         .update::<Option<Game>>(game_identifier.clone())
         .content(saved_game)
         .await.expect("Failed to update game")
 }
 
-async fn save_items(items: Vec<Item>, owner: RecordId) {
-    let is_area = owner.table() == "area";
+async fn save_area_items(items: Vec<Item>, owner: RecordId) {
     let _ = DATABASE
-        .query("DELETE FROM $table WHERE in = $owner")
-        .bind(("table", if is_area { "items" } else { "owns" }))
+        .query("DELETE FROM items WHERE in = $owner")
         .bind(("owner", owner.clone()))
         .await.expect("Failed to delete items");
 
@@ -525,21 +519,43 @@ async fn save_items(items: Vec<Item>, owner: RecordId) {
         }
 
         if item.quantity > 0 {
-            if is_area {
-                let _: Vec<TributeOwns> = DATABASE.insert("items").relation(
-                    AreaItem {
-                        area: owner.clone(),
-                        item: item_identifier.clone(),
-                    }
-                ).await.expect("Failed to update Items relation");
-            } else {
-                let _: Vec<TributeOwns> = DATABASE.insert("owns").relation(
-                    TributeOwns {
-                        tribute: owner.clone(),
-                        item: item_identifier.clone(),
-                    }
-                ).await.expect("Failed to update Owns relation");
-            }
+            let _: Vec<TributeOwns> = DATABASE.insert("items").relation(
+                AreaItem {
+                    area: owner.clone(),
+                    item: item_identifier.clone(),
+                }
+            ).await.expect("Failed to update Items relation");
+        }
+    }
+}
+
+async fn save_tribute_items(items: Vec<Item>, owner: RecordId) {
+    let _ = DATABASE
+        .query("DELETE FROM owns WHERE in = $owner")
+        .bind(("owner", owner.clone()))
+        .await.expect("Failed to delete items");
+
+    for item in items {
+        let item_identifier = RecordId::from(("item", item.identifier.clone()));
+        if item.quantity == 0 {
+            DATABASE
+                .delete::<Option<Item>>(item_identifier.clone())
+                .await.expect("Failed to delete item");
+            return;
+        } else {
+            DATABASE
+                .update::<Option<Item>>(item_identifier.clone())
+                .content(item.clone())
+                .await.expect("Failed to update item");
+        }
+
+        if item.quantity > 0 {
+            let _: Vec<TributeOwns> = DATABASE.insert("owns").relation(
+                TributeOwns {
+                    tribute: owner.clone(),
+                    item: item_identifier.clone(),
+                }
+            ).await.expect("Failed to update Owns relation");
         }
     }
 }

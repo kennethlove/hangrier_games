@@ -46,28 +46,30 @@ async fn fetch_tribute(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryV
 
 async fn fetch_tribute_log(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::TributeLog(identifier)) = keys.first() {
-        let client = reqwest::Client::new();
+        if let Some(QueryKey::DisplayGame(game_identifier)) = keys.last() {
+            let client = reqwest::Client::new();
 
-        let request = client.request(
-            reqwest::Method::GET,
-            format!("{}/api/tributes/{}/log", APP_API_HOST, identifier))
-            .bearer_auth(token);
+            let request = client.request(
+                reqwest::Method::GET,
+                format!("{}/api/games/{}/tributes/{}/log", APP_API_HOST, game_identifier, identifier))
+                .bearer_auth(token);
 
-        match request.send().await {
-            Ok(response) => {
-                match response.json::<Vec<GameMessage>>().await {
-                    Ok(logs) => {
-                        QueryResult::Ok(QueryValue::Logs(logs))
-                    }
-                    Err(_) => {
-                        QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
+            match request.send().await {
+                Ok(response) => {
+                    match response.json::<Vec<GameMessage>>().await {
+                        Ok(logs) => {
+                            QueryResult::Ok(QueryValue::Logs(logs))
+                        }
+                        Err(_) => {
+                            QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
+                        }
                     }
                 }
+                Err(_) => {
+                    QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
+                }
             }
-            Err(_) => {
-                QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
-            }
-        }
+        } else { QueryResult::Err(QueryError::Unknown) }
     } else {
         QueryResult::Err(QueryError::Unknown)
     }
@@ -218,6 +220,7 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                             open: false,
                             TributeLog {
                                 identifier: tribute.clone().identifier,
+                                game_identifier: game_identifier.clone()
                             }
                         }
                     }
@@ -235,7 +238,7 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
 }
 
 #[component]
-fn TributeLog(identifier: String) -> Element {
+fn TributeLog(game_identifier: String, identifier: String) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
 
@@ -243,6 +246,7 @@ fn TributeLog(identifier: String) -> Element {
         [
             QueryKey::TributeLog(identifier.clone()),
             QueryKey::Tribute(identifier.clone()),
+            QueryKey::DisplayGame(game_identifier.clone())
         ],
         move |keys: Vec<QueryKey>| { fetch_tribute_log(keys, token.clone()) },
     );

@@ -133,20 +133,17 @@ impl OwnsItems for Tribute {
     }
 
     fn use_item(&mut self, item: &Item) -> Result<(), ItemError> {
-        let used_item = self.items
-            .iter_mut()
-            .find(|i| i.identifier == item.identifier);
+        let index = self.items.iter()
+            .position(|i| i.identifier == item.identifier)
+            .ok_or(ItemError::ItemNotFound)?;
 
-        if let Some(used_item) = used_item {
-            if used_item.quantity == 0 {
-                return Err(ItemError::ItemNotUsable);
-            }
+        let current_quantity = self.items[index].quantity;
 
-            used_item.quantity = used_item.quantity.saturating_sub(1);
-            if used_item.quantity == 0 {
-                self.remove_item(item)
-            } else { Ok(()) }
+        if current_quantity > 1 {
+            self.items[index].quantity -= 1;
+            Ok(())
         } else {
+            self.items.remove(index);
             Err(ItemError::ItemNotFound)
         }
     }

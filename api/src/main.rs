@@ -7,7 +7,7 @@ mod users;
 use crate::users::USERS_ROUTER;
 use axum::error_handling::HandleErrorLayer;
 use axum::extract::Request;
-use axum::http::header::{ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_MAX_AGE, AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE, EXPIRES};
+use axum::http::header::{ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_MAX_AGE, AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE, EXPIRES};
 use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
@@ -112,6 +112,7 @@ async fn main() {
             ACCEPT_ENCODING,
             ACCEPT_LANGUAGE,
             ACCESS_CONTROL_ALLOW_METHODS,
+            ACCESS_CONTROL_ALLOW_ORIGIN,
             ACCESS_CONTROL_MAX_AGE,
             AUTHORIZATION,
             CACHE_CONTROL,

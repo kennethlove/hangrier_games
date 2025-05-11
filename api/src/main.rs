@@ -4,7 +4,6 @@ pub mod logging;
 pub mod messages;
 mod users;
 
-use crate::tributes::TRIBUTES_ROUTER;
 use crate::users::USERS_ROUTER;
 use axum::error_handling::HandleErrorLayer;
 use axum::extract::Request;
@@ -122,7 +121,6 @@ async fn main() {
 
     let api_routes = Router::new()
         .nest("/games", GAMES_ROUTER.clone().layer(middleware::from_fn(surreal_jwt)))
-        .nest("/tributes", TRIBUTES_ROUTER.clone().layer(middleware::from_fn(surreal_jwt)))
         .nest("/users", USERS_ROUTER.clone());
 
     let router = Router::new()

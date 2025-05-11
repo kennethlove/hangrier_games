@@ -1,3 +1,4 @@
+use crate::games::game_tributes;
 use crate::DATABASE;
 use axum::extract::Path;
 use axum::http::StatusCode;
@@ -13,9 +14,10 @@ use shared::EditTribute;
 use std::sync::LazyLock;
 use surrealdb::RecordId;
 
-
 pub static TRIBUTES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
     Router::new()
+        .route("/", get(game_tributes).post(tribute_create))
+        .route("/{identifier}", get(tribute_detail).delete(tribute_delete).put(tribute_update))
         .route("/{identifier}/log", get(tribute_log))
 });
 
@@ -100,7 +102,6 @@ pub async fn tribute_update(
     Path((_game_identifier, _tribute_identifier)): Path<(String, String)>,
     Json(payload): Json<EditTribute>
 ) -> impl IntoResponse {
-    tracing::debug!("Payload: {:?}", &payload);
     let response = DATABASE
         .query("UPDATE tribute SET name = $name, district = $district WHERE identifier = $identifier;")
         .bind(("identifier", payload.0))
@@ -111,8 +112,7 @@ pub async fn tribute_update(
     match response {
         Ok(mut response) => {
             match response.take::<Option<Tribute>>(0).unwrap() {
-                Some(tribute) => {
-                    tracing::debug!("Tribute update: {:?}", &tribute);
+                Some(_tribute) => {
                     Box::new(StatusCode::OK).into_response()
                 }
                 None => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to update tribute").into_response()
@@ -145,16 +145,12 @@ pub async fn tribute_detail(Path((_game_identifier, tribute_identifier)): Path<(
     }
 }
 
-pub async fn tribute_log(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<GameMessage>>) {
+pub async fn tribute_log(Path((_game_identifier, identifier)): Path<(String, String)>) -> impl IntoResponse {
     let mut result = DATABASE
-        .query(r#"SELECT * FROM fn::get_messages_by_tribute_id("$identifier")"#)
+        .query("SELECT * FROM fn::get_messages_by_tribute_id($identifier)")
         .bind(("identifier", identifier))
         .await.expect("Failed to find log");
 
     let logs: Vec<GameMessage> = result.take(0).unwrap();
-    if logs.is_empty() {
-        (StatusCode::NOT_FOUND, Json(vec![]))
-    } else {
-        (StatusCode::OK, Json(logs))
-    }
+    (StatusCode::OK, Json(logs)).into_response()
 }

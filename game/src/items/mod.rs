@@ -102,7 +102,7 @@ impl Item {
     pub fn new_weapon(name: &str) -> Item {
         let mut rng = SmallRng::from_entropy();
 
-        let quantity = rng.gen_range(1..=2);
+        let quantity = 1;
         let attribute = Attribute::Strength;
         let effect = rng.gen_range(1..=5);
 
@@ -150,7 +150,7 @@ impl Item {
         let mut rng = SmallRng::from_entropy();
 
         let item_type = ItemType::Weapon;
-        let quantity = rng.gen_range(1..=3);
+        let quantity = 1;
         let attribute = Attribute::Defense;
         let effect = rng.gen_range(1..=7);
 

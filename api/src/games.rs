@@ -131,7 +131,7 @@ pub async fn game_create(Json(payload): Json<Game>) -> impl IntoResponse {
             payload.clone().identifier // Game to link to,
         ).await.expect("Failed to create game area");
 
-        for _ in 0..2 {
+        for _ in 0..3 {
             // Insert an item
             let new_item: Item = Item::new_random(None);
             let new_item_id: RecordId = RecordId::from(("item", &new_item.identifier));

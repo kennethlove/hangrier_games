@@ -1293,7 +1293,7 @@ impl Attributes {
 mod tests {
     use crate::areas::events::AreaEvent;
     use crate::areas::Area::{Cornucopia, East, North, South, West};
-    use crate::areas::{Area, AreaDetails};
+    use crate::areas::AreaDetails;
     use crate::games::Game;
     use crate::items::{Attribute, Item, ItemType, OwnsItems};
     use crate::threats::animals::Animal;
@@ -1303,11 +1303,12 @@ mod tests {
     use rand::prelude::SmallRng;
     use rand::SeedableRng;
     use rstest::{fixture, rstest};
-    use std::str::FromStr;
 
+    #[allow(unused_braces)]
     #[fixture]
     fn tribute() -> Tribute { Tribute::random() }
 
+    #[allow(unused_braces)]
     #[fixture]
     fn target() -> Tribute { Tribute::random() }
 
@@ -1499,7 +1500,7 @@ mod tests {
     async fn travels_success(tribute: Tribute) {
         let open_area = AreaDetails::new(Some("Forest".to_string()), Cornucopia);
         let result = tribute.travels(&[East, South, North, West], None).await;
-        assert_eq!(result, TravelResult::Success(Area::from_str(open_area.area.as_str()).unwrap()));
+        assert_eq!(result, TravelResult::Success(open_area.area.unwrap()));
     }
 
     #[rstest]
@@ -1541,7 +1542,7 @@ mod tests {
         tribute.attributes.movement = 5;
         let open_area = AreaDetails::new(Some("Forest".to_string()), Cornucopia);
         let result = tribute.travels(&[East, South], Some(Cornucopia)).await;
-        assert_eq!(result, TravelResult::Success(Area::from_str(open_area.area.as_str()).unwrap()));
+        assert_eq!(result, TravelResult::Success(open_area.area.unwrap()));
     }
 
     #[rstest]
@@ -1621,7 +1622,7 @@ mod tests {
     fn apply_area_effects(mut tribute: Tribute, #[case] event: AreaEvent, #[case] status: TributeStatus) {
         let mut game = Game::default();
         let mut area_details = AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia);
-        let area = Area::from_str(area_details.area.as_str()).unwrap();
+        let area = area_details.area.clone().unwrap();
         area_details.events.push(event);
         game.areas.push(area_details.clone());
         tribute.area = area.clone();
@@ -1635,7 +1636,7 @@ mod tests {
         let mut rng = SmallRng::from_entropy();
         let mut game = Game::default();
         let mut area_details = AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia);
-        let area = Area::from_str(area_details.area.as_str()).unwrap();
+        let area = area_details.area.clone().unwrap();
         let event = AreaEvent::Wildfire;
         area_details.events.push(event);
         game.areas.push(area_details.clone());

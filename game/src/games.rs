@@ -13,10 +13,10 @@ use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use shared::GameStatus;
+use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::Index;
-use std::str::FromStr;
 use uuid::Uuid;
 
 /// Represents the current state of the game.
@@ -258,21 +258,21 @@ impl Game {
         self.clean_up_recent_deaths().await;
     }
 
-    /// Announces events in closed areas.
+    /// Announce events in closed areas.
     fn announce_area_events(&self) {
-        for area in &self.areas {
-            let area_name = area.area.clone();
-            if !area.is_open() {
+        for area_details in &self.areas {
+            let area_name = area_details.area.clone().unwrap().to_string();
+            if !area_details.is_open() {
                 add_area_message(
-                    &area.area,
+                    area_name.as_str(),
                     &self.identifier,
                     format!("{}", GameOutput::AreaClose(area_name.as_str()))
                 ).expect("Failed to add area close message");
 
-                for event in &area.events {
+                for event in &area_details.events {
                     let event_name = event.to_string();
                     add_area_message(
-                        &area.area,
+                        area_name.as_str(),
                         &self.identifier,
                         format!("{}", GameOutput::AreaEvent(event_name.as_str(), area_name.as_str()))
                     ).expect("Failed to add area event message");
@@ -303,14 +303,14 @@ impl Game {
         // If it's nighttime, trigger an event
         // If it is daytime and not day #1 or day #3, trigger an event
         if !day || ![1u32, 3u32].contains(&self.day.unwrap_or(1u32)) {
-            for area in self.areas.iter_mut() {
+            for area_details in self.areas.iter_mut() {
                 if rng.gen_bool(frequency) {
                     let area_event = AreaEvent::random();
-                    area.events.push(area_event.clone());
+                    area_details.events.push(area_event.clone());
                     let event_name = area_event.to_string();
-                    let area_name = area.area.clone();
+                    let area_name = area_details.area.clone().unwrap().to_string();
                     add_area_message(
-                        area.area.as_str(),
+                        area_name.as_str(),
                         &self.identifier,
                         format!("{}", GameOutput::AreaEvent(event_name.as_str(), area_name.as_str()))
                     ).expect("Failed to add area event message");
@@ -320,17 +320,18 @@ impl Game {
 
         // Day 3 is Feast Day, refill the Cornucopia with a random assortment of items
         if day && self.day == Some(3) {
-            let area = self.areas.iter_mut()
-                .find(|a| a.area == *"Cornucopia")
+            let area_details = self.areas.iter_mut()
+                .filter(|ad| ad.area.is_some())
+                .find(|ad| ad.area.clone().unwrap().to_string() == "Cornucopia")
                 .expect("Cannot find Cornucopia");
             for _ in 0..rng.gen_range(1..=2) {
-                area.add_item(Item::new_random_weapon());
+                area_details.add_item(Item::new_random_weapon());
             }
             for _ in 0..rng.gen_range(1..=2) {
-                area.add_item(Item::new_random_shield());
+                area_details.add_item(Item::new_random_shield());
             }
             for _ in 0..rng.gen_range(1..=4) {
-                area.add_item(Item::new_random_consumable());
+                area_details.add_item(Item::new_random_consumable());
             }
         }
 
@@ -343,37 +344,39 @@ impl Game {
         let odds = tribute_count as f64 / 24.0;
         let mut area_events: HashMap<String, (AreaDetails, Vec<AreaEvent>)> = HashMap::new();
 
+        // TODO: Make this a const
         if (1u32..8u32).contains(&tribute_count) {
             // If there is an open area, close it.
-            if let Some(area) = self.random_open_area() {
+            if let Some(area_details) = self.random_open_area() {
                 let event = AreaEvent::random();
-                area_events.insert(area.area.clone(), (area.clone(), vec![event.clone()]));
+                let area_name = area_details.area.clone().unwrap().to_string();
+                area_events.insert(area_name, (area_details.clone(), vec![event.clone()]));
             }
 
             if rng.gen_bool(odds) {
                 // Assuming there's still an open area.
-                if let Some(area) = self.random_open_area() {
+                if let Some(area_details) = self.random_open_area() {
                     let event = AreaEvent::random();
-                    let area_name = area.area.clone();
+                    let area_name = area_details.area.clone().unwrap().to_string();
                     if area_events.get(&area_name.clone()).is_some() {
-                        let mut events = area_events[&area_name.clone()].1.clone();
+                        let mut events = area_events[&area_name].1.clone();
                         events.push(event.clone());
-                        area_events.insert(area_name, (area.clone(), events));
+                        area_events.insert(area_name, (area_details.clone(), events));
                     } else {
-                        area_events.insert(area_name, (area.clone(), vec![event.clone()]));
+                        area_events.insert(area_name, (area_details.clone(), vec![event.clone()]));
                     }
                 }
             }
 
             // Add events to each area and announce them
-            for (_area_name, (mut area, events)) in area_events.clone() {
+            for (_area_name, (mut area_details, events)) in area_events.clone() {
                 for event in events {
-                    area.events.push(event.clone());
+                    area_details.events.push(event.clone());
                     let event_name = event.to_string();
-                    let area_name = area.area.clone();
+                    let area_name = area_details.area.clone().unwrap().to_string();
 
                     add_area_message(
-                        area.area.as_str(),
+                        area_name.as_str(),
                         &self.identifier,
                         format!("{}", GameOutput::AreaEvent(event_name.as_str(), area_name.as_str()))
                     ).expect("Failed to add area event message");
@@ -381,9 +384,11 @@ impl Game {
             }
 
             // Update the areas with the new events
-            for area in self.areas.iter_mut() {
-                if area_events.contains_key(&area.area) {
-                    area.events.extend(area_events[&area.area].1.clone());
+            for area_details in self.areas.iter_mut() {
+                let key = area_details.area.clone().unwrap().to_string();
+                if area_events.contains_key(&key) {
+                    let events = area_events[&key].1.clone();
+                    area_details.events.extend(events);
                 }
             }
         }
@@ -393,7 +398,14 @@ impl Game {
     async fn run_tribute_cycle(&mut self, day: bool, rng: &mut SmallRng) {
         // Shuffle the tributes
         self.tributes.shuffle(rng);
-        let closed_areas: Vec<Area> = self.closed_areas().clone().iter().map(|ad| Area::from_str(ad.area.as_str()).unwrap()).collect();
+        let closed_areas: Vec<Area> = self.closed_areas()
+            .iter()
+            .filter(|ad| ad.area.is_some())
+            .map(|ad| {
+                ad.area.clone().unwrap()
+            })
+            .clone()
+            .collect();
         let living_tributes = self.living_tributes();
         let living_tributes_count: usize = living_tributes.len();
 
@@ -417,7 +429,8 @@ impl Game {
             };
 
             let area_details = self.areas.iter_mut()
-                .find(|a| a.area == tribute.area.to_string())
+                .filter(|ad| ad.area.is_some())
+                .find(|ad| ad.area.clone().unwrap() == tribute.area)
                 .expect("Cannot find area details");
             let environment_details = &mut EnvironmentContext {
                 is_day: day,
@@ -502,7 +515,7 @@ impl Game {
 
     /// Get a mutable reference to the area details for a given area.
     fn get_area_details_mut(&mut self, area: Area) -> Option<&mut AreaDetails> {
-        self.areas.iter_mut().find(|a| a.area == area.to_string())
+        self.areas.iter_mut().find(|ad| ad.area == Some(area.clone()))
     }
 }
 

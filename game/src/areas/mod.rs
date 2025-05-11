@@ -36,16 +36,23 @@ impl PartialEq<&Area> for Area {
     }
 }
 
+impl Default for Area {
+    fn default() -> Self {
+        Area::Cornucopia
+    }
+}
+
 impl FromStr for Area {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
+            "cornucopia" => Ok(Area::Cornucopia),
             "north" => Ok(Area::North),
             "east" => Ok(Area::East),
             "south" => Ok(Area::South),
             "west" => Ok(Area::West),
-            _ => Ok(Area::Cornucopia)
+            _ => Err(format!("Invalid area: {}", s)),
         }
     }
 }
@@ -66,7 +73,7 @@ impl Area {
 pub struct AreaDetails {
     pub identifier: String,
     pub name: String,
-    pub area: String,
+    pub area: Option<Area>,
     #[serde(default)]
     pub items: Vec<Item>,
     #[serde(default)]
@@ -111,7 +118,7 @@ impl AreaDetails {
         Self {
             identifier: Uuid::new_v4().to_string(),
             name: name.unwrap_or(area.to_string()),
-            area: area.to_string(),
+            area: Some(area),
             items: vec![],
             events: vec![],
         }

@@ -19,6 +19,13 @@ use std::fmt::Display;
 use std::ops::Index;
 use uuid::Uuid;
 
+const LOW_TRIBUTE_THRESHOLD: u32 = 8;
+const FEAST_WEAPON_COUNT: u32 = 2;
+const FEAST_SHIELD_COUNT: u32 = 2;
+const FEAST_CONSUMABLE_COUNT: u32 = 4;
+const DAY_EVENT_FREQUENCY: f64 = 1.0 / 4.0;
+const NIGHT_EVENT_FREQUENCY: f64 = 1.0 / 8.0;
+
 /// Represents the current state of the game.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Game {
@@ -292,17 +299,11 @@ impl Game {
 
     /// Triggers events for the current cycle.
     fn trigger_cycle_events(&mut self, day: bool, rng: &mut SmallRng) {
-        let frequency = {
-            if day {
-                1.0 / 4.0
-            } else {
-                1.0 / 8.0
-            }
-        };
+        let frequency = if day { DAY_EVENT_FREQUENCY } else { NIGHT_EVENT_FREQUENCY };
 
         // If it's nighttime, trigger an event
         // If it is daytime and not day #1 or day #3, trigger an event
-        if !day || ![1u32, 3u32].contains(&self.day.unwrap_or(1u32)) {
+        if !day || ![1, 3].contains(&self.day.unwrap_or(1)) {
             for area_details in self.areas.iter_mut() {
                 if rng.gen_bool(frequency) {
                     let area_event = AreaEvent::random();
@@ -324,13 +325,13 @@ impl Game {
                 .filter(|ad| ad.area.is_some())
                 .find(|ad| ad.area.clone().unwrap().to_string() == "Cornucopia")
                 .expect("Cannot find Cornucopia");
-            for _ in 0..rng.gen_range(1..=2) {
+            for _ in 0..rng.gen_range(1..=FEAST_WEAPON_COUNT) {
                 area_details.add_item(Item::new_random_weapon());
             }
-            for _ in 0..rng.gen_range(1..=2) {
+            for _ in 0..rng.gen_range(1..=FEAST_SHIELD_COUNT) {
                 area_details.add_item(Item::new_random_shield());
             }
-            for _ in 0..rng.gen_range(1..=4) {
+            for _ in 0..rng.gen_range(1..=FEAST_CONSUMABLE_COUNT) {
                 area_details.add_item(Item::new_random_consumable());
             }
         }
@@ -344,8 +345,7 @@ impl Game {
         let odds = tribute_count as f64 / 24.0;
         let mut area_events: HashMap<String, (AreaDetails, Vec<AreaEvent>)> = HashMap::new();
 
-        // TODO: Make this a const
-        if (1u32..8u32).contains(&tribute_count) {
+        if (1..LOW_TRIBUTE_THRESHOLD).contains(&tribute_count) {
             // If there is an open area, close it.
             if let Some(area_details) = self.random_open_area() {
                 let event = AreaEvent::random();
@@ -369,11 +369,11 @@ impl Game {
             }
 
             // Add events to each area and announce them
-            for (_area_name, (mut area_details, events)) in area_events.clone() {
+            for (area_name, (mut area_details, events)) in area_events.clone() {
                 for event in events {
                     area_details.events.push(event.clone());
                     let event_name = event.to_string();
-                    let area_name = area_details.area.clone().unwrap().to_string();
+                    // let area_name = area_details.area.clone().unwrap().to_string();
 
                     add_area_message(
                         area_name.as_str(),

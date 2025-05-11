@@ -201,13 +201,13 @@ impl Display for ItemType {
 }
 
 impl FromStr for ItemType {
-    type Err = ();
+    type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "consumable" => Ok(ItemType::Consumable),
             "weapon" => Ok(ItemType::Weapon),
-            _ => Err(()),
+            _ => Err("Invalid item type".to_string()),
         }
     }
 }
@@ -216,10 +216,10 @@ impl FromStr for ItemType {
 pub enum Attribute {
     Health,   // Heals health
     Sanity,   // Heals sanity
-    Movement, // Increases movement
-    Bravery,  // Increases bravery
-    Speed,    // Increases speed
-    Strength, // Increases damage done, i.e. weapon
+    Movement, // Increase movement
+    Bravery,  // Increase bravery
+    Speed,    // Increase speed
+    Strength, // Increases damage done, i.e., weapon
     Defense,  // Reduces damage taken
 }
 
@@ -237,9 +237,9 @@ pub trait ConsumableAttribute {
 impl ConsumableAttribute for Attribute {
     fn consumable_name(&self) -> String {
         match &self {
-            // restores health
+            // restore health
             Attribute::Health => { "health kit".to_string() }
-            // restores sanity
+            // restore sanity
             Attribute::Sanity => { "memento".to_string() }
             // move further
             Attribute::Movement => { "trail mix".to_string() }

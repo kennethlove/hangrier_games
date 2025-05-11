@@ -436,9 +436,9 @@ impl Game {
                 .collect();
 
             let encounter_context = EncounterContext {
-                nearby_tributes_count,
+                nearby_tributes_count: nearby_tributes_count.try_into().unwrap(),
                 potential_targets: targets,
-                total_living_tributes: living_tributes_count,
+                total_living_tributes: living_tributes_count.try_into().unwrap(),
             };
 
             tribute.process_turn_phase(
@@ -519,6 +519,7 @@ mod tests {
             day: Some(1),
             areas: vec![],
             tributes,
+            private: true
         }
     }
 

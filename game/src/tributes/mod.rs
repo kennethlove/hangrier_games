@@ -82,9 +82,9 @@ pub struct EnvironmentContext<'a> {
 }
 
 pub struct EncounterContext {
-    pub nearby_tributes_count: usize,
+    pub nearby_tributes_count: u32,
     pub potential_targets: Vec<Tribute>,
-    pub total_living_tributes: usize,
+    pub total_living_tributes: u32,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -932,7 +932,7 @@ impl Tribute {
     /// 4. If there are no enemies nearby and no enemies left in the game:
     /// 4a. If loyalty is low, target ally.
     /// 4b. Otherwise, target no one.
-    async fn pick_target(&self, mut targets: Vec<Tribute>, living_tributes_count: usize) -> Option<Tribute> {
+    async fn pick_target(&self, mut targets: Vec<Tribute>, living_tributes_count: u32) -> Option<Tribute> {
         // If there are no targets, check if the tribute is feeling suicidal.
         if targets.is_empty() {
             match self.attributes.sanity {

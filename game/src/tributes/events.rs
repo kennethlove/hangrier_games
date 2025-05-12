@@ -1,8 +1,9 @@
 use crate::threats::animals::Animal;
-use rand::Rng;
+use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
+use rand::prelude::SmallRng;
 
 #[derive(Clone, Debug, PartialOrd, PartialEq, Serialize, Deserialize)]
 pub enum TributeEvent {
@@ -70,7 +71,7 @@ impl Display for TributeEvent {
 
 impl TributeEvent {
     pub fn random() -> TributeEvent {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
         let animal = Animal::random();
         let events = [
             TributeEvent::AnimalAttack(animal),
@@ -86,7 +87,7 @@ impl TributeEvent {
             TributeEvent::Drowning,
             TributeEvent::Burn,
         ];
-        let index = rng.gen_range(0..events.len());
+        let index = rng.random_range(0..events.len());
         events[index].clone()
     }
 }

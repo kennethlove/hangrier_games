@@ -1831,12 +1831,12 @@ dependencies = [
 
 [[package]]
 name = "fake"
-version = "3.1.0"
+version = "4.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aef603df4ba9adbca6a332db7da6f614f21eafefbaf8e087844e452fdec152d0"
+checksum = "2f5f203b70a419cb8880d1cfe6bebe488add0a0307d404e9f24021e5fd864b80"
 dependencies = [
  "deunicode",
- "rand 0.8.5",
+ "rand 0.9.1",
 ]
 
 [[package]]
@@ -2044,13 +2044,11 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "fake",
- "getrandom 0.2.16",
  "indefinite",
  "once_cell",
- "rand 0.8.5",
+ "rand 0.9.1",
  "rstest",
  "serde",
- "serde_json",
  "shared",
  "strum 0.27.1",
  "strum_macros 0.27.1",
@@ -2981,9 +2979,9 @@ checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
 
 [[package]]
 name = "matrixmultiply"
-version = "0.3.9"
+version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9380b911e3e96d10c1f415da0876389aaf1b56759054eeb0de7df940c456ba1a"
+checksum = "a06de3016e9fae57a36fd14dba131fccf49f74b40b7fbdb472f96e361ec71a08"
 dependencies = [
  "autocfg",
  "rawpointer",
@@ -5977,13 +5975,11 @@ dependencies = [
  "dioxus-query",
  "dotenvy",
  "game",
- "getrandom 0.2.16",
  "gloo-storage",
  "reqwest",
  "serde",
  "serde_json",
  "shared",
- "wasm-bindgen",
 ]
 
 [[package]]

@@ -195,8 +195,8 @@ impl Tribute {
 
     pub fn random() -> Self {
         let name = Name(EN).fake();
-        let mut rng = SmallRng::from_entropy();
-        let district = rng.gen_range(1..=12);
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+        let district = rng.random_range(1..=12);
         Tribute::new(name, Some(district), None)
     }
 
@@ -300,8 +300,8 @@ impl Tribute {
 
     /// Hides the tribute from view.
     fn hides(&mut self) -> bool {
-        let mut rng = SmallRng::from_entropy();
-        let hidden = rng.gen_bool(self.attributes.intelligence as f64 / 100.0);
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+        let hidden = rng.random_bool(self.attributes.intelligence as f64 / 100.0);
         self.attributes.is_hidden = hidden;
         hidden
     }
@@ -447,7 +447,7 @@ impl Tribute {
     /// If the tribute has low movement, they can only move to the suggested area or stay put.
     /// If the tribute has high movement, they can move to any open neighbor or the suggested area.
     async fn travels(&self, closed_areas: &[Area], suggested_area: Option<Area>) -> TravelResult {
-        let mut rng = SmallRng::from_entropy();
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
         // Where is the tribute?
         let current_area = self.area.clone();
 
@@ -560,7 +560,7 @@ impl Tribute {
             TributeStatus::Poisoned => { self.takes_mental_damage(POISONED_MENTAL_DAMAGE); }
             TributeStatus::Broken => {
                 // die roll for which bone breaks
-                let bone = rng.gen_range(0..4);
+                let bone = rng.random_range(0..4);
                 match bone {
                     // Leg
                     0 => self.reduce_speed(BROKEN_BONE_LEG_SPEED_REDUCTION),
@@ -581,7 +581,7 @@ impl Tribute {
                 self.takes_mental_damage(DROWNED_MENTAL_DAMAGE);
             }
             TributeStatus::Mauled(animal) => {
-                let number_of_animals = rng.gen_range(2..=5);
+                let number_of_animals = rng.random_range(2..=5);
                 let damage = animal.damage() * number_of_animals;
                 self.takes_physical_damage(damage);
             }
@@ -837,12 +837,12 @@ impl Tribute {
             _ => 1.0, // Mainly for testing/debugging purposes
         };
 
-        if rng.gen_bool(chance) { Some(Item::new_random_consumable()) } else { None }
+        if rng.random_bool(chance) { Some(Item::new_random_consumable()) } else { None }
     }
 
     /// Take an item from the current area
     fn take_nearby_item(&mut self, area_details: &mut AreaDetails) -> Option<Item> {
-        let mut rng = SmallRng::from_entropy();
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
         let items = area_details.items.clone();
         if items.is_empty() {
             None
@@ -999,7 +999,7 @@ impl Tribute {
                 },
                 1 => Some(enemies.first()?.clone()), // Easy choice
                 _ => {
-                    let mut rng = SmallRng::from_entropy();
+                    let mut rng = SmallRng::from_rng(&mut rand::rng());
                     let enemy = enemies.choose(&mut rng)?;
                     Some(enemy.clone())
                 }
@@ -1105,7 +1105,7 @@ fn calculate_violence_stress(kills: u32, wins: u32, current_sanity: u32) -> u32 
 /// If either roll is more than 1.5x the other, that triggers a "decisive" victory.
 fn attack_contest(attacker: &mut Tribute, target: &mut Tribute, rng: &mut impl Rng) -> AttackResult {
     // Get attack roll and strength modifier
-    let mut attack_roll: i32 = rng.gen_range(1..=20); // Base roll
+    let mut attack_roll: i32 = rng.random_range(1..=20); // Base roll
     attack_roll += attacker.attributes.strength as i32; // Add strength
 
     // If the attacker has a weapon, use it
@@ -1124,7 +1124,7 @@ fn attack_contest(attacker: &mut Tribute, target: &mut Tribute, rng: &mut impl R
     }
 
     // Get defense roll and defense modifier
-    let mut defense_roll: i32 = rng.gen_range(1..=20); // Base roll
+    let mut defense_roll: i32 = rng.random_range(1..=20); // Base roll
     defense_roll += target.attributes.defense as i32; // Add defense
 
     // If the defender has a shield, use it
@@ -1273,21 +1273,21 @@ impl Default for Attributes {
 impl Attributes {
     /// Provides a randomized set of Attributes
     pub fn new() -> Self {
-        let mut rng = SmallRng::from_entropy();
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
 
         Self {
-            health: rng.gen_range(50..=MAX_HEALTH),
-            sanity: rng.gen_range(50..=MAX_SANITY),
+            health: rng.random_range(50..=MAX_HEALTH),
+            sanity: rng.random_range(50..=MAX_SANITY),
             movement: MAX_MOVEMENT,
-            strength: rng.gen_range(1..=MAX_STRENGTH),
-            defense: rng.gen_range(1..=MAX_DEFENSE),
-            bravery: rng.gen_range(1..=MAX_BRAVERY),
-            loyalty: rng.gen_range(1..=MAX_LOYALTY),
-            speed: rng.gen_range(1..=MAX_SPEED),
-            dexterity: rng.gen_range(1..=MAX_DEXTERITY),
-            intelligence: rng.gen_range(1..=MAX_INTELLIGENCE),
-            persuasion: rng.gen_range(1..=MAX_PERSUASION),
-            luck: rng.gen_range(1..=MAX_LUCK),
+            strength: rng.random_range(1..=MAX_STRENGTH),
+            defense: rng.random_range(1..=MAX_DEFENSE),
+            bravery: rng.random_range(1..=MAX_BRAVERY),
+            loyalty: rng.random_range(1..=MAX_LOYALTY),
+            speed: rng.random_range(1..=MAX_SPEED),
+            dexterity: rng.random_range(1..=MAX_DEXTERITY),
+            intelligence: rng.random_range(1..=MAX_INTELLIGENCE),
+            persuasion: rng.random_range(1..=MAX_PERSUASION),
+            luck: rng.random_range(1..=MAX_LUCK),
             is_hidden: false,
         }
     }
@@ -1315,6 +1315,10 @@ mod tests {
     #[allow(unused_braces)]
     #[fixture]
     fn target() -> Tribute { Tribute::random() }
+
+    #[allow(unused_braces)]
+    #[fixture]
+    fn small_rng() -> SmallRng { SmallRng::seed_from_u64(0) }
 
     #[test]
     fn default() {
@@ -1563,20 +1567,18 @@ mod tests {
     #[case(TributeStatus::Burned)]
     #[case(TributeStatus::Drowned)]
     #[case(TributeStatus::Infected)]
-    fn process_status(mut tribute: Tribute, #[case] status: TributeStatus) {
+    fn process_status(mut tribute: Tribute, #[case] status: TributeStatus, mut small_rng: SmallRng) {
         let mut game = Game::default();
         game.areas.push(AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia));
         tribute.status = status;
         let clone = tribute.clone();
-        let mut rng = SmallRng::from_entropy();
 
-        tribute.process_status(&game.areas[0], &mut rng);
+        tribute.process_status(&game.areas[0], &mut small_rng);
         assert_ne!(clone, tribute);
     }
 
     #[rstest]
-    fn process_status_mauled(mut tribute: Tribute) {
-        let mut rng = SmallRng::from_entropy();
+    fn process_status_mauled(mut tribute: Tribute, mut small_rng: SmallRng) {
         let mut game = Game::default();
         let bear = Animal::Bear;
         let hp = tribute.attributes.health;
@@ -1584,7 +1586,7 @@ mod tests {
         game.areas.push(AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia));
         tribute.status = TributeStatus::Mauled(bear.clone());
 
-        tribute.process_status(&game.areas[0], &mut rng);
+        tribute.process_status(&game.areas[0], &mut small_rng);
         assert!(hp - bear.damage() >= tribute.attributes.health);
     }
 
@@ -1592,26 +1594,24 @@ mod tests {
     #[case(TributeStatus::Healthy)]
     #[case(TributeStatus::RecentlyDead)]
     #[case(TributeStatus::Dead)]
-    fn process_status_no_effect(mut tribute: Tribute, #[case] status: TributeStatus) {
-        let mut rng = SmallRng::from_entropy();
+    fn process_status_no_effect(mut tribute: Tribute, #[case] status: TributeStatus, mut small_rng: SmallRng) {
         let mut game = Game::default();
         game.areas.push(AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia));
         tribute.status = status;
         let clone = tribute.clone();
 
-        tribute.process_status(&game.areas[0], &mut rng);
+        tribute.process_status(&game.areas[0], &mut small_rng);
         assert_eq!(clone, tribute);
     }
 
     #[rstest]
-    fn process_status_dies(mut tribute: Tribute) {
-        let mut rng = SmallRng::from_entropy();
+    fn process_status_dies(mut tribute: Tribute, mut small_rng: SmallRng) {
         let mut game = Game::default();
         game.areas.push(AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia));
         tribute.status = TributeStatus::Wounded;
         tribute.attributes.health = 1;
 
-        tribute.process_status(&game.areas[0], &mut rng);
+        tribute.process_status(&game.areas[0], &mut small_rng);
         assert_eq!(TributeStatus::RecentlyDead, tribute.status);
     }
 
@@ -1636,8 +1636,7 @@ mod tests {
     }
 
     #[rstest]
-    fn process_status_from_area_event(mut tribute: Tribute) {
-        let mut rng = SmallRng::from_entropy();
+    fn process_status_from_area_event(mut tribute: Tribute, mut small_rng: SmallRng) {
         let mut game = Game::default();
         let mut area_details = AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia);
         let area = area_details.area.clone().unwrap();
@@ -1646,16 +1645,15 @@ mod tests {
         game.areas.push(area_details.clone());
         tribute.area = area.clone();
 
-        tribute.process_status(&game.areas[0], &mut rng);
+        tribute.process_status(&game.areas[0], &mut small_rng);
         assert_eq!(tribute.status, TributeStatus::Burned);
     }
 
     #[rstest]
     #[tokio::test]
-    async fn receive_patron_gift(mut tribute: Tribute) {
-        let rng = SmallRng::from_entropy();
+    async fn receive_patron_gift(mut tribute: Tribute, mut small_rng: SmallRng) {
         tribute.district = 13;
-        let gift = tribute.receive_patron_gift(rng).await;
+        let gift = tribute.receive_patron_gift(&mut small_rng).await;
         assert!(gift.is_some());
     }
 
@@ -1854,102 +1852,91 @@ mod tests {
         assert_eq!(target, Some(peeta));
     }
 
-    #[test]
-    fn attack_contest_win() {
+    #[rstest]
+    fn attack_contest_win(mut small_rng: SmallRng) {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         let mut target = Tribute::new("Peeta".to_string(), None, None);
 
         attacker.attributes.strength = 10;
         target.attributes.defense = 5;
 
-        let mut seeded_rng = SmallRng::seed_from_u64(42);
-
-        let result = attack_contest(&mut attacker, &mut target, &mut seeded_rng);
+        let result = attack_contest(&mut attacker, &mut target, &mut small_rng);
         assert_eq!(result, AttackResult::AttackerWins);
     }
 
-    #[test]
-    fn attack_contest_win_decisively() {
+    #[rstest]
+    fn attack_contest_win_decisively(mut small_rng: SmallRng) {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         let mut target = Tribute::new("Peeta".to_string(), None, None);
 
         attacker.attributes.strength = 15;
         target.attributes.defense = 0;
 
-        let mut seeded_rng = SmallRng::seed_from_u64(42);
-
-        let result = attack_contest(&mut attacker, &mut target, &mut seeded_rng);
+        let result = attack_contest(&mut attacker, &mut target, &mut small_rng);
         assert_eq!(result, AttackResult::AttackerWinsDecisively);
     }
 
-    #[test]
-    fn attack_contest_lose() {
+    #[rstest]
+    fn attack_contest_lose(mut small_rng: SmallRng) {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         let mut target = Tribute::new("Peeta".to_string(), None, None);
 
         attacker.attributes.strength = 15;
         target.attributes.defense = 20;
 
-        let mut seeded_rng = SmallRng::seed_from_u64(42);
 
-        let result = attack_contest(&mut attacker, &mut target, &mut seeded_rng);
+        let result = attack_contest(&mut attacker, &mut target, &mut small_rng);
         assert_eq!(result, AttackResult::DefenderWins);
     }
 
-    #[test]
-    fn attack_contest_lose_decisively() {
+    #[rstest]
+    fn attack_contest_lose_decisively(mut small_rng: SmallRng) {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         let mut target = Tribute::new("Peeta".to_string(), None, None);
 
         attacker.attributes.strength = 1;
         target.attributes.defense = 20;
 
-        let mut seeded_rng = SmallRng::seed_from_u64(42);
-
-        let result = attack_contest(&mut attacker, &mut target, &mut seeded_rng);
+        let result = attack_contest(&mut attacker, &mut target, &mut small_rng);
         assert_eq!(result, AttackResult::DefenderWinsDecisively);
     }
 
-    #[test]
-    fn attack_contest_draw() {
+    #[rstest]
+    fn attack_contest_draw(mut small_rng: SmallRng) {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         let mut target = Tribute::new("Peeta".to_string(), None, None);
 
-        attacker.attributes.strength = 23; // Magic number to make the final scores even
+        attacker.attributes.strength = 21; // Magic number to make the final scores even
         target.attributes.defense = 20;
 
-        let mut seeded_rng = SmallRng::seed_from_u64(42);
-
-        let result = attack_contest(&mut attacker, &mut target, &mut seeded_rng);
+        let result = attack_contest(&mut attacker, &mut target, &mut small_rng);
         assert_eq!(result, AttackResult::Miss);
     }
 
-    #[test]
-    fn attacks_self() {
+    #[rstest]
+    fn attacks_self(mut small_rng: SmallRng) {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         attacker.attributes.sanity = 50;
         let sanity = 50;
         let mut target = attacker.clone();
-        let mut rng = SmallRng::from_entropy();
 
-        let outcome = attacker.attacks(&mut target, &mut rng);
+        let outcome = attacker.attacks(&mut target, &mut small_rng);
         assert_eq!(outcome, AttackOutcome::Wound(attacker.clone(), target));
         assert!(attacker.attributes.sanity < sanity);
     }
 
-    #[test]
-    fn attacks_self_suicide() {
+    #[rstest]
+    fn attacks_self_suicide(mut small_rng: SmallRng) {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         attacker.attributes.strength = 100;
         let mut target = attacker.clone();
-        let mut rng = SmallRng::from_entropy();
 
-        let outcome = attacker.attacks(&mut target, &mut rng);
+        let outcome = attacker.attacks(&mut target, &mut small_rng);
         assert_eq!(outcome, AttackOutcome::Kill(attacker, target));
     }
 
-    #[test]
-    fn attacks_wound() {
+    #[rstest]
+    fn attacks_wound(mut small_rng: SmallRng) {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         let sanity = attacker.attributes.sanity;
         let mut target = Tribute::new("Peeta".to_string(), None, None);
@@ -1957,17 +1944,15 @@ mod tests {
         attacker.attributes.strength = 25;
         target.attributes.defense = 20;
 
-        let mut seeded_rng = SmallRng::seed_from_u64(42);
-
-        let result = attacker.attacks(&mut target, &mut seeded_rng);
+        let result = attacker.attacks(&mut target, &mut small_rng);
         assert_eq!(result, AttackOutcome::Wound(attacker.clone(), target.clone()));
         assert_eq!(attacker.statistics.wins, 1);
         assert_eq!(target.statistics.defeats, 1);
         assert!(attacker.attributes.sanity < sanity);
     }
 
-    #[test]
-    fn attacks_kill() {
+    #[rstest]
+    fn attacks_kill(mut small_rng: SmallRng) {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         let sanity = attacker.attributes.sanity;
         let mut target = Tribute::new("Peeta".to_string(), None, None);
@@ -1976,9 +1961,7 @@ mod tests {
         attacker.attributes.strength = 25;
         target.attributes.defense = 2;
 
-        let mut seeded_rng = SmallRng::seed_from_u64(42);
-
-        let result = attacker.attacks(&mut target, &mut seeded_rng);
+        let result = attacker.attacks(&mut target, &mut small_rng);
 
         assert_eq!(result, AttackOutcome::Kill(attacker.clone(), target.clone()));
         assert_eq!(target.status, TributeStatus::RecentlyDead);
@@ -1988,21 +1971,21 @@ mod tests {
         assert!(attacker.attributes.sanity < sanity);
     }
 
-    #[test]
-    fn attacks_miss() {
+    #[rstest]
+    fn attacks_miss(mut small_rng: SmallRng) {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         let mut target = Tribute::new("Peeta".to_string(), None, None);
         target.attributes.health = 1;
 
-        attacker.attributes.strength = 23;
-        target.attributes.defense = 20;
+        attacker.attributes.strength = 2;
+        target.attributes.defense = 1;
 
-        let mut seeded_rng = SmallRng::seed_from_u64(42);
-
-        let result = attacker.attacks(&mut target, &mut seeded_rng);
-        assert_eq!(result, AttackOutcome::Miss(attacker.clone(), target.clone()));
+        let result = attacker.attacks(&mut target, &mut small_rng);
+        assert_eq!(attacker.statistics.wins, 0);
+        assert_eq!(target.statistics.wins, 0);
         assert_eq!(attacker.statistics.draws, 1);
         assert_eq!(target.statistics.draws, 1);
+        assert_eq!(result, AttackOutcome::Miss(attacker.clone(), target.clone()));
     }
 
     #[tokio::test]

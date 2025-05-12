@@ -47,7 +47,7 @@ impl Brain {
 
         // If there is a preferred action, we should take it, assuming a positive roll
         if let Some(preferred_action) = self.preferred_action.clone() {
-            if rng.gen_bool(self.preferred_action_percentage) {
+            if rng.random_bool(self.preferred_action_percentage) {
                 return preferred_action;
             }
         }
@@ -142,8 +142,7 @@ mod tests {
     use crate::items::Item;
     use crate::tributes::actions::Action;
     use crate::tributes::Tribute;
-    use rand::rngs::SmallRng;
-    use rand::SeedableRng;
+    use rand::prelude::*;
     use rstest::{fixture, rstest};
 
     #[fixture]
@@ -153,7 +152,7 @@ mod tests {
 
     #[fixture]
     fn small_rng() -> SmallRng {
-        SmallRng::from_entropy()
+        SmallRng::from_rng(&mut rand::rng())
     }
 
     #[rstest]

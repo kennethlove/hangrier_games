@@ -41,7 +41,7 @@ pub fn GameDaySummary(game: Game, day: u32) -> Element {
     );
 
     match summary_query.result().value() {
-        QueryResult::Ok(QueryValue::Summary(summary)) => {
+        QueryState::Settled(Ok(QueryValue::Summary(summary))) => {
             rsx! {
                 for p in summary.split("\n") {
                     p {
@@ -55,10 +55,10 @@ pub fn GameDaySummary(game: Game, day: u32) -> Element {
                 }
             }
         }
-        QueryResult::Err(_) => {
+        QueryState::Settled(Err(_)) => {
             rsx! { p { class: "theme1:text-green-200 theme2:text-green-200", "Failed to load." } }
         }
-        QueryResult::Loading(_) => {
+        QueryState::Loading(_) => {
             rsx! { p { class: "theme1:text-green-200 theme2:text-green-200", "Loading..." } }
         }
         _ => {

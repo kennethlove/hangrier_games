@@ -4,7 +4,7 @@ use crate::components::modal::{Modal, Props as ModalProps};
 use crate::components::{Button, Input};
 use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
+use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult, MutationState};
 use game::games::Game;
 use shared::EditTribute;
 use std::ops::Deref;
@@ -141,14 +141,10 @@ pub fn EditTributeForm() -> Element {
         if !name.is_empty() && (1..=12u32).contains(&district) {
             let edit_tribute = EditTribute(identifier.clone(), district, name.clone());
             spawn(async move {
-                mutate
-                    .manual_mutate((edit_tribute.clone(), game_identifier.clone(), token))
-                    .await;
+                mutate.mutate((edit_tribute.clone(), game_identifier.clone(), token));
                 edit_tribute_signal.set(Some(edit_tribute));
 
-                if let MutationResult::Ok(MutationValue::TributeUpdated(_identifier)) =
-                    mutate.result().deref()
-                {
+                if let MutationState::Settled(Ok(MutationValue::TributeUpdated(_identifier))) = mutate.result().deref() {
                     client.invalidate_queries(&[QueryKey::Tributes(game_identifier.clone())]);
                     edit_tribute_signal.set(None);
                 }

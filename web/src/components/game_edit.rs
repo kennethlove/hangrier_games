@@ -4,7 +4,7 @@ use crate::components::icons::edit::EditIcon;
 use crate::components::Button;
 use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
+use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult, MutationState};
 use shared::EditGame;
 use std::ops::Deref;
 use crate::storage::{use_persistent, AppState};
@@ -110,10 +110,10 @@ pub fn EditGameForm() -> Element {
         if !name.is_empty() {
             let edit_game = EditGame(identifier.clone(), name.clone(), private.clone());
             spawn(async move {
-                mutate.manual_mutate((edit_game.clone(), token)).await;
+                mutate.mutate((edit_game.clone(), token));
                 edit_game_signal.set(Some(edit_game.clone()));
 
-                if let MutationResult::Ok(MutationValue::GameUpdated(identifier)) = mutate.result().deref() {
+                if let MutationState::Settled(MutationResult::Ok(MutationValue::GameUpdated(identifier))) = mutate.result().deref() {
                     client.invalidate_queries(&[QueryKey::DisplayGame(identifier.clone()), QueryKey::Games]);
                     edit_game_signal.set(None);
                 }

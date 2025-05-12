@@ -7,7 +7,7 @@ use crate::env::APP_API_HOST;
 use crate::routes::Routes;
 use crate::storage::{use_persistent, AppState};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_get_query, QueryResult};
+use dioxus_query::prelude::{use_get_query, QueryResult, QueryState};
 use game::items::Item;
 use game::messages::GameMessage;
 use game::tributes::Tribute;
@@ -87,7 +87,7 @@ pub fn GameTributes(game: DisplayGame) -> Element {
     );
 
     match tribute_query.result().value() {
-        QueryResult::Ok(QueryValue::Tributes(tributes)) => {
+        QueryState::Settled(Ok(QueryValue::Tributes(tributes))) => {
             rsx! {
                 ul {
                     class: "grid gap-2 grid-cols-2",
@@ -137,10 +137,10 @@ pub fn GameTributes(game: DisplayGame) -> Element {
                 }
             }
         }
-        QueryResult::Err(_) => {
+        QueryState::Settled(Err(_)) => {
             rsx! { p { "Something went wrong" } }
         }
-        QueryResult::Loading(_) => {
+        QueryState::Loading(_) => {
             rsx! { p { "Loading..." } }
         }
         _ => { rsx! {} }

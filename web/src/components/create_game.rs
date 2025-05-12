@@ -3,7 +3,7 @@ use crate::components::{Input, ThemedButton};
 use crate::LoadingState;
 use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
+use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult, MutationState};
 use game::games::Game;
 use std::ops::Deref;
 use crate::storage::{use_persistent, AppState};
@@ -52,13 +52,13 @@ pub fn CreateGameButton() -> Element {
         loading_signal.set(LoadingState::Loading);
         let token = storage.get().jwt.expect("No JWT found");
         spawn(async move {
-            mutate.manual_mutate((None, token)).await;
-            if mutate.result().is_ok() {
-                if let MutationResult::Ok(MutationValue::NewGame(_game)) = mutate.result().deref() {
+            mutate.mutate((None, token));
+            if let MutationState::Settled(Ok(result)) = mutate.result().deref() {
+                if let MutationValue::NewGame(_game) = result {
                     loading_signal.set(LoadingState::Loaded);
                     client.invalidate_queries(&[QueryKey::Games]);
                 }
-            }
+            };
         });
     };
 
@@ -86,17 +86,12 @@ pub fn CreateGameForm() -> Element {
         loading_signal.set(LoadingState::Loading);
 
         spawn(async move {
-            mutate.manual_mutate((Some(name), token)).await;
-            if mutate.result().is_ok() {
-
-                match mutate.result().deref() {
-                    MutationResult::Ok(MutationValue::NewGame(_game)) => {
-                        client.invalidate_queries(&[QueryKey::Games]);
-                        loading_signal.set(LoadingState::Loaded);
-                        game_name_signal.set(String::default());
-                    },
-                    MutationResult::Err(MutationError::UnableToCreateGame) => {},
-                    _ => {}
+            mutate.mutate((Some(name), token));
+            if let MutationState::Settled(Ok(result)) = mutate.result().deref() {
+                if let MutationValue::NewGame(_game) = result {
+                    client.invalidate_queries(&[QueryKey::Games]);
+                    loading_signal.set(LoadingState::Loaded);
+                    game_name_signal.set(String::default());
                 }
             }
         });

@@ -3,7 +3,7 @@ use crate::components::icons::delete::DeleteIcon;
 use crate::components::Button;
 use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
+use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult, MutationState};
 use shared::DeleteGame;
 use std::ops::Deref;
 use crate::storage::{use_persistent, AppState};
@@ -77,8 +77,8 @@ pub fn DeleteGameModal() -> Element {
         if let Some(dg) = delete_game_info.clone() {
             let token = storage.get().jwt.expect("No JWT found");
             spawn(async move {
-                mutate.manual_mutate((dg.clone(), token)).await;
-                if let MutationResult::Ok(MutationValue::GameDeleted(_, _)) = mutate.result().deref() {
+                mutate.mutate((dg.clone(), token));
+                if let MutationState::Settled(Ok(MutationValue::GameDeleted(_, _))) = mutate.result().deref() {
                     client.invalidate_queries(&[QueryKey::Games]);
                     delete_game_signal.set(None);
                 }

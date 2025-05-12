@@ -7,7 +7,7 @@ use crate::env::APP_API_HOST;
 use crate::routes::Routes;
 use crate::storage::{use_persistent, AppState};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_get_query, QueryResult};
+use dioxus_query::prelude::{use_get_query, QueryResult, QueryState};
 use game::messages::GameMessage;
 use game::tributes::{Attributes, Tribute};
 
@@ -91,7 +91,7 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
     );
 
     match tribute_query.result().value() {
-        QueryResult::Ok(QueryValue::Tribute(tribute)) => {
+        QueryState::Settled(Ok(QueryValue::Tribute(tribute))) => {
             rsx! {
                 div {
                     class: "flex flex-row gap-4 mb-4 place-items-center place-content-between",
@@ -227,10 +227,10 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                 }
             }
         }
-        QueryResult::Err(QueryError::TributeNotFound(identifier)) => {
+        QueryState::Settled(Err(QueryError::TributeNotFound(identifier))) => {
             rsx! { p { "{identifier} not found." } }
         }
-        QueryResult::Loading(_) => {
+        QueryState::Loading(_) => {
             rsx! { p { "Loading..." } }
         }
         _ => { rsx! { } }
@@ -252,7 +252,7 @@ fn TributeLog(game_identifier: String, identifier: String) -> Element {
     );
 
     match log_query.result().value() {
-        QueryResult::Ok(QueryValue::Logs(logs)) => {
+        QueryState::Settled(Ok(QueryValue::Logs(logs))) => {
             rsx! {
                 ul {
                     class: "theme1:text-stone-200 theme2:text-green-200 theme3:text-stone-800",
@@ -268,8 +268,8 @@ fn TributeLog(game_identifier: String, identifier: String) -> Element {
                 }
             }
         }
-        QueryResult::Err(_) => { rsx! { p { "Failed to load." }  } }
-        QueryResult::Loading(_) => { rsx! { p { "Loading..." }  } }
+        QueryState::Settled(Err(_)) => { rsx! { p { "Failed to load." }  } }
+        QueryState::Loading(_) => { rsx! { p { "Loading..." }  } }
         _ => { rsx! {} }
     }
 }

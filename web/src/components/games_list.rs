@@ -7,7 +7,7 @@ use crate::env::APP_API_HOST;
 use crate::routes::Routes;
 use crate::storage::{use_persistent, AppState};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult};
+use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult, QueryState};
 use shared::{DisplayGame, GameStatus};
 
 async fn fetch_games(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
@@ -73,7 +73,7 @@ pub fn GamesList() -> Element {
         }
 
         match games_query.result().value() {
-            QueryResult::Ok(QueryValue::DisplayGames(games)) => {
+            QueryState::Settled(QueryResult::Ok(QueryValue::DisplayGames(games))) => {
                 rsx! {
                     if games.is_empty() {
                         NoGames {}
@@ -86,11 +86,11 @@ pub fn GamesList() -> Element {
                     }
                 }
             },
-            QueryResult::Loading(_) => rsx! { p {
+            QueryState::Loading(_) => rsx! { p {
                 class: "pb-4 text-center theme1:text-stone-200 theme2:text-green-200 theme3:text-stone-700",
                 "Loading..."
             } },
-            QueryResult::Err(QueryError::NoGames) => rsx! { NoGames {} },
+            QueryState::Settled(Err(QueryError::NoGames)) => rsx! { NoGames {} },
             _ => rsx! { p { "Something went wrong" } },
         }
 

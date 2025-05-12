@@ -139,12 +139,19 @@ impl OwnsItems for Tribute {
 
         let current_quantity = self.items[index].quantity;
 
-        if current_quantity > 1 {
-            self.items[index].quantity -= 1;
-            Ok(())
-        } else {
-            self.items.remove(index);
-            Err(ItemError::ItemNotFound)
+        // If the item has 0 uses left, return an error.
+        // If the item has 1 use left, remove it from the inventory.
+        // If the item has more than 1 use left, decrement the quantity.
+        match current_quantity {
+            0 => Err(ItemError::ItemNotFound),
+            1 => {
+                self.items.remove(index);
+                Ok(())
+            }
+            _ => {
+                self.items[index].quantity = self.items[index].quantity.saturating_sub(1);
+                Ok(())
+            }
         }
     }
 

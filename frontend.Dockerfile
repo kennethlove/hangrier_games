@@ -43,6 +43,7 @@ COPY web/build.rs ./web/build.rs
 COPY shared/ ./shared/
 COPY game ./game/
 ENV APP_API_HOST=${APP_API_HOST}
+ENV RUSTFLAGS="--cfg getrandom_backend='wasm_js'"
 RUN mkdir -p web/src && \
     echo "fn main() {}" > web/src/main.rs && \
     cd web && \

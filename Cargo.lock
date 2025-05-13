@@ -185,7 +185,7 @@ checksum = "ea50b14b7a4b9343f8c627a7a53c52076482bd4bdad0a24fd3ec533ed616cc2c"
 
 [[package]]
 name = "api"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "announcers",
  "async-stream",
@@ -5959,7 +5959,7 @@ dependencies = [
 
 [[package]]
 name = "web"
-version = "0.1.17"
+version = "0.1.18"
 dependencies = [
  "dioxus",
  "dioxus-logger",

@@ -47,7 +47,7 @@ ENV RUSTFLAGS='--cfg getrandom_backend="wasm_js"'
 RUN mkdir -p web/src && \
     echo "fn main() {}" > web/src/main.rs && \
     cd web && \
-    cargo build --release && \
+    cargo build --release --target wasm32-unknown-unknown && \
     rm -f target/release/deps/web*
 
 # Build real app with cached dependencies
@@ -56,6 +56,7 @@ COPY --from=css-builder /app/assets/dist/ ./web/assets/dist/
 COPY web/assets/images/ ./web/assets/images/
 COPY web/assets/favicons/ ./web/assets/favicons/
 
+ENV RUSTFLAGS='--cfg getrandom_backend="wasm_js"'
 WORKDIR /app/web
 RUN dx build --release
 

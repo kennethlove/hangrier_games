@@ -192,14 +192,13 @@ dependencies = [
  "axum",
  "futures",
  "game",
- "getrandom 0.2.16",
  "serde",
  "serde_json",
  "shared",
  "strum 0.27.1",
  "surrealdb",
  "surrealdb-migrations",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "tokio",
  "tower",
  "tower-http",
@@ -2056,7 +2055,6 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
- "witty-phrase-generator",
 ]
 
 [[package]]
@@ -2116,15 +2114,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f611040a2bb37eaa29a78a128d1e92a378a03e0b6e66ae27398d42b1ba9a7841"
 dependencies = [
  "libm",
-]
-
-[[package]]
-name = "getopts"
-version = "0.2.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14dbbfd5c71d70241ecf9e6f13737f7b5ce823821063188d7e46c41d371eebd5"
-dependencies = [
- "unicode-width",
 ]
 
 [[package]]
@@ -3251,9 +3240,9 @@ dependencies = [
 
 [[package]]
 name = "object_store"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9ce831b09395f933addbc56d894d889e4b226eba304d4e7adbab591e26daf1e"
+checksum = "d94ac16b433c0ccf75326388c893d2835ab7457ea35ab8ba5d745c053ef5fa16"
 dependencies = [
  "async-trait",
  "bytes",
@@ -3269,6 +3258,8 @@ dependencies = [
  "tracing",
  "url",
  "walkdir",
+ "wasm-bindgen-futures",
+ "web-time",
 ]
 
 [[package]]
@@ -5975,6 +5966,7 @@ dependencies = [
  "dioxus-query",
  "dotenvy",
  "game",
+ "getrandom 0.3.3",
  "gloo-storage",
  "reqwest",
  "serde",
@@ -6357,16 +6349,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f42320e61fe2cfd34354ecb597f86f413484a798ba44a8ca1165c58d42da6c1"
 dependencies = [
  "bitflags",
-]
-
-[[package]]
-name = "witty-phrase-generator"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9640817a55ab9b80af520a0c9c71bcc2907fb02e9d2f107b784d9b0e792e3757"
-dependencies = [
- "getopts",
- "rand 0.8.5",
 ]
 
 [[package]]

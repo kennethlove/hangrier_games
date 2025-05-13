@@ -20,3 +20,7 @@ dotenvy = "0.15.7"
 [features]
 default = ["web"]
 web = ["dioxus/web"]
+
+[dependencies.getrandom]
+features = ["wasm_js"]
+version = "0.3"

@@ -135,33 +135,27 @@ async fn handle_next_step(
     loading_signal.set(LoadingState::Loading);
     mutate.mutate_async((game_id.clone(), token)).await;
 
-    let mut invalidate_keys = None;
-
     match mutate.result().deref() {
         MutationState::Settled(Ok(result)) => {
             match result {
                 MutationValue::GameStarted(game_identifier) |
                 MutationValue::GameFinished(game_identifier) |
                 MutationValue::GameAdvanced(game_identifier) => {
-                    invalidate_keys = Some(vec![QueryKey::DisplayGame(game_identifier.clone().into()), QueryKey::Games]);
+                    client.invalidate_queries(&[QueryKey::DisplayGame(game_identifier.clone().into()), QueryKey::Games]);
                     loading_signal.set(LoadingState::Loaded);
                 }
                 _ => {
-                    loading_signal.set(LoadingState::Error); // Or an error state
+                    loading_signal.set(LoadingState::Loaded); // Or an error state
                 }
             }
         }
         MutationState::Settled(Err(MutationError::UnableToAdvanceGame)) => {
-            loading_signal.set(LoadingState::Error); // Or an error state
+            loading_signal.set(LoadingState::Loaded); // Or an error state
         }
         MutationState::Settled(Err(e)) => {
-            loading_signal.set(LoadingState::Error); // Or an error state
+            loading_signal.set(LoadingState::Loaded); // Or an error state
         }
         _ => {}
-    }
-
-    if let Some(keys) = invalidate_keys {
-        client.invalidate_queries(&keys);
     }
 }
 
@@ -193,7 +187,7 @@ fn GameState(identifier: String) -> Element {
 
     let token_clone = token.clone();
     let game_query = use_get_query(
-        [QueryKey::DisplayGame(identifier.clone())],
+        [QueryKey::DisplayGame(identifier.clone()), QueryKey::Games],
         move |keys: Vec<QueryKey>| { fetch_display_game(keys, token.clone()) },
     );
 
@@ -386,7 +380,7 @@ fn GameState(identifier: String) -> Element {
                 }
             }
         }
-        QueryState::Settled(Ok(_)) => { rsx! {} }
+        _ => { rsx! {} }
     }
 }
 
@@ -396,7 +390,7 @@ fn GameStats(identifier: String) -> Element {
     let token = storage.get().jwt.unwrap_or_default();
 
     let game_query = use_get_query(
-        [QueryKey::DisplayGame(identifier.clone())],
+        [QueryKey::DisplayGame(identifier.clone()), QueryKey::Games],
         move |keys: Vec<QueryKey>| { fetch_display_game(keys, token.clone()) },
     );
 
@@ -522,7 +516,7 @@ fn GameDetails(identifier: String) -> Element {
     let display_token = storage.get().jwt.unwrap_or_default();
 
     let display_game_query = use_get_query(
-        [QueryKey::DisplayGame(identifier.clone())],
+        [QueryKey::DisplayGame(identifier.clone()), QueryKey::Games],
         move |keys: Vec<QueryKey>| { fetch_display_game(keys, display_token.clone()) },
     );
 

@@ -165,7 +165,7 @@ fn LoginForm() -> Element {
                                 username: username.clone(),
                                 password: password.clone(),
                             };
-                            mutate.mutate(user);
+                            mutate.mutate_async(user).await;
                             if let MutationState::Settled(Ok(result)) = mutate.result().deref() {
                                 if let MutationValue::User(user) = result {
                                         client.invalidate_queries(&[QueryKey::User]);
@@ -304,7 +304,7 @@ fn RegisterForm() -> Element {
                                 username: username.clone(),
                                 password: password.clone(),
                             };
-                            mutate.mutate(user);
+                            mutate.mutate_async(user).await;
                             match mutate.result().deref() {
                                 MutationState::Settled(Ok(result)) => {
                                     if let MutationValue::User(user) = result {

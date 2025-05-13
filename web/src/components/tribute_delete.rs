@@ -57,7 +57,7 @@ pub fn DeleteTributeModal() -> Element {
         if let Some(tribute_name) = tribute_name.clone() {
             let game_name = game_name.clone();
             spawn(async move {
-                mutate.manual_mutate(tribute_name.clone()).await;
+                mutate.mutate_async(tribute_name.clone()).await;
                 if let MutationResult::Ok(MutationValue::TributeDeleted(_tribute_name)) = mutate.result().deref() {
                     client.invalidate_queries(&[QueryKey::Tributes(game_name.clone())]);
                     delete_tribute_signal.set(None);

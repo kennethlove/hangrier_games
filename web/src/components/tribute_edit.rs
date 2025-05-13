@@ -141,7 +141,7 @@ pub fn EditTributeForm() -> Element {
         if !name.is_empty() && (1..=12u32).contains(&district) {
             let edit_tribute = EditTribute(identifier.clone(), district, name.clone());
             spawn(async move {
-                mutate.mutate((edit_tribute.clone(), game_identifier.clone(), token));
+                mutate.mutate_async((edit_tribute.clone(), game_identifier.clone(), token)).await;
                 edit_tribute_signal.set(Some(edit_tribute));
 
                 if let MutationState::Settled(Ok(MutationValue::TributeUpdated(_identifier))) = mutate.result().deref() {

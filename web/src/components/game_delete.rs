@@ -77,7 +77,7 @@ pub fn DeleteGameModal() -> Element {
         if let Some(dg) = delete_game_info.clone() {
             let token = storage.get().jwt.expect("No JWT found");
             spawn(async move {
-                mutate.mutate((dg.clone(), token));
+                mutate.mutate_async((dg.clone(), token)).await;
                 if let MutationState::Settled(Ok(MutationValue::GameDeleted(_, _))) = mutate.result().deref() {
                     client.invalidate_queries(&[QueryKey::Games]);
                     delete_game_signal.set(None);

@@ -110,7 +110,7 @@ pub fn EditGameForm() -> Element {
         if !name.is_empty() {
             let edit_game = EditGame(identifier.clone(), name.clone(), private.clone());
             spawn(async move {
-                mutate.mutate((edit_game.clone(), token));
+                mutate.mutate_async((edit_game.clone(), token)).await;
                 edit_game_signal.set(Some(edit_game.clone()));
 
                 if let MutationState::Settled(MutationResult::Ok(MutationValue::GameUpdated(identifier))) = mutate.result().deref() {

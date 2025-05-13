@@ -43,7 +43,7 @@ pub struct Game {
 impl Default for Game {
     /// Creates a new game with a random name.
     fn default() -> Game {
-        let wp_gen = witty_phrase_generator::WPGen::new();
+        let wp_gen = crate::witty_phrase_generator::WPGen::new();
         let mut name = String::new();
         if let Some(words) = wp_gen.with_words(3) {
             name = words.join("-").to_string();

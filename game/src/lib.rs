@@ -5,3 +5,4 @@ pub mod messages;
 pub mod threats;
 pub mod tributes;
 pub mod output;
+mod witty_phrase_generator;

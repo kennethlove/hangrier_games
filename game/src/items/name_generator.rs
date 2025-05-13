@@ -1,5 +1,4 @@
 use rand::prelude::*;
-use rand::thread_rng;
 
 // Adjectives to come before "shield"
 // _____ shield
@@ -21,13 +20,13 @@ const WEAPON_ADJECTIVES: &[&str] = &[
 ];
 
 pub fn generate_shield_name() -> String {
-    let mut rng = thread_rng();
+    let mut rng = SmallRng::from_rng(&mut rand::rng());
     let adjective = SHIELD_ADJECTIVES.choose(&mut rng).unwrap().to_owned();
     format!("{} {}", adjective, "shield")
 }
 
 pub fn generate_weapon_name() -> String {
-    let mut rng = thread_rng();
+    let mut rng = SmallRng::from_rng(&mut rand::rng());
     let adjective = WEAPON_ADJECTIVES.choose(&mut rng).unwrap().to_owned();
     let noun = WEAPON_NOUNS.choose(&mut rng).unwrap().to_owned();
     format!("{} {}", adjective, noun)

@@ -49,7 +49,7 @@ pub fn GameDayLog(game: DisplayGame, day: u32) -> Element {
     );
 
     match log_query.result().value() {
-        QueryResult::Ok(QueryValue::Logs(logs)) => {
+        QueryState::Settled(Ok(QueryValue::Logs(logs))) => {
             rsx! {
                 ul {
                     class: r#"
@@ -65,10 +65,10 @@ pub fn GameDayLog(game: DisplayGame, day: u32) -> Element {
                 }
             }
         }
-        QueryResult::Err(_) => {
+        QueryState::Settled(Err(_)) => {
             rsx! { p { class: "theme1:text-green-200 theme2:text-green-200", "Failed to load." } }
         }
-        QueryResult::Loading(_) => {
+        QueryState::Loading(_) => {
             rsx! { p { class: "theme1:text-green-200 theme2:text-green-200", "Loading..." } }
         }
         _ => { rsx! {} }

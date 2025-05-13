@@ -76,10 +76,10 @@ impl Item {
     }
 
     pub fn new_random(name: Option<&str>) -> Item {
-        let mut rng = SmallRng::from_entropy();
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
 
         let item_type = ItemType::random();
-        let is_shield = rng.gen_bool(0.5);
+        let is_shield = rng.random_bool(0.5);
 
         match (item_type, name) {
             (ItemType::Consumable, Some(name)) => Self::new_consumable(name),
@@ -100,11 +100,11 @@ impl Item {
     }
 
     pub fn new_weapon(name: &str) -> Item {
-        let mut rng = SmallRng::from_entropy();
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
 
         let quantity = 1;
         let attribute = Attribute::Strength;
-        let effect = rng.gen_range(1..=5);
+        let effect = rng.random_range(1..=5);
 
         Item::new(name, ItemType::Weapon, quantity, attribute, effect)
     }
@@ -115,11 +115,11 @@ impl Item {
     }
 
     pub fn new_consumable(name: &str) -> Item {
-        let mut rng = SmallRng::from_entropy();
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
 
         let quantity = 1;
         let attribute = Attribute::random();
-        let effect = rng.gen_range(1..=10);
+        let effect = rng.random_range(1..=10);
 
         Item::new(
             name,
@@ -131,11 +131,11 @@ impl Item {
     }
 
     pub fn new_random_consumable() -> Item {
-        let mut rng = SmallRng::from_entropy();
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
         let attribute = Attribute::random();
         let name = attribute.consumable_name();
         let quantity = 1;
-        let effect = rng.gen_range(1..=10);
+        let effect = rng.random_range(1..=10);
 
         Item::new(
             &name,
@@ -147,12 +147,12 @@ impl Item {
     }
 
     pub fn new_shield(name: &str) -> Item {
-        let mut rng = SmallRng::from_entropy();
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
 
         let item_type = ItemType::Weapon;
         let quantity = 1;
         let attribute = Attribute::Defense;
-        let effect = rng.gen_range(1..=7);
+        let effect = rng.random_range(1..=7);
 
         Item::new(name, item_type, quantity, attribute, effect)
     }
@@ -183,8 +183,8 @@ pub enum ItemType {
 
 impl ItemType {
     pub fn random() -> ItemType {
-        let mut rng = SmallRng::from_entropy();
-        match rng.gen_bool(0.5) {
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+        match rng.random_bool(0.5) {
             true => ItemType::Consumable,
             false => ItemType::Weapon,
         }
@@ -225,7 +225,7 @@ pub enum Attribute {
 
 impl Attribute {
     pub fn random() -> Attribute {
-        let mut rng = SmallRng::from_entropy();
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
         Attribute::iter().choose(&mut rng).unwrap()
     }
 }

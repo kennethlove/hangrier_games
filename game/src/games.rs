@@ -8,7 +8,7 @@ use crate::tributes::actions::Action;
 use crate::tributes::events::TributeEvent;
 use crate::tributes::statuses::TributeStatus;
 use crate::tributes::{ActionSuggestion, EncounterContext, EnvironmentContext, Tribute};
-use rand::prelude::SliceRandom;
+use rand::prelude::*;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
@@ -43,7 +43,7 @@ pub struct Game {
 impl Default for Game {
     /// Creates a new game with a random name.
     fn default() -> Game {
-        let wp_gen = witty_phrase_generator::WPGen::new();
+        let wp_gen = crate::witty_phrase_generator::WPGen::new();
         let mut name = String::new();
         if let Some(words) = wp_gen.with_words(3) {
             name = words.join("-").to_string();
@@ -115,13 +115,13 @@ impl Game {
 
     /// Returns a random area from the game.
     fn random_area(&mut self) -> Option<&mut AreaDetails> {
-        self.areas.choose_mut(&mut rand::thread_rng())
+        self.areas.choose_mut(&mut rand::rng())
     }
 
     /// Returns a random open area from the game.
     fn random_open_area(&self) -> Option<AreaDetails> {
         self.open_areas()
-            .choose(&mut rand::thread_rng())
+            .choose(&mut rand::rng())
             .cloned()
     }
 
@@ -305,7 +305,7 @@ impl Game {
         // If it is daytime and not day #1 or day #3, trigger an event
         if !day || ![1, 3].contains(&self.day.unwrap_or(1)) {
             for area_details in self.areas.iter_mut() {
-                if rng.gen_bool(frequency) {
+                if rng.random_bool(frequency) {
                     let area_event = AreaEvent::random();
                     area_details.events.push(area_event.clone());
                     let event_name = area_event.to_string();
@@ -325,13 +325,13 @@ impl Game {
                 .filter(|ad| ad.area.is_some())
                 .find(|ad| ad.area.clone().unwrap().to_string() == "Cornucopia")
                 .expect("Cannot find Cornucopia");
-            for _ in 0..rng.gen_range(1..=FEAST_WEAPON_COUNT) {
+            for _ in 0..rng.random_range(1..=FEAST_WEAPON_COUNT) {
                 area_details.add_item(Item::new_random_weapon());
             }
-            for _ in 0..rng.gen_range(1..=FEAST_SHIELD_COUNT) {
+            for _ in 0..rng.random_range(1..=FEAST_SHIELD_COUNT) {
                 area_details.add_item(Item::new_random_shield());
             }
-            for _ in 0..rng.gen_range(1..=FEAST_CONSUMABLE_COUNT) {
+            for _ in 0..rng.random_range(1..=FEAST_CONSUMABLE_COUNT) {
                 area_details.add_item(Item::new_random_consumable());
             }
         }
@@ -353,7 +353,7 @@ impl Game {
                 area_events.insert(area_name, (area_details.clone(), vec![event.clone()]));
             }
 
-            if rng.gen_bool(odds) {
+            if rng.random_bool(odds) {
                 // Assuming there's still an open area.
                 if let Some(area_details) = self.random_open_area() {
                     let event = AreaEvent::random();
@@ -417,7 +417,7 @@ impl Game {
             }
 
             // If the tribute is unlucky, they get a random event.
-            if !rng.gen_bool(tribute.attributes.luck as f64 / 100.0) {
+            if !rng.random_bool(tribute.attributes.luck as f64 / 100.0) {
                 tribute.events.push(TributeEvent::random());
             }
 
@@ -472,7 +472,7 @@ impl Game {
     /// 6. Run the tribute cycle.
     /// 7. Update the tributes in the game.
     async fn do_a_cycle(&mut self, day: bool) {
-        let mut rng = rand::rngs::SmallRng::from_entropy();
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
 
         // Announce area events
         self.announce_area_events();
@@ -790,7 +790,7 @@ mod tests {
         game.tributes.push(tribute2.clone());
 
         // Constrain areas
-        let mut rng = SmallRng::from_entropy();
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
         game.constrain_areas(&mut rng);
 
         // Check if at least one area is closed
@@ -810,7 +810,7 @@ mod tests {
         game.areas.push(area);
 
         // Run the tribute cycle
-        let mut rng = SmallRng::from_entropy();
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
         game.run_tribute_cycle(true, &mut rng).await;
 
         // Check if the tributes are updated correctly

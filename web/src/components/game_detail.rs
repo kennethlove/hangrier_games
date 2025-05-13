@@ -11,7 +11,7 @@ use crate::storage::{use_persistent, AppState};
 use crate::LoadingState;
 use dioxus::prelude::*;
 use dioxus_logger::tracing;
-use dioxus_query::prelude::{use_get_query, use_mutation, use_query_client, MutationResult, QueryResult, UseMutation, UseQueryClient};
+use dioxus_query::prelude::{use_get_query, use_mutation, use_query_client, MutationResult, MutationState, QueryResult, QueryState, UseMutation, UseQueryClient};
 use game::games::Game;
 use reqwest::StatusCode;
 use shared::{DisplayGame, GameStatus};
@@ -31,30 +31,30 @@ async fn fetch_display_game(keys: Vec<QueryKey>, token: String) -> QueryResult<Q
                 match response.error_for_status() {
                     Ok(response) => {
                         if let Ok(game) = response.json::<DisplayGame>().await {
-                            QueryResult::Ok(QueryValue::DisplayGame(Box::new(game)))
+                            Ok(QueryValue::DisplayGame(Box::new(game)))
                         } else {
-                            QueryResult::Err(QueryError::BadJson)
+                            Err(QueryError::BadJson)
                         }
                     }
                     Err(e) => {
                         if e.status() == Some(StatusCode::UNAUTHORIZED) {
-                            QueryResult::Err(QueryError::Unauthorized)
+                            Err(QueryError::Unauthorized)
                         } else {
-                            QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
+                            Err(QueryError::GameNotFound(identifier.to_string()))
                         }
                     }
                 }
             }
             Err(e) => {
                 if e.status() == Some(StatusCode::UNAUTHORIZED) {
-                    QueryResult::Err(QueryError::Unauthorized)
+                    Err(QueryError::Unauthorized)
                 } else {
-                    QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
+                    Err(QueryError::GameNotFound(identifier.to_string()))
                 }
             }
         }
     } else {
-        QueryResult::Err(QueryError::Unknown)
+        Err(QueryError::Unknown)
     }
 }
 
@@ -111,16 +111,16 @@ async fn next_step(args: (String, String)) -> MutationResult<MutationValue, Muta
     match request.send().await {
         Ok(response) => {
             match response.status() {
-                StatusCode::NO_CONTENT => MutationResult::Ok(MutationValue::GameFinished(identifier)),
-                StatusCode::CREATED => MutationResult::Ok(MutationValue::GameStarted(identifier)),
+                StatusCode::NO_CONTENT => Ok(MutationValue::GameFinished(identifier)),
+                StatusCode::CREATED => Ok(MutationValue::GameStarted(identifier)),
                 StatusCode::OK => {
-                    MutationResult::Ok(MutationValue::GameAdvanced(identifier))
+                    Ok(MutationValue::GameAdvanced(identifier))
                 },
-                _ => MutationResult::Err(MutationError::UnableToAdvanceGame),
+                _ => Err(MutationError::UnableToAdvanceGame),
             }
         }
         Err(_) => {
-            MutationResult::Err(MutationError::UnableToAdvanceGame)
+            Err(MutationError::UnableToAdvanceGame)
         }
     }
 }
@@ -133,35 +133,31 @@ async fn handle_next_step(
     mut loading_signal: Signal<LoadingState>,
 ) {
     loading_signal.set(LoadingState::Loading);
-    mutate.manual_mutate((game_id.clone(), token)).await;
+    mutate.mutate_async((game_id.clone(), token)).await;
 
     let mut invalidate_keys = None;
 
     match mutate.result().deref() {
-        MutationResult::Ok(mutation_result) => {
-            match mutation_result {
-                MutationValue::GameAdvanced(game_identifier)
-                | MutationValue::GameFinished(game_identifier)
-                | MutationValue::GameStarted(game_identifier) => {
-                    invalidate_keys = Some(vec![QueryKey::DisplayGame(game_identifier.into()), QueryKey::Games]);
+        MutationState::Settled(Ok(result)) => {
+            match result {
+                MutationValue::GameStarted(game_identifier) |
+                MutationValue::GameFinished(game_identifier) |
+                MutationValue::GameAdvanced(game_identifier) => {
+                    invalidate_keys = Some(vec![QueryKey::DisplayGame(game_identifier.clone().into()), QueryKey::Games]);
+                    loading_signal.set(LoadingState::Loaded);
                 }
-                _ => {}
+                _ => {
+                    loading_signal.set(LoadingState::Error); // Or an error state
+                }
             }
-            loading_signal.set(LoadingState::Loaded);
-        },
-        MutationResult::Err(MutationError::UnableToAdvanceGame) => {
-            tracing::error!("Failed to advance game {}", game_id);
-            // Potentially reset loading state or show an error message
-            loading_signal.set(LoadingState::Loaded); // Or an error state
-        },
-        MutationResult::Err(e) => {
-            tracing::error!("Mutation failed for game {}: {:?}", game_id, e);
-            loading_signal.set(LoadingState::Loaded); // Or an error state
-        },
-        _ => {
-            // Handle pending/uninitialized states if needed
-            // Usually covered by the initial loading_signal.set(LoadingState::Loading)
         }
+        MutationState::Settled(Err(MutationError::UnableToAdvanceGame)) => {
+            loading_signal.set(LoadingState::Error); // Or an error state
+        }
+        MutationState::Settled(Err(e)) => {
+            loading_signal.set(LoadingState::Error); // Or an error state
+        }
+        _ => {}
     }
 
     if let Some(keys) = invalidate_keys {
@@ -202,7 +198,7 @@ fn GameState(identifier: String) -> Element {
     );
 
     match game_query.result().value() {
-        QueryResult::Ok(QueryValue::DisplayGame(game_data)) => {
+        QueryState::Settled(Ok(QueryValue::DisplayGame(game_data))) => {
             let game = *game_data.clone();
             let game_id = game.identifier.clone();
             let g_id = game_id.clone();
@@ -313,7 +309,7 @@ fn GameState(identifier: String) -> Element {
                 }
             }
         },
-        QueryResult::Err(QueryError::GameNotFound(_)) => {
+        QueryState::Settled(Err(QueryError::GameNotFound(_))) => {
             rsx! {
                 p {
                     class: r#"
@@ -326,7 +322,7 @@ fn GameState(identifier: String) -> Element {
                 }
             }
         },
-        QueryResult::Err(QueryError::Unauthorized) => {
+        QueryState::Settled(Err(QueryError::Unauthorized)) => {
             rsx! {
                 p {
                     class: r#"
@@ -364,7 +360,7 @@ fn GameState(identifier: String) -> Element {
                 }
             }
         },
-        QueryResult::Err(e) => {
+        QueryState::Settled(Err(e)) => {
             rsx! {
                 p {
                     class: r#"
@@ -377,7 +373,7 @@ fn GameState(identifier: String) -> Element {
                 }
             }
         },
-        _ => {
+        QueryState::Loading(_) => {
             rsx! {
                 p {
                     class: r#"
@@ -390,6 +386,7 @@ fn GameState(identifier: String) -> Element {
                 }
             }
         }
+        QueryState::Settled(Ok(_)) => { rsx! {} }
     }
 }
 
@@ -404,7 +401,7 @@ fn GameStats(identifier: String) -> Element {
     );
 
     match game_query.result().value() {
-        QueryResult::Ok(QueryValue::DisplayGame(game)) => {
+        QueryState::Settled(Ok(QueryValue::DisplayGame(game))) => {
             let game_day = game.day.unwrap_or(0);
             let tribute_count = game.living_count;
 
@@ -501,8 +498,8 @@ fn GameStats(identifier: String) -> Element {
                 }
             }
         },
-        QueryResult::Err(_) => { rsx! {} },
-        _ => {
+        QueryState::Settled(Err(_)) => { rsx! {} },
+        QueryState::Loading(_) => {
             rsx! {
                 p {
                     class: r#"
@@ -515,6 +512,7 @@ fn GameStats(identifier: String) -> Element {
                 }
             }
         }
+        _ => { rsx! {} }
     }
 }
 
@@ -529,28 +527,9 @@ fn GameDetails(identifier: String) -> Element {
     );
 
     match display_game_query.result().value() {
-        QueryResult::Ok(QueryValue::DisplayGame(game)) => {
+        QueryState::Settled(Ok(QueryValue::DisplayGame(game))) => {
             let display_game = *game.clone();
             let day = display_game.clone().day.unwrap_or(0);
-
-            // let game_query = use_get_query(
-            //     [QueryKey::Game(identifier.clone())],
-            //     move |keys: Vec<QueryKey>| { fetch_full_game(keys, full_token.clone()) },
-            // );
-            //
-            // let mut game_signal: Signal<Option<Game>> = use_context();
-            //
-            // use_effect(move || {
-            //     match game_query.result().value() {
-            //         QueryResult::Ok(QueryValue::Game(game)) => {
-            //             game_signal.set(Some(*game.clone()));
-            //         }
-            //         QueryResult::Err(_) => {
-            //             game_signal.set(None);
-            //         }
-            //         _ => {}
-            //     }
-            // });
 
             rsx! {
                 div {
@@ -584,7 +563,7 @@ fn GameDetails(identifier: String) -> Element {
                 }
             }
         },
-        QueryResult::Err(_) => { rsx! { } },
+        QueryState::Settled(Err(_)) => { rsx! { } },
         _ => {
             rsx! {
                 p {

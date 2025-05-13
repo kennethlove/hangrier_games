@@ -6,7 +6,7 @@ use crate::components::map::Map;
 use crate::env::APP_API_HOST;
 use crate::storage::{use_persistent, AppState};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_get_query, QueryResult};
+use dioxus_query::prelude::{use_get_query, QueryResult, QueryState};
 use game::areas::AreaDetails;
 use shared::DisplayGame;
 
@@ -23,17 +23,17 @@ async fn fetch_areas(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryVal
             Ok(response) => {
                 match response.json::<Vec<AreaDetails>>().await {
                     Ok(areas) => {
-                        QueryResult::Ok(QueryValue::Areas(areas))
+                        Ok(QueryValue::Areas(areas))
                     }
-                    Err(_) => QueryResult::Err(QueryError::GameNotFound(identifier.to_string())),
+                    Err(_) => Err(QueryError::GameNotFound(identifier.to_string())),
                 }
             }
             Err(_) => {
-                QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
+                Err(QueryError::GameNotFound(identifier.to_string()))
             }
         }
     } else {
-        QueryResult::Err(QueryError::Unknown)
+        Err(QueryError::Unknown)
     }
 }
 
@@ -54,7 +54,7 @@ pub fn GameAreaList(game: DisplayGame) -> Element {
     );
 
     match area_query.result().value() {
-        QueryResult::Ok(QueryValue::Areas(areas)) => {
+        QueryState::Settled(Ok(QueryValue::Areas(areas))) => {
             rsx! {
                 ul {
                     class: "grid grid-cols-2 gap-4",
@@ -195,10 +195,10 @@ pub fn GameAreaList(game: DisplayGame) -> Element {
                 }
             }
         }
-        QueryResult::Err(_) => {
+        QueryState::Settled(Err(_)) => {
             rsx! { p { "Something went wrong" } }
         }
-        QueryResult::Loading(_) => {
+        QueryState::Loading(_) => {
             rsx! { p { "Loading..." } }
         }
         _ => { rsx! {} }

@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 dioxus = { version = "0.6.3", features = ["web", "router"] }
 dioxus-logger = "0.6.2"
-dioxus-query = "0.6.0"
+dioxus-query = "0.7.0"
 game = { path = "../game" }
 gloo-storage = "0.3.0"
 serde = { version = "1.0.216", features = ["derive"] }
@@ -14,16 +14,13 @@ shared = { path = "../shared" }
 reqwest = { version = "0.12.9", features = ["json"] }
 serde_json = "1.0.140"
 
-[dependencies.getrandom]
-version = "0.2.15"
-features = ["js"]
-
-[dependencies.wasm-bindgen]
-version = "0.2.99"
-
 [build-dependencies]
 dotenvy = "0.15.7"
 
 [features]
 default = ["web"]
 web = ["dioxus/web"]
+
+[dependencies.getrandom]
+features = ["wasm_js"]
+version = "0.3"

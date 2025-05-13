@@ -48,7 +48,7 @@ impl Display for AreaEvent {
 
 impl AreaEvent {
     pub fn random() -> AreaEvent {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
         Self::iter().choose(&mut rng).unwrap().clone()
     }
 }

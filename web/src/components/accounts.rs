@@ -1,6 +1,6 @@
 use std::ops::Deref;
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult};
+use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult, MutationState};
 use shared::{AuthenticatedUser, RegistrationUser};
 use crate::env::APP_API_HOST;
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
@@ -165,10 +165,9 @@ fn LoginForm() -> Element {
                                 username: username.clone(),
                                 password: password.clone(),
                             };
-                            mutate.manual_mutate(user).await;
-                            if mutate.result().is_ok() {
-                                match mutate.result().deref() {
-                                    MutationResult::Ok(MutationValue::User(user)) => {
+                            mutate.mutate(user);
+                            if let MutationState::Settled(Ok(result)) = mutate.result().deref() {
+                                if let MutationValue::User(user) = result {
                                         client.invalidate_queries(&[QueryKey::User]);
                                         disabled_signal.set(false);
                                         username_signal.set(String::default());
@@ -183,16 +182,13 @@ fn LoginForm() -> Element {
 
                                         let navigator = use_navigator();
                                         navigator.replace(Routes::GamesList {});
-                                    },
-                                    MutationResult::Err(MutationError::UnableToAuthenticateUser) => {
+                                }
+                            } else if let MutationState::Settled(Err(err)) = mutate.result().deref() {
+                                if let MutationError::UnableToAuthenticateUser = err {
                                         username_error_signal.set("Unable to authenticate user".to_string());
                                         disabled_signal.set(false);
-                                    },
-                                    _ => {}
+
                                 }
-                            } else {
-                                username_error_signal.set("Unable to authenticate user".to_string());
-                                disabled_signal.set(false);
                             }
                         });
                     }
@@ -308,10 +304,10 @@ fn RegisterForm() -> Element {
                                 username: username.clone(),
                                 password: password.clone(),
                             };
-                            mutate.manual_mutate(user).await;
-                            if mutate.result().is_ok() {
-                                match mutate.result().deref() {
-                                    MutationResult::Ok(MutationValue::User(user)) => {
+                            mutate.mutate(user);
+                            match mutate.result().deref() {
+                                MutationState::Settled(Ok(result)) => {
+                                    if let MutationValue::User(user) = result {
                                         client.invalidate_queries(&[QueryKey::User]);
                                         disabled_signal.set(false);
                                         username_signal.set(String::default());
@@ -327,16 +323,15 @@ fn RegisterForm() -> Element {
 
                                         let navigator = use_navigator();
                                         navigator.replace(Routes::GamesList {});
-                                    },
-                                    MutationResult::Err(MutationError::UnableToRegisterUser) => {
+                                    }
+                                },
+                                MutationState::Settled(Err(err)) => {
+                                    if let MutationError::UnableToRegisterUser = err {
                                         username_error_signal.set("Unable to register user".to_string());
-                                        disabled_signal.set(false);
-                                    },
-                                    _ => {}
-                                }
-                            } else {
-                                username_error_signal.set("Unable to register user".to_string());
-                                disabled_signal.set(false);
+                                    }
+                                    disabled_signal.set(false);
+                                },
+                                _ => {}
                             }
                         });
                     }

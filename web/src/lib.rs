@@ -12,4 +12,5 @@ pub enum LoadingState {
     Unloaded,
     Loading,
     Loaded,
+    Error,
 }

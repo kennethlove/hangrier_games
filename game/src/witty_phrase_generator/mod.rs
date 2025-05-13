@@ -14,6 +14,7 @@ pub struct WPGen {
     words_nouns: Vec<&'static str>,
 }
 
+#[allow(dead_code)]
 impl WPGen {
     pub fn new() -> WPGen {
         let words_intensifiers = include_str!("intensifiers.txt");

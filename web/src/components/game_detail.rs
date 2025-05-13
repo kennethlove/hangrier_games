@@ -31,30 +31,30 @@ async fn fetch_display_game(keys: Vec<QueryKey>, token: String) -> QueryResult<Q
                 match response.error_for_status() {
                     Ok(response) => {
                         if let Ok(game) = response.json::<DisplayGame>().await {
-                            QueryResult::Ok(QueryValue::DisplayGame(Box::new(game)))
+                            Ok(QueryValue::DisplayGame(Box::new(game)))
                         } else {
-                            QueryResult::Err(QueryError::BadJson)
+                            Err(QueryError::BadJson)
                         }
                     }
                     Err(e) => {
                         if e.status() == Some(StatusCode::UNAUTHORIZED) {
-                            QueryResult::Err(QueryError::Unauthorized)
+                            Err(QueryError::Unauthorized)
                         } else {
-                            QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
+                            Err(QueryError::GameNotFound(identifier.to_string()))
                         }
                     }
                 }
             }
             Err(e) => {
                 if e.status() == Some(StatusCode::UNAUTHORIZED) {
-                    QueryResult::Err(QueryError::Unauthorized)
+                    Err(QueryError::Unauthorized)
                 } else {
-                    QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
+                    Err(QueryError::GameNotFound(identifier.to_string()))
                 }
             }
         }
     } else {
-        QueryResult::Err(QueryError::Unknown)
+        Err(QueryError::Unknown)
     }
 }
 
@@ -111,16 +111,16 @@ async fn next_step(args: (String, String)) -> MutationResult<MutationValue, Muta
     match request.send().await {
         Ok(response) => {
             match response.status() {
-                StatusCode::NO_CONTENT => MutationResult::Ok(MutationValue::GameFinished(identifier)),
-                StatusCode::CREATED => MutationResult::Ok(MutationValue::GameStarted(identifier)),
+                StatusCode::NO_CONTENT => Ok(MutationValue::GameFinished(identifier)),
+                StatusCode::CREATED => Ok(MutationValue::GameStarted(identifier)),
                 StatusCode::OK => {
-                    MutationResult::Ok(MutationValue::GameAdvanced(identifier))
+                    Ok(MutationValue::GameAdvanced(identifier))
                 },
-                _ => MutationResult::Err(MutationError::UnableToAdvanceGame),
+                _ => Err(MutationError::UnableToAdvanceGame),
             }
         }
         Err(_) => {
-            MutationResult::Err(MutationError::UnableToAdvanceGame)
+            Err(MutationError::UnableToAdvanceGame)
         }
     }
 }
@@ -133,7 +133,7 @@ async fn handle_next_step(
     mut loading_signal: Signal<LoadingState>,
 ) {
     loading_signal.set(LoadingState::Loading);
-    mutate.mutate((game_id.clone(), token));
+    mutate.mutate_async((game_id.clone(), token)).await;
 
     let mut invalidate_keys = None;
 
@@ -147,24 +147,17 @@ async fn handle_next_step(
                     loading_signal.set(LoadingState::Loaded);
                 }
                 _ => {
-                    tracing::error!("Unexpected mutation result: {:?}", result);
-                    loading_signal.set(LoadingState::Loaded); // Or an error state
+                    loading_signal.set(LoadingState::Error); // Or an error state
                 }
             }
         }
         MutationState::Settled(Err(MutationError::UnableToAdvanceGame)) => {
-            tracing::error!("Failed to advance game {}", game_id);
-            // Potentially reset loading state or show an error message
-            loading_signal.set(LoadingState::Loaded); // Or an error state
+            loading_signal.set(LoadingState::Error); // Or an error state
         }
         MutationState::Settled(Err(e)) => {
-            tracing::error!("Mutation failed for game {}: {:?}", game_id, e);
-            loading_signal.set(LoadingState::Loaded); // Or an error state
+            loading_signal.set(LoadingState::Error); // Or an error state
         }
-        _ => {
-            // Handle pending/uninitialized states if needed
-            // Usually covered by the initial loading_signal.set(LoadingState::Loading)
-        }
+        _ => {}
     }
 
     if let Some(keys) = invalidate_keys {

@@ -395,20 +395,7 @@ impl Game {
     }
 
     /// Runs the tributes' logic for the current cycle.
-    async fn run_tribute_cycle(&mut self, day: bool, rng: &mut SmallRng) {
-        // Shuffle the tributes
-        self.tributes.shuffle(rng);
-        let closed_areas: Vec<Area> = self.closed_areas()
-            .iter()
-            .filter(|ad| ad.area.is_some())
-            .map(|ad| {
-                ad.area.clone().unwrap()
-            })
-            .clone()
-            .collect();
-        let living_tributes = self.living_tributes();
-        let living_tributes_count: usize = living_tributes.len();
-
+    async fn run_tribute_cycle(&mut self, day: bool, rng: &mut SmallRng, closed_areas: Vec<Area>, living_tributes: Vec<Tribute>, living_tributes_count: usize) {
         for tribute in self.tributes.iter_mut() {
             // Non-alive tributes should be skipped.
             if !tribute.is_alive() {
@@ -486,7 +473,20 @@ impl Game {
         // If the tribute count is low, constrain them by closing areas.
         self.constrain_areas(&mut rng).await;
 
-        self.run_tribute_cycle(day, &mut rng).await;
+        self.tributes.shuffle(&mut rng);
+        let closed_areas: Vec<Area> = self.closed_areas()
+            .iter()
+            .filter(|ad| ad.area.is_some())
+            .map(|ad| {
+                ad.area.clone().unwrap()
+            })
+            .clone()
+            .collect();
+        let living_tributes = self.living_tributes();
+        let living_tributes_count: usize = living_tributes.len();
+
+
+        self.run_tribute_cycle(day, &mut rng, closed_areas, living_tributes, living_tributes_count).await;
     }
 
     /// Any tributes who have died in the current cycle will be moved to the "dead" list,

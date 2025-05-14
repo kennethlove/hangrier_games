@@ -381,7 +381,7 @@ RETURN count(
             }
             GameStatus::InProgress => {
                 match dead_tribute_count {
-                    Some(23) | Some(24) => {
+                    Some(24) => {
                         DATABASE
                             .query("UPDATE $record_id SET status = $status")
                             .bind(("record_id", record_id.clone()))
@@ -774,9 +774,13 @@ LET $tributes = (
     WHERE out.identifier = $identifier
 );
 
+LET $living_tributes = (
+    SELECT * FROM $tributes.in WHERE attributes.health > 0
+);
+
 LET $winner = (
-    IF count($tributes) == 1 THEN
-        RETURN $tributes[0].name
+    IF count($living_tributes) == 1 THEN
+        RETURN $living_tributes[0].name
     ELSE
         RETURN ""
     END
@@ -803,8 +807,9 @@ FETCH tribute
 ;"#)
         .bind(("identifier", identifier.clone()))
         .await.unwrap();
+    tracing::debug!("Result: {:?}", result);
 
-    let game: Option<DisplayGame> = result.take(2).expect("No game found");
+    let game: Option<DisplayGame> = result.take(3).expect("No game found");
 
     if let Some(game) = game {
         (StatusCode::OK, Json(game)).into_response()

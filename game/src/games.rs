@@ -144,7 +144,7 @@ impl Game {
 
     /// Checks if the game has concluded (i.e., if there is a winner or if all tributes are dead).
     /// If concluded, it updates the game status, posts the final messages, and returns the game.
-    fn check_for_winner(&mut self) {
+    async fn check_for_winner(&mut self) {
         if let Some(winner) = self.winner() {
             add_game_message(
                 self.identifier.as_str(),
@@ -163,7 +163,7 @@ impl Game {
     /// Prepares the game state for a new cycle.
     /// Clears old messages and area events.
     /// Increments day count by 1 if it's a day cycle.
-    fn prepare_cycle(&mut self, day: bool) {
+    async fn prepare_cycle(&mut self, day: bool) {
         clear_messages().expect("Failed to clear messages for day");
 
         // Clear all events from the previous cycle
@@ -177,7 +177,7 @@ impl Game {
     }
 
     /// Announces the start of the cycle.
-    fn announce_cycle_start(&self, day: bool) {
+    async fn announce_cycle_start(&self, day: bool) {
         let current_day = self.day.unwrap_or(1);
 
         if day {
@@ -215,7 +215,7 @@ impl Game {
     }
 
     /// Announces the end of a cycle
-    fn announce_cycle_end(&self, day: bool) {
+    async fn announce_cycle_end(&self, day: bool) {
         add_game_message(
             self.identifier.as_str(),
             format!("{}", GameOutput::TributesLeft(self.living_tributes().len() as u32)),
@@ -247,26 +247,26 @@ impl Game {
     pub async fn run_day_night_cycle(&mut self, day: bool) {
         // Check if the game is over, and if so, end it.
         // This will also post the final messages.
-        self.check_for_winner();
+        self.check_for_winner().await;
 
         // Prepare the game for a new cycle
-        self.prepare_cycle(day);
+        self.prepare_cycle(day).await;
 
         // Announce the start of the cycle
-        self.announce_cycle_start(day);
+        self.announce_cycle_start(day).await;
 
         // Run the day
         self.do_a_cycle(day).await;
 
         // Announce the end of the cycle
-        self.announce_cycle_end(day);
+        self.announce_cycle_end(day).await;
 
         // Clean up any deaths
         self.clean_up_recent_deaths().await;
     }
 
     /// Announce events in closed areas.
-    fn announce_area_events(&self) {
+    async fn announce_area_events(&self) {
         for area_details in &self.areas {
             let area_name = area_details.area.clone().unwrap().to_string();
             if !area_details.is_open() {
@@ -289,7 +289,7 @@ impl Game {
     }
 
     /// Ensures at least one area is open. If not, opens a random area by clearing its events.
-    fn ensure_open_area(&mut self) {
+    async fn ensure_open_area(&mut self) {
         if self.random_open_area().is_none() {
             if let Some(area) = self.random_area() {
                 area.events.clear();
@@ -298,7 +298,7 @@ impl Game {
     }
 
     /// Triggers events for the current cycle.
-    fn trigger_cycle_events(&mut self, day: bool, rng: &mut SmallRng) {
+    async fn trigger_cycle_events(&mut self, day: bool, rng: &mut SmallRng) {
         let frequency = if day { DAY_EVENT_FREQUENCY } else { NIGHT_EVENT_FREQUENCY };
 
         // If it's nighttime, trigger an event
@@ -340,7 +340,7 @@ impl Game {
 
     /// If the tribute count is low, constrain them by closing areas.
     /// We achieve this by spawning events in open areas.
-    fn constrain_areas(&mut self, rng: &mut SmallRng) {
+    async fn constrain_areas(&mut self, rng: &mut SmallRng) {
         let tribute_count = self.living_tributes().len() as u32;
         let odds = tribute_count as f64 / 24.0;
         let mut area_events: HashMap<String, (AreaDetails, Vec<AreaEvent>)> = HashMap::new();
@@ -475,16 +475,16 @@ impl Game {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
 
         // Announce area events
-        self.announce_area_events();
+        self.announce_area_events().await;
 
         // If there are no open areas, we need to open one.
-        self.ensure_open_area();
+        self.ensure_open_area().await;
 
         // Trigger any events for this cycle
-        self.trigger_cycle_events(day, &mut rng);
+        self.trigger_cycle_events(day, &mut rng).await;
 
         // If the tribute count is low, constrain them by closing areas.
-        self.constrain_areas(&mut rng);
+        self.constrain_areas(&mut rng).await;
 
         self.run_tribute_cycle(day, &mut rng).await;
     }
@@ -502,7 +502,7 @@ impl Game {
                 self.tributes[i].statistics.day_killed = self.day;
                 let tribute_area = self.tributes[i].area.clone();
 
-                if let Some(area) = self.get_area_details_mut(tribute_area) {
+                if let Some(area) = self.get_area_details_mut(tribute_area).await {
                     for item in tribute_items {
                         area.add_item(item.clone());
                     }
@@ -514,7 +514,7 @@ impl Game {
     }
 
     /// Get a mutable reference to the area details for a given area.
-    fn get_area_details_mut(&mut self, area: Area) -> Option<&mut AreaDetails> {
+    async fn get_area_details_mut(&mut self, area: Area) -> Option<&mut AreaDetails> {
         self.areas.iter_mut().find(|ad| ad.area == Some(area.clone()))
     }
 }

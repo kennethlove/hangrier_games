@@ -188,9 +188,7 @@ name = "api"
 version = "0.1.13"
 dependencies = [
  "announcers",
- "async-stream",
  "axum",
- "futures",
  "game",
  "serde",
  "serde_json",

@@ -1,14 +1,10 @@
 use crate::tributes::{tribute_record_create, TributeOwns, TRIBUTES_ROUTER};
-use crate::DATABASE;
-use announcers::{summarize, summarize_stream};
-use axum::extract::Path;
+use crate::{AppError, AppState};
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::response::sse::Event;
-use axum::response::{IntoResponse, Sse};
 use axum::routing::{get, put};
 use axum::Router;
-use axum::{BoxError, Json};
-use futures::StreamExt;
+use axum::Json;
 use game::areas::{Area, AreaDetails};
 use game::games::Game;
 use game::items::Item;
@@ -22,10 +18,11 @@ use std::str::FromStr;
 use std::sync::LazyLock;
 use strum::IntoEnumIterator;
 use surrealdb::sql::Thing;
-use surrealdb::RecordId;
+use surrealdb::{RecordId, Surreal};
+use surrealdb::engine::any::Any;
 use uuid::Uuid;
 
-pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
+pub static GAMES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
     Router::new()
         .route("/", get(game_list).post(game_create))
         .route("/{game_identifier}", get(game_detail).delete(game_delete).put(game_update))
@@ -35,8 +32,8 @@ pub static GAMES_ROUTER: LazyLock<Router> = LazyLock::new(|| {
         .route("/{game_identifier}/log/{day}/{tribute_identifier}", get(tribute_logs))
         .route("/{game_identifier}/next", put(next_step))
         .route("/{game_identifier}/publish", put(publish_game))
-        .route("/{game_identifier}/summarize", get(game_summary))
-        .route("/{game_identifier}/summarize/{day}", get(game_day_summary))
+        // .route("/{game_identifier}/summarize", get(game_summary))
+        // .route("/{game_identifier}/summarize/{day}", get(game_day_summary))
         .route("/{game_identifier}/unpublish", put(unpublish_game))
         .nest("/{game_identifier}/tributes", TRIBUTES_ROUTER.clone())
 });
@@ -57,36 +54,62 @@ pub struct AreaItem {
     item: RecordId
 }
 
-async fn game_area_create(area: Area) -> Option<GameArea> {
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct GameResponse {
+    game: Option<Game>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GameSummary {
+    pub day: i64,
+    pub summary: String,
+}
+
+async fn game_area_create(area: Area, db: &Surreal<Any>) -> Result<GameArea, AppError> {
     let identifier = Uuid::new_v4().to_string();
-    let area_id: RecordId = RecordId::from(("area", identifier.clone()));
+    let area_id: RecordId = RecordId::from(("area", identifier.to_string()));
 
     // create the `area` record
-    DATABASE
+    let game_area: Option<GameArea> = db
         .insert::<Option<GameArea>>(area_id.clone())
         .content(GameArea {
-            identifier: identifier.clone(),
+            identifier: identifier.to_string(),
             name: area.to_string(),
             area: area.to_string(),
         })
-        .await.expect("Failed to find Area and Game link")
+        .await.expect("Failed to find Area and Game link");
+
+    if let Some(game_area) = game_area {
+        Ok(game_area)
+    } else {
+        Err(AppError::InternalServerError("Failed to create game area".into()))
+    }
 }
 
-async fn game_area_record_create(identifier: String, game_id: RecordId) -> Option<Vec<GameAreaRecord>> {
-    DATABASE
+async fn game_area_record_create(identifier: Uuid, game_id: RecordId, db: &Surreal<Any>) -> Result<Vec<GameAreaRecord>, AppError> {
+    let gar = db
         .insert::<Option<Vec<GameAreaRecord>>>(
-            RecordId::from(("areas", identifier.clone()))
+            RecordId::from(("areas", identifier.to_string()))
         ).relation(
         GameAreaRecord {
             game: game_id.clone(),
-            area: RecordId::from(("area", &identifier)),
+            area: RecordId::from(("area", &identifier.to_string())),
         }
-    ).await.expect("Failed to link Area and Game")
+    ).await.expect("Failed to link Area and Game");
+
+    if let Some(gar) = gar {
+        Ok(gar)
+    } else {
+        Err(AppError::InternalServerError("Failed to create game area record".into()))
+    }
 }
 
-async fn game_area_record_creator(area: Area, game_identifier: String) -> Option<GameAreaRecord> {
+async fn game_area_record_creator(area: Area, game_identifier: Uuid, db: &Surreal<Any>) -> Result<GameAreaRecord, AppError> {
     // Does the `area` exist for the game?
-    let mut existing_area = DATABASE.query(r#"
+    let existing_area: Option<String>;
+    let game_identifier = game_identifier.to_string();
+
+    if let Ok(mut area) = db.query(r#"
         SELECT identifier
         FROM area
         WHERE original_name = '$name'
@@ -94,48 +117,67 @@ async fn game_area_record_creator(area: Area, game_identifier: String) -> Option
     )
         .bind(("name", area.clone()))
         .bind(("game_id", game_identifier.clone()))
-        .await.expect("Failed to query game area");
-    let existing_area: Option<String> = existing_area.take(0).unwrap(); // e.g. a UUID
+        .await
+    {
+        existing_area = area.take::<Option<String>>(0).unwrap(); // e.g. a UUID
+    } else {
+        existing_area = None;
+    }
 
     let game_id = RecordId::from(("game", game_identifier));
-    let gar: Option<Vec<GameAreaRecord>>;
+    let gar: Vec<GameAreaRecord>;
 
     if let Some(identifier) = existing_area {
         // The `area` exists, create the `areas` connection
-        gar = game_area_record_create(identifier, game_id).await;
+        let uuid = Uuid::from_str(identifier.as_str()).expect("Bad UUID");
+        gar = game_area_record_create(uuid, game_id, &db).await?;
     } else {
         // The `area` does not exist, create the `area`
-        if let Some(area) = game_area_create(area).await {
+        if let Ok(area) = game_area_create(area, &db).await {
             // Then create the `areas` connection
             let identifier = area.identifier.clone();
-            gar = game_area_record_create(identifier, game_id).await;
-        } else { return None; }
+            let uuid = Uuid::from_str(identifier.as_str()).expect("Bad UUID");
+            gar = game_area_record_create(uuid, game_id, &db).await?;
+        } else {
+            return Err(AppError::InternalServerError("Failed to create game area".into()));
+        }
     }
-    gar.expect("Failed to link area and game.").clone().pop()
+
+    if !gar.is_empty() {
+        if let Some(resp) = gar.clone().pop() {
+            Ok(resp)
+        } else {
+            Err(AppError::InternalServerError("Failed to create game area".into()))
+        }
+    } else {
+        Err(AppError::InternalServerError("Failed to create game area record".into()))
+    }
 }
 
-pub async fn game_create(Json(payload): Json<Game>) -> impl IntoResponse {
-    let game: Option<Game> = DATABASE
+pub async fn game_create(state: State<AppState>, Json(payload): Json<Game>) -> Result<Json<Game>, AppError> {
+    let game: Option<Game> = state.db
         .create(("game", &payload.identifier))
         .content(payload.clone())
-        .await.expect("failed to create game");
+        .await.expect("Failed to create game");
     let game = game.unwrap();
 
     for _ in 0..24 {
-        tribute_record_create(None, payload.clone().identifier).await;
+        tribute_record_create(None, payload.clone().identifier, &state.db).await.expect("Failed to create tributes");
     }
 
     for area in Area::iter() {
+        let uuid = Uuid::from_str(payload.clone().identifier.as_str()).expect("Bad UUID");
         let game_area = game_area_record_creator(
             area.clone(), // Area to link to,
-            payload.clone().identifier // Game to link to,
+            uuid, // Game to link to,
+            &state.db // Database connection
         ).await.expect("Failed to create game area");
 
         for _ in 0..3 {
             // Insert an item
             let new_item: Item = Item::new_random(None);
             let new_item_id: RecordId = RecordId::from(("item", &new_item.identifier));
-            DATABASE
+            state.db
                 .insert::<Option<Item>>(new_item_id.clone())
                 .content(new_item.clone())
                 .await.expect("failed to insert item");
@@ -145,19 +187,19 @@ pub async fn game_create(Json(payload): Json<Game>) -> impl IntoResponse {
                 area: game_area.area.clone(),
                 item: new_item_id.clone(),
             };
-            DATABASE
+            state.db
                 .insert::<Vec<AreaItem>>("items")
                 .relation([area_item])
                 .await.expect("");
         }
     }
 
-    (StatusCode::OK, Json::<Game>(game.clone())).into_response()
+    Ok(Json::<Game>(game.clone()))
 }
 
-pub async fn game_delete(game_identifier: Path<String>) -> StatusCode {
+pub async fn game_delete(game_identifier: Path<String>, state: State<AppState>) -> Result<StatusCode, AppError> {
     let game_identifier = game_identifier.to_string().clone();
-    let mut result = DATABASE.query(r#"
+    let mut result = state.db.query(r#"
     SELECT <-playing_in<-tribute as tribute,
            <-playing_in<-tribute->owns->item as item,
            <-playing_in<-tribute->owns as owns
@@ -174,33 +216,37 @@ pub async fn game_delete(game_identifier: Path<String>) -> StatusCode {
 
     let game_pieces: Option<HashMap<String, Vec<Thing>>> = result.take(0).unwrap();
     let area_pieces: Option<HashMap<String, Vec<Thing>>> = result.take(1).unwrap();
-    if game_pieces.is_some() { delete_pieces(game_pieces.unwrap()).await };
-    if area_pieces.is_some() { delete_pieces(area_pieces.unwrap()).await };
+    if game_pieces.is_some() { delete_pieces(game_pieces.unwrap(), &state.db).await? };
+    if area_pieces.is_some() { delete_pieces(area_pieces.unwrap(), &state.db).await? };
 
-    let game: Option<Game> = DATABASE.delete(("game", &game_identifier)).await.expect("Failed to delete game");
+    let game: Option<Game> = state.db.delete(("game", &game_identifier)).await.expect("Failed to delete game");
     match game {
-        Some(_) => StatusCode::NO_CONTENT,
+        Some(_) => Ok(StatusCode::NO_CONTENT),
         None => {
-            StatusCode::INTERNAL_SERVER_ERROR
+            Err(AppError::InternalServerError("Failed to delete game".into()))
         }
     }
 }
 
-async fn delete_pieces(pieces: HashMap<String, Vec<Thing>>) {
+async fn delete_pieces(pieces: HashMap<String, Vec<Thing>>, db: &Surreal<Any>) -> Result<(), AppError>{
     for (table, ids) in pieces {
-        let _ = DATABASE
+        let db = db
             .query("DELETE $table WHERE id IN [$ids]".to_string())
             .bind(("table", table.clone()))
             .bind(("ids", ids.iter()
                 .map(|i| format!(r#"{table}:{}"#, i.id))
                 .collect::<Vec<String>>().join(",")
             ))
-            .await.unwrap_or_else(|_| panic!("Failed to delete {} pieces.", table));
+            .await;
+        if db.is_err() {
+            return Err(AppError::InternalServerError(format!("Failed to delete {} pieces.", table)));
+        }
     }
+    Ok(())
 }
 
-pub async fn game_list() -> impl IntoResponse {
-    let mut games = DATABASE.query(r#"
+pub async fn game_list(state: State<AppState>) -> Result<Json<Vec<DisplayGame>>, AppError> {
+    let mut games = state.db.query(r#"
 SELECT name, identifier, status, day, private,
 created_by.id == $auth.id AS is_mine,
 created_by.username,
@@ -223,25 +269,26 @@ FROM game
 
     match games.take::<Vec<DisplayGame>>(0) {
         Ok(games) => {
-            (StatusCode::OK, Json::<Vec<DisplayGame>>(games)).into_response()
+            Ok(Json::<Vec<DisplayGame>>(games))
         }
         Err(e) => {
             tracing::error!("{}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json::<Vec<Game>>(Vec::new())).into_response()
+            Err(AppError::InternalServerError("Failed to fetch games".into()))
         }
     }
 }
 
-pub async fn game_detail(game_identifier: Path<String>) -> impl IntoResponse {
-    let identifier = game_identifier.0;
-    let day = DATABASE
-        .query("SELECT day FROM game WHERE identifier = '$identifier' LIMIT 1")
+pub async fn game_detail(game_identifier: Path<Uuid>, state: State<AppState>) -> Result<Json<DisplayGame>, AppError> {
+    // let identifier = game_identifier.0;
+    let identifier = game_identifier.to_string();
+    let day = state.db
+        .query("SELECT day FROM game WHERE identifier = $identifier LIMIT 1")
         .bind(("identifier", identifier.clone()))
         .await;
     let day: Option<i64> = day.unwrap().take("day").unwrap();
     let day: i64 = day.unwrap_or(0);
 
-    let mut result = DATABASE.query(r#"
+    let mut result = state.db.query(r#"
 SELECT *, (
     SELECT *,
     ->owns->item[*] AS items, (
@@ -271,14 +318,14 @@ WHERE identifier = $identifier;"#)
     let game: Option<DisplayGame> = result.take(0).expect("No game found");
 
     if let Some(game) = game {
-        (StatusCode::OK, Json(Some(game))).into_response()
+        Ok(Json(game))
     } else {
-        (StatusCode::NOT_FOUND, Json(None::<DisplayGame>)).into_response()
+        Err(AppError::NotFound("Failed to find game".into()))
     }
 }
 
-pub async fn game_update(Path(_): Path<String>, Json(payload): Json<EditGame>) -> (StatusCode, Json<Option<Game>>) {
-    let response = DATABASE.query(r#"
+pub async fn game_update(Path(_): Path<String>, state: State<AppState>, Json(payload): Json<EditGame>) -> Result<Json<Game>, AppError> {
+    let response = state.db.query(r#"
         UPDATE game
         SET name = $name, private = $private
         WHERE identifier = $identifier;
@@ -292,72 +339,71 @@ pub async fn game_update(Path(_): Path<String>, Json(payload): Json<EditGame>) -
     match response {
         Ok(mut response) => {
             let game: Option<Game> = response.take(0).unwrap();
-            (StatusCode::OK, Json::<Option<Game>>(game))
+            if let Some(game) = game {
+                Ok(Json::<Game>(game))
+            } else if let None = game {
+                Err(AppError::NotFound("Failed to find game".into()))
+            } else {
+                unreachable!()
+            }
         }
-        Err(e) => {
-            tracing::error!("{}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json::<Option<Game>>(None))
+        Err(_) => {
+            Err(AppError::InternalServerError("Failed to update game".into()))
         }
     }
 }
 
-pub async fn game_areas(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<AreaDetails>>) {
-    let response = DATABASE.query(r#"
+pub async fn game_areas(Path(identifier): Path<Uuid>, state: State<AppState>) -> Result<Json<Vec<AreaDetails>>, AppError> {
+    let response = state.db.query(r#"
 SELECT (
     SELECT *, ->items->item[*] AS items
     FROM ->areas->area
 ) AS areas FROM game WHERE identifier = $identifier;
-"#).bind(("identifier", identifier)).await;
+"#).bind(("identifier", identifier.to_string())).await;
 
     match response {
         Ok(mut response) => {
             let areas: Vec<Vec<AreaDetails>> = response.take("areas").unwrap();
-            (StatusCode::OK, Json::<Vec<AreaDetails>>(areas[0].clone()))
+            Ok(Json::<Vec<AreaDetails>>(areas[0].clone()))
         }
         Err(e) => {
-            tracing::error!("{}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(vec![]))
+            Err(AppError::InternalServerError(format!("Failed to fetch areas: {}", e)))
         }
     }
 }
 
-pub async fn game_tributes(Path(identifier): Path<String>) -> (StatusCode, Json<Vec<Tribute>>) {
-    let mut game_day = DATABASE
+pub async fn game_tributes(Path(identifier): Path<Uuid>, state: State<AppState>) -> Result<Json<Vec<Tribute>>, AppError> {
+    let mut game_day = state.db
         .query("SELECT day FROM game WHERE identifier = $identifier")
-        .bind(("identifier", identifier.clone()))
+        .bind(("identifier", identifier.to_string()))
         .await.unwrap();
     let game_day: Option<i64> = game_day.take("day").unwrap();
     let _game_day: i64 = game_day.unwrap_or(0);
 
 
-    let response = DATABASE.query(r#"
+    let response = state.db.query(r#"
 SELECT (
     SELECT *, ->owns->item[*] as items
     FROM <-playing_in<-tribute
     ORDER district
 ) AS tributes FROM game WHERE identifier = $identifier;"#)
-        .bind(("identifier", identifier.clone())).await;
+        .bind(("identifier", identifier.to_string())).await;
 
     match response {
         Ok(mut response) => {
             let tributes: Vec<Vec<Tribute>> = response.take("tributes").unwrap();
-            (StatusCode::OK, Json::<Vec<Tribute>>(tributes[0].clone()))
+            Ok(Json::<Vec<Tribute>>(tributes[0].clone()))
         }
         Err(e) => {
-            tracing::error!("{}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(vec![]))
+            Err(AppError::InternalServerError(format!("Failed to fetch tributes: {}", e)))
         }
     }
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
-pub struct GameResponse {
-    game: Option<Game>,
-}
-
-pub async fn next_step(Path(identifier): Path<String>) -> impl IntoResponse {
+pub async fn next_step(Path(identifier): Path<Uuid>, state: State<AppState>) -> Result<Json<GameResponse>, AppError> {
+    let identifier = identifier.to_string();
     let record_id = RecordId::from(("game", identifier.clone()));
-    let mut result = DATABASE.query(r#"
+    let mut result = state.db.query(r#"
 SELECT status FROM game WHERE identifier = $identifier;
 RETURN count(
     SELECT in.identifier
@@ -372,49 +418,52 @@ RETURN count(
         let status = GameStatus::from_str(status.as_str()).expect("Invalid game status");
         match status {
             GameStatus::NotStarted => {
-                DATABASE
+                state.db
                     .query("UPDATE $record_id SET status = $status")
                     .bind(("record_id", record_id.clone()))
                     .bind(("status", GameStatus::InProgress))
                     .await.expect("Failed to start game");
-                (StatusCode::CREATED, Json(GameResponse::default())).into_response()
+                Ok(Json(GameResponse::default()))
             }
-            GameStatus::InProgress => {
-                match dead_tribute_count {
-                    Some(24) => {
-                        DATABASE
-                            .query("UPDATE $record_id SET status = $status")
-                            .bind(("record_id", record_id.clone()))
-                            .bind(("status", GameStatus::Finished))
-                            .await.expect("Failed to end game");
-                        (StatusCode::NO_CONTENT, Json(GameResponse::default())).into_response()
-                    }
-                    _ => {
-                        if let Some(mut game) = get_full_game(identifier).await {
+            GameStatus::InProgress | GameStatus::Finished => {
+                let uuid = Uuid::parse_str(identifier.as_str()).expect("Failed to parse UUID");
+                if let Ok(Json(mut game)) = get_full_game(uuid, &state.db).await {
+                    match dead_tribute_count {
+                        Some(24) => {
+                            state.db
+                                .query("UPDATE $record_id SET status = $status")
+                                .bind(("record_id", record_id.clone()))
+                                .bind(("status", GameStatus::Finished))
+                                .await.expect("Failed to end game");
+                            Ok(Json(GameResponse::default()))
+                        }
+                        _ => {
                             // Run day
                             game.run_day_night_cycle(true).await;
-                            save_game(&game).await;
+                            let _ = save_game(&game, &state.db).await.expect("Day cycle failed");
 
                             // Run night
                             game.run_day_night_cycle(false).await;
-                            save_game(&game).await;
+                            let _ = save_game(&game, &state.db).await.expect("Night cycle failed");
 
-                            (StatusCode::OK, Json(GameResponse { game: Some(game) })).into_response()
-                        } else {
-                            StatusCode::NOT_FOUND.into_response()
+                            Ok(Json(GameResponse { game: Some(game) }))
                         }
                     }
+                } else {
+                    tracing::info!("Full game could not be found");
+                    Err(AppError::NotFound("Failed to find game".into()))
                 }
             }
-            GameStatus::Finished => {
-                StatusCode::NO_CONTENT.into_response()
-            }
         }
-    } else { StatusCode::NOT_FOUND.into_response() }
+    } else {
+        tracing::info!("Game could not be found");
+        Err(AppError::NotFound("Failed to find game".into()))
+    }
 }
 
-async fn get_full_game(identifier: String) -> Option<Game> {
-    let mut result = DATABASE.query(r#"
+async fn get_full_game(identifier: Uuid, db: &Surreal<Any>) -> Result<Json<Game>, AppError> {
+    let identifier = identifier.to_string();
+    let mut result = db.query(r#"
 SELECT *, (
     SELECT *, ->owns->item[*] AS items
     FROM <-playing_in<-tribute[*]
@@ -434,10 +483,14 @@ FROM game
 WHERE identifier = $identifier;"#)
         .bind(("identifier", identifier.clone()))
         .await.unwrap();
-    result.take(0).expect("No game found")
+    if let Some(game) = result.take(0).expect("No game found") {
+        Ok(Json::<Game>(game))
+    } else {
+        Err(AppError::NotFound("Failed to find game".into()))
+    }
 }
 
-async fn save_game(game: &Game) -> Option<Game> {
+async fn save_game(game: &Game, db: &Surreal<Any>) -> Result<Json<Game>, AppError> {
     let game_identifier = RecordId::from(("game", game.identifier.clone()));
     let mut saved_game = game.clone();
 
@@ -445,17 +498,12 @@ async fn save_game(game: &Game) -> Option<Game> {
     if let Ok(logs) = get_all_messages() {
         for mut log in logs {
             log.game_day = game.day.unwrap_or_default();
-            match DATABASE
+            if let Err(_) = db
                 .upsert::<Option<GameMessage>>(("message", &log.identifier))
                 .content(log.clone())
-                .await {
-                Ok(_) => {
-                    // Successfully saved
-                }
-                Err(err) => {
-                    eprintln!("Error saving message: {err:?}");
-                    // Handle the error
-                }
+                .await
+            {
+                return Err(AppError::InternalServerError("Failed to save game log".into()));
             }
         }
     }
@@ -466,13 +514,10 @@ async fn save_game(game: &Game) -> Option<Game> {
     for mut area in areas {
         let id = RecordId::from(("area", area.identifier.clone()));
         let items = area.items.clone();
-        let _ = save_area_items(items, id.clone()).await;
+        let _ = save_area_items(items, id.clone(), &db).await;
         area.items = vec![];
 
-        DATABASE
-            .update::<Option<AreaDetails>>(id)
-            .content(area)
-            .await.expect("Failed to update area items");
+        db.update::<Option<AreaDetails>>(id).content(area).await.expect("Failed to update area items");
     }
 
     let tributes = game.tributes.clone();
@@ -484,42 +529,37 @@ async fn save_game(game: &Game) -> Option<Game> {
         if !tribute.is_alive() { items.clear(); }
         tribute.items = vec![];
 
-        let _ = save_tribute_items(items, id.clone()).await;
+        let _ = save_tribute_items(items, id.clone(), &db).await;
 
-        DATABASE
-            .update::<Option<Tribute>>(id)
-            .content(tribute)
-            .await.expect("Failed to update tributes");
+        db.update::<Option<Tribute>>(id).content(tribute).await.expect("Failed to update tributes");
     }
 
-    DATABASE
-        .update::<Option<Game>>(game_identifier.clone())
-        .content(saved_game)
-        .await.expect("Failed to update game")
+    let game = db.update::<Option<Game>>(game_identifier.clone()).content(saved_game).await.expect("Failed to update game");
+    if let Some(game) = game {
+        Ok(Json(game))
+    } else {
+        Err(AppError::NotFound("Failed to find game".into()))
+    }
 }
 
-async fn save_area_items(items: Vec<Item>, owner: RecordId) {
-    let _ = DATABASE
-        .query("DELETE FROM items WHERE in = $owner")
+async fn save_area_items(items: Vec<Item>, owner: RecordId, db: &Surreal<Any>) -> Result<(), AppError> {
+    let _ = db.query("DELETE FROM items WHERE in = $owner")
         .bind(("owner", owner.clone()))
         .await.expect("Failed to delete items");
 
     for item in items {
         let item_identifier = RecordId::from(("item", item.identifier.clone()));
         if item.quantity == 0 {
-            DATABASE
-                .delete::<Option<Item>>(item_identifier.clone())
+            db.delete::<Option<Item>>(item_identifier.clone())
                 .await.expect("Failed to delete item");
-            return;
         } else {
-            DATABASE
-                .update::<Option<Item>>(item_identifier.clone())
+            db.update::<Option<Item>>(item_identifier.clone())
                 .content(item.clone())
                 .await.expect("Failed to update item");
         }
 
         if item.quantity > 0 {
-            let _: Vec<TributeOwns> = DATABASE.insert("items").relation(
+            let _: Vec<TributeOwns> = db.insert("items").relation(
                 AreaItem {
                     area: owner.clone(),
                     item: item_identifier.clone(),
@@ -527,30 +567,28 @@ async fn save_area_items(items: Vec<Item>, owner: RecordId) {
             ).await.expect("Failed to update Items relation");
         }
     }
+
+    Ok(())
 }
 
-async fn save_tribute_items(items: Vec<Item>, owner: RecordId) {
-    let _ = DATABASE
-        .query("DELETE FROM owns WHERE in = $owner")
+async fn save_tribute_items(items: Vec<Item>, owner: RecordId, db: &Surreal<Any>) -> Result<(), AppError> {
+    let _ = db.query("DELETE FROM owns WHERE in = $owner")
         .bind(("owner", owner.clone()))
         .await.expect("Failed to delete items");
 
     for item in items {
         let item_identifier = RecordId::from(("item", item.identifier.clone()));
         if item.quantity == 0 {
-            DATABASE
-                .delete::<Option<Item>>(item_identifier.clone())
+            db.delete::<Option<Item>>(item_identifier.clone())
                 .await.expect("Failed to delete item");
-            return;
         } else {
-            DATABASE
-                .update::<Option<Item>>(item_identifier.clone())
+            db.update::<Option<Item>>(item_identifier.clone())
                 .content(item.clone())
                 .await.expect("Failed to update item");
         }
 
         if item.quantity > 0 {
-            let _: Vec<TributeOwns> = DATABASE.insert("owns").relation(
+            let _: Vec<TributeOwns> = db.insert("owns").relation(
                 TributeOwns {
                     tribute: owner.clone(),
                     item: item_identifier.clone(),
@@ -558,17 +596,12 @@ async fn save_tribute_items(items: Vec<Item>, owner: RecordId) {
             ).await.expect("Failed to update Owns relation");
         }
     }
+    Ok(())
 }
 
-async fn game_day_logs(Path((game_identifier, day)): Path<(String, String)>) -> Json<Vec<GameMessage>> {
-    let day: u32 = match day.parse() {
-        Ok(num) => num,
-        Err(_) => {
-            eprintln!("Invalid day: {day}");
-            return Json(vec![]);
-        }
-    };
-    match DATABASE
+async fn game_day_logs(Path((game_identifier, day)): Path<(Uuid, u32)>, state: State<AppState>) -> Result<Json<Vec<GameMessage>>, AppError> {
+    let game_identifier = game_identifier.to_string();
+    match state.db
         .query(r#"SELECT * FROM message
         WHERE string::starts_with(subject, $identifier) AND
         game_day = $day ORDER BY timestamp;"#)
@@ -581,22 +614,23 @@ async fn game_day_logs(Path((game_identifier, day)): Path<(String, String)>) -> 
                 eprintln!("Error taking logs: {err:?}");
                 vec![]
             });
-            Json(logs)
+            Ok(Json(logs))
         }
         Err(err) => {
-            eprintln!("{err:?}");
-            Json(vec![])
+            Err(AppError::NotFound(format!("Failed to get logs: {err:?}")))
         }
     }
 }
 
-async fn tribute_logs(Path((game_identifier, day, tribute_identifier)): Path<(String, String, String)>) -> Json<Vec<GameMessage>> {
-    match DATABASE
+async fn tribute_logs(Path((game_identifier, day, tribute_identifier)): Path<(Uuid, u32, Uuid)>, state: State<AppState>) -> Result<Json<Vec<GameMessage>>, AppError> {
+    let game_identifier = game_identifier.to_string();
+    let tribute_identifier = tribute_identifier.to_string();
+    match state.db
         .query(r#"SELECT *
         FROM message
-        WHERE string::starts_with(subject, "$game_identifier")
+        WHERE string::starts_with(subject, $game_identifier)
         AND game_day = $day
-        AND source.value = "$tribute_identifier"
+        AND source.value = $tribute_identifier
         ORDER BY timestamp;"#.to_string())
         .bind(("game_identifier", game_identifier))
         .bind(("day", day))
@@ -605,166 +639,47 @@ async fn tribute_logs(Path((game_identifier, day, tribute_identifier)): Path<(St
     {
         Ok(mut logs) => {
             let logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
-            Json(logs)
+            Ok(Json(logs))
         }
         Err(err) => {
-            eprintln!("{err:?}");
-            Json(vec![])
+            Err(AppError::NotFound(format!("Failed to get logs: {err:?}")))
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct GameSummary {
-    pub day: i64,
-    pub summary: String,
-}
-
-async fn game_day_summary(Path((game_identifier, day)): Path<(String, String)>) -> Json<String> {
-    match DATABASE
-        .query(r#"SELECT * FROM summary WHERE <-game->game.identifier = "$game_identifier" AND day = $day;"#)
-        .bind(("game_identifier", game_identifier.clone()))
-        .bind(("day", day.clone()))
-        .await
-    {
-        Ok(mut logs) => {
-            let log: Option<GameSummary> = logs.take(0).expect("log is empty");
-            if log.is_some() {
-                let log = log.unwrap();
-                let summary = log.summary;
-                Json(summary)
-            } else {
-                match DATABASE.query(r#"
-                    SELECT *
-                    FROM message
-                    WHERE string::starts_with(subject, "$game_identifier")
-                    AND game_day = $day
-                    ORDER BY timestamp;
-                    "#
-                )
-                    .bind(("game_identifier", game_identifier))
-                    .bind(("day", day.clone()))
-                    .await
-                {
-                    Ok(mut logs) => {
-                        let logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
-                        let logs = logs.into_iter().map(|l| l.content).collect::<Vec<String>>().join("\n");
-                        if !logs.is_empty() {
-                            let res = summarize(&logs).await;
-
-                            if let Ok(res) = res {
-                                // TODO: Save summary to database
-                                Json(res)
-                            } else {
-                                Json(String::new())
-                            }
-                        } else {
-                            Json(String::new())
-                        }
-                    }
-                    Err(_err) => {
-                        Json(String::new())
-                    }
-                }
-            }
-        }
-        Err(err) => {
-            eprintln!("{err:?}");
-            Json(String::new())
-        }
-    }
-}
-
-async fn game_summary(Path(game_identifier): Path<String>) -> impl IntoResponse {
-    let result = DATABASE.query(r#"SELECT *
-        FROM message
-        WHERE string::starts_with(subject, "$game_identifier")
-        ORDER BY timestamp;"#)
-        .bind(("game_identifier", game_identifier.clone()))
-        .await;
-
-    let stream = match result {
-        Ok(mut result) => {
-            let logs: Vec<GameMessage> = match result.take(0) {
-                Ok(logs) => logs,
-                Err(e) => {
-                    eprintln!("Error taking logs: {}", e);
-                    return Sse::new(async_stream::stream! {
-                        yield Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "Error taking logs")) as BoxError);
-                    }.boxed());
-                }
-            };
-
-            let logs = logs.into_iter()
-                .map(|l| l.content)
-                .collect::<Vec<String>>()
-                .join("\n");
-
-            if !logs.is_empty() {
-                let text_stream = summarize_stream(&logs).await;
-
-                // Create a new stream that converts String results to Event objects
-                let event_stream = async_stream::stream! {
-                    let mut stream = text_stream;
-                    while let Some(result) = stream.next().await {
-                        match result {
-                            Ok(text) => yield Ok(Event::default().data(text)),
-                            Err(e) => yield Ok(Event::default().data(format!("Error: {}", e)))
-                        }
-                    }
-                };
-
-                event_stream.boxed()
-            } else {
-                async_stream::stream! {
-                    yield Ok(Event::default().data("No logs found"));
-                }.boxed()
-            }
-        }
-        Err(e) => {
-            eprintln!("Error querying logs: {}", e);
-            async_stream::stream! {
-                yield Ok(Event::default().data(format!("Error querying logs: {}", e)));
-            }.boxed()
-        }
-    };
-
-    Sse::new(stream)
-}
-
-async fn publish_game(Path(game_identifier): Path<String>) -> impl IntoResponse {
-    let response = DATABASE
+async fn publish_game(Path(game_identifier): Path<Uuid>, state: State<AppState>) -> Result<StatusCode, AppError> {
+    let game_identifier = game_identifier.to_string();
+    let response = state.db
         .query("UPDATE game SET private = false WHERE identifier = '$identifier'")
         .bind(("identifier", game_identifier))
         .await;
 
     match response {
-        Ok(_) => StatusCode::OK,
+        Ok(_) => Ok(StatusCode::OK),
         Err(e) => {
-            tracing::error!("{}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
+            Err(AppError::InternalServerError(format!("Failed to publish game: {e:?}")))
         }
     }
 }
 
-async fn unpublish_game(Path(game_identifier): Path<String>) -> impl IntoResponse {
-    let response = DATABASE
+async fn unpublish_game(Path(game_identifier): Path<Uuid>, state: State<AppState>) -> Result<StatusCode, AppError> {
+    let game_identifier = game_identifier.to_string();
+    let response = state.db
         .query("UPDATE game SET private = true WHERE identifier = '$identifier'")
         .bind(("identifier", game_identifier))
         .await;
 
     match response {
-        Ok(_) => StatusCode::OK,
+        Ok(_) => Ok(StatusCode::OK),
         Err(e) => {
-            tracing::error!("{}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
+            Err(AppError::InternalServerError(format!("Failed to unpublish game: {e:?}")))
         }
     }
 }
 
-pub async fn game_display(game_identifier: Path<String>) -> impl IntoResponse {
+pub async fn game_display(game_identifier: Path<Uuid>, state: State<AppState>) -> Result<Json<DisplayGame>, AppError> {
     let identifier = game_identifier.to_string();
-    let mut result = DATABASE.query(r#"
+    let mut result = state.db.query(r#"
 LET $tributes = (
     SELECT  in.id,
             in.name,
@@ -807,13 +722,12 @@ FETCH tribute
 ;"#)
         .bind(("identifier", identifier.clone()))
         .await.unwrap();
-    tracing::debug!("Result: {:?}", result);
 
     let game: Option<DisplayGame> = result.take(3).expect("No game found");
 
     if let Some(game) = game {
-        (StatusCode::OK, Json(game)).into_response()
+        Ok(Json(game))
     } else {
-        StatusCode::NOT_FOUND.into_response()
+        Err(AppError::NotFound(format!("No game found with identifier: {identifier}")))
     }
 }

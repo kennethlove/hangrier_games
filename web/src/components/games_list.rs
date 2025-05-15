@@ -73,7 +73,7 @@ pub fn GamesList() -> Element {
         }
 
         match games_query.result().value() {
-            QueryState::Settled(QueryResult::Ok(QueryValue::DisplayGames(games))) => {
+            QueryState::Settled(Ok(QueryValue::DisplayGames(games))) => {
                 rsx! {
                     if games.is_empty() {
                         NoGames {}
@@ -91,6 +91,10 @@ pub fn GamesList() -> Element {
                 "Loading..."
             } },
             QueryState::Settled(Err(QueryError::NoGames)) => rsx! { NoGames {} },
+            QueryState::Settled(Err(QueryError::BadJson)) => rsx! { p {
+                class: "pb-4 text-center theme1:text-stone-200 theme2:text-green-200 theme3:text-stone-700",
+                "Bad JSON response"
+            } },
             _ => rsx! { p { "Something went wrong" } },
         }
 

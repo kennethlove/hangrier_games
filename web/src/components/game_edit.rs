@@ -23,9 +23,9 @@ async fn edit_game(args: (EditGame, String)) -> MutationResult<MutationValue, Mu
         .send().await;
 
     if response.expect("Failed to update game").status().is_success() {
-        MutationResult::Ok(MutationValue::GameUpdated(identifier))
+        Ok(MutationValue::GameUpdated(identifier))
     } else {
-        MutationResult::Err(MutationError::Unknown)
+        Err(MutationError::Unknown)
     }
 }
 

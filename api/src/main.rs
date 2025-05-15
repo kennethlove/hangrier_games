@@ -1,18 +1,12 @@
-mod games;
-mod tributes;
-pub mod logging;
-pub mod messages;
-mod users;
-
-use crate::users::USERS_ROUTER;
+use api::games::GAMES_ROUTER;
+use api::users::USERS_ROUTER;
 use axum::error_handling::HandleErrorLayer;
-use axum::extract::Request;
+use axum::extract::{Request, State};
 use axum::http::header::{ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_MAX_AGE, AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE, EXPIRES};
 use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::{middleware, BoxError, Router};
-use games::GAMES_ROUTER;
 use std::env;
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -25,6 +19,7 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use api::AppState;
 
 pub static DATABASE: LazyLock<Surreal<Any>> = LazyLock::new(Surreal::init);
 
@@ -79,19 +74,21 @@ fn initialize_logging() {
 async fn main() {
     initialize_logging();
 
-    DATABASE.connect(env::var("SURREAL_HOST").unwrap()).await.expect("Failed to connect to database");
+    let app_state = AppState { db: Surreal::init() };
+
+    app_state.db.connect(env::var("SURREAL_HOST").unwrap()).await.expect("Failed to connect to database");
     tracing::debug!("connected to SurrealDB");
 
-    DATABASE.signin(Root {
+    app_state.db.signin(Root {
         username: env::var("SURREAL_USER").unwrap().as_str(),
         password: env::var("SURREAL_PASS").unwrap().as_str(),
     }).await.unwrap();
     tracing::debug!("authenticated to SurrealDB");
 
-    DATABASE.use_ns("hangry-games").use_db("games").await.unwrap();
+    app_state.db.use_ns("hangry-games").use_db("games").await.unwrap();
     tracing::debug!("Using 'hangry-games' namespace and 'games' database");
 
-    MigrationRunner::new(&DATABASE)
+    MigrationRunner::new(&app_state.db)
         .up()
         .await
         .expect("Failed to apply migrations");
@@ -121,11 +118,13 @@ async fn main() {
         ]);
 
     let api_routes = Router::new()
-        .nest("/games", GAMES_ROUTER.clone().layer(middleware::from_fn(surreal_jwt)))
+        .nest("/games", GAMES_ROUTER.clone()
+            .layer(middleware::from_fn_with_state(app_state.clone(), surreal_jwt)))
         .nest("/users", USERS_ROUTER.clone());
 
     let router = Router::new()
         .nest("/api", api_routes)
+        .with_state(app_state)
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|error: BoxError| async move {
@@ -149,7 +148,7 @@ async fn main() {
     axum::serve(listener, router).await.unwrap();
 }
 
-async fn surreal_jwt(request: Request, next: Next) -> Response {
+async fn surreal_jwt(State(state): State<AppState>, request: Request, next: Next) -> Response {
     let token = request.headers().get("authorization");
     match token {
         None => StatusCode::UNAUTHORIZED.into_response(),
@@ -159,7 +158,8 @@ async fn surreal_jwt(request: Request, next: Next) -> Response {
                 Some(token) => token,
                 None => return StatusCode::UNAUTHORIZED.into_response(),
             };
-            match DATABASE.authenticate(token).await {
+            let token = surrealdb::opt::auth::Jwt::from(token);
+            match state.db.authenticate(token).await {
                 Ok(_) => { next.run(request).await },
                 Err(_) => { StatusCode::UNAUTHORIZED.into_response() }
             }

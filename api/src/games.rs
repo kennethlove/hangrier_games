@@ -39,7 +39,7 @@ pub static GAMES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
 });
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct GameAreaRecord {
+pub struct GameAreaEdge {
     #[serde(rename="in")]
     game: RecordId,
     #[serde(rename="out")]
@@ -47,16 +47,11 @@ pub struct GameAreaRecord {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct AreaItem {
+pub struct AreaItemEdge {
     #[serde(rename="in")]
     area: RecordId,
     #[serde(rename="out")]
     item: RecordId
-}
-
-#[derive(Debug, Default, Deserialize, Serialize)]
-pub struct GameResponse {
-    game: Option<Game>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -86,12 +81,12 @@ async fn game_area_create(area: Area, db: &Surreal<Any>) -> Result<GameArea, App
     }
 }
 
-async fn game_area_record_create(identifier: Uuid, game_id: RecordId, db: &Surreal<Any>) -> Result<Vec<GameAreaRecord>, AppError> {
+async fn game_area_record_create(identifier: Uuid, game_id: RecordId, db: &Surreal<Any>) -> Result<Vec<GameAreaEdge>, AppError> {
     let gar = db
-        .insert::<Option<Vec<GameAreaRecord>>>(
+        .insert::<Option<Vec<GameAreaEdge>>>(
             RecordId::from(("areas", identifier.to_string()))
         ).relation(
-        GameAreaRecord {
+        GameAreaEdge {
             game: game_id.clone(),
             area: RecordId::from(("area", &identifier.to_string())),
         }
@@ -104,7 +99,7 @@ async fn game_area_record_create(identifier: Uuid, game_id: RecordId, db: &Surre
     }
 }
 
-async fn game_area_record_creator(area: Area, game_identifier: Uuid, db: &Surreal<Any>) -> Result<GameAreaRecord, AppError> {
+async fn game_area_record_creator(area: Area, game_identifier: Uuid, db: &Surreal<Any>) -> Result<GameAreaEdge, AppError> {
     // Does the `area` exist for the game?
     let existing_area: Option<String>;
     let game_identifier = game_identifier.to_string();
@@ -125,7 +120,7 @@ async fn game_area_record_creator(area: Area, game_identifier: Uuid, db: &Surrea
     }
 
     let game_id = RecordId::from(("game", game_identifier));
-    let gar: Vec<GameAreaRecord>;
+    let gar: Vec<GameAreaEdge>;
 
     if let Some(identifier) = existing_area {
         // The `area` exists, create the `areas` connection
@@ -183,12 +178,12 @@ pub async fn game_create(state: State<AppState>, Json(payload): Json<Game>) -> R
                 .await.expect("failed to insert item");
 
             // Insert an area-item relationship
-            let area_item: AreaItem = AreaItem {
+            let area_item: AreaItemEdge = AreaItemEdge {
                 area: game_area.area.clone(),
                 item: new_item_id.clone(),
             };
             state.db
-                .insert::<Vec<AreaItem>>("items")
+                .insert::<Vec<AreaItemEdge>>("items")
                 .relation([area_item])
                 .await.expect("");
         }
@@ -197,8 +192,8 @@ pub async fn game_create(state: State<AppState>, Json(payload): Json<Game>) -> R
     Ok(Json::<Game>(game.clone()))
 }
 
-pub async fn game_delete(game_identifier: Path<String>, state: State<AppState>) -> Result<StatusCode, AppError> {
-    let game_identifier = game_identifier.to_string().clone();
+pub async fn game_delete(game_identifier: Path<Uuid>, state: State<AppState>) -> Result<StatusCode, AppError> {
+    let game_identifier = game_identifier.to_string();
     let mut result = state.db.query(r#"
     SELECT <-playing_in<-tribute as tribute,
            <-playing_in<-tribute->owns->item as item,
@@ -324,14 +319,14 @@ WHERE identifier = $identifier;"#)
     }
 }
 
-pub async fn game_update(Path(_): Path<String>, state: State<AppState>, Json(payload): Json<EditGame>) -> Result<Json<Game>, AppError> {
+pub async fn game_update(Path(game_identifier): Path<Uuid>, state: State<AppState>, Json(payload): Json<EditGame>) -> Result<Json<Game>, AppError> {
     let response = state.db.query(r#"
         UPDATE game
         SET name = $name, private = $private
         WHERE identifier = $identifier;
         "#
     )
-        .bind(("identifier", payload.0.clone()))
+        .bind(("identifier", game_identifier.to_string()))
         .bind(("name", payload.1.clone()))
         .bind(("private", payload.2))
         .await;
@@ -400,7 +395,7 @@ SELECT (
     }
 }
 
-pub async fn next_step(Path(identifier): Path<Uuid>, state: State<AppState>) -> Result<Json<GameResponse>, AppError> {
+pub async fn next_step(Path(identifier): Path<Uuid>, state: State<AppState>) -> Result<Json<Option<Game>>, AppError> {
     let identifier = identifier.to_string();
     let record_id = RecordId::from(("game", identifier.clone()));
     let mut result = state.db.query(r#"
@@ -423,7 +418,7 @@ RETURN count(
                     .bind(("record_id", record_id.clone()))
                     .bind(("status", GameStatus::InProgress))
                     .await.expect("Failed to start game");
-                Ok(Json(GameResponse::default()))
+                Ok(Json(None))
             }
             GameStatus::InProgress | GameStatus::Finished => {
                 let uuid = Uuid::parse_str(identifier.as_str()).expect("Failed to parse UUID");
@@ -435,18 +430,17 @@ RETURN count(
                                 .bind(("record_id", record_id.clone()))
                                 .bind(("status", GameStatus::Finished))
                                 .await.expect("Failed to end game");
-                            Ok(Json(GameResponse::default()))
+                            Ok(Json(None))
                         }
                         _ => {
                             // Run day
                             game.run_day_night_cycle(true).await;
-                            let _ = save_game(&game, &state.db).await.expect("Day cycle failed");
 
                             // Run night
                             game.run_day_night_cycle(false).await;
                             let _ = save_game(&game, &state.db).await.expect("Night cycle failed");
 
-                            Ok(Json(GameResponse { game: Some(game) }))
+                            Ok(Json(Some(game)))
                         }
                     }
                 } else {
@@ -560,7 +554,7 @@ async fn save_area_items(items: Vec<Item>, owner: RecordId, db: &Surreal<Any>) -
 
         if item.quantity > 0 {
             let _: Vec<TributeOwns> = db.insert("items").relation(
-                AreaItem {
+                AreaItemEdge {
                     area: owner.clone(),
                     item: item_identifier.clone(),
                 }

@@ -1,40 +1,14 @@
-use crate::DATABASE;
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
+use axum::extract::State;
 use surrealdb::opt::auth::Record;
+use crate::{AppError, AppState};
 
-mod error {
-    use axum::http::StatusCode;
-    use axum::response::IntoResponse;
-    use axum::response::Response;
-    use axum::Json;
-    use thiserror::Error;
-
-    #[derive(Debug, Error)]
-    pub enum Error {
-        #[error("database error")]
-        Db,
-    }
-
-    impl IntoResponse for Error {
-        fn into_response(self) -> Response {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(self.to_string())).into_response()
-        }
-    }
-
-    impl From<surrealdb::Error> for Error {
-        fn from(error: surrealdb::Error) -> Self {
-            eprintln!("{error}");
-            Self::Db
-        }
-    }
-}
-
-pub static USERS_ROUTER: LazyLock<Router> = LazyLock::new(|| {
+pub static USERS_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
     Router::new()
-        .route("/", post(user_create).get(session))
+        .route("/", get(session).post(user_create))
         .route("/authenticate", post(user_authenticate))
 });
 
@@ -49,16 +23,16 @@ struct JwtResponse {
     jwt: String,
 }
 
-async fn session() -> Result<Json<String>, error::Error> {
-    let res: Option<String> = DATABASE.query("RETURN <string>$session").await?.take(0)?;
+async fn session(state: State<AppState>) -> Result<Json<String>, AppError> {
+    let res: Option<String> = state.db.query("RETURN <string>$session").await.unwrap().take(0).unwrap();
     Ok(Json(res.unwrap_or("No session data found!".into())))
 }
 
-async fn user_create(Json(payload): Json<Params>) -> Result<Json<JwtResponse>, error::Error> {
+async fn user_create(state: State<AppState>, Json(payload): Json<Params>) -> Result<Json<JwtResponse>, AppError> {
     let username = payload.username;
     let password = payload.password;
 
-    match DATABASE.signup(Record {
+    match state.db.signup(Record {
         access: "user",
         namespace: "hangry-games",
         database: "games",
@@ -70,18 +44,17 @@ async fn user_create(Json(payload): Json<Params>) -> Result<Json<JwtResponse>, e
         Ok(token) => {
             Ok(Json(JwtResponse { jwt: token.into_insecure_token() }))
         }
-        Err(e) => {
-            tracing::error!(target: "api", "Error creating user: {e}");
-            Err(error::Error::Db)
+        Err(_) => {
+            Err(AppError::DbError("Failed to create user".to_string()))
         }
     }
 }
 
-async fn user_authenticate(Json(payload): Json<Params>) -> Result<Json<JwtResponse>, error::Error> {
+async fn user_authenticate(state: State<AppState>, Json(payload): Json<Params>) -> Result<Json<JwtResponse>, AppError> {
     let username = payload.username;
     let password = payload.password;
 
-    let jwt = DATABASE.signin(Record {
+    match state.db.signin(Record {
         access: "user",
         namespace: "hangry-games",
         database: "games",
@@ -89,9 +62,10 @@ async fn user_authenticate(Json(payload): Json<Params>) -> Result<Json<JwtRespon
             username: username.clone(),
             password: password.clone()
         },
-    })
-    .await?
-    .into_insecure_token();
-
-    Ok(Json(JwtResponse { jwt }))
+    }).await {
+        Ok(auth_user) => { Ok(Json(JwtResponse { jwt: auth_user.into_insecure_token() })) }
+        Err(_) => {
+            Err(AppError::DbError("Failed to authenticate user".to_string()))
+        }
+    }
 }

@@ -42,7 +42,7 @@ async fn edit_tribute(args: (EditTribute, String, String)) -> MutationResult<Mut
 }
 
 #[component]
-pub fn TributeEdit(identifier: String, district: u32, name: String) -> Element {
+pub fn TributeEdit(identifier: String, district: u32, name: String, game_identifier: String) -> Element {
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
 
     let onclick = move |_| {
@@ -50,6 +50,7 @@ pub fn TributeEdit(identifier: String, district: u32, name: String) -> Element {
             identifier.clone(),
             district,
             name.clone(),
+            game_identifier.clone(),
         )));
     };
 
@@ -106,13 +107,15 @@ pub fn EditTributeForm() -> Element {
     let tribute_details = edit_tribute_signal.read().clone().unwrap_or_default();
     let name = tribute_details.2.clone();
     let district = tribute_details.1;
+    let game_identifier = tribute_details.3.clone();
 
-    let game: Signal<Option<Game>> = use_context();
-    if game.peek().is_none() {
-        return rsx! {};
-    }
-    let game = game.unwrap();
-    let game_identifier = game.identifier.clone();
+    // let game: Signal<Option<Game>> = use_context();
+    // if game.peek().is_none() {
+    //     dioxus_logger::tracing::debug!("here");
+    //     return rsx! {};
+    // }
+    // let game = game.unwrap();
+    // let game_identifier = game.identifier.clone();
 
     let mutate = use_mutation(edit_tribute);
 
@@ -139,7 +142,7 @@ pub fn EditTributeForm() -> Element {
             .unwrap();
 
         if !name.is_empty() && (1..=12u32).contains(&district) {
-            let edit_tribute = EditTribute(identifier.clone(), district, name.clone());
+            let edit_tribute = EditTribute(identifier.clone(), district, name.clone(), game_identifier.clone());
             spawn(async move {
                 mutate.mutate_async((edit_tribute.clone(), game_identifier.clone(), token)).await;
                 edit_tribute_signal.set(Some(edit_tribute));

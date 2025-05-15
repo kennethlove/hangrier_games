@@ -236,6 +236,7 @@ pub fn GameTributeListMember(tribute: Tribute, game_identifier: String, game_sta
                             identifier: tribute.clone().identifier,
                             district: tribute.district,
                             name: tribute.clone().name,
+                            game_identifier: game_identifier.clone(),
                         }
                     }
                 } else {

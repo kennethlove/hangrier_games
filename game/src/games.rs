@@ -164,15 +164,14 @@ impl Game {
     /// Clears old messages and area events.
     /// Increments day count by 1 if it's a day cycle.
     async fn prepare_cycle(&mut self, day: bool) {
-        clear_messages().expect("Failed to clear messages for day");
+        if day {
+            clear_messages().expect("Failed to clear messages for day");
+            self.day = Some(self.day.unwrap_or(0) + 1);
+        }
 
         // Clear all events from the previous cycle
         for area in self.areas.iter_mut() {
             area.events.clear();
-        }
-
-        if day {
-            self.day = Some(self.day.unwrap_or(0) + 1);
         }
     }
 

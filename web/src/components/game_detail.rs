@@ -105,8 +105,7 @@ async fn next_step(args: (String, String)) -> MutationResult<MutationValue, Muta
     let client = reqwest::Client::new();
     let url: String = format!("{}/api/games/{}/next", APP_API_HOST, identifier);
 
-    let request = client.request(reqwest::Method::PUT, url)
-        .bearer_auth(token);
+    let request = client.request(reqwest::Method::PUT, url).bearer_auth(token);
 
     match request.send().await {
         Ok(response) => {

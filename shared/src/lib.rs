@@ -11,8 +11,9 @@ pub type DeleteTribute = String;
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct DeleteGame(pub String, pub String); // Identifier, name
 
+/// Used to edit a tribute. Contains the identifier, district, name, and game identifier of the tribute.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-pub struct EditTribute(pub String, pub u32, pub String); // Identifier, district, name
+pub struct EditTribute(pub String, pub u32, pub String, pub String);
 
 /// This struct is used to edit a game
 /// It contains the identifier, name, and a boolean indicating if the game is private

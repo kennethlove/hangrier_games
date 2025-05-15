@@ -81,7 +81,7 @@ async fn game_area_create(area: Area, db: &Surreal<Any>) -> Result<GameArea, App
     }
 }
 
-async fn game_area_record_create(identifier: Uuid, game_id: RecordId, db: &Surreal<Any>) -> Result<Vec<GameAreaRecord>, AppError> {
+async fn game_area_record_create(identifier: Uuid, game_id: RecordId, db: &Surreal<Any>) -> Result<Vec<GameAreaEdge>, AppError> {
     let gar = db
         .insert::<Option<Vec<GameAreaEdge>>>(
             RecordId::from(("areas", identifier.to_string()))

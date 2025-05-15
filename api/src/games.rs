@@ -81,7 +81,7 @@ async fn game_area_create(area: Area, db: &Surreal<Any>) -> Result<GameArea, App
     }
 }
 
-async fn game_area_record_create(identifier: Uuid, game_id: RecordId, db: &Surreal<Any>) -> Result<Vec<GameAreaEdge>, AppError> {
+async fn game_area_record_create(identifier: Uuid, game_id: RecordId, db: &Surreal<Any>) -> Result<Vec<GameAreaRecord>, AppError> {
     let gar = db
         .insert::<Option<Vec<GameAreaEdge>>>(
             RecordId::from(("areas", identifier.to_string()))
@@ -319,7 +319,7 @@ WHERE identifier = $identifier;"#)
     }
 }
 
-pub async fn game_update(Path(game_identifier): Path<Uuid>, state: State<AppState>, Json(payload): Json<EditGame>) -> Result<Json<Game>, AppError> {
+pub async fn game_update(Path(game_identifier): Path<Uuid>, state: State<AppState>, state: State<AppState>, Json(payload): Json<EditGame>) -> Result<Json<Game>, AppError> {
     let response = state.db.query(r#"
         UPDATE game
         SET name = $name, private = $private

@@ -493,7 +493,7 @@ async fn save_game(game: &Game, db: &Surreal<Any>) -> Result<Json<Game>, AppErro
         for mut log in logs {
             log.game_day = game.day.unwrap_or_default();
             if let Err(_) = db
-                .upsert::<Option<GameMessage>>(("message", &log.identifier))
+                .insert::<Option<GameMessage>>(("message", &log.identifier))
                 .content(log.clone())
                 .await
             {

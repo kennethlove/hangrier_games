@@ -627,8 +627,8 @@ mod tests {
         assert_eq!(game.tributes[0].status, TributeStatus::Dead);
     }
 
-    #[test]
-    fn test_check_game_state_winner_exists() {
+    #[tokio::test]
+    async fn test_check_game_state_winner_exists() {
         let winner_tribute = create_tribute("Winner", true);
         let loser_tribute = create_tribute("Loser", false);
         let mut game = create_test_game_with_tributes(vec![winner_tribute.clone(), loser_tribute.clone()]);
@@ -637,14 +637,14 @@ mod tests {
         assert_eq!(game.living_tributes().len(), 1);
         assert_eq!(game.winner(), Some(winner_tribute.clone()));
 
-        game.check_for_winner();
+        game.check_for_winner().await;
 
         // Game should be finished
         assert_eq!(game.status, GameStatus::Finished);
     }
 
-    #[test]
-    fn test_check_game_state_no_survivors() {
+    #[tokio::test]
+    async fn test_check_game_state_no_survivors() {
         let loser_tribute = create_tribute("Loser", false);
         let loser2_tribute = create_tribute("Loser 2", false);
         let mut game = create_test_game_with_tributes(vec![loser_tribute.clone(), loser2_tribute.clone()]);
@@ -653,14 +653,14 @@ mod tests {
         assert!(game.living_tributes().is_empty());
         assert!(game.winner().is_none());
 
-        game.check_for_winner();
+        game.check_for_winner().await;
 
         // Game should be finished
         assert_eq!(game.status, GameStatus::Finished);
     }
 
-    #[test]
-    fn test_check_game_state_continues() {
+    #[tokio::test]
+    async fn test_check_game_state_continues() {
         let living_tribute1 = create_tribute("Living1", true);
         let living_tribute2 = create_tribute("Living2", true);
         let mut game = create_test_game_with_tributes(vec![living_tribute1.clone(), living_tribute2.clone()]);
@@ -670,40 +670,40 @@ mod tests {
         assert_eq!(game.living_tributes().len(), 2);
         assert!(game.winner().is_none());
 
-        game.check_for_winner();
+        game.check_for_winner().await;
 
         // Game should be finished
         assert_eq!(game.status, starting_state);
     }
 
-    #[test]
-    fn test_prepare_cycle() {
+    #[tokio::test]
+    async fn test_prepare_cycle() {
         let mut game = Game::new("Test Game");
         let area = AreaDetails::new(Some("Lake".to_string()), Area::North);
         let event = AreaEvent::random();
         game.day = Some(1);
         game.areas.push(area);
         game.areas[0].events.push(event.clone());
-        game.prepare_cycle(true);
+        game.prepare_cycle(true).await;
         assert_eq!(game.day, Some(2));
         assert_eq!(game.areas[0].events.len(), 0);
 
         game.areas[0].events.push(event.clone());
-        game.prepare_cycle(false);
+        game.prepare_cycle(false).await;
         // Night cycle shouldn't advance the game day.
         assert_eq!(game.day, Some(2));
         assert_eq!(game.areas[0].events.len(), 0);
     }
 
-    #[test]
-    fn test_announce_cycle_start() {
+    #[tokio::test]
+    async fn test_announce_cycle_start() {
         let tribute1 = create_tribute("Tribute1", true);
         let tribute2 = create_tribute("Tribute2", true);
         let mut game = create_test_game_with_tributes(vec![tribute1.clone(), tribute2.clone()]);
         game.day = Some(1);
 
         clear_messages().unwrap();
-        game.announce_cycle_start(true);
+        game.announce_cycle_start(true).await;
         let messages = get_all_messages().unwrap();
         // Game day 1 message
         // Day start message
@@ -712,8 +712,8 @@ mod tests {
         clear_messages().unwrap();
     }
 
-    #[test]
-    fn test_announce_cycle_end() {
+    #[tokio::test]
+    async fn test_announce_cycle_end() {
         let tribute1 = create_tribute("Tribute1", true);
         let mut tribute2 = create_tribute("Tribute2", false);
         tribute2.set_status(TributeStatus::RecentlyDead);
@@ -721,7 +721,7 @@ mod tests {
         game.day = Some(1);
 
         clear_messages().unwrap();
-        game.announce_cycle_end(true);
+        game.announce_cycle_end(true).await;
         let messages = get_all_messages().unwrap();
         // Living tributes message
         // Tribute 2 death message
@@ -730,8 +730,8 @@ mod tests {
         clear_messages().unwrap();
     }
 
-    #[test]
-    fn test_announce_area_events() {
+    #[tokio::test]
+    async fn test_announce_area_events() {
         let mut game = Game::new("Test Game");
         let mut area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
         area.events.push(AreaEvent::random());
@@ -741,7 +741,7 @@ mod tests {
         assert!(!game.areas[0].is_open());
 
         clear_messages().unwrap();
-        game.announce_area_events();
+        game.announce_area_events().await;
         let messages = get_all_messages().unwrap();
         // Area closed message
         // Area event message
@@ -750,8 +750,8 @@ mod tests {
         clear_messages().unwrap();
     }
 
-    #[test]
-    fn test_ensure_open_area() {
+    #[tokio::test]
+    async fn test_ensure_open_area() {
         let mut game = Game::new("Test Game");
         let area1 = AreaDetails::new(Some("Lake".to_string()), Area::North);
         let area2 = AreaDetails::new(Some("Forest".to_string()), Area::South);
@@ -766,7 +766,7 @@ mod tests {
 
         assert!(game.random_open_area().is_none());
 
-        game.ensure_open_area();
+        game.ensure_open_area().await;
         assert!(game.random_open_area().is_some());
         clear_messages().unwrap();
     }
@@ -774,8 +774,8 @@ mod tests {
     #[test]
     fn test_trigger_cycle_events() { }
 
-    #[test]
-    fn test_constrain_areas() {
+    #[tokio::test]
+    async fn test_constrain_areas() {
         let mut game = Game::new("Test Game");
         let area1 = AreaDetails::new(Some("Lake".to_string()), Area::North);
         let area2 = AreaDetails::new(Some("Forest".to_string()), Area::South);
@@ -790,7 +790,7 @@ mod tests {
 
         // Constrain areas
         let mut rng = SmallRng::from_rng(&mut rand::rng());
-        game.constrain_areas(&mut rng);
+        game.constrain_areas(&mut rng).await;
 
         // Check if at least one area is closed
         assert!(game.random_open_area().is_some());
@@ -807,10 +807,11 @@ mod tests {
         let mut game = create_test_game_with_tributes(vec![tribute1.clone(), tribute2.clone()]);
         let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
         game.areas.push(area);
+        let closed_areas = game.areas.iter().filter(|ad| ad.area.is_some() & &!ad.is_open()).map(|ad| ad.area.clone().unwrap()).collect::<Vec<Area>>();
 
         // Run the tribute cycle
         let mut rng = SmallRng::from_rng(&mut rand::rng());
-        game.run_tribute_cycle(true, &mut rng).await;
+        game.run_tribute_cycle(true, &mut rng, closed_areas, vec![tribute1.clone(), tribute2.clone()], 2).await;
 
         // Check if the tributes are updated correctly
         let new_tribute1 = game.tributes[0].clone();

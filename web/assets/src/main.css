@@ -70,12 +70,12 @@
     50% {
         stroke-dasharray: 89, 200;
         stroke-dashoffset: -35px;
-        transform: rotate(180deg);
+        transform: rotate(-180deg);
     }
     100% {
         stroke-dasharray: 89, 200;
         stroke-dashoffset: -124px;
-        transform: rotate(360deg);
+        transform: rotate(-360deg);
     }
 }
 .spinner {

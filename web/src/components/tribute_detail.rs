@@ -12,13 +12,13 @@ use game::messages::GameMessage;
 use game::tributes::{Attributes, Tribute};
 
 async fn fetch_tribute(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::Tribute(identifier)) = keys.first() {
+    if let Some(QueryKey::Tribute(_game_identifier, tribute_identifier)) = keys.first() {
         if let Some(QueryKey::DisplayGame(game_identifier)) = keys.last() {
             let client = reqwest::Client::new();
 
             let request = client.request(
                 reqwest::Method::GET,
-                format!("{}/api/games/{}/tributes/{}", APP_API_HOST, game_identifier, identifier))
+                format!("{}/api/games/{}/tributes/{}", APP_API_HOST, game_identifier, tribute_identifier))
                 .bearer_auth(token);
 
             match request.send().await {
@@ -26,10 +26,10 @@ async fn fetch_tribute(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryV
                     if response.status().is_success() {
                         match response.json::<Option<Tribute>>().await {
                             Ok(Some(tribute)) => QueryResult::Ok(QueryValue::Tribute(Box::new(tribute))),
-                            _ => QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
+                            _ => QueryResult::Err(QueryError::TributeNotFound(tribute_identifier.to_string()))
                         }
                     } else {
-                        QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
+                        QueryResult::Err(QueryError::TributeNotFound(tribute_identifier.to_string()))
                     }
                 }
                 Err(_) => {
@@ -83,7 +83,7 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
 
     let tribute_query = use_get_query(
         [
-            QueryKey::Tribute(tribute_identifier.clone()),
+            QueryKey::Tribute(game_identifier.clone(), tribute_identifier.clone()),
             QueryKey::Tributes(game_identifier.clone()),
             QueryKey::DisplayGame(game_identifier.clone()),
         ],
@@ -245,7 +245,6 @@ fn TributeLog(game_identifier: String, identifier: String) -> Element {
     let log_query = use_get_query(
         [
             QueryKey::TributeLog(identifier.clone()),
-            QueryKey::Tribute(identifier.clone()),
             QueryKey::DisplayGame(game_identifier.clone())
         ],
         move |keys: Vec<QueryKey>| { fetch_tribute_log(keys, token.clone()) },

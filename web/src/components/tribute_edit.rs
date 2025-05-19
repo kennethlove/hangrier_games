@@ -108,14 +108,6 @@ pub fn EditTributeForm() -> Element {
     let district = tribute_details.1;
     let game_identifier = tribute_details.3.clone();
 
-    // let game: Signal<Option<Game>> = use_context();
-    // if game.peek().is_none() {
-    //     dioxus_logger::tracing::debug!("here");
-    //     return rsx! {};
-    // }
-    // let game = game.unwrap();
-    // let game_identifier = game.identifier.clone();
-
     let mutate = use_mutation(edit_tribute);
 
     let dismiss = move |_| {
@@ -146,8 +138,8 @@ pub fn EditTributeForm() -> Element {
                 mutate.mutate_async((edit_tribute.clone(), game_identifier.clone(), token)).await;
                 edit_tribute_signal.set(Some(edit_tribute));
 
-                if let MutationState::Settled(Ok(MutationValue::TributeUpdated(_identifier))) = mutate.result().deref() {
-                    client.invalidate_queries(&[QueryKey::Tributes(game_identifier.clone())]);
+                if let MutationState::Settled(Ok(MutationValue::TributeUpdated(identifier))) = mutate.result().deref() {
+                    client.invalidate_queries(&[QueryKey::Tribute(game_identifier.clone(), identifier.clone())]);
                     edit_tribute_signal.set(None);
                 }
             });

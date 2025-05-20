@@ -132,6 +132,7 @@ impl AreaDetails {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use strum::IntoEnumIterator;
 
     #[test]
     fn from_str() {
@@ -142,6 +143,16 @@ mod tests {
     #[test]
     fn to_str() {
         assert_eq!(Area::Cornucopia.to_string(), "Cornucopia");
+    }
+
+    #[test]
+    fn iter() {
+        let areas: Vec<Area> = Area::iter().collect();
+        assert_eq!(areas.len(), 5);
+        assert_eq!(areas[0], Area::Cornucopia);
+        assert_eq!(areas[1], Area::North);
+        assert_eq!(areas[2], Area::East);
+        assert_eq!(areas[3], Area::South);
     }
 
     #[test]

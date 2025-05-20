@@ -3,12 +3,11 @@ use crate::components::icons::edit::EditIcon;
 use crate::components::modal::{Modal, Props as ModalProps};
 use crate::components::{Button, Input};
 use crate::env::APP_API_HOST;
+use crate::storage::{use_persistent, AppState};
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult, MutationState};
-use game::games::Game;
 use shared::EditTribute;
 use std::ops::Deref;
-use crate::storage::{use_persistent, AppState};
 
 async fn edit_tribute(args: (EditTribute, String, String)) -> MutationResult<MutationValue, MutationError> {
     let tribute = args.clone().0;
@@ -109,14 +108,6 @@ pub fn EditTributeForm() -> Element {
     let district = tribute_details.1;
     let game_identifier = tribute_details.3.clone();
 
-    // let game: Signal<Option<Game>> = use_context();
-    // if game.peek().is_none() {
-    //     dioxus_logger::tracing::debug!("here");
-    //     return rsx! {};
-    // }
-    // let game = game.unwrap();
-    // let game_identifier = game.identifier.clone();
-
     let mutate = use_mutation(edit_tribute);
 
     let dismiss = move |_| {
@@ -147,8 +138,8 @@ pub fn EditTributeForm() -> Element {
                 mutate.mutate_async((edit_tribute.clone(), game_identifier.clone(), token)).await;
                 edit_tribute_signal.set(Some(edit_tribute));
 
-                if let MutationState::Settled(Ok(MutationValue::TributeUpdated(_identifier))) = mutate.result().deref() {
-                    client.invalidate_queries(&[QueryKey::Tributes(game_identifier.clone())]);
+                if let MutationState::Settled(Ok(MutationValue::TributeUpdated(identifier))) = mutate.result().deref() {
+                    client.invalidate_queries(&[QueryKey::Tribute(game_identifier.clone(), identifier.clone())]);
                     edit_tribute_signal.set(None);
                 }
             });

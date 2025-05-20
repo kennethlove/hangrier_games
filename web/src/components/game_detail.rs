@@ -10,7 +10,6 @@ use crate::routes::Routes;
 use crate::storage::{use_persistent, AppState};
 use crate::LoadingState;
 use dioxus::prelude::*;
-use dioxus_logger::tracing;
 use dioxus_query::prelude::{use_get_query, use_mutation, use_query_client, MutationResult, MutationState, QueryResult, QueryState, UseMutation, UseQueryClient};
 use game::games::Game;
 use reqwest::StatusCode;
@@ -151,7 +150,7 @@ async fn handle_next_step(
         MutationState::Settled(Err(MutationError::UnableToAdvanceGame)) => {
             loading_signal.set(LoadingState::Loaded); // Or an error state
         }
-        MutationState::Settled(Err(e)) => {
+        MutationState::Settled(Err(_)) => {
             loading_signal.set(LoadingState::Loaded); // Or an error state
         }
         _ => {}

@@ -12,6 +12,8 @@ use game::items::Item;
 use game::messages::GameMessage;
 use game::tributes::Tribute;
 use shared::{DisplayGame, GameStatus};
+use crate::components::icons::loading::LoadingIcon;
+use crate::components::icons::mockingjay_arrow::MockingjayArrow;
 
 async fn fetch_tributes(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tributes(game_identifier)) = keys.first() {
@@ -25,15 +27,15 @@ async fn fetch_tributes(keys: Vec<QueryKey>, token: String) -> QueryResult<Query
         match request.send().await {
             Ok(response) =>  {
                 if let Ok(tributes) = response.json::<Vec<Tribute>>().await {
-                    QueryResult::Ok(QueryValue::Tributes(tributes))
+                    Ok(QueryValue::Tributes(tributes))
                 } else {
-                    QueryResult::Err(QueryError::BadJson)
+                    Err(QueryError::BadJson)
                 }
             }
-            Err(_) => QueryResult::Err(QueryError::GameNotFound(game_identifier.to_string())),
+            Err(_) => Err(QueryError::GameNotFound(game_identifier.to_string())),
         }
     } else {
-        QueryResult::Err(QueryError::Unknown)
+        Err(QueryError::Unknown)
     }
 }
 
@@ -53,21 +55,21 @@ async fn _fetch_tribute_log(keys: Vec<QueryKey>, token: String) -> QueryResult<Q
                         let messages = response.json::<Vec<GameMessage>>().await;
                         match messages {
                             Ok(messages) => {
-                                QueryResult::Ok(QueryValue::Logs(messages))
+                                Ok(QueryValue::Logs(messages))
                             }
-                            Err(_) => QueryResult::Err(QueryError::BadJson)
+                            Err(_) => Err(QueryError::BadJson)
                         }
                     } else {
-                        QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
+                        Err(QueryError::TributeNotFound(identifier.to_string()))
                     }
                 }
-                Err(_) => QueryResult::Err(QueryError::GameNotFound(identifier.to_string())),
+                Err(_) => Err(QueryError::GameNotFound(identifier.to_string())),
             }
         } else {
-            QueryResult::Err(QueryError::Unknown)
+            Err(QueryError::Unknown)
         }
     } else {
-        QueryResult::Err(QueryError::Unknown)
+        Err(QueryError::Unknown)
     }
 }
 
@@ -153,12 +155,12 @@ pub fn GameTributes(game: DisplayGame) -> Element {
                             ul {
                                 class: "grid subgrid gap-2 grid-cols-2",
                                 GameTributeListMember {
-                                    tribute: chunk.first().unwrap().clone(),
+                                    tribute_identifier: chunk.first().unwrap().clone().identifier,
                                     game_identifier: identifier.clone(),
                                     game_status: game.status.clone(),
                                 }
                                 GameTributeListMember {
-                                    tribute: chunk.last().unwrap().clone(),
+                                    tribute_identifier: chunk.last().unwrap().clone().identifier,
                                     game_identifier: identifier.clone(),
                                     game_status: game.status.clone(),
                                 }
@@ -172,20 +174,25 @@ pub fn GameTributes(game: DisplayGame) -> Element {
             rsx! { p { "Something went wrong" } }
         }
         QueryState::Loading(_) => {
-            rsx! { p { "Loading..." } }
+            rsx! {
+                div {
+                    class: "flex justify-center",
+                    LoadingIcon {}
+                }
+            }
         }
         _ => { rsx! {} }
     }
 }
 
 #[component]
-pub fn GameTributeListMember(tribute: Tribute, game_identifier: String, game_status: GameStatus) -> Element {
+pub fn GameTributeListMember(tribute_identifier: String, game_identifier: String, game_status: GameStatus) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
 
     let tribute_query = use_get_query(
         [
-            QueryKey::Tribute(game_identifier.clone(), tribute.identifier.clone()),
+            QueryKey::Tribute(game_identifier.clone(), tribute_identifier.clone()),
         ],
         move |keys: Vec<QueryKey>| { fetch_tribute(keys, token.clone()) },
     );
@@ -368,7 +375,12 @@ pub fn GameTributeListMember(tribute: Tribute, game_identifier: String, game_sta
             rsx! { p { "Something went wrong: {e:?}" } }
         }
         QueryState::Loading(_) => {
-            rsx! { p { "Loading..." } }
+            rsx! {
+                div {
+                    class: "flex justify-center",
+                    LoadingIcon {}
+                }
+            }
         }
         _ => { rsx! {} }
     }

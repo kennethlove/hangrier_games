@@ -1,18 +1,19 @@
 use dioxus::prelude::*;
+use crate::components::icons::mockingjay_arrow::MockingjayArrow;
 
 #[component]
-pub fn LoadingIcon(class: String) -> Element {
+pub fn LoadingIcon() -> Element {
     rsx! {
-        svg {
-            view_box: "0 0 50 50",
-            class: "{class}",
-            circle {
-                // Use a unique class name linked to the style block
-                class: "spinner",
-                cx: "25",
-                cy: "25",
-                r: "20",
-            }
+        MockingjayArrow {
+            class: r#"
+            size-16
+            motion-safe:animate-pulse
+            motion-reduce:animate-none
+            theme1:fill-red-900
+            theme2:fill-green-800
+            theme3:fill-amber-600
+            theme3:size-24
+            "#
         }
     }
 }

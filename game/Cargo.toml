@@ -5,18 +5,18 @@ edition = "2024"
 publish = false
 
 [dependencies]
+chrono = { version = "0.4.41", features = ["serde"] }
 fake = "4.3.0"
 indefinite = "0.1.9"
+once_cell = "1.21.3"
 rand = { version = "0.9.1", features = ["small_rng"] }
 serde = { version = "1.0.219", features = ["derive"] }
 shared = { path = "../shared" }
 strum = { version = "0.27.1", features = ["derive"] }
 strum_macros = "0.27.1"
+thiserror = "2.0.12"
 tracing = "0.1.41"
 uuid = { version = "1.13.2", features = ["v4", "js"] }
-chrono = { version = "0.4.41", features = ["serde"] }
-once_cell = "1.21.3"
-thiserror = "2.0.12"
 
 [dev-dependencies]
 rstest = "0.25.0"

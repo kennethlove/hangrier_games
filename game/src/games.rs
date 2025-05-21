@@ -395,54 +395,64 @@ impl Game {
 
     /// Runs the tributes' logic for the current cycle.
     async fn run_tribute_cycle(&mut self, day: bool, rng: &mut SmallRng, closed_areas: Vec<Area>, living_tributes: Vec<Tribute>, living_tributes_count: usize) {
+        // Pre-compute global action suggestion
+        let action_suggestion = match (self.day, day) {
+            (Some(1), true) => Some(ActionSuggestion { action: Action::Move(None), probability: Some(0.5) }),
+            (Some(3), true) => Some(ActionSuggestion { action: Action::Move(Some(Area::Cornucopia)), probability: Some(0.75) }),
+            (_, _) => None,
+        };
+
+        // Group tributes by area for faster lookups
+        let mut tributes_by_area: HashMap<Area, Vec<&Tribute>> = HashMap::new();
+        for tribute in &living_tributes {
+            tributes_by_area.entry(tribute.area.clone())
+                .or_insert_with(Vec::new)
+                .push(tribute);
+        }
+
         for tribute in self.tributes.iter_mut() {
-            // Non-alive tributes should be skipped.
             if !tribute.is_alive() {
                 tribute.status = TributeStatus::Dead;
                 continue;
             }
 
-            // If the tribute is unlucky, they get a random event.
             if !rng.random_bool(tribute.attributes.luck as f64 / 100.0) {
                 tribute.events.push(TributeEvent::random());
             }
 
-            // Trigger day or night cycles for the tribute
-            let action_suggestion = match (self.day, day) {
-                (Some(1), true) => Some(ActionSuggestion { action: Action::Move(None), probability: Some(0.5) }),
-                (Some(3), true) => Some(ActionSuggestion { action: Action::Move(Some(Area::Cornucopia)), probability: Some(0.75) }),
-                (_, _) => None,
+            let area_details = match self.areas.iter_mut()
+                .filter(|ad| ad.area.is_some())
+                .find(|ad| ad.area.clone().unwrap() == tribute.area) {
+                Some(area_details) => area_details,
+                None => continue,
             };
 
-            let area_details = self.areas.iter_mut()
-                .filter(|ad| ad.area.is_some())
-                .find(|ad| ad.area.clone().unwrap() == tribute.area)
-                .expect("Cannot find area details");
-            let environment_details = &mut EnvironmentContext {
+            let mut environment_details = EnvironmentContext {
                 is_day: day,
                 area_details,
-                closed_areas: &*closed_areas.clone(),
+                closed_areas: &closed_areas,
             };
 
-            let nearby_tributes_count = living_tributes.iter()
-                .filter(|t| t.area == tribute.area)
-                .count();
-            let targets: Vec<Tribute> = living_tributes.iter()
-                .filter(|t| t.area == tribute.area) // must be in the same area
-                .filter(|t| t.is_visible()) // must be visible
-                .filter(|t| t.identifier != tribute.identifier) // can't be self
+            let nearby_tributes: &Vec<&Tribute>;
+            let empty_vec = Vec::new();
+            nearby_tributes = tributes_by_area.get(&tribute.area).unwrap_or(&empty_vec);
+            let nearby_tributes_count = nearby_tributes.len() as u32;
+
+            let targets: Vec<Tribute> = nearby_tributes.iter()
+                .filter(|t| t.is_visible() && t.identifier != tribute.identifier)
+                .cloned()
                 .cloned()
                 .collect();
 
             let encounter_context = EncounterContext {
-                nearby_tributes_count: nearby_tributes_count.try_into().unwrap(),
+                nearby_tributes_count,
                 potential_targets: targets,
-                total_living_tributes: living_tributes_count.try_into().unwrap(),
+                total_living_tributes: living_tributes_count as u32,
             };
 
             tribute.process_turn_phase(
-                action_suggestion,
-                environment_details,
+                action_suggestion.clone(),
+                &mut environment_details,
                 encounter_context,
                 rng
             ).await;

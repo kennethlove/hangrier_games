@@ -70,17 +70,20 @@ const MAX_INTELLIGENCE: u32 = 100;
 const MAX_PERSUASION: u32 = 100;
 const MAX_LUCK: u32 = 100;
 
+#[derive(Clone, Debug)]
 pub struct ActionSuggestion {
     pub action: Action,
     pub probability: Option<f64>,
 }
 
+#[derive(Debug)]
 pub struct EnvironmentContext<'a> {
     pub is_day: bool,
     pub area_details: &'a mut AreaDetails,
     pub closed_areas: &'a [Area],
 }
 
+#[derive(Clone, Debug)]
 pub struct EncounterContext {
     pub nearby_tributes_count: u32,
     pub potential_targets: Vec<Tribute>,

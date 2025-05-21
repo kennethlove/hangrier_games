@@ -1,10 +1,10 @@
-use crate::tributes::{tribute_record_create, TributeOwns, TRIBUTES_ROUTER};
+use crate::tributes::{create_tribute, TributeAreaEdge, TRIBUTES_ROUTER};
 use crate::{AppError, AppState};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::routing::{get, put};
-use axum::Router;
 use axum::Json;
+use axum::Router;
 use game::areas::{Area, AreaDetails};
 use game::games::Game;
 use game::items::Item;
@@ -17,14 +17,14 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::LazyLock;
 use strum::IntoEnumIterator;
+use surrealdb::engine::any::Any;
 use surrealdb::sql::Thing;
 use surrealdb::{RecordId, Surreal};
-use surrealdb::engine::any::Any;
 use uuid::Uuid;
 
 pub static GAMES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
     Router::new()
-        .route("/", get(game_list).post(game_create))
+        .route("/", get(game_list).post(create_game))
         .route("/{game_identifier}", get(game_detail).delete(game_delete).put(game_update))
         .route("/{game_identifier}/areas", get(game_areas))
         .route("/{game_identifier}/display", get(game_display))
@@ -32,8 +32,6 @@ pub static GAMES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
         .route("/{game_identifier}/log/{day}/{tribute_identifier}", get(tribute_logs))
         .route("/{game_identifier}/next", put(next_step))
         .route("/{game_identifier}/publish", put(publish_game))
-        // .route("/{game_identifier}/summarize", get(game_summary))
-        // .route("/{game_identifier}/summarize/{day}", get(game_day_summary))
         .route("/{game_identifier}/unpublish", put(unpublish_game))
         .nest("/{game_identifier}/tributes", TRIBUTES_ROUTER.clone())
 });
@@ -54,13 +52,7 @@ pub struct AreaItemEdge {
     item: RecordId
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct GameSummary {
-    pub day: i64,
-    pub summary: String,
-}
-
-async fn game_area_create(area: Area, db: &Surreal<Any>) -> Result<GameArea, AppError> {
+async fn create_game_area(area: Area, db: &Surreal<Any>) -> Result<GameArea, AppError> {
     let identifier = Uuid::new_v4().to_string();
     let area_id: RecordId = RecordId::from(("area", identifier.to_string()));
 
@@ -81,115 +73,120 @@ async fn game_area_create(area: Area, db: &Surreal<Any>) -> Result<GameArea, App
     }
 }
 
-async fn game_area_record_create(identifier: Uuid, game_id: RecordId, db: &Surreal<Any>) -> Result<Vec<GameAreaEdge>, AppError> {
-    let gar = db
-        .insert::<Option<Vec<GameAreaEdge>>>(
-            RecordId::from(("areas", identifier.to_string()))
-        ).relation(
-        GameAreaEdge {
-            game: game_id.clone(),
-            area: RecordId::from(("area", &identifier.to_string())),
-        }
-    ).await.expect("Failed to link Area and Game");
+async fn create_game_area_edge(area: Area, game_identifier: Uuid, db: &Surreal<Any>) -> Result<GameAreaEdge, AppError> {
+    let game_identifier_str = game_identifier.to_string();
+    let game_id = RecordId::from(("game", &game_identifier_str));
 
-    if let Some(gar) = gar {
-        Ok(gar)
-    } else {
-        Err(AppError::InternalServerError("Failed to create game area record".into()))
-    }
-}
-
-async fn game_area_record_creator(area: Area, game_identifier: Uuid, db: &Surreal<Any>) -> Result<GameAreaEdge, AppError> {
     // Does the `area` exist for the game?
-    let existing_area: Option<String>;
-    let game_identifier = game_identifier.to_string();
-
-    if let Ok(mut area) = db.query(r#"
+    let existing_area: Option<Area> = db.query(r#"
         SELECT identifier
         FROM area
         WHERE original_name = '$name'
         AND <-areas<-game.identifier = '$game_id'"#,
     )
         .bind(("name", area.clone()))
-        .bind(("game_id", game_identifier.clone()))
-        .await
-    {
-        existing_area = area.take::<Option<String>>(0).unwrap(); // e.g. a UUID
-    } else {
-        existing_area = None;
-    }
+        .bind(("game_id", game_identifier_str.clone()))
+        .await.and_then(|mut resp| resp.take(0)).expect("Failed to find Area");
 
-    let game_id = RecordId::from(("game", game_identifier));
-    let gar: Vec<GameAreaEdge>;
-
-    if let Some(identifier) = existing_area {
-        // The `area` exists, create the `areas` connection
-        let uuid = Uuid::from_str(identifier.as_str()).expect("Bad UUID");
-        gar = game_area_record_create(uuid, game_id, &db).await?;
+    let area_uuid = if let Some(identifier) = existing_area {
+        Uuid::from_str(&identifier.to_string()).expect("Failed to parse uuid")
     } else {
-        // The `area` does not exist, create the `area`
-        if let Ok(area) = game_area_create(area, &db).await {
-            // Then create the `areas` connection
-            let identifier = area.identifier.clone();
-            let uuid = Uuid::from_str(identifier.as_str()).expect("Bad UUID");
-            gar = game_area_record_create(uuid, game_id, &db).await?;
-        } else {
-            return Err(AppError::InternalServerError("Failed to create game area".into()));
+        match create_game_area(area, &db).await {
+            Ok(game_area) => {
+                Uuid::from_str(&game_area.identifier.as_str()).expect("Failed to parse uuid")
+            }
+            Err(_) => {
+                return Err(AppError::InternalServerError("Failed to create game area".into()));
+            }
         }
-    }
+    };
 
-    if !gar.is_empty() {
-        if let Some(resp) = gar.clone().pop() {
-            Ok(resp)
-        } else {
-            Err(AppError::InternalServerError("Failed to create game area".into()))
+    let gar = db
+        .insert::<Option<Vec<GameAreaEdge>>>(
+            RecordId::from(("areas", area_uuid.to_string()))
+        ).relation(
+        GameAreaEdge {
+            game: game_id.clone(),
+            area: RecordId::from(("area", &area_uuid.to_string())),
         }
-    } else {
-        Err(AppError::InternalServerError("Failed to create game area record".into()))
+    ).await.map_err(|_| AppError::InternalServerError("Failed to link game and area".into()))?;
+
+    match gar {
+        Some(edges) if !edges.is_empty() => Ok(edges[0].clone()),
+        _ => Err(AppError::InternalServerError("Failed to create game area record".into())),
     }
 }
 
-pub async fn game_create(state: State<AppState>, Json(payload): Json<Game>) -> Result<Json<Game>, AppError> {
+pub async fn create_game(state: State<AppState>, Json(payload): Json<Game>) -> Result<Json<Game>, AppError> {
+    let game_identifier = payload.clone().identifier;
+
     let game: Option<Game> = state.db
-        .create(("game", &payload.identifier))
+        .create(("game", &game_identifier))
         .content(payload.clone())
-        .await.expect("Failed to create game");
-    let game = game.unwrap();
+        .await
+        .map_err(|e| AppError::InternalServerError(format!("Failed to create game: {}", e)))?;
 
-    for _ in 0..24 {
-        tribute_record_create(None, payload.clone().identifier, &state.db).await.expect("Failed to create tributes");
+    let game = game.ok_or_else(|| AppError::InternalServerError("Game creation returned empty result".into()))?;
+
+    // Create tributes concurrently
+    let tribute_futures = (0..24).map(|_| create_tribute(None, &game_identifier, &state.db));
+    let tribute_results = futures::future::join_all(tribute_futures).await;
+
+    if let Some(err) = tribute_results.into_iter().find_map(Result::err) {
+        return Err(AppError::InternalServerError(format!("Failed to create tributes: {}", err)));
     }
 
-    for area in Area::iter() {
-        let uuid = Uuid::from_str(payload.clone().identifier.as_str()).expect("Bad UUID");
-        let game_area = game_area_record_creator(
-            area.clone(), // Area to link to,
-            uuid, // Game to link to,
-            &state.db // Database connection
-        ).await.expect("Failed to create game area");
+    // Create areas concurrently
+    let area_futures = Area::iter()
+        .map(|area| create_area(game_identifier.as_str(), area.clone(), 3, &state.db));
+    let area_results = futures::future::join_all(area_futures).await;
 
-        for _ in 0..3 {
-            // Insert an item
-            let new_item: Item = Item::new_random(None);
-            let new_item_id: RecordId = RecordId::from(("item", &new_item.identifier));
-            state.db
-                .insert::<Option<Item>>(new_item_id.clone())
-                .content(new_item.clone())
-                .await.expect("failed to insert item");
+    if let Some(err) = area_results.into_iter().find_map(Result::err) {
+        return Err(AppError::InternalServerError(format!("Failed to create areas: {}", err)));
+    }
 
-            // Insert an area-item relationship
-            let area_item: AreaItemEdge = AreaItemEdge {
-                area: game_area.area.clone(),
-                item: new_item_id.clone(),
-            };
-            state.db
-                .insert::<Vec<AreaItemEdge>>("items")
-                .relation([area_item])
-                .await.expect("");
+    Ok(Json(game))
+}
+
+pub async fn create_area(game_identifier: &str, area: Area, num_items: u32, db: &Surreal<Any>) -> Result<(), AppError> {
+    let game_uuid = Uuid::from_str(game_identifier).expect("Bad UUID");
+    if let Ok(game_area) = create_game_area_edge(area.clone(), game_uuid, &db).await {
+        let item_futures = (0..num_items).map(|_| add_item_to_area(&game_area, &db));
+        let item_results = futures::future::join_all(item_futures).await;
+        if let Some(err) = item_results.into_iter().find_map(Result::err) {
+            return Err(AppError::InternalServerError(format!("Failed to create items: {}", err)));
         }
+    } else {
+        return Err(AppError::InternalServerError("Failed to create game area".into()));
     }
 
-    Ok(Json::<Game>(game.clone()))
+    Ok(())
+}
+
+pub async fn add_item_to_area(game_area_edge: &GameAreaEdge, db: &Surreal<Any>) -> Result<(), AppError> {
+    // Insert an item
+    let new_item: Item = Item::new_random(None);
+    let new_item_id: RecordId = RecordId::from(("item", &new_item.identifier));
+    if let Err(e) = db.insert::<Option<Item>>(new_item_id.clone())
+        .content(new_item.clone())
+        .await
+    {
+        return Err(AppError::InternalServerError(format!("Failed to create item: {}", e)));
+    }
+
+    // Insert an area-item relationship
+    let area_item: AreaItemEdge = AreaItemEdge {
+        area: game_area_edge.area.clone(),
+        item: new_item_id.clone(),
+    };
+    if let Err(e) = db.insert::<Vec<AreaItemEdge>>("items")
+        .relation([area_item])
+        .await
+    {
+        Err(AppError::InternalServerError(format!("Failed to create area-item relationship: {}", e)))
+    } else {
+        Ok(())
+    }
 }
 
 pub async fn game_delete(game_identifier: Path<Uuid>, state: State<AppState>) -> Result<StatusCode, AppError> {
@@ -266,8 +263,7 @@ FROM game
         Ok(games) => {
             Ok(Json::<Vec<DisplayGame>>(games))
         }
-        Err(e) => {
-            tracing::error!("{}", e);
+        Err(_) => {
             Err(AppError::InternalServerError("Failed to fetch games".into()))
         }
     }
@@ -553,7 +549,7 @@ async fn save_area_items(items: Vec<Item>, owner: RecordId, db: &Surreal<Any>) -
         }
 
         if item.quantity > 0 {
-            let _: Vec<TributeOwns> = db.insert("items").relation(
+            let _: Vec<TributeAreaEdge> = db.insert("items").relation(
                 AreaItemEdge {
                     area: owner.clone(),
                     item: item_identifier.clone(),
@@ -582,8 +578,8 @@ async fn save_tribute_items(items: Vec<Item>, owner: RecordId, db: &Surreal<Any>
         }
 
         if item.quantity > 0 {
-            let _: Vec<TributeOwns> = db.insert("owns").relation(
-                TributeOwns {
+            let _: Vec<TributeAreaEdge> = db.insert("owns").relation(
+                TributeAreaEdge {
                     tribute: owner.clone(),
                     item: item_identifier.clone(),
                 }

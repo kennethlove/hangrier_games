@@ -8,11 +8,11 @@ use game::items::Item;
 use game::messages::GameMessage;
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
-use surrealdb::{Surreal};
 use shared::EditTribute;
 use std::sync::LazyLock;
 use surrealdb::engine::any::Any;
 use surrealdb::RecordId;
+use surrealdb::Surreal;
 use uuid::Uuid;
 
 pub static TRIBUTES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
@@ -23,7 +23,7 @@ pub static TRIBUTES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
 });
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct TributeOwns {
+pub struct TributeAreaEdge {
     #[serde(rename = "in")]
     pub tribute: RecordId,
     #[serde(rename = "out")]
@@ -31,14 +31,14 @@ pub struct TributeOwns {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct TributePlaysIn {
+struct TributeGameEdge {
     #[serde(rename = "in")]
     tribute: RecordId,
     #[serde(rename = "out")]
     game: RecordId,
 }
 
-pub async fn tribute_record_create(tribute: Option<Tribute>, game_identifier: String, db: &Surreal<Any>) -> Result<Tribute, AppError> {
+pub async fn create_tribute(tribute: Option<Tribute>, game_identifier: &String, db: &Surreal<Any>) -> Result<Tribute, AppError> {
     let game_id = RecordId::from(("game", game_identifier.clone()));
     let tribute_count = db
         .query("RETURN count(SELECT id FROM playing_in WHERE out.identifier=$game)")
@@ -51,7 +51,7 @@ pub async fn tribute_record_create(tribute: Option<Tribute>, game_identifier: St
 
     let mut tribute = tribute.unwrap_or_else(Tribute::random);
     tribute.district = (tribute_count.unwrap_or(1) % 12) + 1;
-    tribute.statistics.game = game_identifier;
+    tribute.statistics.game = game_identifier.clone();
 
     let id = RecordId::from(("tribute", &tribute.identifier));
 
@@ -60,8 +60,8 @@ pub async fn tribute_record_create(tribute: Option<Tribute>, game_identifier: St
         .content(tribute)
         .await.expect("Failed to create Tribute record");
 
-    let _: Vec<TributePlaysIn> = db.insert("playing_in").relation(
-        TributePlaysIn {
+    let _: Vec<TributeGameEdge> = db.insert("playing_in").relation(
+        TributeGameEdge {
             tribute: id.clone(),
             game: game_id.clone(),
         }
@@ -70,8 +70,8 @@ pub async fn tribute_record_create(tribute: Option<Tribute>, game_identifier: St
     let new_object: Item = Item::new_random(None);
     let new_object_id: RecordId = RecordId::from(("item", &new_object.identifier));
     let _: Option<Item> = db.insert(new_object_id.clone()).content(new_object.clone()).await.expect("Failed to update Item");
-    let _: Vec<TributeOwns> = db.insert("owns").relation(
-        TributeOwns {
+    let _: Vec<TributeAreaEdge> = db.insert("owns").relation(
+        TributeAreaEdge {
             tribute: id.clone(),
             item: new_object_id.clone(),
         }
@@ -85,7 +85,7 @@ pub async fn tribute_record_create(tribute: Option<Tribute>, game_identifier: St
 }
 
 pub async fn tribute_create(Path(game_identifier): Path<String>, state: State<AppState>, Json(payload): Json<Tribute>) -> Result<Json<Tribute>, AppError> {
-    let tribute = tribute_record_create(Some(payload), game_identifier, &state.db).await?;
+    let tribute = create_tribute(Some(payload), &game_identifier, &state.db).await?;
     Ok(Json(tribute.clone()))
 }
 

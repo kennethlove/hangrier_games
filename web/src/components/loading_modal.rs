@@ -1,7 +1,7 @@
-use crate::components::icons::mockingjay_arrow::MockingjayArrow;
 use crate::components::modal::{Modal, Props as ModalProps};
 use crate::LoadingState;
 use dioxus::prelude::*;
+use crate::components::icons::loading::LoadingIcon;
 
 #[component]
 pub fn LoadingModal() -> Element {
@@ -18,17 +18,7 @@ pub fn LoadingModal() -> Element {
         children: Some(rsx! {
             div {
                 class: "flex justify-center pb-4",
-                MockingjayArrow {
-                    class: r#"
-                    size-16
-                    motion-safe:animate-pulse
-                    motion-reduce:animate-none
-                    theme1:fill-red-900
-                    theme2:fill-green-800
-                    theme3:fill-amber-600
-                    theme3:size-24
-                    "#
-                }
+                LoadingIcon {}
             }
         })
     };

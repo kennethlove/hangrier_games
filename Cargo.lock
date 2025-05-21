@@ -189,6 +189,7 @@ version = "0.1.13"
 dependencies = [
  "announcers",
  "axum",
+ "futures",
  "game",
  "serde",
  "serde_json",

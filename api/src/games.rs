@@ -119,28 +119,42 @@ async fn create_game_area_edge(area: Area, game_identifier: Uuid, db: &Surreal<A
 
 pub async fn create_game(state: State<AppState>, Json(payload): Json<Game>) -> Result<Json<Game>, AppError> {
     let game_identifier = payload.clone().identifier;
+
     let game: Option<Game> = state.db
         .create(("game", &game_identifier))
         .content(payload.clone())
-        .await.expect("Failed to create game");
-    let game = game.unwrap();
+        .await
+        .map_err(|e| AppError::InternalServerError(format!("Failed to create game: {}", e)))?;
 
-    for _ in 0..24 {
-        create_tribute(None, &game_identifier, &state.db).await?;
+    let game = game.ok_or_else(|| AppError::InternalServerError("Game creation returned empty result".into()))?;
+
+    // Create tributes concurrently
+    let tribute_futures = (0..24).map(|_| create_tribute(None, &game_identifier, &state.db));
+    let tribute_results = futures::future::join_all(tribute_futures).await;
+
+    if let Some(err) = tribute_results.into_iter().find_map(Result::err) {
+        return Err(AppError::InternalServerError(format!("Failed to create tributes: {}", err)));
     }
 
-    for area in Area::iter() {
-        create_area(game_identifier.as_str(), area.clone(), 3, &state.db).await?;
+    // Create areas concurrently
+    let area_futures = Area::iter()
+        .map(|area| create_area(game_identifier.as_str(), area.clone(), 3, &state.db));
+    let area_results = futures::future::join_all(area_futures).await;
+
+    if let Some(err) = area_results.into_iter().find_map(Result::err) {
+        return Err(AppError::InternalServerError(format!("Failed to create areas: {}", err)));
     }
 
-    Ok(Json::<Game>(game.clone()))
+    Ok(Json(game))
 }
 
 pub async fn create_area(game_identifier: &str, area: Area, num_items: u32, db: &Surreal<Any>) -> Result<(), AppError> {
     let game_uuid = Uuid::from_str(game_identifier).expect("Bad UUID");
     if let Ok(game_area) = create_game_area_edge(area.clone(), game_uuid, &db).await {
-        for _ in 0..num_items {
-            add_item_to_area(&game_area, &db).await?;
+        let item_futures = (0..num_items).map(|_| add_item_to_area(&game_area, &db));
+        let item_results = futures::future::join_all(item_futures).await;
+        if let Some(err) = item_results.into_iter().find_map(Result::err) {
+            return Err(AppError::InternalServerError(format!("Failed to create items: {}", err)));
         }
     } else {
         return Err(AppError::InternalServerError("Failed to create game area".into()));

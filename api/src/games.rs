@@ -496,6 +496,7 @@ pub async fn next_step(Path(identifier): Path<Uuid>, state: State<AppState>) -> 
     }
 }
 
+
 async fn get_full_game(identifier: Uuid, db: &Surreal<Any>) -> Result<Json<Game>, AppError> {
     let identifier = identifier.to_string();
     let mut result = db.query(r#"

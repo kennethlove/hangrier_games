@@ -13,7 +13,6 @@ use game::messages::GameMessage;
 use game::tributes::Tribute;
 use shared::{DisplayGame, GameStatus};
 use crate::components::icons::loading::LoadingIcon;
-use crate::components::icons::mockingjay_arrow::MockingjayArrow;
 
 async fn fetch_tributes(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tributes(game_identifier)) = keys.first() {

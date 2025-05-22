@@ -406,38 +406,6 @@ fn GameStats(identifier: String) -> Element {
             rsx! {
                 div {
                     class: "flex flex-col gap-2 mt-4",
-
-                    if !game.winner.is_empty() && game_status == GameStatus::Finished.to_string() {
-                        h1 {
-                            class: r#"
-                            block
-                            text-3xl
-                            text-center
-                            font-bold
-                            theme1:text-amber-500
-                            theme1:font-[Cinzel]
-                            theme2:text-green-900
-                            theme2:font-bold
-                            theme2:font-[Playfair_Display]
-                            theme3:text-yellow-500
-                            theme3:drop-shadow-sm
-                            theme3:font-[Orbitron]
-                            "#,
-                            span {
-                                class: r#"
-                                block
-                                font-normal
-                                theme1:text-amber-300
-                                theme2:text-green-200
-                                theme3:text-stone-700
-                                "#,
-                                "Winner"
-                            },
-
-                            "{game.winner}!"
-                        }
-                    }
-
                     div {
                         class: "flex flex-row place-content-between pr-2",
 

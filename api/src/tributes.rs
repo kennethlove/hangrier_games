@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 pub static TRIBUTES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
     Router::new()
-        .route("/", get(game_tributes).post(tribute_create))
+        .route("/", get(game_tributes))
         .route("/{identifier}", get(tribute_detail).delete(tribute_delete).put(tribute_update))
         .route("/{identifier}/log", get(tribute_log))
 });
@@ -38,7 +38,7 @@ struct TributeGameEdge {
     game: RecordId,
 }
 
-pub async fn create_tribute(tribute: Option<Tribute>, game_identifier: &String, db: &Surreal<Any>) -> Result<Tribute, AppError> {
+pub async fn create_tribute(tribute: Option<Tribute>, game_identifier: &String, db: &Surreal<Any>, district: u32) -> Result<Tribute, AppError> {
     let game_id = RecordId::from(("game", game_identifier.clone()));
     let tribute_count = db
         .query("RETURN count(SELECT id FROM playing_in WHERE out.identifier=$game)")
@@ -50,7 +50,7 @@ pub async fn create_tribute(tribute: Option<Tribute>, game_identifier: &String, 
     }
 
     let mut tribute = tribute.unwrap_or_else(Tribute::random);
-    tribute.district = (tribute_count.unwrap_or(1) % 12) + 1;
+    tribute.district = district + 1;
     tribute.statistics.game = game_identifier.clone();
 
     let id = RecordId::from(("tribute", &tribute.identifier));
@@ -82,11 +82,6 @@ pub async fn create_tribute(tribute: Option<Tribute>, game_identifier: &String, 
     } else {
         Err(AppError::InternalServerError("Failed to create tribute".to_string()))
     }
-}
-
-pub async fn tribute_create(Path(game_identifier): Path<String>, state: State<AppState>, Json(payload): Json<Tribute>) -> Result<Json<Tribute>, AppError> {
-    let tribute = create_tribute(Some(payload), &game_identifier, &state.db).await?;
-    Ok(Json(tribute.clone()))
 }
 
 pub async fn tribute_delete(Path((_, tribute_identifier)): Path<(String, String)>, state: State<AppState>) -> Result<StatusCode, AppError> {

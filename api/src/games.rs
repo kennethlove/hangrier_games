@@ -11,7 +11,7 @@ use game::items::Item;
 use game::messages::{get_all_messages, GameMessage};
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
-use shared::GameArea;
+use shared::{GameArea, ListDisplayGame};
 use shared::{DisplayGame, EditGame, GameStatus};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -129,7 +129,7 @@ pub async fn create_game(state: State<AppState>, Json(payload): Json<Game>) -> R
     let game = game.ok_or_else(|| AppError::InternalServerError("Game creation returned empty result".into()))?;
 
     // Create tributes concurrently
-    let tribute_futures = (0..24).map(|_| create_tribute(None, &game_identifier, &state.db));
+    let tribute_futures = (0..24).map(|idx| create_tribute(None, &game_identifier, &state.db, idx % 12));
     let tribute_results = futures::future::join_all(tribute_futures).await;
 
     if let Some(err) = tribute_results.into_iter().find_map(Result::err) {
@@ -237,7 +237,7 @@ async fn delete_pieces(pieces: HashMap<String, Vec<Thing>>, db: &Surreal<Any>) -
     Ok(())
 }
 
-pub async fn game_list(state: State<AppState>) -> Result<Json<Vec<DisplayGame>>, AppError> {
+pub async fn game_list(state: State<AppState>) -> Result<Json<Vec<ListDisplayGame>>, AppError> {
     let mut games = state.db.query(r#"
 SELECT name, identifier, status, day, private,
 created_by.id == $auth.id AS is_mine,
@@ -259,12 +259,13 @@ AS ready
 FROM game
 ;"#).await.unwrap();
 
-    match games.take::<Vec<DisplayGame>>(0) {
+    match games.take::<Vec<ListDisplayGame>>(0) {
         Ok(games) => {
-            Ok(Json::<Vec<DisplayGame>>(games))
+            Ok(Json::<Vec<ListDisplayGame>>(games))
         }
-        Err(_) => {
-            Err(AppError::InternalServerError("Failed to fetch games".into()))
+        Err(e) => {
+            dbg!(&games);
+            Err(AppError::InternalServerError(format!("Failed to fetch games: {}", e)))
         }
     }
 }
@@ -397,15 +398,18 @@ async fn get_game_status(db: &Surreal<Any>, identifier: &str) -> Result<GameStat
         .await;
     match result {
         Ok(mut result) => {
-            match result.take::<Option<String>>(0) {
+            match result.take::<Option<String>>("status") {
                 Ok(Some(game_status)) => {
                     match GameStatus::from_str(game_status.as_str()) {
                         Ok(status) => Ok(status),
                         Err(_) => Err(AppError::InternalServerError("Invalid status".into())),
                     }
                 }
+                Err(e) => {
+                    Err(AppError::NotFound(format!("Failed to find game status: {}", e)))
+                }
                 _ => {
-                    Err(AppError::NotFound("Failed to find game".into()))
+                    Err(AppError::NotFound("Failed to find game status".into()))
                 }
             }
         }
@@ -415,7 +419,7 @@ async fn get_game_status(db: &Surreal<Any>, identifier: &str) -> Result<GameStat
 
 async fn update_game_status(db: &Surreal<Any>, record_id: &RecordId, status: GameStatus) -> Result<(), AppError> {
     match db.query("UPDATE $record_id SET status = $status")
-        .bind(("record_id", record_id.to_string()))
+        .bind(("record_id", record_id.clone()))
         .bind(("status", status.to_string()))
         .await
     {
@@ -469,7 +473,9 @@ pub async fn next_step(Path(identifier): Path<Uuid>, state: State<AppState>) -> 
     match game_status {
         GameStatus::NotStarted => {
             update_game_status(&state.db, &record_id, GameStatus::InProgress).await?;
-            Ok(Json(None))
+            let mut game = get_full_game(identifier, &state.db).await?.0;
+            game.status = GameStatus::InProgress;
+            Ok(Json(Some(game)))
         },
         GameStatus::InProgress => {
             let dead_tribute_count = get_dead_tribute_count(&state.db, &id_str).await?;
@@ -489,7 +495,6 @@ pub async fn next_step(Path(identifier): Path<Uuid>, state: State<AppState>) -> 
         }
     }
 }
-
 
 async fn get_full_game(identifier: Uuid, db: &Surreal<Any>) -> Result<Json<Game>, AppError> {
     let identifier = identifier.to_string();

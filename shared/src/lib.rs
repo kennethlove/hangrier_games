@@ -102,3 +102,22 @@ pub struct DisplayGame {
 pub struct CreatedBy {
     pub username: String,
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct ListDisplayGame {
+    pub identifier: String,
+    pub name: String,
+    pub status: GameStatus,
+    pub day: Option<u32>,
+    #[serde(default)]
+    pub tribute_count: u32,
+    #[serde(default)]
+    pub living_count: u32,
+    #[serde(default)]
+    pub ready: bool,
+    #[serde(default)]
+    pub private: bool,
+    #[serde(default)]
+    pub is_mine: bool,
+    pub created_by: CreatedBy,
+}

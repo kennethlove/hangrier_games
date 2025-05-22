@@ -20,18 +20,19 @@ async fn fetch_games(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryVal
 
         match request.send().await{
             Ok(request) => {
+                dbg!(&request);
                 if let Ok(response) = request.json::<Vec<DisplayGame>>().await {
-                    QueryResult::Ok(QueryValue::DisplayGames(response))
+                    Ok(QueryValue::DisplayGames(response))
                 } else {
-                    QueryResult::Err(QueryError::BadJson)
+                    Err(QueryError::BadJson)
                 }
             },
             Err(_) => {
-                QueryResult::Err(QueryError::NoGames)
+                Err(QueryError::NoGames)
             }
         }
     } else {
-        QueryResult::Err(QueryError::Unknown)
+        Err(QueryError::Unknown)
     }
 }
 

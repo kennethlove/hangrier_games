@@ -144,7 +144,7 @@ impl Game {
 
     /// Checks if the game has concluded (i.e., if there is a winner or if all tributes are dead).
     /// If concluded, it updates the game status, posts the final messages, and returns the game.
-    async fn check_for_winner(&mut self) {
+    fn check_for_winner(&mut self) {
         if let Some(winner) = self.winner() {
             add_game_message(
                 self.identifier.as_str(),
@@ -163,7 +163,7 @@ impl Game {
     /// Prepares the game state for a new cycle.
     /// Clears old messages and area events.
     /// Increments day count by 1 if it's a day cycle.
-    async fn prepare_cycle(&mut self, day: bool) {
+    fn prepare_cycle(&mut self, day: bool) {
         if day {
             clear_messages().expect("Failed to clear messages for day");
             self.day = Some(self.day.unwrap_or(0) + 1);
@@ -176,7 +176,7 @@ impl Game {
     }
 
     /// Announces the start of the cycle.
-    async fn announce_cycle_start(&self, day: bool) {
+    fn announce_cycle_start(&self, day: bool) {
         let current_day = self.day.unwrap_or(1);
 
         if day {
@@ -214,7 +214,7 @@ impl Game {
     }
 
     /// Announces the end of a cycle
-    async fn announce_cycle_end(&self, day: bool) {
+    fn announce_cycle_end(&self, day: bool) {
         add_game_message(
             self.identifier.as_str(),
             format!("{}", GameOutput::TributesLeft(self.living_tributes().len() as u32)),
@@ -243,29 +243,29 @@ impl Game {
     }
 
     /// Runs the day and night cycles of one game round.
-    pub async fn run_day_night_cycle(&mut self, day: bool) {
+    pub fn run_day_night_cycle(&mut self, day: bool) {
         // Check if the game is over, and if so, end it.
         // This will also post the final messages.
-        self.check_for_winner().await;
+        self.check_for_winner();
 
         // Prepare the game for a new cycle
-        self.prepare_cycle(day).await;
+        self.prepare_cycle(day);
 
         // Announce the start of the cycle
-        self.announce_cycle_start(day).await;
+        self.announce_cycle_start(day);
 
         // Run the day
-        self.do_a_cycle(day).await;
+        self.do_a_cycle(day);
 
         // Announce the end of the cycle
-        self.announce_cycle_end(day).await;
+        self.announce_cycle_end(day);
 
         // Clean up any deaths
-        self.clean_up_recent_deaths().await;
+        self.clean_up_recent_deaths();
     }
 
     /// Announce events in closed areas.
-    async fn announce_area_events(&self) {
+    fn announce_area_events(&self) {
         for area_details in &self.areas {
             let area_name = area_details.area.clone().unwrap().to_string();
             if !area_details.is_open() {
@@ -288,7 +288,7 @@ impl Game {
     }
 
     /// Ensures at least one area is open. If not, opens a random area by clearing its events.
-    async fn ensure_open_area(&mut self) {
+    fn ensure_open_area(&mut self) {
         if self.random_open_area().is_none() {
             if let Some(area) = self.random_area() {
                 area.events.clear();
@@ -297,7 +297,7 @@ impl Game {
     }
 
     /// Triggers events for the current cycle.
-    async fn trigger_cycle_events(&mut self, day: bool, rng: &mut SmallRng) {
+    fn trigger_cycle_events(&mut self, day: bool, rng: &mut SmallRng) {
         let frequency = if day { DAY_EVENT_FREQUENCY } else { NIGHT_EVENT_FREQUENCY };
 
         // If it's nighttime, trigger an event
@@ -339,7 +339,7 @@ impl Game {
 
     /// If the tribute count is low, constrain them by closing areas.
     /// We achieve this by spawning events in open areas.
-    async fn constrain_areas(&mut self, rng: &mut SmallRng) {
+    fn constrain_areas(&mut self, rng: &mut SmallRng) {
         let tribute_count = self.living_tributes().len() as u32;
         let odds = tribute_count as f64 / 24.0;
         let mut area_events: HashMap<String, (AreaDetails, Vec<AreaEvent>)> = HashMap::new();
@@ -394,13 +394,21 @@ impl Game {
     }
 
     /// Runs the tributes' logic for the current cycle.
-    async fn run_tribute_cycle(&mut self, day: bool, rng: &mut SmallRng, closed_areas: Vec<Area>, living_tributes: Vec<Tribute>, living_tributes_count: usize) {
+    fn run_tribute_cycle(&mut self, day: bool, rng: &mut SmallRng, closed_areas: Vec<Area>, living_tributes: Vec<Tribute>, living_tributes_count: usize) {
         // Pre-compute global action suggestion
         let action_suggestion = match (self.day, day) {
             (Some(1), true) => Some(ActionSuggestion { action: Action::Move(None), probability: Some(0.5) }),
             (Some(3), true) => Some(ActionSuggestion { action: Action::Move(Some(Area::Cornucopia)), probability: Some(0.75) }),
             (_, _) => None,
         };
+
+        // Create area details lookup map
+        let mut area_details_map = HashMap::with_capacity(self.areas.len());
+        for (i, area_detail) in self.areas.iter_mut().enumerate() {
+            if let Some(area) = &area_detail.area {
+                area_details_map.insert(area.clone(), i);
+            }
+        }
 
         // Group tributes by area for faster lookups
         let mut tributes_by_area: HashMap<Area, Vec<&Tribute>> = HashMap::new();
@@ -410,6 +418,7 @@ impl Game {
                 .push(tribute);
         }
 
+        // Process tributes
         for tribute in self.tributes.iter_mut() {
             if !tribute.is_alive() {
                 tribute.status = TributeStatus::Dead;
@@ -420,12 +429,11 @@ impl Game {
                 tribute.events.push(TributeEvent::random());
             }
 
-            let area_details = match self.areas.iter_mut()
-                .filter(|ad| ad.area.is_some())
-                .find(|ad| ad.area.clone().unwrap() == tribute.area) {
-                Some(area_details) => area_details,
+            let area_index = match area_details_map.get(&tribute.area) {
+                Some(&idx) => idx,
                 None => continue,
             };
+            let area_details = &mut self.areas[area_index];
 
             let mut environment_details = EnvironmentContext {
                 is_day: day,
@@ -433,9 +441,14 @@ impl Game {
                 closed_areas: &closed_areas,
             };
 
-            let nearby_tributes: &Vec<&Tribute>;
-            let empty_vec = Vec::new();
-            nearby_tributes = tributes_by_area.get(&tribute.area).unwrap_or(&empty_vec);
+            // Get nearby tributes using the pre-computed map
+            let ev = Vec::new();
+            let nearby_tributes = {
+                match tributes_by_area.get(&tribute.area) {
+                    Some(tributes) => tributes,
+                    None => &ev
+                }
+            };
             let nearby_tributes_count = nearby_tributes.len() as u32;
 
             let targets: Vec<Tribute> = nearby_tributes.iter()
@@ -455,7 +468,7 @@ impl Game {
                 &mut environment_details,
                 encounter_context,
                 rng
-            ).await;
+            );
         }
     }
 
@@ -467,20 +480,20 @@ impl Game {
     /// 5. Close more areas by spawning more events if the tributes are getting low.
     /// 6. Run the tribute cycle.
     /// 7. Update the tributes in the game.
-    async fn do_a_cycle(&mut self, day: bool) {
+    fn do_a_cycle(&mut self, day: bool) {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
 
         // Announce area events
-        self.announce_area_events().await;
+        self.announce_area_events();
 
         // If there are no open areas, we need to open one.
-        self.ensure_open_area().await;
+        self.ensure_open_area();
 
         // Trigger any events for this cycle
-        self.trigger_cycle_events(day, &mut rng).await;
+        self.trigger_cycle_events(day, &mut rng);
 
         // If the tribute count is low, constrain them by closing areas.
-        self.constrain_areas(&mut rng).await;
+        self.constrain_areas(&mut rng);
 
         self.tributes.shuffle(&mut rng);
         let closed_areas: Vec<Area> = self.closed_areas()
@@ -495,12 +508,12 @@ impl Game {
         let living_tributes_count: usize = living_tributes.len();
 
 
-        self.run_tribute_cycle(day, &mut rng, closed_areas, living_tributes, living_tributes_count).await;
+        self.run_tribute_cycle(day, &mut rng, closed_areas, living_tributes, living_tributes_count);
     }
 
     /// Any tributes who have died in the current cycle will be moved to the "dead" list,
     /// and their items will be added to the area they died in.
-    async fn clean_up_recent_deaths(&mut self) {
+    fn clean_up_recent_deaths(&mut self) {
         let tribute_count = self.tributes.len();
 
         for i in 0..tribute_count {  // Using a for loop to avoid mutable borrow issues
@@ -511,7 +524,7 @@ impl Game {
                 self.tributes[i].statistics.day_killed = self.day;
                 let tribute_area = self.tributes[i].area.clone();
 
-                if let Some(area) = self.get_area_details_mut(tribute_area).await {
+                if let Some(area) = self.get_area_details_mut(tribute_area) {
                     for item in tribute_items {
                         area.add_item(item.clone());
                     }
@@ -523,7 +536,7 @@ impl Game {
     }
 
     /// Get a mutable reference to the area details for a given area.
-    async fn get_area_details_mut(&mut self, area: Area) -> Option<&mut AreaDetails> {
+    fn get_area_details_mut(&mut self, area: Area) -> Option<&mut AreaDetails> {
         self.areas.iter_mut().find(|ad| ad.area == Some(area.clone()))
     }
 }
@@ -622,8 +635,8 @@ mod tests {
         assert_eq!(game.random_open_area().unwrap(), area2);
     }
 
-    #[tokio::test]
-    async fn test_clean_up_recent_deaths() {
+    #[test]
+    fn test_clean_up_recent_deaths() {
         let mut game = Game::new("Test Game");
 
         let mut tribute = Tribute::default();
@@ -633,12 +646,12 @@ mod tests {
         assert_eq!(game.recently_dead_tributes().len(), 1);
         assert_eq!(game.recently_dead_tributes()[0], tribute);
 
-        game.clean_up_recent_deaths().await;
+        game.clean_up_recent_deaths();
         assert_eq!(game.tributes[0].status, TributeStatus::Dead);
     }
 
-    #[tokio::test]
-    async fn test_check_game_state_winner_exists() {
+    #[test]
+    fn test_check_game_state_winner_exists() {
         let winner_tribute = create_tribute("Winner", true);
         let loser_tribute = create_tribute("Loser", false);
         let mut game = create_test_game_with_tributes(vec![winner_tribute.clone(), loser_tribute.clone()]);
@@ -647,14 +660,14 @@ mod tests {
         assert_eq!(game.living_tributes().len(), 1);
         assert_eq!(game.winner(), Some(winner_tribute.clone()));
 
-        game.check_for_winner().await;
+        game.check_for_winner();
 
         // Game should be finished
         assert_eq!(game.status, GameStatus::Finished);
     }
 
-    #[tokio::test]
-    async fn test_check_game_state_no_survivors() {
+    #[test]
+    fn test_check_game_state_no_survivors() {
         let loser_tribute = create_tribute("Loser", false);
         let loser2_tribute = create_tribute("Loser 2", false);
         let mut game = create_test_game_with_tributes(vec![loser_tribute.clone(), loser2_tribute.clone()]);
@@ -663,14 +676,14 @@ mod tests {
         assert!(game.living_tributes().is_empty());
         assert!(game.winner().is_none());
 
-        game.check_for_winner().await;
+        game.check_for_winner();
 
         // Game should be finished
         assert_eq!(game.status, GameStatus::Finished);
     }
 
-    #[tokio::test]
-    async fn test_check_game_state_continues() {
+    #[test]
+    fn test_check_game_state_continues() {
         let living_tribute1 = create_tribute("Living1", true);
         let living_tribute2 = create_tribute("Living2", true);
         let mut game = create_test_game_with_tributes(vec![living_tribute1.clone(), living_tribute2.clone()]);
@@ -680,40 +693,40 @@ mod tests {
         assert_eq!(game.living_tributes().len(), 2);
         assert!(game.winner().is_none());
 
-        game.check_for_winner().await;
+        game.check_for_winner();
 
         // Game should be finished
         assert_eq!(game.status, starting_state);
     }
 
-    #[tokio::test]
-    async fn test_prepare_cycle() {
+    #[test]
+    fn test_prepare_cycle() {
         let mut game = Game::new("Test Game");
         let area = AreaDetails::new(Some("Lake".to_string()), Area::North);
         let event = AreaEvent::random();
         game.day = Some(1);
         game.areas.push(area);
         game.areas[0].events.push(event.clone());
-        game.prepare_cycle(true).await;
+        game.prepare_cycle(true);
         assert_eq!(game.day, Some(2));
         assert_eq!(game.areas[0].events.len(), 0);
 
         game.areas[0].events.push(event.clone());
-        game.prepare_cycle(false).await;
+        game.prepare_cycle(false);
         // Night cycle shouldn't advance the game day.
         assert_eq!(game.day, Some(2));
         assert_eq!(game.areas[0].events.len(), 0);
     }
 
-    #[tokio::test]
-    async fn test_announce_cycle_start() {
+    #[test]
+    fn test_announce_cycle_start() {
         let tribute1 = create_tribute("Tribute1", true);
         let tribute2 = create_tribute("Tribute2", true);
         let mut game = create_test_game_with_tributes(vec![tribute1.clone(), tribute2.clone()]);
         game.day = Some(1);
 
         clear_messages().unwrap();
-        game.announce_cycle_start(true).await;
+        game.announce_cycle_start(true);
         let messages = get_all_messages().unwrap();
         // Game day 1 message
         // Day start message
@@ -722,8 +735,8 @@ mod tests {
         clear_messages().unwrap();
     }
 
-    #[tokio::test]
-    async fn test_announce_cycle_end() {
+    #[test]
+    fn test_announce_cycle_end() {
         let tribute1 = create_tribute("Tribute1", true);
         let mut tribute2 = create_tribute("Tribute2", false);
         tribute2.set_status(TributeStatus::RecentlyDead);
@@ -731,7 +744,7 @@ mod tests {
         game.day = Some(1);
 
         clear_messages().unwrap();
-        game.announce_cycle_end(true).await;
+        game.announce_cycle_end(true);
         let messages = get_all_messages().unwrap();
         // Living tributes message
         // Tribute 2 death message
@@ -740,8 +753,8 @@ mod tests {
         clear_messages().unwrap();
     }
 
-    #[tokio::test]
-    async fn test_announce_area_events() {
+    #[test]
+    fn test_announce_area_events() {
         let mut game = Game::new("Test Game");
         let mut area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
         area.events.push(AreaEvent::random());
@@ -751,7 +764,7 @@ mod tests {
         assert!(!game.areas[0].is_open());
 
         clear_messages().unwrap();
-        game.announce_area_events().await;
+        game.announce_area_events();
         let messages = get_all_messages().unwrap();
         // Area closed message
         // Area event message
@@ -760,8 +773,8 @@ mod tests {
         clear_messages().unwrap();
     }
 
-    #[tokio::test]
-    async fn test_ensure_open_area() {
+    #[test]
+    fn test_ensure_open_area() {
         let mut game = Game::new("Test Game");
         let area1 = AreaDetails::new(Some("Lake".to_string()), Area::North);
         let area2 = AreaDetails::new(Some("Forest".to_string()), Area::South);
@@ -776,7 +789,7 @@ mod tests {
 
         assert!(game.random_open_area().is_none());
 
-        game.ensure_open_area().await;
+        game.ensure_open_area();
         assert!(game.random_open_area().is_some());
         clear_messages().unwrap();
     }
@@ -784,8 +797,8 @@ mod tests {
     #[test]
     fn test_trigger_cycle_events() { }
 
-    #[tokio::test]
-    async fn test_constrain_areas() {
+    #[test]
+    fn test_constrain_areas() {
         let mut game = Game::new("Test Game");
         let area1 = AreaDetails::new(Some("Lake".to_string()), Area::North);
         let area2 = AreaDetails::new(Some("Forest".to_string()), Area::South);
@@ -800,7 +813,7 @@ mod tests {
 
         // Constrain areas
         let mut rng = SmallRng::from_rng(&mut rand::rng());
-        game.constrain_areas(&mut rng).await;
+        game.constrain_areas(&mut rng);
 
         // Check if at least one area is closed
         assert!(game.random_open_area().is_some());
@@ -808,8 +821,8 @@ mod tests {
         assert_eq!(game.closed_areas().len(), 1);
     }
 
-    #[tokio::test]
-    async fn test_run_tribute_cycle() {
+    #[test]
+    fn test_run_tribute_cycle() {
         // Add tributes
         let tribute1 = create_tribute("Tribute1", true);
         let tribute2 = create_tribute("Tribute2", true);
@@ -821,7 +834,7 @@ mod tests {
 
         // Run the tribute cycle
         let mut rng = SmallRng::from_rng(&mut rand::rng());
-        game.run_tribute_cycle(true, &mut rng, closed_areas, vec![tribute1.clone(), tribute2.clone()], 2).await;
+        game.run_tribute_cycle(true, &mut rng, closed_areas, vec![tribute1.clone(), tribute2.clone()], 2);
 
         // Check if the tributes are updated correctly
         let new_tribute1 = game.tributes[0].clone();

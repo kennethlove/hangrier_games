@@ -449,7 +449,7 @@ impl Tribute {
     /// If the tribute is already in the suggested area, they stay put.
     /// If the tribute has low movement, they can only move to the suggested area or stay put.
     /// If the tribute has high movement, they can move to any open neighbor or the suggested area.
-    async fn travels(&self, closed_areas: &[Area], suggested_area: Option<Area>) -> TravelResult {
+    fn travels(&self, closed_areas: &[Area], suggested_area: Option<Area>) -> TravelResult {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
         // Where is the tribute?
         let current_area = self.area.clone();
@@ -673,7 +673,7 @@ impl Tribute {
     /// 6. Get the tribute's action from the brain.
     /// 7. Perform the action.
     /// 8. Log the action.
-    pub async fn process_turn_phase(
+    pub fn process_turn_phase(
         &mut self,
         action_suggestion: Option<ActionSuggestion>,
         environment_details: &mut EnvironmentContext<'_>,
@@ -704,18 +704,19 @@ impl Tribute {
         }
 
         // Any generous patrons this round?
-        if let Some(gift) = self.receive_patron_gift(&mut *rng).await {
-            self.add_item(gift.clone());
+        if let Some(gift) = self.receive_patron_gift(&mut *rng) {
             self.try_log_action(
-                GameOutput::SponsorGift(self.name.as_str(), gift.clone()),
+                GameOutput::SponsorGift(self.name.as_str(), &gift),
                 "received gift"
             );
+            self.add_item(gift);
         }
 
         // Nighttime terror
         let is_day = environment_details.is_day;
         if !is_day && self.is_alive() { self.misses_home(); }
 
+        // Set a preferred action if one is suggested
         if let Some(suggestion) = action_suggestion {
             self.brain.set_preferred_action(
                 suggestion.action,
@@ -723,18 +724,26 @@ impl Tribute {
             );
         }
 
-        let tribute = self.clone();
+        // Get tribute action
         let number_of_nearby_tributes = encounter_context.nearby_tributes_count;
-        let action = self.brain.act(&tribute, number_of_nearby_tributes, &mut *rng);
+        let action = self.brain.act(&self, number_of_nearby_tributes, rng);
+
         let closed_areas = environment_details.closed_areas;
 
         match &action {
-            Action::Move(area) => match self.travels(closed_areas, area.clone()).await {
-                TravelResult::Success(area) => {
-                    self.area = area;
-                }
-                TravelResult::Failure => {
-                    self.short_rests();
+            Action::Move(area) => {
+                let travel_result = match area {
+                    Some(specific_area) => self.travels(closed_areas, Some(specific_area.clone())),
+                    None => self.travels(closed_areas, None),
+                };
+
+                match travel_result {
+                    TravelResult::Success(area) => {
+                        self.area = area;
+                    }
+                    TravelResult::Failure => {
+                        self.short_rests();
+                    }
                 }
             },
             Action::Hide => {
@@ -755,7 +764,7 @@ impl Tribute {
             Action::Attack => {
                 let targets = encounter_context.potential_targets;
                 let living_tributes_count = encounter_context.total_living_tributes;
-                if let Some(mut target) = self.pick_target(targets, living_tributes_count).await {
+                if let Some(mut target) = self.pick_target(targets, living_tributes_count) {
                     self.attacks(&mut target, &mut *rng);
                 } else {
                     self.short_rests();
@@ -769,49 +778,18 @@ impl Tribute {
                     );
                 }
             }
-            Action::UseItem(None) => {
-                // Get consumable items
+            Action::UseItem(maybe_item) => {
                 let items = self.consumables();
-                if items.is_empty() {
-                    self.long_rests();
-                } else {
-                    // Use random item
-                    let item = items.choose(rng).unwrap();
 
-                    match self.try_use_consumable(item.clone()) {
-                        Ok(()) => {
-                            self.try_log_action(
-                                GameOutput::TributeUseItem(self.name.as_str(), item.clone()),
-                                "used random item"
-                            );
-                        }
-                        Err(_) => {
-                            self.try_log_action(
-                                GameOutput::TributeCannotUseItem(self.name.as_str(), item.name.as_str()),
-                                "cannot use random item"
-                            );
-                            self.short_rests();
-                        }
-                    };
-                }
-            }
-            Action::UseItem(item) => {
-                let items = self.consumables();
-                if let Some(item) = item {
-                    if items.contains(item) {
-                        match self.try_use_consumable(item.clone()) {
+                match maybe_item {
+                    Some(item) if items.contains(&item) => {
+                        // Use a specific item
+                        match self.try_use_consumable(item) {
                             Ok(()) => {
                                 self.try_log_action(
-                                    GameOutput::TributeUseItem(self.name.as_str(), item.clone()),
+                                    GameOutput::TributeUseItem(self.name.as_str(), item),
                                     "used specific item"
                                 );
-                                if let Err(_) = self.use_item(item) {
-                                    self.try_log_action(
-                                        GameOutput::TributeCannotUseItem(self.name.as_str(), item.name.as_str()),
-                                        "cannot use specific item"
-                                    );
-                                    self.short_rests();
-                                }
                             }
                             Err(_) => {
                                 self.try_log_action(
@@ -822,13 +800,37 @@ impl Tribute {
                             }
                         };
                     }
+                    None if !items.is_empty() => {
+                        // Use a random item
+                        if let Some(item) = items.choose(rng) {
+                            match self.try_use_consumable(item) {
+                                Ok(()) => {
+                                    self.try_log_action(
+                                        GameOutput::TributeUseItem(self.name.as_str(), item),
+                                        "used random item"
+                                    );
+                                }
+                                Err(_) => {
+                                    self.try_log_action(
+                                        GameOutput::TributeCannotUseItem(self.name.as_str(), item.name.as_str()),
+                                        "cannot use random item"
+                                    );
+                                    self.short_rests();
+                                }
+                            };
+                        }
+                    }
+                    _ => {
+                        // No items to use
+                        self.long_rests();
+                    }
                 }
             }
         }
     }
 
     /// Receive a patron gift, broken down by district
-    async fn receive_patron_gift(&mut self, mut rng: impl Rng) -> Option<Item> {
+    fn receive_patron_gift(&mut self, mut rng: impl Rng) -> Option<Item> {
         // Gift from patrons?
         let chance = match self.district {
             1 | 2 => 1.0 / 10.0,
@@ -861,7 +863,7 @@ impl Tribute {
     }
 
     /// Use consumable item from inventory
-    fn try_use_consumable(&mut self, chosen_item: Item) -> Result<(), ItemError> {
+    fn try_use_consumable(&mut self, chosen_item: &Item) -> Result<(), ItemError> {
         let items = self.consumables();
         let item: Item;
 
@@ -939,7 +941,7 @@ impl Tribute {
     /// 4. If there are no enemies nearby and no enemies left in the game:
     /// 4a. If loyalty is low, target ally.
     /// 4b. Otherwise, target no one.
-    async fn pick_target(&self, mut targets: Vec<Tribute>, living_tributes_count: u32) -> Option<Tribute> {
+    fn pick_target(&self, mut targets: Vec<Tribute>, living_tributes_count: u32) -> Option<Tribute> {
         // If there are no targets, check if the tribute is feeling suicidal.
         if targets.is_empty() {
             match self.attributes.sanity {
@@ -1510,7 +1512,7 @@ mod tests {
     #[tokio::test]
     async fn travels_success(tribute: Tribute) {
         let open_area = AreaDetails::new(Some("Forest".to_string()), Cornucopia);
-        let result = tribute.travels(&[East, South, North, West], None).await;
+        let result = tribute.travels(&[East, South, North, West], None);
         assert_eq!(result, TravelResult::Success(open_area.area.unwrap()));
     }
 
@@ -1518,7 +1520,7 @@ mod tests {
     #[tokio::test]
     async fn travels_fail_no_movement(mut tribute: Tribute) {
         tribute.attributes.movement = 0;
-        let result = tribute.travels(&[], None).await;
+        let result = tribute.travels(&[], None);
         assert_eq!(result, TravelResult::Failure);
     }
 
@@ -1526,7 +1528,7 @@ mod tests {
     #[tokio::test]
     async fn travels_fail_already_there(mut tribute: Tribute) {
         tribute.area = North;
-        let result = tribute.travels(&[Cornucopia, East, West, South], Some(North)).await;
+        let result = tribute.travels(&[Cornucopia, East, West, South], Some(North));
         assert_eq!(result, TravelResult::Failure);
     }
 
@@ -1534,7 +1536,7 @@ mod tests {
     #[tokio::test]
     async fn travels_fail_low_movement_no_suggestion(mut tribute: Tribute) {
         tribute.attributes.movement = 5;
-        let result = tribute.travels(&[Cornucopia, East, West, North], None).await;
+        let result = tribute.travels(&[Cornucopia, East, West, North], None);
         assert_eq!(result, TravelResult::Failure);
     }
 
@@ -1542,7 +1544,7 @@ mod tests {
     #[tokio::test]
     async fn travels_fail_low_movement_suggestion(mut tribute: Tribute) {
         tribute.attributes.movement = 5;
-        let result = tribute.travels(&[Cornucopia, East, West, North], Some(North)).await;
+        let result = tribute.travels(&[Cornucopia, East, West, North], Some(North));
         assert_eq!(result, TravelResult::Failure);
     }
 
@@ -1552,7 +1554,7 @@ mod tests {
         tribute.area = North;
         tribute.attributes.movement = 5;
         let open_area = AreaDetails::new(Some("Forest".to_string()), Cornucopia);
-        let result = tribute.travels(&[East, South], Some(Cornucopia)).await;
+        let result = tribute.travels(&[East, South], Some(Cornucopia));
         assert_eq!(result, TravelResult::Success(open_area.area.unwrap()));
     }
 
@@ -1653,10 +1655,9 @@ mod tests {
     }
 
     #[rstest]
-    #[tokio::test]
-    async fn receive_patron_gift(mut tribute: Tribute, mut small_rng: SmallRng) {
+    fn receive_patron_gift(mut tribute: Tribute, mut small_rng: SmallRng) {
         tribute.district = 13;
-        let gift = tribute.receive_patron_gift(&mut small_rng).await;
+        let gift = tribute.receive_patron_gift(&mut small_rng);
         assert!(gift.is_some());
     }
 
@@ -1683,7 +1684,7 @@ mod tests {
         let clone = tribute.clone();
         let health_potion = Item::new("Health Potion", ItemType::Consumable, 1, Attribute::Health, 1);
         tribute.items.push(health_potion.clone());
-        assert!(tribute.try_use_consumable(health_potion.clone()).is_ok());
+        assert!(tribute.try_use_consumable(&health_potion).is_ok());
         assert_eq!(tribute.items.len(), 0);
         assert_ne!(clone, tribute);
         assert_eq!(clone.attributes.health + 1, tribute.attributes.health);
@@ -1692,13 +1693,13 @@ mod tests {
     #[rstest]
     fn use_consumable_fail_item_not_found(mut tribute: Tribute) {
         let health_potion = Item::new("Health Potion", ItemType::Consumable, 1, Attribute::Health, 1);
-        assert!(tribute.try_use_consumable(health_potion.clone()).is_err());
+        assert!(tribute.try_use_consumable(&health_potion).is_err());
     }
 
     #[rstest]
     fn use_consumable_fail_item_not_available(mut tribute: Tribute) {
         let health_potion = Item::new("Health Potion", ItemType::Consumable, 0, Attribute::Health, 1);
-        assert!(tribute.try_use_consumable(health_potion.clone()).is_err());
+        assert!(tribute.try_use_consumable(&health_potion).is_err());
     }
 
     #[rstest]
@@ -1756,7 +1757,7 @@ mod tests {
 
         game.tributes.extend_from_slice([tribute.clone(), target.clone()].as_ref());
 
-        let target = tribute.pick_target(vec![target.clone()], 2).await;
+        let target = tribute.pick_target(vec![target.clone()], 2);
 
         assert_eq!(target, target.clone());
     }
@@ -1775,7 +1776,7 @@ mod tests {
 
         game.tributes.push(katniss.clone());
 
-        let target = katniss.pick_target(vec![], 1).await;
+        let target = katniss.pick_target(vec![], 1);
 
         assert_eq!(target, Some(katniss.clone()));
     }
@@ -1802,7 +1803,7 @@ mod tests {
 
         game.tributes.extend_from_slice([katniss.clone(), peeta.clone(), rue.clone()].as_ref());
 
-        let target = katniss.pick_target(vec![peeta], 3).await;
+        let target = katniss.pick_target(vec![peeta], 3);
 
         assert_eq!(target, None);
     }
@@ -1829,7 +1830,7 @@ mod tests {
 
         game.tributes.extend_from_slice([katniss.clone(), peeta.clone(), rue.clone()].as_ref());
 
-        let target = katniss.pick_target(vec![peeta.clone()], 3).await;
+        let target = katniss.pick_target(vec![peeta.clone()], 3);
 
         assert_eq!(target, Some(peeta));
     }
@@ -1850,7 +1851,7 @@ mod tests {
 
         game.tributes.extend_from_slice([katniss.clone(), peeta.clone()].as_ref());
 
-        let target = katniss.pick_target(vec![peeta.clone()], 2).await;
+        let target = katniss.pick_target(vec![peeta.clone()], 2);
 
         assert_eq!(target, Some(peeta));
     }
@@ -2021,7 +2022,7 @@ mod tests {
             environment_details,
             encounter_context,
             &mut rng
-        ).await;
+        );
 
         assert_ne!(clone, tribute1);
     }
@@ -2055,7 +2056,7 @@ mod tests {
             environment_details,
             encounter_context,
             &mut rng
-        ).await;
+        );
 
         assert_eq!(clone, tribute1);
     }

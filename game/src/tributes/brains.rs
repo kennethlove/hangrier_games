@@ -40,28 +40,31 @@ impl Brain {
     }
 
     /// The AI for a tribute. Automatic decisions based on the current state of the tribute.
-    pub fn act(&mut self, tribute: &Tribute, nearby_tributes: u32, mut rng: impl Rng) -> Action {
+    pub fn act(&self, tribute: &Tribute, nearby_tributes: u32, rng: &mut impl Rng) -> Action {
         if !tribute.is_alive() {
             return Action::None;
         }
 
         // If there is a preferred action, we should take it, assuming a positive roll
-        if let Some(preferred_action) = self.preferred_action.clone() {
+        if let Some(ref preferred_action) = self.preferred_action {
             if rng.random_bool(self.preferred_action_percentage) {
-                return preferred_action;
+                return preferred_action.clone();
             }
         }
 
         // Does the tribute have items?
-        if !tribute.consumables().is_empty() {
+        let has_consumables = !tribute.consumables().is_empty();
+        if has_consumables {
             // Use an item
             return Action::UseItem(None);
         }
 
-        match &nearby_tributes {
-            0 => self.decide_action_no_enemies(tribute),
-            1..LOW_ENEMY_LIMIT => self.decide_action_few_enemies(tribute),
-            _ => self.decide_action_many_enemies(tribute),
+        if nearby_tributes == 0 {
+            self.decide_action_no_enemies(tribute)
+        } else if nearby_tributes < LOW_ENEMY_LIMIT {
+            self.decide_action_few_enemies(tribute)
+        } else {
+            self.decide_action_many_enemies(tribute)
         }
     }
 
@@ -156,7 +159,7 @@ mod tests {
     }
 
     #[rstest]
-    fn decide_on_action_default(mut tribute: Tribute, mut small_rng: SmallRng) {
+    fn decide_on_action_default(tribute: Tribute, mut small_rng: SmallRng) {
         // If there are no enemies nearby, the tribute should move
         let action = tribute.brain.act(&tribute.clone(), 0, &mut small_rng);
         assert_eq!(action, Action::Move(None));
@@ -196,7 +199,7 @@ mod tests {
     }
 
     #[rstest]
-    fn decide_on_action_enemies(mut tribute: Tribute, mut small_rng: SmallRng) {
+    fn decide_on_action_enemies(tribute: Tribute, mut small_rng: SmallRng) {
         // If there are enemies nearby, the tribute should attack
         let action = tribute.brain.act(&tribute.clone(), 2, &mut small_rng);
         assert_eq!(action, Action::Attack);

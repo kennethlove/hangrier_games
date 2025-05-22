@@ -391,65 +391,105 @@ SELECT (
     }
 }
 
-pub async fn next_step(Path(identifier): Path<Uuid>, state: State<AppState>) -> Result<Json<Option<Game>>, AppError> {
-    let identifier = identifier.to_string();
-    let record_id = RecordId::from(("game", identifier.clone()));
-    let mut result = state.db.query(r#"
-SELECT status FROM game WHERE identifier = $identifier;
-RETURN count(
-    SELECT in.identifier
-    FROM playing_in
-    WHERE out.identifier = $identifier
-    AND in.status IN ["RecentlyDead", "Dead"]
-);"#).bind(("identifier", identifier.clone())).await.expect("No game found");
-    let status: Option<String> = result.take("status").expect("No game found");
-    let dead_tribute_count: Option<u32> = result.take(1).unwrap_or(Some(0));
-
-    if let Some(status) = status {
-        let status = GameStatus::from_str(status.as_str()).expect("Invalid game status");
-        match status {
-            GameStatus::NotStarted => {
-                state.db
-                    .query("UPDATE $record_id SET status = $status")
-                    .bind(("record_id", record_id.clone()))
-                    .bind(("status", GameStatus::InProgress))
-                    .await.expect("Failed to start game");
-                Ok(Json(None))
-            }
-            GameStatus::InProgress | GameStatus::Finished => {
-                let uuid = Uuid::parse_str(identifier.as_str()).expect("Failed to parse UUID");
-                if let Ok(Json(mut game)) = get_full_game(uuid, &state.db).await {
-                    match dead_tribute_count {
-                        Some(24) => {
-                            state.db
-                                .query("UPDATE $record_id SET status = $status")
-                                .bind(("record_id", record_id.clone()))
-                                .bind(("status", GameStatus::Finished))
-                                .await.expect("Failed to end game");
-                            Ok(Json(None))
-                        }
-                        _ => {
-                            // Run day
-                            game.run_day_night_cycle(true).await;
-
-                            // Run night
-                            game.run_day_night_cycle(false).await;
-                            let _ = save_game(&game, &state.db).await.expect("Night cycle failed");
-
-                            Ok(Json(Some(game)))
-                        }
+async fn get_game_status(db: &Surreal<Any>, identifier: &str) -> Result<GameStatus, AppError> {
+    let result = db.query("SELECT status FROM game WHERE identifier = $identifier")
+        .bind(("identifier", identifier.to_string()))
+        .await;
+    match result {
+        Ok(mut result) => {
+            match result.take::<Option<String>>(0) {
+                Ok(Some(game_status)) => {
+                    match GameStatus::from_str(game_status.as_str()) {
+                        Ok(status) => Ok(status),
+                        Err(_) => Err(AppError::InternalServerError("Invalid status".into())),
                     }
-                } else {
-                    tracing::info!("Full game could not be found");
+                }
+                _ => {
                     Err(AppError::NotFound("Failed to find game".into()))
                 }
             }
         }
-    } else {
-        tracing::info!("Game could not be found");
-        Err(AppError::NotFound("Failed to find game".into()))
+        _ => Err(AppError::NotFound("Failed to find game".into())),
     }
 }
+
+async fn update_game_status(db: &Surreal<Any>, record_id: &RecordId, status: GameStatus) -> Result<(), AppError> {
+    match db.query("UPDATE $record_id SET status = $status")
+        .bind(("record_id", record_id.to_string()))
+        .bind(("status", status.to_string()))
+        .await
+    {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            Err(AppError::InternalServerError(format!("Failed to update game status: {}", e)))
+        }
+    }
+}
+
+async fn get_dead_tribute_count(db: &Surreal<Any>, identifier: &str) -> Result<u32, AppError> {
+    let result = db.query(r#"
+        RETURN count(
+            SELECT in.identifier
+            FROM playing_in
+            WHERE out.identifier = $identifier
+            AND in.status IN ["RecentlyDead", "Dead"]
+        );"#).bind(("identifier", identifier.to_string()))
+        .await;
+
+    match result {
+        Ok(mut result) => {
+            match result.take::<Option<u32>>(0) {
+                Ok(Some(dead_tributes)) => {
+                    Ok(dead_tributes)
+                }
+                _ => {
+                    Err(AppError::NotFound("Failed to find game".into()))
+                }
+            }
+        },
+        _ => {
+            Err(AppError::NotFound("Failed to find game".into()))
+        }
+    }
+}
+
+async fn run_game_cycles(game: &mut Game, db: &Surreal<Any>) -> Result<(), AppError> {
+    game.run_day_night_cycle(true);
+    game.run_day_night_cycle(false);
+    let _ = save_game(game, db).await.expect("Failed to run game cycles");
+    Ok(())
+}
+
+pub async fn next_step(Path(identifier): Path<Uuid>, state: State<AppState>) -> Result<Json<Option<Game>>, AppError> {
+    let id = identifier.to_string();
+    let id_str = id.as_str();
+    let record_id = RecordId::from(("game", id_str));
+    let game_status = get_game_status(&state.db, id_str).await?;
+
+    match game_status {
+        GameStatus::NotStarted => {
+            update_game_status(&state.db, &record_id, GameStatus::InProgress).await?;
+            Ok(Json(None))
+        },
+        GameStatus::InProgress => {
+            let dead_tribute_count = get_dead_tribute_count(&state.db, &id_str).await?;
+
+            if dead_tribute_count >= 24 {
+                update_game_status(&state.db, &record_id, GameStatus::Finished).await?;
+                Ok(Json(None))
+            } else {
+                let mut game = get_full_game(identifier, &state.db).await?.0;
+                run_game_cycles(&mut game, &state.db).await?;
+
+                Ok(Json(Some(game)))
+            }
+        },
+        GameStatus::Finished => {
+            Ok(Json(None))
+        }
+    }
+}
+
 
 async fn get_full_game(identifier: Uuid, db: &Surreal<Any>) -> Result<Json<Game>, AppError> {
     let identifier = identifier.to_string();

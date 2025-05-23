@@ -541,7 +541,6 @@ struct GameLog {
 
 async fn save_game(game: &Game, db: &Surreal<Any>) -> Result<Json<Game>, AppError> {
     let game_identifier = RecordId::from(("game", game.identifier.clone()));
-    let mut saved_game = game.clone();
 
     // Start transaction
     db.query("BEGIN TRANSACTION").await.expect("Failed to start transaction");
@@ -569,38 +568,46 @@ async fn save_game(game: &Game, db: &Surreal<Any>) -> Result<Json<Game>, AppErro
         }
     }
 
-    let areas = game.areas.clone();
-    saved_game.areas = vec![];
 
-    for mut area in areas {
+    let area_results = futures::future::join_all(game.areas.iter().map(|area| async {
         let id = RecordId::from(("area", area.identifier.clone()));
-        let items = area.items.clone();
-        let _ = save_area_items(items, id.clone(), &db).await;
-        area.items = vec![];
+        save_area_items(&area.items, id.clone(), db).await?;
 
-        if let Err(e) = db.update::<Option<AreaDetails>>(id).content(area).await {
-            db.query("ROLLBACK").await.expect("Failed to rollback transaction");
-            return Err(AppError::InternalServerError(format!("Failed to update area: {}", e)));
-        }
+        let mut area_without_items = area.clone();
+        area_without_items.items = vec![];
+        db.update::<Option<AreaDetails>>(id.clone())
+            .content(area_without_items)
+            .await
+            .map_err(|e| AppError::InternalServerError(format!("Failed to update area: {}", e)))
+    })).await;
+
+    if area_results.iter().any(|result| result.is_err()) {
+        db.query("ROLLBACK").await.expect("Failed to rollback transaction");
+        return Err(AppError::InternalServerError("Failed to save area items".into()));
     }
 
-    let tributes = game.tributes.clone();
-    saved_game.tributes = vec![];
-
-    for mut tribute in tributes {
+    let tribute_results = futures::future::join_all(game.tributes.iter().map(|tribute| async {
         let id = RecordId::from(("tribute", tribute.identifier.clone()));
-        let mut items = tribute.items.clone();
-        if !tribute.is_alive() { items.clear(); }
-        tribute.items = vec![];
-
-        let _ = save_tribute_items(items, id.clone(), &db).await;
-
-        if let Err(e) = db.update::<Option<Tribute>>(id).content(tribute).await {
-            db.query("ROLLBACK").await.expect("Failed to rollback transaction");
-            return Err(AppError::InternalServerError(format!("Failed to update tribute: {}", e)));
+        if tribute.is_alive() {
+            save_tribute_items(tribute.items.clone(), id.clone(), db).await?;
         }
+
+        let mut tribute_without_items = tribute.clone();
+        tribute_without_items.items = vec![];
+        db.update::<Option<Tribute>>(id.clone())
+            .content(tribute_without_items)
+            .await
+            .map_err(|e| AppError::InternalServerError(format!("Failed to update tribute: {}", e)))
+    })).await;
+
+    if tribute_results.iter().any(|result| result.is_err()) {
+        db.query("ROLLBACK").await.expect("Failed to rollback transaction");
+        return Err(AppError::InternalServerError("Failed to save tribute items".into()));
     }
 
+    let mut saved_game = game.clone();
+    saved_game.tributes = vec![];
+    saved_game.areas = vec![];
     match db.update::<Option<Game>>(game_identifier.clone()).content(saved_game).await {
         Ok(Some(game)) => {
             // Commit transaction
@@ -618,7 +625,7 @@ async fn save_game(game: &Game, db: &Surreal<Any>) -> Result<Json<Game>, AppErro
     }
 }
 
-async fn save_area_items(items: Vec<Item>, owner: RecordId, db: &Surreal<Any>) -> Result<(), AppError> {
+async fn save_area_items(items: &Vec<Item>, owner: RecordId, db: &Surreal<Any>) -> Result<(), AppError> {
     let _ = db.query("DELETE FROM items WHERE in = $owner")
         .bind(("owner", owner.clone()))
         .await.expect("Failed to delete items");

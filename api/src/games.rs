@@ -5,14 +5,15 @@ use axum::http::StatusCode;
 use axum::routing::{get, put};
 use axum::Json;
 use axum::Router;
+use chrono::{DateTime, Utc};
 use game::areas::{Area, AreaDetails};
 use game::games::Game;
 use game::items::Item;
-use game::messages::{get_all_messages, GameMessage};
+use game::messages::{get_all_messages, GameMessage, MessageSource};
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
-use shared::{GameArea, ListDisplayGame};
 use shared::{DisplayGame, EditGame, GameStatus};
+use shared::{GameArea, ListDisplayGame};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::LazyLock;
@@ -526,21 +527,45 @@ WHERE identifier = $identifier;"#)
     }
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+struct GameLog {
+    pub id: RecordId,
+    pub identifier: String,
+    pub source: MessageSource,
+    pub game_day: u32,
+    pub subject: String,
+    #[serde(with = "chrono::serde::ts_nanoseconds")]
+    pub timestamp: DateTime<Utc>,
+    pub content: String,
+}
+
 async fn save_game(game: &Game, db: &Surreal<Any>) -> Result<Json<Game>, AppError> {
     let game_identifier = RecordId::from(("game", game.identifier.clone()));
     let mut saved_game = game.clone();
 
+    // Start transaction
+    db.query("BEGIN TRANSACTION").await.expect("Failed to start transaction");
 
     if let Ok(logs) = get_all_messages() {
-        for mut log in logs {
-            log.game_day = game.day.unwrap_or_default();
-            if let Err(_) = db
-                .insert::<Option<GameMessage>>(("message", &log.identifier))
-                .content(log.clone())
-                .await
-            {
-                return Err(AppError::InternalServerError("Failed to save game log".into()));
-            }
+        let game_day = game.day.unwrap_or_default();
+
+        let game_logs: Vec<GameLog> = logs.iter().map(|log| {
+            let log = log.clone();
+            let game_log = GameLog {
+                id: RecordId::from(("message", &log.identifier)),
+                identifier: log.identifier,
+                source: log.source,
+                game_day,
+                subject: log.subject,
+                timestamp: log.timestamp,
+                content: log.content,
+            };
+            game_log
+        }).collect();
+
+        if let Err(e) = db.insert::<Vec<GameMessage>>(()).content(game_logs).await {
+            db.query("ROLLBACK").await.expect("Failed to rollback transaction");
+            return Err(AppError::InternalServerError(format!("Failed to save game logs: {}", e)));
         }
     }
 
@@ -553,7 +578,10 @@ async fn save_game(game: &Game, db: &Surreal<Any>) -> Result<Json<Game>, AppErro
         let _ = save_area_items(items, id.clone(), &db).await;
         area.items = vec![];
 
-        db.update::<Option<AreaDetails>>(id).content(area).await.expect("Failed to update area items");
+        if let Err(e) = db.update::<Option<AreaDetails>>(id).content(area).await {
+            db.query("ROLLBACK").await.expect("Failed to rollback transaction");
+            return Err(AppError::InternalServerError(format!("Failed to update area: {}", e)));
+        }
     }
 
     let tributes = game.tributes.clone();
@@ -567,14 +595,26 @@ async fn save_game(game: &Game, db: &Surreal<Any>) -> Result<Json<Game>, AppErro
 
         let _ = save_tribute_items(items, id.clone(), &db).await;
 
-        db.update::<Option<Tribute>>(id).content(tribute).await.expect("Failed to update tributes");
+        if let Err(e) = db.update::<Option<Tribute>>(id).content(tribute).await {
+            db.query("ROLLBACK").await.expect("Failed to rollback transaction");
+            return Err(AppError::InternalServerError(format!("Failed to update tribute: {}", e)));
+        }
     }
 
-    let game = db.update::<Option<Game>>(game_identifier.clone()).content(saved_game).await.expect("Failed to update game");
-    if let Some(game) = game {
-        Ok(Json(game))
-    } else {
-        Err(AppError::NotFound("Failed to find game".into()))
+    match db.update::<Option<Game>>(game_identifier.clone()).content(saved_game).await {
+        Ok(Some(game)) => {
+            // Commit transaction
+            db.query("COMMIT").await.expect("Failed to commit transaction");
+            Ok(Json(game))
+        }
+        Ok(None) => {
+            db.query("ROLLBACK").await.expect("Failed to rollback transaction");
+            Err(AppError::NotFound("Failed to find game".into()))
+        }
+        Err(e) => {
+            db.query("ROLLBACK").await.expect("Failed to rollback transaction");
+            Err(AppError::InternalServerError(format!("Failed to update game: {}", e)))
+        }
     }
 }
 

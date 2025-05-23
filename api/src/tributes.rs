@@ -23,7 +23,7 @@ pub static TRIBUTES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
 });
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct TributeAreaEdge {
+pub struct TributeItemEdge {
     #[serde(rename = "in")]
     pub tribute: RecordId,
     #[serde(rename = "out")]
@@ -70,8 +70,8 @@ pub async fn create_tribute(tribute: Option<Tribute>, game_identifier: &String, 
     let new_object: Item = Item::new_random(None);
     let new_object_id: RecordId = RecordId::from(("item", &new_object.identifier));
     let _: Option<Item> = db.insert(new_object_id.clone()).content(new_object.clone()).await.expect("Failed to update Item");
-    let _: Vec<TributeAreaEdge> = db.insert("owns").relation(
-        TributeAreaEdge {
+    let _: Vec<TributeItemEdge> = db.insert("owns").relation(
+        TributeItemEdge {
             tribute: id.clone(),
             item: new_object_id.clone(),
         }

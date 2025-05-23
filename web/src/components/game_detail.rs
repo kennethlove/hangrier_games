@@ -201,6 +201,7 @@ fn GameState(identifier: String) -> Element {
             let is_finished = game.status == GameStatus::Finished;
             let game_private = game.private;
             let creator = game.created_by.username.clone();
+            let day = game.day.unwrap_or(0);
 
             let mutate = use_mutation(next_step);
 
@@ -208,8 +209,8 @@ fn GameState(identifier: String) -> Element {
                 GameStatus::NotStarted => {
                     if is_ready { "Start" } else { "Wait" }.to_string()
                 },
-                GameStatus::InProgress => "Play next step".to_string(),
-                GameStatus::Finished => "Clone".to_string(),
+                GameStatus::InProgress => format!("Play day {}", day + 1),
+                GameStatus::Finished => "Done!".to_string(),
             };
 
             let next_step_handler = move |_| {

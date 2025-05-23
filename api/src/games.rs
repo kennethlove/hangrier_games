@@ -1,18 +1,19 @@
-use crate::tributes::{create_tribute, TributeAreaEdge, TRIBUTES_ROUTER};
+use crate::tributes::{create_tribute, TributeItemEdge, TRIBUTES_ROUTER};
 use crate::{AppError, AppState};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::routing::{get, put};
 use axum::Json;
 use axum::Router;
+use chrono::{DateTime, Utc};
 use game::areas::{Area, AreaDetails};
 use game::games::Game;
 use game::items::Item;
-use game::messages::{get_all_messages, GameMessage};
+use game::messages::{get_all_messages, GameMessage, MessageSource};
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
-use shared::{GameArea, ListDisplayGame};
 use shared::{DisplayGame, EditGame, GameStatus};
+use shared::{GameArea, ListDisplayGame};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::LazyLock;
@@ -526,112 +527,262 @@ WHERE identifier = $identifier;"#)
     }
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+struct GameLog {
+    pub id: RecordId,
+    pub identifier: String,
+    pub source: MessageSource,
+    pub game_day: u32,
+    pub subject: String,
+    #[serde(with = "chrono::serde::ts_nanoseconds")]
+    pub timestamp: DateTime<Utc>,
+    pub content: String,
+}
+
 async fn save_game(game: &Game, db: &Surreal<Any>) -> Result<Json<Game>, AppError> {
     let game_identifier = RecordId::from(("game", game.identifier.clone()));
-    let mut saved_game = game.clone();
 
+    // Start transaction
+    db.query("BEGIN TRANSACTION").await.expect("Failed to start transaction");
 
     if let Ok(logs) = get_all_messages() {
-        for mut log in logs {
-            log.game_day = game.day.unwrap_or_default();
-            if let Err(_) = db
-                .insert::<Option<GameMessage>>(("message", &log.identifier))
-                .content(log.clone())
-                .await
-            {
-                return Err(AppError::InternalServerError("Failed to save game log".into()));
-            }
+        let game_day = game.day.unwrap_or_default();
+
+        let game_logs: Vec<GameLog> = logs.iter().map(|log| {
+            let log = log.clone();
+            let game_log = GameLog {
+                id: RecordId::from(("message", &log.identifier)),
+                identifier: log.identifier,
+                source: log.source,
+                game_day,
+                subject: log.subject,
+                timestamp: log.timestamp,
+                content: log.content,
+            };
+            game_log
+        }).collect();
+
+        if let Err(e) = db.insert::<Vec<GameMessage>>(()).content(game_logs).await {
+            db.query("ROLLBACK").await.expect("Failed to rollback transaction");
+            return Err(AppError::InternalServerError(format!("Failed to save game logs: {}", e)));
         }
     }
 
-    let areas = game.areas.clone();
-    saved_game.areas = vec![];
-
-    for mut area in areas {
+    let area_results = futures::future::join_all(game.areas.iter().map(|area| async {
         let id = RecordId::from(("area", area.identifier.clone()));
-        let items = area.items.clone();
-        let _ = save_area_items(items, id.clone(), &db).await;
-        area.items = vec![];
+        save_area_items(&area.items, id.clone(), db).await?;
 
-        db.update::<Option<AreaDetails>>(id).content(area).await.expect("Failed to update area items");
+        let mut area_without_items = area.clone();
+        area_without_items.items = vec![];
+        db.update::<Option<AreaDetails>>(id.clone())
+            .content(area_without_items)
+            .await
+            .map_err(|e| AppError::InternalServerError(format!("Failed to update area: {}", e)))
+    })).await;
+
+    if area_results.iter().any(|result| result.is_err()) {
+        db.query("ROLLBACK").await.expect("Failed to rollback transaction");
+        return Err(AppError::InternalServerError("Failed to save area items".into()));
     }
 
-    let tributes = game.tributes.clone();
-    saved_game.tributes = vec![];
-
-    for mut tribute in tributes {
+    let tribute_results = futures::future::join_all(game.tributes.iter().map(|tribute| async {
         let id = RecordId::from(("tribute", tribute.identifier.clone()));
-        let mut items = tribute.items.clone();
-        if !tribute.is_alive() { items.clear(); }
-        tribute.items = vec![];
+        if tribute.is_alive() {
+            save_tribute_items(&tribute.items, id.clone(), db).await?;
+        }
 
-        let _ = save_tribute_items(items, id.clone(), &db).await;
+        let mut tribute_without_items = tribute.clone();
+        tribute_without_items.items = vec![];
+        db.update::<Option<Tribute>>(id.clone())
+            .content(tribute_without_items)
+            .await
+            .map_err(|e| AppError::InternalServerError(format!("Failed to update tribute: {}", e)))
+    })).await;
 
-        db.update::<Option<Tribute>>(id).content(tribute).await.expect("Failed to update tributes");
+    if tribute_results.iter().any(|result| result.is_err()) {
+        db.query("ROLLBACK").await.expect("Failed to rollback transaction");
+        return Err(AppError::InternalServerError("Failed to save tribute items".into()));
     }
 
-    let game = db.update::<Option<Game>>(game_identifier.clone()).content(saved_game).await.expect("Failed to update game");
-    if let Some(game) = game {
-        Ok(Json(game))
-    } else {
-        Err(AppError::NotFound("Failed to find game".into()))
+    let mut saved_game = game.clone();
+    saved_game.tributes = vec![];
+    saved_game.areas = vec![];
+    match db.update::<Option<Game>>(game_identifier.clone()).content(saved_game).await {
+        Ok(Some(game)) => {
+            // Commit transaction
+            db.query("COMMIT").await.expect("Failed to commit transaction");
+            Ok(Json(game))
+        }
+        Ok(None) => {
+            db.query("ROLLBACK").await.expect("Failed to rollback transaction");
+            Err(AppError::NotFound("Failed to find game".into()))
+        }
+        Err(e) => {
+            db.query("ROLLBACK").await.expect("Failed to rollback transaction");
+            Err(AppError::InternalServerError(format!("Failed to update game: {}", e)))
+        }
     }
 }
 
-async fn save_area_items(items: Vec<Item>, owner: RecordId, db: &Surreal<Any>) -> Result<(), AppError> {
-    let _ = db.query("DELETE FROM items WHERE in = $owner")
+async fn save_area_items(items: &Vec<Item>, owner: RecordId, db: &Surreal<Any>) -> Result<(), AppError> {
+    // Get existing items
+    let existing_items: Vec<Item> = db.query("SELECT * FROM items WHERE in = $owner")
         .bind(("owner", owner.clone()))
-        .await.expect("Failed to delete items");
+        .await
+        .map_err(|e| AppError::InternalServerError(format!("Failed to fetch items: {}", e)))?
+        .take(0)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take items: {}", e)))?;
 
+    // Create lookups for efficient comparison
+    let mut existing_map = HashMap::new();
+    for item in existing_items {
+        existing_map.insert(item.identifier.clone(), item.clone());
+    }
+
+    let mut new_map = HashMap::new();
     for item in items {
-        let item_identifier = RecordId::from(("item", item.identifier.clone()));
-        if item.quantity == 0 {
-            db.delete::<Option<Item>>(item_identifier.clone())
-                .await.expect("Failed to delete item");
-        } else {
-            db.update::<Option<Item>>(item_identifier.clone())
-                .content(item.clone())
-                .await.expect("Failed to update item");
-        }
+        new_map.insert(item.identifier.clone(), item.clone());
+    }
 
-        if item.quantity > 0 {
-            let _: Vec<TributeAreaEdge> = db.insert("items").relation(
-                AreaItemEdge {
-                    area: owner.clone(),
-                    item: item_identifier.clone(),
-                }
-            ).await.expect("Failed to update Items relation");
+    // Find items to delete (in DB but not in new items or quantity is 0)
+    let mut items_to_delete = Vec::new();
+    for id in existing_map.keys() {
+        if !new_map.contains_key(id) || new_map.get(id).unwrap().quantity == 0 {
+            items_to_delete.push(id.clone());
         }
+    }
+
+    // Find items to update (in DB and in new items with different values)
+    let mut items_to_update = Vec::new();
+    for (id, item) in &new_map {
+        if item.quantity > 0 &&
+            (!existing_map.contains_key(id) || existing_map.get(id).unwrap() != item) {
+            items_to_update.push(item.clone());
+        }
+    }
+
+    // Batch delete operations
+    let mut delete_failed = false;
+    for id in &items_to_delete {
+        let item_id = RecordId::from(("item", id.clone()));
+        if let Err(_) = db.delete::<Option<Item>>(item_id).await {
+            delete_failed = true;
+        }
+    }
+
+    if delete_failed {
+        return Err(AppError::InternalServerError("Failed to delete items".into()));
+    }
+
+    // Batch update operations
+    let mut update_failed = false;
+    for item in &items_to_update {
+        let item_id = RecordId::from(("item", item.identifier.clone()));
+        if let Err(_) = db.update::<Option<Item>>(item_id)
+            .content(item.clone())
+            .await
+        {
+            update_failed = true;
+        }
+    }
+
+    if update_failed {
+        return Err(AppError::InternalServerError("Failed to update items".into()));
+    }
+
+    // Update relations - first delete existing relations
+    db.query("DELETE FROM items WHERE in = $owner")
+        .bind(("owner", owner.clone()))
+        .await
+        .map_err(|e| AppError::InternalServerError(format!("Failed to delete items: {}", e)))?;
+
+    for item in &items_to_update {
+        let item_id = RecordId::from(("item", item.identifier.clone()));
+        match db.insert::<Vec<AreaItemEdge>>("items").relation(
+            AreaItemEdge {
+                area: owner.clone(),
+                item: item_id.clone(),
+            }
+        ).await {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(AppError::InternalServerError(format!("Failed to create items relation: {}", e)));
+            }
+        };
     }
 
     Ok(())
 }
 
-async fn save_tribute_items(items: Vec<Item>, owner: RecordId, db: &Surreal<Any>) -> Result<(), AppError> {
-    let _ = db.query("DELETE FROM owns WHERE in = $owner")
+async fn save_tribute_items(items: &Vec<Item>, owner: RecordId, db: &Surreal<Any>) -> Result<(), AppError> {
+    // Get existing items
+    let existing_items: Vec<Item> = db.query("SELECT * from owns->items WHERE in = $owner")
         .bind(("owner", owner.clone()))
-        .await.expect("Failed to delete items");
+        .await
+        .map_err(|e| AppError::InternalServerError(format!("Failed to fetch items: {}", e)))?
+        .take(0)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take items: {}", e)))?;
 
+    // Create lookups for efficient comparison
+    let mut existing_map = HashMap::new();
+    for item in existing_items {
+        existing_map.insert(item.identifier.clone(), item);
+    }
+
+    let mut new_map = HashMap::new();
     for item in items {
-        let item_identifier = RecordId::from(("item", item.identifier.clone()));
-        if item.quantity == 0 {
-            db.delete::<Option<Item>>(item_identifier.clone())
-                .await.expect("Failed to delete item");
-        } else {
-            db.update::<Option<Item>>(item_identifier.clone())
-                .content(item.clone())
-                .await.expect("Failed to update item");
-        }
+        new_map.insert(item.identifier.clone(), item.clone());
+    }
 
-        if item.quantity > 0 {
-            let _: Vec<TributeAreaEdge> = db.insert("owns").relation(
-                TributeAreaEdge {
-                    tribute: owner.clone(),
-                    item: item_identifier.clone(),
-                }
-            ).await.expect("Failed to update Owns relation");
+    // Find items to delete (in DB but not in new items or quantity is 0)
+    let mut items_to_delete = Vec::new();
+    for id in existing_map.keys() {
+        if !new_map.contains_key(id) || new_map.get(id).unwrap().quantity == 0 {
+            items_to_delete.push(id.clone());
         }
     }
+
+    // Find items to update (in DB and in new items with different values)
+    let mut items_to_update = Vec::new();
+    for (id, item) in &new_map {
+        if item.quantity > 0 &&
+            (!existing_map.contains_key(id) || existing_map.get(id).unwrap() != item) {
+            items_to_update.push(item.clone());
+        }
+    }
+
+    // Delete existing relations - do this once for all items
+    db.query("DELETE FROM owns WHERE in = $owner")
+        .bind(("owner", owner.clone()))
+        .await
+        .map_err(|e| AppError::InternalServerError(format!("Failed to delete items: {}", e)))?;
+
+    // Process delete operations
+    for id in &items_to_delete {
+        let item_id = RecordId::from(("item", id.clone()));
+        db.delete::<Option<Item>>(item_id)
+            .await
+            .map_err(|e| AppError::InternalServerError(format!("Failed to delete items: {}", e)))?;
+    }
+
+    // Process update operations
+    for item in &items_to_update {
+        let item_id = RecordId::from(("item", item.identifier.clone()));
+        db.update::<Option<Item>>(&item_id)
+            .content(item.clone())
+            .await
+            .map_err(|e| AppError::InternalServerError(format!("Failed to update items: {}", e)))?;
+
+        // Create new relation
+        db.insert::<Vec<TributeItemEdge>>("owns")
+            .relation(TributeItemEdge {
+                tribute: owner.clone(),
+                item: item_id.clone(),
+            })
+            .await
+            .map_err(|e| AppError::InternalServerError(format!("Failed to create items relation: {}", e)))?;
+    }
+
     Ok(())
 }
 

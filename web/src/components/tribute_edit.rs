@@ -165,6 +165,7 @@ pub fn EditTributeForm() -> Element {
                     "Name",
 
                     Input {
+                        class: "border ml-2 px-2 py-1",
                         r#type: "text",
                         name: "name",
                         value: name,

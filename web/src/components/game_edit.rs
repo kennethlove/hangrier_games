@@ -1,13 +1,13 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
-use crate::components::modal::{Modal, Props as ModalProps};
 use crate::components::icons::edit::EditIcon;
-use crate::components::Button;
+use crate::components::modal::{Modal, Props as ModalProps};
+use crate::components::{Button, Input};
 use crate::env::APP_API_HOST;
+use crate::storage::{use_persistent, AppState};
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult, MutationState};
 use shared::EditGame;
 use std::ops::Deref;
-use crate::storage::{use_persistent, AppState};
 
 async fn edit_game(args: (EditGame, String)) -> MutationResult<MutationValue, MutationError> {
     let identifier = args.0.0.clone();
@@ -142,7 +142,7 @@ pub fn EditGameForm() -> Element {
             label {
                 "Name",
 
-                input {
+                Input {
                     class: "border ml-2 px-2 py-1",
                     r#type: "text",
                     name: "name",

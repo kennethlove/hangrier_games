@@ -1,9 +1,9 @@
 use crate::items::Item;
 use crate::threats::animals::Animal;
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
 use indefinite::indefinite;
 use indefinite::indefinite_capitalized;
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 
 // Collection on strings to be used as output for the game
 #[allow(dead_code)]
@@ -88,7 +88,7 @@ impl <'a> Display for GameOutput<'a> {
                 write!(f, "=== ☀️ Day {} ends! ===", day_number)
             }
             GameOutput::FirstDayStart => {
-                write!(f, "=== 🎉 The Hunger Games begin! 🎉 ===")
+                write!(f, "=== 🎉 The Hangry Games begin! 🎉 ===")
             }
             GameOutput::FeastDayStart => {
                 write!(f, "=== 😋 Day 3: Feast Day ===")

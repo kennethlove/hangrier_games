@@ -516,15 +516,20 @@ fn GameDetails(identifier: String) -> Element {
             let display_game = *game.clone();
             let day = display_game.clone().day.unwrap_or(0);
 
+            let mut class: String = r#"
+            grid
+            gap-4
+            grid-cols-1
+            lg:grid-cols-2
+            "#.into();
+
+            if day > 0 {
+                class = format!("{}\nxl:grid-cols-[1fr_1fr_22rem]", class);
+            }
+
             rsx! {
                 div {
-                    class: r#"
-                    grid
-                    gap-4
-                    grid-cols-1
-                    lg:grid-cols-2
-                    xl:grid-cols-[1fr_1fr_18rem]
-                    "#,
+                    class,
 
                     InfoDetail {
                         title: "Areas",

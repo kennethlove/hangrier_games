@@ -8,7 +8,6 @@ use dioxus::prelude::*;
 use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult, MutationState};
 use shared::EditTribute;
 use std::ops::Deref;
-use std::rc::Rc;
 
 async fn edit_tribute(args: (EditTribute, String, String)) -> MutationResult<MutationValue, MutationError> {
     let tribute = args.clone().0;

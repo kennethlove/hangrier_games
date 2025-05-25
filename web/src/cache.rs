@@ -21,6 +21,7 @@ pub(crate) enum QueryKey {
     _GameSummary(String),
     _GameDaySummary(String, u32), // Game identifier, day
     User,
+    ServerVersion,
 }
 
 #[derive(PartialEq, Debug)]
@@ -31,6 +32,8 @@ pub(crate) enum QueryError {
     TributeNotFound(String),
     Unauthorized,
     Unknown,
+    ServerNotFound,
+    ServerVersionNotFound,
 }
 
 #[allow(dead_code)]
@@ -46,6 +49,7 @@ pub(crate) enum QueryValue {
     GameTributes(Vec<TributeKey>),
     Logs(Vec<GameMessage>),
     Summary(String),
+    ServerVersion(String),
 }
 
 #[allow(dead_code)]

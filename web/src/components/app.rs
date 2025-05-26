@@ -93,6 +93,8 @@ pub fn App() -> Element {
                 theme3:bg-linear-to-b
                 theme3:from-stone-50/80
                 theme3:to-stone-900/95
+                theme3:bg-top
+                theme3:bg-fixed
                 "#,
 
                 div {

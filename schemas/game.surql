@@ -82,3 +82,75 @@ DEFINE FUNCTION OVERWRITE fn::get_display_game($game_id: string) {
     LIMIT 1
     FETCH tribute
 };
+
+DEFINE FUNCTION OVERWRITE fn::get_list_games() {
+    RETURN SELECT name, identifier, status, day, private,
+    created_by.id == $auth.id AS is_mine,
+    created_by.username,
+    (
+        RETURN count(
+            SELECT id FROM <-playing_in<-tribute
+        )
+    ) AS tribute_count,
+    (
+        RETURN count(
+            SELECT id FROM <-playing_in<-tribute WHERE attributes.health > 0
+        )
+    ) AS living_count,
+    count(<-playing_in<-tribute.id) == 24
+    AND
+    count(array::distinct(<-playing_in<-tribute.district)) == 12
+    AS ready
+    FROM game
+};
+
+DEFINE FUNCTION OVERWRITE fn::get_detail_game($game_id: string) {
+    LET $day = SELECT day FROM game WHERE identifier = $game_id LIMIT 1;
+
+    RETURN SELECT *, (
+        SELECT *,
+        ->owns->item[*] AS items, (
+            SELECT *
+            FROM tribute_log
+            WHERE tribute_identifier = $parent.identifier
+            AND day = $day
+            ORDER BY instant
+        ) AS log
+        FROM <-playing_in<-tribute[*]
+        ORDER district
+    ) AS tributes, (
+        SELECT *, ->items->item[*] AS items
+        FROM ->areas->area
+    ) AS areas, (
+        RETURN count(SELECT id FROM <-playing_in<-tribute)
+    ) AS tribute_count,
+    count(<-playing_in<-tribute.id) == 24 AND count(array::distinct(<-playing_in<-tribute.district)) == 12 AS ready,
+    created_by.id == $auth.id AS is_mine,
+    created_by.username
+    FROM game
+    WHERE identifier = $game_id
+};
+
+DEFINE FUNCTION OVERWRITE fn::get_tributes_by_game($game_id: string) {
+    RETURN SELECT (
+        SELECT *, ->owns->item[*] AS items
+        FROM <-playing_in<-tribute
+        ORDER district
+    ) AS tributes
+    FROM game WHERE identifier = $game_id
+};
+
+DEFINE FUNCTION OVERWRITE fn::get_tributes_items_by_game($game_id: string) {
+    RETURN SELECT <-playing_in<-tribute as tribute,
+        <-playing_in<-tribute->owns->item as item,
+        <-playing_in<-tribute->owns as owns
+    FROM game WHERE identifier = $game_id
+};
+
+DEFINE FUNCTION OVERWRITE fn::get_areas_items_by_game($game_id: string) {
+    RETURN SELECT ->areas->area AS area,
+        ->areas->area->items->item AS item,
+        ->areas->area->items AS items,
+        -> areas AS areas
+    FROM game WHERE identifier = $game_id;
+};

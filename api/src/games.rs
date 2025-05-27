@@ -193,18 +193,9 @@ pub async fn add_item_to_area(game_area_edge: &GameAreaEdge, db: &Surreal<Any>) 
 pub async fn game_delete(game_identifier: Path<Uuid>, state: State<AppState>) -> Result<StatusCode, AppError> {
     let game_identifier = game_identifier.to_string();
     let mut result = state.db.query(r#"
-    SELECT <-playing_in<-tribute as tribute,
-           <-playing_in<-tribute->owns->item as item,
-           <-playing_in<-tribute->owns as owns
-    FROM game WHERE identifier = "$game_identifier";
-
-    SELECT ->areas->area AS area,
-           ->areas->area->items->item AS item,
-           ->areas->area->items as items,
-           ->areas AS areas
-    FROM game WHERE identifier = "$game_identifier";
-    "#.to_string())
-        .bind(("game_id", game_identifier.clone()))
+        SELECT * FROM fn::get_tributes_items_by_game($game_id);
+        SELECT * FROM fn::get_areas_items_by_game($game_id);
+    "#).bind(("game_id", game_identifier.clone()))
         .await.expect("Failed to find game pieces");
 
     let game_pieces: Option<HashMap<String, Vec<Thing>>> = result.take(0).unwrap();
@@ -239,34 +230,24 @@ async fn delete_pieces(pieces: HashMap<String, Vec<Thing>>, db: &Surreal<Any>) -
 }
 
 pub async fn game_list(state: State<AppState>) -> Result<Json<Vec<ListDisplayGame>>, AppError> {
-    let mut games = state.db.query(r#"
-SELECT name, identifier, status, day, private,
-created_by.id == $auth.id AS is_mine,
-created_by.username,
-(
-    RETURN count(
-        SELECT id FROM <-playing_in<-tribute
-    )
-) AS tribute_count,
-(
-    RETURN count(
-        SELECT id FROM <-playing_in<-tribute WHERE attributes.health > 0
-    )
-) AS living_count,
-count(<-playing_in<-tribute.id) == 24
-AND
-count(array::distinct(<-playing_in<-tribute.district)) == 12
-AS ready
-FROM game
-;"#).await.unwrap();
+    let games = state.db.query("SELECT * FROM fn::get_list_games()").await;
 
-    match games.take::<Vec<ListDisplayGame>>(0) {
-        Ok(games) => {
-            Ok(Json::<Vec<ListDisplayGame>>(games))
-        }
-        Err(e) => {
-            dbg!(&games);
-            Err(AppError::InternalServerError(format!("Failed to fetch games: {}", e)))
+    match games {
+        Ok(mut games) => {
+            match games.take::<Vec<ListDisplayGame>>(0) {
+                Ok(games) => {
+                    if games.is_empty() {
+                        return Err(AppError::NotFound("No games found".into()));
+                    }
+                    Ok(Json::<Vec<ListDisplayGame>>(games))
+                }
+                Err(e) => {
+                    Err(AppError::InternalServerError(format!("Failed to parse games: {}", e)))
+                }
+            }
+        },
+        _ => {
+            Err(AppError::InternalServerError("Failed to fetch games".into()))
         }
     }
 }
@@ -274,37 +255,8 @@ FROM game
 pub async fn game_detail(game_identifier: Path<Uuid>, state: State<AppState>) -> Result<Json<DisplayGame>, AppError> {
     // let identifier = game_identifier.0;
     let identifier = game_identifier.to_string();
-    let day = state.db
-        .query("SELECT day FROM game WHERE identifier = $identifier LIMIT 1")
-        .bind(("identifier", identifier.clone()))
-        .await;
-    let day: Option<i64> = day.unwrap().take("day").unwrap();
-    let day: i64 = day.unwrap_or(0);
 
-    let mut result = state.db.query(r#"
-SELECT *, (
-    SELECT *,
-    ->owns->item[*] AS items, (
-        SELECT *
-        FROM tribute_log
-        WHERE tribute_identifier = $parent.identifier
-        AND day = $day
-        ORDER BY instant
-    ) AS log
-    FROM <-playing_in<-tribute[*]
-    ORDER district
-) AS tributes, (
-    SELECT *, ->items->item[*] AS items
-    FROM ->areas->area
-) AS areas, (
-    RETURN count(SELECT id FROM <-playing_in<-tribute)
-) AS tribute_count,
-count(<-playing_in<-tribute.id) == 24 AND count(array::distinct(<-playing_in<-tribute.district)) == 12 AS ready,
-created_by.id == $auth.id AS is_mine,
-created_by.username
-FROM game
-WHERE identifier = $identifier;"#)
-        .bind(("day", day))
+    let mut result = state.db.query("SELECT * FROM fn::get_detail_game($identifier)")
         .bind(("identifier", identifier.clone()))
         .await.unwrap();
 
@@ -366,20 +318,7 @@ SELECT (
 }
 
 pub async fn game_tributes(Path(identifier): Path<Uuid>, state: State<AppState>) -> Result<Json<Vec<Tribute>>, AppError> {
-    let mut game_day = state.db
-        .query("SELECT day FROM game WHERE identifier = $identifier")
-        .bind(("identifier", identifier.to_string()))
-        .await.unwrap();
-    let game_day: Option<i64> = game_day.take("day").unwrap();
-    let _game_day: i64 = game_day.unwrap_or(0);
-
-
-    let response = state.db.query(r#"
-SELECT (
-    SELECT *, ->owns->item[*] as items
-    FROM <-playing_in<-tribute
-    ORDER district
-) AS tributes FROM game WHERE identifier = $identifier;"#)
+    let response = state.db.query("SELECT * FROM fn::get_tributes_by_game($identifier);")
         .bind(("identifier", identifier.to_string())).await;
 
     match response {

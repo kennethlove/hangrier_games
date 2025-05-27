@@ -1,10 +1,7 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::env::APP_API_HOST;
-use crate::storage::{use_persistent, AppState};
 use dioxus::prelude::*;
 use dioxus_query::prelude::{use_get_query, QueryResult, QueryState};
-use game::areas::AreaDetails;
-use shared::DisplayGame;
 
 async fn fetch_server_version(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::ServerVersion) = keys.first() {

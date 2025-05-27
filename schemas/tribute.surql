@@ -14,7 +14,7 @@ DEFINE FIELD OVERWRITE statistics ON tribute;
 DEFINE FIELD OVERWRITE attributes ON tribute;
 DEFINE FIELD OVERWRITE created_by ON tribute VALUE $auth READONLY;
 
-DEFINE INDEX OVERWRITE tribute_identifier ON tribute FIELDS identifier;
+DEFINE INDEX OVERWRITE tribute_identifier ON tribute FIELDS identifier UNIQUE;
 DEFINE INDEX OVERWRITE tribute_created_by ON tribute FIELDS created_by;
 
 DEFINE TABLE OVERWRITE owns TYPE RELATION IN tribute OUT item

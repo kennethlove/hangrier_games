@@ -123,13 +123,7 @@ pub async fn tribute_update(
 pub async fn tribute_detail(Path((_, tribute_identifier)): Path<(Uuid, Uuid)>, state: State<AppState>) -> Result<Json<Tribute>, AppError> {
     let tribute_identifier = tribute_identifier.to_string();
     let mut result = state.db
-        .query(r#"
-        SELECT *, ->owns->item[*] AS items,
-        (SELECT * FROM fn::get_messages_by_tribute_id($identifier)) AS log,
-        (->playing_in->game.status)[0] == "NotStarted" AS editable
-        FROM tribute
-        WHERE identifier = $identifier
-        "#)
+        .query("SELECT * FROM fn::get_full_tribute($identifier);")
         .bind(("identifier", tribute_identifier))
         .await.expect("Failed to find tribute");
 

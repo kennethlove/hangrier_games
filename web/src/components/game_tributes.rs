@@ -1,4 +1,5 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
+use crate::components::icons::loading::LoadingIcon;
 use crate::components::icons::map_pin::MapPinIcon;
 use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_edit::TributeEdit;
@@ -12,7 +13,6 @@ use game::items::Item;
 use game::messages::GameMessage;
 use game::tributes::Tribute;
 use shared::{DisplayGame, GameStatus};
-use crate::components::icons::loading::LoadingIcon;
 
 async fn fetch_tributes(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::Tributes(game_identifier)) = keys.first() {
@@ -283,7 +283,6 @@ pub fn GameTributeListMember(tribute_identifier: String, game_identifier: String
                             div {
                                 TributeEdit {
                                     identifier: tribute.clone().identifier,
-                                    district: tribute.district,
                                     name: tribute.clone().name,
                                     game_identifier: game_identifier.clone(),
                                 }

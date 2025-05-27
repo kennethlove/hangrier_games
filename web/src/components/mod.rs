@@ -39,3 +39,4 @@ mod tribute_detail;
 pub use tribute_detail::TributeDetail;
 mod tribute_edit;
 mod tribute_status_icon;
+mod server_version;

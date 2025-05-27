@@ -1,12 +1,13 @@
 use api::games::GAMES_ROUTER;
 use api::users::USERS_ROUTER;
+use api::AppState;
 use axum::error_handling::HandleErrorLayer;
 use axum::extract::{Request, State};
 use axum::http::header::{ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_MAX_AGE, AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE, EXPIRES};
 use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use axum::{middleware, BoxError, Router};
+use axum::{middleware, BoxError, Json, Router};
 use std::env;
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -19,7 +20,6 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use api::AppState;
 
 pub static DATABASE: LazyLock<Surreal<Any>> = LazyLock::new(Surreal::init);
 
@@ -124,6 +124,7 @@ async fn main() {
 
     let router = Router::new()
         .nest("/api", api_routes)
+        .route("/", axum::routing::get(move || async { Json(env!("CARGO_PKG_VERSION")) }))
         .with_state(app_state)
         .layer(
             ServiceBuilder::new()

@@ -516,15 +516,22 @@ fn GameDetails(identifier: String) -> Element {
             let display_game = *game.clone();
             let day = display_game.clone().day.unwrap_or(0);
 
+            let xl_display = match day {
+                0 => "xl:grid-cols-[1fr_1fr]".to_string(),
+                _ => "xl:grid-cols-[1fr_1fr_22rem]".to_string(),
+            };
+
+            let class: String = format!(r#"
+            grid
+            gap-4
+            grid-cols-1
+            lg:grid-cols-2
+            {}
+            "#, xl_display);
+
             rsx! {
                 div {
-                    class: r#"
-                    grid
-                    gap-4
-                    grid-cols-1
-                    lg:grid-cols-2
-                    xl:grid-cols-[1fr_1fr_18rem]
-                    "#,
+                    class,
 
                     InfoDetail {
                         title: "Areas",

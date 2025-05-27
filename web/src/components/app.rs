@@ -1,14 +1,15 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::game_edit::EditGameModal;
+use crate::components::loading_modal::LoadingModal;
+use crate::components::server_version::ServerVersion;
 use crate::components::tribute_edit::EditTributeModal;
 use crate::routes::Routes;
 use crate::storage::{use_persistent, AppState, Colorscheme};
+use crate::LoadingState;
 use dioxus::prelude::*;
 use dioxus_query::prelude::use_init_query_client;
 use game::games::Game;
 use shared::{DeleteGame, EditGame, EditTribute};
-use crate::components::loading_modal::LoadingModal;
-use crate::LoadingState;
 
 #[component]
 pub fn App() -> Element {
@@ -92,6 +93,8 @@ pub fn App() -> Element {
                 theme3:bg-linear-to-b
                 theme3:from-stone-50/80
                 theme3:to-stone-900/95
+                theme3:bg-top
+                theme3:bg-fixed
                 "#,
 
                 div {
@@ -128,7 +131,8 @@ pub fn App() -> Element {
                         }
                     }
                     p {
-                        "Server version: {server_version}; Client version: {client_version}",
+                        ServerVersion {},
+                        "; Client: v{client_version}",
                     }
                 }
             }

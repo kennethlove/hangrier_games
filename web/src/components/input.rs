@@ -44,8 +44,8 @@ pub fn Input(props: InputProperties) -> Element {
             theme1:rounded-sm
 
             theme2:border-green-400
-            theme2:text-green-200
-            theme2:placeholder-green-200/50
+            theme2:text-green-900
+            theme2:placeholder-green-900/50
             theme2:rounded-md
 
             theme3:bg-stone-50/50

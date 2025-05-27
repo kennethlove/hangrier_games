@@ -34,20 +34,19 @@ async fn edit_tribute(args: (EditTribute, String, String)) -> MutationResult<Mut
         .status()
         .is_success()
     {
-        MutationResult::Ok(MutationValue::TributeUpdated(identifier))
+        Ok(MutationValue::TributeUpdated(identifier))
     } else {
-        MutationResult::Err(MutationError::Unknown)
+        Err(MutationError::Unknown)
     }
 }
 
 #[component]
-pub fn TributeEdit(identifier: String, district: u32, name: String, game_identifier: String) -> Element {
+pub fn TributeEdit(identifier: String, name: String, game_identifier: String) -> Element {
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
 
     let onclick = move |_| {
         edit_tribute_signal.set(Some(EditTribute(
             identifier.clone(),
-            district,
             name.clone(),
             game_identifier.clone(),
         )));
@@ -104,9 +103,8 @@ pub fn EditTributeForm() -> Element {
 
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
     let tribute_details = edit_tribute_signal.read().clone().unwrap_or_default();
-    let name = tribute_details.2.clone();
-    let district = tribute_details.1;
-    let game_identifier = tribute_details.3.clone();
+    let name = tribute_details.1.clone();
+    let game_identifier = tribute_details.2.clone();
 
     let mutate = use_mutation(edit_tribute);
 
@@ -127,13 +125,9 @@ pub fn EditTributeForm() -> Element {
 
         let data = e.data().values();
         let name = data.get("name").expect("No name value").0[0].clone();
-        let district: u32 = data.get("district").expect("No district value").0[0]
-            .clone()
-            .parse()
-            .unwrap();
 
-        if !name.is_empty() && (1..=12u32).contains(&district) {
-            let edit_tribute = EditTribute(identifier.clone(), district, name.clone(), game_identifier.clone());
+        if !name.is_empty() {
+            let edit_tribute = EditTribute(identifier.clone(), name.clone(), game_identifier.clone());
             spawn(async move {
                 mutate.mutate_async((edit_tribute.clone(), game_identifier.clone(), token)).await;
                 edit_tribute_signal.set(Some(edit_tribute));
@@ -170,25 +164,10 @@ pub fn EditTributeForm() -> Element {
                     "Name",
 
                     Input {
+                        class: "border ml-2 px-2 py-1",
                         r#type: "text",
                         name: "name",
                         value: name,
-                    }
-                }
-                label {
-                    class: "block mt-2",
-                    "District",
-
-                    select {
-                        class: "border ml-2 px-2 py-1",
-                        name: "district",
-                        for n in 1..=12u32 {
-                            option {
-                                value: n,
-                                selected: n == district,
-                                "{n}"
-                            }
-                        }
                     }
                 }
             }
@@ -199,7 +178,6 @@ pub fn EditTributeForm() -> Element {
                     "Update"
                 }
                 Button {
-                    r#type: "dialog",
                     onclick: dismiss,
                     "Cancel"
                 }

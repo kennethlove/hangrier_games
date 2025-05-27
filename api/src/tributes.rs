@@ -100,10 +100,9 @@ pub async fn tribute_update(
     Json(payload): Json<EditTribute>,
 ) -> Result<StatusCode, AppError> {
     let response = state.db
-        .query("UPDATE tribute SET name = $name, district = $district WHERE identifier = $identifier;")
+        .query("UPDATE tribute SET name = $name WHERE identifier = $identifier;")
         .bind(("identifier", payload.0))
-        .bind(("district", payload.1))
-        .bind(("name", payload.2))
+        .bind(("name", payload.1))
         .await;
 
     match response {

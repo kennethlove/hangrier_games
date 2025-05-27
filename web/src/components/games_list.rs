@@ -80,6 +80,11 @@ pub fn GamesList() -> Element {
                         NoGames {}
                     } else {
                         ul {
+                            class: r#"
+                            xl:grid
+                            xl:grid-cols-2
+                            xl:gap-4
+                            "#,
                             for game in games {
                                 GameListMember { game: game.clone() }
                             }
@@ -99,7 +104,10 @@ pub fn GamesList() -> Element {
             _ => rsx! { p { "Something went wrong" } },
         }
 
-        RefreshButton {}
+        div {
+            class: "mt-4",
+            RefreshButton {}
+        }
 
         DeleteGameModal {}
     }
@@ -139,6 +147,7 @@ pub fn GameListMember(game: DisplayGame) -> Element {
             border
             p-2
             mb-4
+            xl:mb-0
             transition
 
             theme1:border-stone-950

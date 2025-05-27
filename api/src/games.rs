@@ -849,51 +849,11 @@ async fn unpublish_game(Path(game_identifier): Path<Uuid>, state: State<AppState
 
 pub async fn game_display(game_identifier: Path<Uuid>, state: State<AppState>) -> Result<Json<DisplayGame>, AppError> {
     let identifier = game_identifier.to_string();
-    let mut result = state.db.query(r#"
-LET $tributes = (
-    SELECT  in.id,
-            in.name,
-            in.district,
-            in.attributes.health
-    FROM playing_in
-    WHERE out.identifier = $identifier
-);
-
-LET $living_tributes = (
-    SELECT * FROM $tributes.in WHERE attributes.health > 0
-);
-
-LET $winner = (
-    IF count($living_tributes) == 1 THEN
-        RETURN $living_tributes[0].name
-    ELSE
-        RETURN ""
-    END
-);
-
-SELECT
-    identifier,
-    name,
-    status,
-    day,
-    private,
-    created_by.username,
-    created_by.id == $auth.id AS is_mine,
-    $tributes.in AS tributes,
-    count($tributes.in) as tribute_count,
-    count(SELECT * FROM $tributes.in WHERE attributes.health > 0) AS living_count,
-    count($tributes.in) == 24 AND
-        count(array::distinct(<-playing_in<-tribute.district)) == 12 AS ready,
-    $winner AS winner
-FROM game
-WHERE identifier = $identifier
-LIMIT 1
-FETCH tribute
-;"#)
+    let mut result = state.db.query("SELECT * FROM fn::get_display_game($identifier);")
         .bind(("identifier", identifier.clone()))
         .await.unwrap();
 
-    let game: Option<DisplayGame> = result.take(3).expect("No game found");
+    let game: Option<DisplayGame> = result.take(0).expect("No game found");
 
     if let Some(game) = game {
         Ok(Json(game))

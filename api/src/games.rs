@@ -500,24 +500,7 @@ pub async fn next_step(Path(identifier): Path<Uuid>, state: State<AppState>) -> 
 
 async fn get_full_game(identifier: Uuid, db: &Surreal<Any>) -> Result<Json<Game>, AppError> {
     let identifier = identifier.to_string();
-    let mut result = db.query(r#"
-SELECT *, (
-    SELECT *, ->owns->item[*] AS items
-    FROM <-playing_in<-tribute[*]
-    ORDER district
-)
-AS tributes, (
-    SELECT *, ->items->item[*] AS items
-    FROM ->areas->area
-) AS areas, (
-    RETURN count(SELECT id FROM <-playing_in<-tribute)
-) AS tribute_count,
-count(<-playing_in<-tribute.id) == 24
-AND
-count(array::distinct(<-playing_in<-tribute.district)) == 12
-AS ready
-FROM game
-WHERE identifier = $identifier;"#)
+    let mut result = db.query("SELECT * FROM fn::get_full_game($identifier)")
         .bind(("identifier", identifier.clone()))
         .await.unwrap();
     if let Some(game) = result.take(0).expect("No game found") {

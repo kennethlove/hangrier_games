@@ -8,3 +8,5 @@ DEFINE FIELD OVERWRITE item_type ON item;
 DEFINE FIELD OVERWRITE quantity ON item;
 DEFINE FIELD OVERWRITE attribute ON item;
 DEFINE FIELD OVERWRITE effect ON item;
+
+DEFINE INDEX OVERWRITE item_identifier ON item FIELDS identifier;

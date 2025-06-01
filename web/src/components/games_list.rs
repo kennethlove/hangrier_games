@@ -20,7 +20,6 @@ async fn fetch_games(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryVal
 
         match request.send().await{
             Ok(request) => {
-                dbg!(&request);
                 if let Ok(response) = request.json::<Vec<DisplayGame>>().await {
                     Ok(QueryValue::DisplayGames(response))
                 } else {

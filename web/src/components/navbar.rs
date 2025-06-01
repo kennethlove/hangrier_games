@@ -10,6 +10,20 @@ pub fn Navbar() -> Element {
     let mut storage = use_persistent("hangry-games", AppState::default);
     let mut theme_signal: Signal<Colorscheme> = use_context();
 
+    if storage.get().jwt.is_some() {
+        let jwt_string = storage.get().jwt.clone().unwrap_or_default();
+        dioxus_logger::tracing::debug!("JWT String: {}", &jwt_string);
+        let decoded = jwt_rustcrypto::decode_only(&jwt_string).expect("Failed to decode JWT");
+        let is_expired = decoded.payload.get("exp").map_or(false, |exp| {
+            let exp_time = exp.as_i64().unwrap_or(0);
+            let current_time = chrono::Utc::now().timestamp();
+            dioxus_logger::tracing::debug!("difference: {}", current_time - exp_time);
+            current_time > exp_time
+        });
+        dioxus_logger::tracing::debug!("Decoded Payload: {:?}", decoded.payload);
+        dioxus_logger::tracing::debug!("Is expired: {}", is_expired);
+    }
+
     let link_theme = r#"
     theme1:hover:bg-amber-500
     theme1:text-amber-500

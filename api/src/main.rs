@@ -1,3 +1,5 @@
+extern crate core;
+
 use api::games::GAMES_ROUTER;
 use api::users::USERS_ROUTER;
 use api::AppState;
@@ -8,13 +10,17 @@ use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::{middleware, BoxError, Json, Router};
+use base64_url::decode;
+use serde_json::Value;
 use std::env;
+use std::string::String;
 use std::sync::LazyLock;
 use std::time::Duration;
 use surrealdb::engine::any::Any;
-use surrealdb::opt::auth::Root;
+use surrealdb::opt::auth::{Jwt, Root};
 use surrealdb::Surreal;
 use surrealdb_migrations::MigrationRunner;
+use time::OffsetDateTime;
 use tower::ServiceBuilder;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
@@ -149,21 +155,57 @@ async fn main() {
     axum::serve(listener, router).await.unwrap();
 }
 
-async fn surreal_jwt(State(state): State<AppState>, request: Request, next: Next) -> Response {
-    let token = request.headers().get("authorization");
-    match token {
-        None => StatusCode::UNAUTHORIZED.into_response(),
-        Some(token) => {
-            let token = token.to_str().expect("Failed to convert token to str");
-            let token = match token.strip_prefix("Bearer ") {
-                Some(token) => token,
-                None => return StatusCode::UNAUTHORIZED.into_response(),
-            };
-            let token = surrealdb::opt::auth::Jwt::from(token);
-            match state.db.authenticate(token).await {
-                Ok(_) => { next.run(request).await },
-                Err(_) => { StatusCode::UNAUTHORIZED.into_response() }
-            }
-        }
+async fn surreal_jwt(
+    State(state): State<AppState>,
+    request: Request,
+    next: Next,
+) -> Response {
+    let token = match request
+        .headers()
+        .get(AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+        .and_then(|h| h.strip_prefix("Bearer "))
+    {
+        Some(token) => token,
+        None => return StatusCode::UNAUTHORIZED.into_response(),
+    };
+
+    let token_parts: Vec<&str> = token.split('.').collect();
+    if token_parts.len() != 3 {
+        return StatusCode::UNAUTHORIZED.into_response();
     }
+
+    let payload_base64 = token_parts[1].trim_start_matches("=");
+    let payload_bytes = decode(payload_base64)
+        .map_err(|_| ())
+        .unwrap_or_default();
+    let payload_str = String::from_utf8(payload_bytes).unwrap_or_default();
+    let payload: Value = serde_json::from_str(&payload_str).unwrap_or_default();
+
+    let exp = payload["exp"].as_u64().unwrap_or_default();
+    let now = OffsetDateTime::now_utc().unix_timestamp() as u64;
+    if exp < now {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+
+    let jwt = Jwt::from(token);
+    match state.db.authenticate(jwt).await {
+        Ok(_) => next.run(request).await,
+        Err(_) => StatusCode::UNAUTHORIZED.into_response(),
+    }
+
+    // let token = request.headers().get("authorization");
+    // match token {
+    //     None => StatusCode::UNAUTHORIZED.into_response(),
+    //     Some(token) => {
+    //         let token = token.to_str().unwrap_or_default();
+    //         let token = token.strip_prefix("Bearer ").unwrap_or(token);
+    //
+    //         let token = surrealdb::opt::auth::Jwt::from(token);
+    //         match state.db.authenticate(token).await {
+    //             Ok(_) => { next.run(request).await },
+    //             Err(_) => { StatusCode::UNAUTHORIZED.into_response() }
+    //         }
+    //     }
+    // }
 }

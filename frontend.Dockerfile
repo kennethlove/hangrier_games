@@ -34,7 +34,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     rustup target add wasm32-unknown-unknown
 
-RUN cargo install dioxus-cli --locked
+RUN cargo install dioxus-cli==0.6.2 --locked
 
 # Build a dummy app with real dependencies
 COPY web/Cargo.toml ./web/Cargo.toml

@@ -1,4 +1,4 @@
-ARG RUST_VERSION=1.86.0
+ARG RUST_VERSION=1.91.1
 
 # Build stage for Tailwind
 FROM node:23-slim AS css-builder

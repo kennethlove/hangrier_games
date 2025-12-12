@@ -232,7 +232,7 @@ pub fn GameTributeListMember(tribute_identifier: String, game_identifier: String
                     div {
                         class: "flex flex-row gap-2",
                         img {
-                            class: "w-full h-full border-2 border-amber-500 min-w-24",
+                            class: "w-full h-full border-2 border-amber-500 min-w-16 max-w-24",
                             src: "{tribute.avatar()}",
                         }
                         div {

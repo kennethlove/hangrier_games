@@ -125,7 +125,9 @@ pub struct Tribute {
 }
 
 impl Default for Tribute {
-    fn default() -> Self { Self::new("Tribute".to_string(), None, None) }
+    fn default() -> Self {
+        Self::new("Tribute".to_string(), None, None)
+    }
 }
 
 impl OwnsItems for Tribute {
@@ -204,11 +206,14 @@ impl Tribute {
     }
 
     pub fn avatar(&self) -> String {
+        if self.avatar.is_none() {
+            return "https://fallback.pics/api/v1/400x400".to_string();
+        }
         format!(
             "assets/{}",
             self.avatar
                 .clone()
-                .unwrap_or("hangry-games.png".to_string())
+                .unwrap()
         )
     }
 

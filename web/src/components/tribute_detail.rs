@@ -156,6 +156,10 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                     InfoDetail {
                         title: "Overview",
                         open: true,
+                        img {
+                            class: "mb-4",
+                            src: "{tribute.avatar()}",
+                        }
                         dl {
                             class: "grid grid-cols-2 gap-4",
                             dt { "District" }

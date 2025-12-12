@@ -237,9 +237,10 @@ pub async fn game_list(state: State<AppState>) -> Result<Json<Vec<ListDisplayGam
             match games.take::<Vec<ListDisplayGame>>(0) {
                 Ok(games) => {
                     if games.is_empty() {
-                        return Err(AppError::NotFound("No games found".into()));
+                        Ok(Json::<Vec<ListDisplayGame>>(vec![]))
+                    } else {
+                        Ok(Json::<Vec<ListDisplayGame>>(games))
                     }
-                    Ok(Json::<Vec<ListDisplayGame>>(games))
                 }
                 Err(e) => {
                     Err(AppError::InternalServerError(format!("Failed to parse games: {}", e)))

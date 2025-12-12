@@ -152,7 +152,6 @@ pub fn GameTributes(game: DisplayGame) -> Element {
                                 "District {chunk.first().unwrap().district}"
                             }
                             ul {
-                                class: "grid subgrid gap-2 grid-cols-2",
                                 GameTributeListMember {
                                     tribute_identifier: chunk.first().unwrap().clone().identifier,
                                     game_identifier: identifier.clone(),
@@ -231,136 +230,149 @@ pub fn GameTributeListMember(tribute_identifier: String, game_identifier: String
                     "#,
 
                     div {
-                        class: r#"
-                        flex
-                        flex-row
-                        gap-2
-                        place-content-between
-                        "#,
-
-                        h4 {
+                        class: "flex flex-row gap-2",
+                        img {
+                            class: "w-full h-full border-2 border-amber-500 min-w-24",
+                            src: "{tribute.avatar()}",
+                        }
+                        div {
                             class: r#"
-                            mb-2
-
-                            theme1:font-[Cinzel]
-                            theme1:text-lg
-
-                            theme2:font-[Playfair_Display]
-                            theme2:text-xl
-                            theme2:text-green-200
-                            theme2:hover:underline
-                            theme2:hover:decoration-2
-                            theme2:hover:decoration-wavy
-
-                            theme3:font-semibold
+                            flex
+                            flex-row
+                            gap-2
+                            place-content-between
                             "#,
 
-                            Link {
+
+                            h4 {
                                 class: r#"
-                                theme1:font-semibold
-                                theme1:text-xl
-                                theme1:text-amber-500
-                                theme1:hover:text-amber-200
-                                theme1:hover:border-b-2
-                                theme1:hover:border-amber-500
+                                mb-2
 
+                                theme1:font-[Cinzel]
+                                theme1:text-lg
+
+                                theme2:font-[Playfair_Display]
+                                theme2:text-xl
                                 theme2:text-green-200
-                                theme2:hover:text-green-200
+                                theme2:hover:underline
+                                theme2:hover:decoration-2
+                                theme2:hover:decoration-wavy
 
-                                theme3:hover:border-b-2
-                                theme3:hover:border-yellow-500
-                                theme3:hover:text-yellow-500
+                                theme3:font-semibold
                                 "#,
-                                to: Routes::TributeDetail {
-                                    game_identifier: game_identifier.clone(),
-                                    tribute_identifier: tribute.identifier.clone()
-                                },
-                                "{tribute.name}"
+
+                                Link {
+                                    class: r#"
+                                    theme1:font-semibold
+                                    theme1:text-xl
+                                    theme1:text-amber-500
+                                    theme1:hover:text-amber-200
+                                    theme1:hover:border-b-2
+                                    theme1:hover:border-amber-500
+
+                                    theme2:text-green-200
+                                    theme2:hover:text-green-200
+
+                                    theme3:hover:border-b-2
+                                    theme3:hover:border-yellow-500
+                                    theme3:hover:text-yellow-500
+                                    "#,
+                                    to: Routes::TributeDetail {
+                                        game_identifier: game_identifier.clone(),
+                                        tribute_identifier: tribute.identifier.clone()
+                                    },
+                                    "{tribute.name}"
+                                }
+                            }
+                            div {
+                                if game_status == GameStatus::NotStarted {
+                                    div {
+                                        TributeEdit {
+                                            identifier: tribute.clone().identifier,
+                                            name: tribute.clone().name,
+                                            game_identifier: game_identifier.clone(),
+                                        }
+                                    }
+                                }
                             }
                         }
 
-                        if game_status == GameStatus::NotStarted {
+                        div {
                             div {
-                                TributeEdit {
-                                    identifier: tribute.clone().identifier,
-                                    name: tribute.clone().name,
-                                    game_identifier: game_identifier.clone(),
-                                }
-                            }
-                        } else {
-                            div {
-                                class: r#"
-                                "#,
-
+                                class: "flex flex-row gap-2 flex-wrap place-items-center text-sm",
                                 TributeStatusIcon {
                                     status: tribute.status.clone(),
                                     css_class: r#"
-                                    inline-block
-                                    size-5
-                                    theme1:fill-stone-200
+                                    size-6
+                                    ml-1
+                                    theme1:fill-amber-500
                                     theme2:fill-green-200
-                                    "#
+                                    mb-2
+                                    "#,
+                                }
+                                span {
+                                    class: "",
+                                    "{tribute.status.to_string()}"
                                 }
                             }
-                        }
-                    }
-
-                    div {
-                        class: r#"
-                        text-sm
-                        flex
-                        flex-row
-                        gap-2
-                        place-items-center
-                        mb-2
-                        "#,
-                        MapPinIcon {
-                            class: r#"
-                            size-6
-                            ml-1
-                            theme1:fill-amber-500
-                            theme2:fill-green-200
-                            "#,
-                        }
-                        span {
-                            class: "",
-                            "{tribute.area}"
-                        }
-                    }
-
-                    ul {
-                        class: "flex flex-row gap-2 flex-wrap",
-                        if tribute.clone().items.is_empty() {
-                            li {
-                                class: "flex flex-row gap-2 flex-wrap place-items-center",
-                                ItemIcon {
-                                    item: fist_item,
-                                    css_class: r#"
-                                    size-8
+                            div {
+                                class: r#"
+                                text-sm
+                                flex
+                                flex-row
+                                gap-2
+                                place-items-center
+                                mb-2
+                                "#,
+                                MapPinIcon {
+                                    class: r#"
+                                    size-6
+                                    ml-1
                                     theme1:fill-amber-500
                                     theme2:fill-green-200
                                     "#,
                                 }
                                 span {
-                                    class: "text-sm",
-                                    "Fist"
+                                    class: "",
+                                    "{tribute.area}"
                                 }
                             }
-                        } else {
-                            for item in tribute.clone().items {
-                                li {
-                                    class: "flex flex-row gap-2 flex-wrap place-items-center",
-                                    ItemIcon {
-                                        item: item.clone(),
-                                        css_class: r#"
-                                        size-8
-                                        theme1:fill-amber-500
-                                        theme2:fill-green-200
-                                        "#,
+
+                            ul {
+                                class: "flex flex-row gap-2 flex-wrap",
+                                if tribute.clone().items.is_empty() {
+                                    li {
+                                        class: "flex flex-row gap-2 flex-wrap place-items-center",
+                                        ItemIcon {
+                                            item: fist_item,
+                                            css_class: r#"
+                                            size-8
+                                            theme1:fill-amber-500
+                                            theme2:fill-green-200
+                                            "#,
+                                        }
+                                        span {
+                                            class: "text-sm",
+                                            "Fist"
+                                        }
                                     }
-                                    span {
-                                        class: "text-sm capitalize",
-                                        "{item.to_string()}"
+                                } else {
+                                    for item in tribute.clone().items {
+                                        li {
+                                            class: "flex flex-row gap-2 flex-wrap place-items-center",
+                                            ItemIcon {
+                                                item: item.clone(),
+                                                css_class: r#"
+                                                size-8
+                                                theme1:fill-amber-500
+                                                theme2:fill-green-200
+                                                "#,
+                                            }
+                                            span {
+                                                class: "text-sm capitalize",
+                                                "{item.to_string()}"
+                                            }
+                                        }
                                     }
                                 }
                             }

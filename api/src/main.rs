@@ -82,16 +82,16 @@ async fn main() {
 
     let app_state = AppState { db: Surreal::init() };
 
-    app_state.db.connect(env::var("SURREAL_HOST").unwrap()).await.expect("Failed to connect to database");
+    app_state.db.connect(env::var("SURREAL_HOST").expect("No database host")).await.expect("Database not found");
     tracing::debug!("connected to SurrealDB");
 
     app_state.db.signin(Root {
-        username: env::var("SURREAL_USER").unwrap().as_str(),
-        password: env::var("SURREAL_PASS").unwrap().as_str(),
-    }).await.unwrap();
+        username: env::var("SURREAL_USER").expect("No database user").as_str(),
+        password: env::var("SURREAL_PASS").expect("No database password").as_str(),
+    }).await.expect("Failed to authenticate to database");
     tracing::debug!("authenticated to SurrealDB");
 
-    app_state.db.use_ns("hangry-games").use_db("games").await.unwrap();
+    app_state.db.use_ns("hangry-games").use_db("games").await.expect("Failed to use database");
     tracing::debug!("Using 'hangry-games' namespace and 'games' database");
 
     MigrationRunner::new(&app_state.db)

@@ -1,3 +1,4 @@
+use std::thread::available_parallelism;
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::icons::loading::LoadingIcon;
 use crate::components::icons::map_pin::MapPinIcon;
@@ -290,6 +291,7 @@ pub fn GameTributeListMember(tribute_identifier: String, game_identifier: String
                                         TributeEdit {
                                             identifier: tribute.clone().identifier,
                                             name: tribute.clone().name,
+                                            avatar: tribute.clone().avatar(),
                                             game_identifier: game_identifier.clone(),
                                         }
                                     }

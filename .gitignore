@@ -9,3 +9,8 @@ web/assets/dist
 **/node_modules
 web/src/env.rs
 .env
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key

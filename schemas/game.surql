@@ -83,7 +83,7 @@ DEFINE FUNCTION OVERWRITE fn::get_display_game($game_id: string) {
     FETCH tribute
 };
 
-DEFINE FUNCTION OVERWRITE fn::get_list_games() {
+DEFINE FUNCTION OVERWRITE fn::get_list_games($limit: int, $offset: int) {
     RETURN SELECT name, identifier, status, day, private,
     created_by.id == $auth.id AS is_mine,
     created_by.username,
@@ -102,6 +102,7 @@ DEFINE FUNCTION OVERWRITE fn::get_list_games() {
     count(array::distinct(<-playing_in<-tribute.district)) == 12
     AS ready
     FROM game
+    LIMIT $limit START $offset
 };
 
 DEFINE FUNCTION OVERWRITE fn::get_detail_game($game_id: string) {

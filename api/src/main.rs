@@ -16,7 +16,9 @@ use axum::response::{IntoResponse, Response};
 use axum::{BoxError, Json, Router, middleware};
 use base64_url::decode;
 use serde_json::Value;
+use std::collections::hash_map::DefaultHasher;
 use std::env;
+use std::hash::{Hash, Hasher};
 use std::string::String;
 use std::sync::Arc;
 use std::sync::LazyLock;
@@ -27,6 +29,8 @@ use surrealdb::opt::auth::{Jwt, Root};
 use surrealdb_migrations::MigrationRunner;
 use time::OffsetDateTime;
 use tower::ServiceBuilder;
+use tower_governor::key_extractor::KeyExtractor;
+use tower_governor::{GovernorConfigBuilder, GovernorLayer};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
@@ -89,33 +93,41 @@ fn initialize_logging() {
 async fn main() {
     initialize_logging();
 
-    let db = Arc::new(Surreal::init());
+    let app_state = AppState {
+        db: Surreal::init(),
+    };
 
-    db.connect(env::var("SURREAL_HOST").expect("No database host"))
+    app_state
+        .db
+        .connect(env::var("SURREAL_HOST").expect("No database host"))
         .await
         .expect("Database not found");
     tracing::debug!("connected to SurrealDB");
 
-    db.signin(Root {
-        username: env::var("SURREAL_USER").expect("No database user").as_str(),
-        password: env::var("SURREAL_PASS")
-            .expect("No database password")
-            .as_str(),
-    })
-    .await
-    .expect("Failed to authenticate to database");
+    app_state
+        .db
+        .signin(Root {
+            username: env::var("SURREAL_USER").expect("No database user").as_str(),
+            password: env::var("SURREAL_PASS")
+                .expect("No database password")
+                .as_str(),
+        })
+        .await
+        .expect("Failed to authenticate to database");
     tracing::debug!("authenticated to SurrealDB");
 
-    db.use_ns("hangry-games")
+    app_state
+        .db
+        .use_ns("hangry-games")
         .use_db("games")
         .await
         .expect("Failed to use database");
     tracing::debug!("Using 'hangry-games' namespace and 'games' database");
 
-    MigrationRunner::new(&*db)
-        .up()
-        .await
-        .expect("Failed to apply migrations");
+    MigrationRunner::new(&*db).up().await.map_err(|e| {
+        eprintln!("Failed to apply migrations: {}", e);
+        std::process::exit(1);
+    })?;
     tracing::debug!("Applied migrations");
 
     let app_state = AppState { db };
@@ -129,7 +141,13 @@ async fn main() {
             "POST".parse().unwrap(),
             "PUT".parse().unwrap(),
         ])
-        .allow_origin(AllowOrigin::any())
+        .allow_origin(
+            allowed_origins
+                .iter()
+                .map(|o| o.parse().unwrap())
+                .collect::<Vec<_>>(),
+        )
+        .allow_credentials(true)
         .allow_headers([
             ACCEPT,
             ACCEPT_ENCODING,
@@ -142,6 +160,14 @@ async fn main() {
             CONTENT_TYPE,
             EXPIRES,
         ]);
+
+    let governor_config = GovernorConfigBuilder::default()
+        .requests_per_period(100)
+        .period(std::time::Duration::from_secs(60))
+        .burst_size(50)
+        .key_extractor(CompoundKeyExtractor)
+        .finish()
+        .expect("Failed to build GovernorConfig");
 
     let api_routes = Router::new()
         .nest(
@@ -174,6 +200,7 @@ async fn main() {
                 }))
                 .timeout(Duration::from_secs(10))
                 .layer(TraceLayer::new_for_http())
+                .layer(GovernorLayer::new(governor_config))
                 .layer(cors_layer)
                 .into_inner(),
         );
@@ -216,3 +243,54 @@ async fn surreal_jwt(State(state): State<AppState>, request: Request, next: Next
         Err(_) => StatusCode::UNAUTHORIZED.into_response(),
     }
 }
+
+/// Rate limiting key extractor that uses IP + user_id for JWT-protected routes
+/// and IP only for public routes.
+#[derive(Clone, Copy, Debug)]
+struct CompoundKeyExtractor;
+
+impl KeyExtractor for CompoundKeyExtractor {
+    type Key = u64;
+
+    fn extract<T>(
+        &self,
+        request: &axum::http::Request<T>,
+    ) -> Result<Self::Key, tower_governor::GovernorError> {
+        // Extract IP from remote_addr
+        let ip = request
+            .extensions()
+            .get::<axum::extract::connect_info::Connected<SeverConnectionInfo>>()
+            .and_then(|c| c.remote_addr().ip().to_string().as_str())
+            .unwrap_or("unknown");
+
+        // Try to extract user_id from JWT payload in Authorization header
+        let user_id = request
+            .headers()
+            .get(AUTHORIZATION)
+            .and_then(|h| h.to_str().ok())
+            .and_then(|h| h.strip_prefix("Bearer "))
+            .and_then(|token| {
+                let token_parts: Vec<&str> = token.split('.').collect();
+                if token_parts.len() == 3 {
+                    let payload_base64 = token_parts[1].trim_start_matches('=');
+                    decode(payload_base64)
+                        .ok()
+                        .and_then(|bytes| String::from_utf8(bytes).ok())
+                } else {
+                    None
+                }
+            })
+            .and_then(|payload_str| serde_json::from_str::<Value>(&payload_str).ok())
+            .and_then(|payload| payload["sub"].as_str())
+            .unwrap_or("");
+
+        // Combine IP and user_id into a single key using hash
+        let mut hasher = DefaultHasher::new();
+        ip.hash(&mut hasher);
+        user_id.hash(&mut hasher);
+        Ok(hasher.finish())
+    }
+}
+
+use axum::extract::connect_info::Connected;
+use axum::extract::connect_info::SeverConnectionInfo;

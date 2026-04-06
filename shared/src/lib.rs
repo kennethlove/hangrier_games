@@ -5,7 +5,11 @@ use validator::Validate;
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct CreateGame {
-    #[validate(length(min = 1, max = 100, message = "Game name must be 1-100 characters"))]
+    #[validate(length(
+        min = 1,
+        max = 100,
+        message = "Game name must be between 1 and 100 characters"
+    ))]
     pub name: Option<String>,
 }
 
@@ -135,4 +139,18 @@ pub struct ListDisplayGame {
     #[serde(default)]
     pub is_mine: bool,
     pub created_by: CreatedBy,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct PaginationMetadata {
+    pub total: u32,
+    pub limit: u32,
+    pub offset: u32,
+    pub has_more: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct PaginatedGames {
+    pub games: Vec<ListDisplayGame>,
+    pub pagination: PaginationMetadata,
 }

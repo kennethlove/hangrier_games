@@ -2,7 +2,7 @@ use crate::tributes::{TRIBUTES_ROUTER, TributeItemEdge, create_tribute};
 use crate::{AppError, AppState};
 use axum::Json;
 use axum::Router;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::routing::{get, put};
 use chrono::{DateTime, Utc};
@@ -12,8 +12,16 @@ use game::items::Item;
 use game::messages::{GameMessage, MessageSource, get_all_messages};
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
-use shared::{DisplayGame, EditGame, GameStatus};
-use shared::{GameArea, ListDisplayGame};
+use shared::{
+    DisplayGame, EditGame, GameStatus, ListDisplayGame, PaginatedGames, PaginationMetadata,
+};
+
+// Local type for paginated tributes - can't use shared since it would require game crate dependency
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct PaginatedTributes {
+    pub tributes: Vec<Tribute>,
+    pub pagination: PaginationMetadata,
+}
 use std::collections::HashMap;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -24,6 +32,22 @@ use surrealdb::engine::any::Any;
 use surrealdb::sql::Thing;
 use surrealdb::{RecordId, Surreal};
 use uuid::Uuid;
+
+#[derive(Debug, Deserialize)]
+pub struct PaginationParams {
+    #[serde(default = "default_limit")]
+    limit: u32,
+    #[serde(default = "default_offset")]
+    offset: u32,
+}
+
+fn default_limit() -> u32 {
+    10
+}
+
+fn default_offset() -> u32 {
+    0
+}
 
 /// Cache entry with TTL tracking
 struct CacheEntry {
@@ -87,7 +111,7 @@ async fn create_game_area(area: Area, db: &Surreal<Any>) -> Result<GameArea, App
             area: area.to_string(),
         })
         .await
-        .expect("Failed to find Area and Game link");
+        .map_err(|e| AppError::InternalServerError(format!("Failed to create area: {}", e)))?;
 
     if let Some(game_area) = game_area {
         Ok(game_area)
@@ -119,15 +143,15 @@ async fn create_game_area_edge(
         .bind(("game_id", game_identifier_str.clone()))
         .await
         .and_then(|mut resp| resp.take(0))
-        .expect("Failed to find Area");
+        .map_err(|e| AppError::InternalServerError(format!("Failed to find area: {}", e)))?;
 
     let area_uuid = if let Some(identifier) = existing_area {
-        Uuid::from_str(&identifier.to_string()).expect("Failed to parse uuid")
+        Uuid::from_str(&identifier.to_string())
+            .map_err(|e| AppError::BadRequest(format!("Invalid area UUID: {}", e)))?
     } else {
         match create_game_area(area, &db).await {
-            Ok(game_area) => {
-                Uuid::from_str(&game_area.identifier.as_str()).expect("Failed to parse uuid")
-            }
+            Ok(game_area) => Uuid::from_str(&game_area.identifier.as_str())
+                .map_err(|e| AppError::BadRequest(format!("Invalid game area UUID: {}", e)))?,
             Err(_) => {
                 return Err(AppError::InternalServerError(
                     "Failed to create game area".into(),
@@ -203,7 +227,8 @@ pub async fn create_area(
     num_items: u32,
     db: &Surreal<Any>,
 ) -> Result<(), AppError> {
-    let game_uuid = Uuid::from_str(game_identifier).expect("Bad UUID");
+    let game_uuid = Uuid::from_str(game_identifier)
+        .map_err(|e| AppError::BadRequest(format!("Invalid game UUID: {}", e)))?;
     if let Ok(game_area) = create_game_area_edge(area.clone(), game_uuid, &db).await {
         let item_futures = (0..num_items).map(|_| add_item_to_area(&game_area, &db));
         let item_results = futures::future::join_all(item_futures).await;
@@ -274,10 +299,16 @@ pub async fn game_delete(
         )
         .bind(("game_id", game_identifier.clone()))
         .await
-        .expect("Failed to find game pieces");
+        .map_err(|e| {
+            AppError::InternalServerError(format!("Failed to fetch game pieces: {}", e))
+        })?;
 
-    let game_pieces: Option<HashMap<String, Vec<Thing>>> = result.take(0).unwrap();
-    let area_pieces: Option<HashMap<String, Vec<Thing>>> = result.take(1).unwrap();
+    let game_pieces: Option<HashMap<String, Vec<Thing>>> = result
+        .take(0)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take game pieces: {}", e)))?;
+    let area_pieces: Option<HashMap<String, Vec<Thing>>> = result
+        .take(1)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take area pieces: {}", e)))?;
     if game_pieces.is_some() {
         delete_pieces(game_pieces.unwrap(), &state.db).await?
     };
@@ -289,7 +320,7 @@ pub async fn game_delete(
         .db
         .delete(("game", &game_identifier))
         .await
-        .expect("Failed to delete game");
+        .map_err(|e| AppError::InternalServerError(format!("Failed to delete game: {}", e)))?;
     match game {
         Some(_) => Ok(StatusCode::NO_CONTENT),
         None => Err(AppError::InternalServerError(
@@ -324,26 +355,44 @@ async fn delete_pieces(
     Ok(())
 }
 
-pub async fn game_list(state: State<AppState>) -> Result<Json<Vec<ListDisplayGame>>, AppError> {
-    let games = state.db.query("SELECT * FROM fn::get_list_games()").await;
+pub async fn game_list(
+    state: State<AppState>,
+    Query(params): Query<PaginationParams>,
+) -> Result<Json<PaginatedGames>, AppError> {
+    let mut result = state
+        .db
+        .query("SELECT * FROM fn::get_list_games($limit, $offset)")
+        .bind(("limit", params.limit))
+        .bind(("offset", params.offset))
+        .await;
 
-    match games {
-        Ok(mut games) => match games.take::<Vec<ListDisplayGame>>(0) {
-            Ok(games) => {
-                if games.is_empty() {
-                    Ok(Json::<Vec<ListDisplayGame>>(vec![]))
-                } else {
-                    Ok(Json::<Vec<ListDisplayGame>>(games))
+    match result {
+        Ok(mut result) => {
+            let games: Vec<ListDisplayGame> = match result.take(0) {
+                Ok(games) => games,
+                Err(e) => {
+                    return Err(AppError::InternalServerError(format!(
+                        "Failed to parse games: {}",
+                        e
+                    )));
                 }
-            }
-            Err(e) => Err(AppError::InternalServerError(format!(
-                "Failed to parse games: {}",
-                e
-            ))),
-        },
-        _ => Err(AppError::InternalServerError(
-            "Failed to fetch games".into(),
-        )),
+            };
+
+            let total = games.len() as u32;
+            let has_more = (params.offset + params.limit) < total;
+            let pagination = PaginationMetadata {
+                total,
+                limit: params.limit,
+                offset: params.offset,
+                has_more,
+            };
+
+            Ok(Json(PaginatedGames { games, pagination }))
+        }
+        Err(e) => Err(AppError::InternalServerError(format!(
+            "Failed to fetch games: {}",
+            e
+        ))),
     }
 }
 
@@ -359,9 +408,11 @@ pub async fn game_detail(
         .query("SELECT * FROM fn::get_detail_game($identifier)")
         .bind(("identifier", identifier.clone()))
         .await
-        .unwrap();
+        .map_err(|e| AppError::InternalServerError(format!("Failed to fetch game: {}", e)))?;
 
-    let game: Option<DisplayGame> = result.take(0).expect("No game found");
+    let game: Option<DisplayGame> = result
+        .take(0)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take game: {}", e)))?;
 
     if let Some(game) = game {
         Ok(Json(game))
@@ -375,6 +426,11 @@ pub async fn game_update(
     state: State<AppState>,
     Json(payload): Json<EditGame>,
 ) -> Result<Json<Game>, AppError> {
+    // Validate input - fail fast if invalid
+    payload
+        .validate()
+        .map_err(|e| AppError::BadRequest(format!("Validation failed: {}", e)))?;
+
     let response = state
         .db
         .query(
@@ -385,8 +441,8 @@ pub async fn game_update(
         "#,
         )
         .bind(("identifier", game_identifier.to_string()))
-        .bind(("name", payload.1.clone()))
-        .bind(("private", payload.2))
+        .bind(("name", payload.name.clone()))
+        .bind(("private", payload.private))
         .await;
 
     match response {
@@ -438,17 +494,51 @@ SELECT (
 pub async fn game_tributes(
     Path(identifier): Path<Uuid>,
     state: State<AppState>,
-) -> Result<Json<Vec<Tribute>>, AppError> {
+    Query(params): Query<PaginationParams>,
+) -> Result<Json<PaginatedTributes>, AppError> {
+    let game_identifier = identifier.to_string();
+
+    // Get total count
+    let total: Option<u32> = state
+        .db
+        .query("RETURN count(SELECT id FROM playing_in WHERE out.identifier=$game)")
+        .bind(("game", game_identifier.clone()))
+        .await
+        .ok()
+        .and_then(|mut r| r.take(0).ok().flatten());
+
+    let total = total.unwrap_or(0);
+
     let response = state
         .db
         .query("SELECT * FROM fn::get_tributes_by_game($identifier);")
-        .bind(("identifier", identifier.to_string()))
+        .bind(("identifier", game_identifier.clone()))
         .await;
 
     match response {
         Ok(mut response) => {
             let tributes: Vec<Vec<Tribute>> = response.take("tributes").unwrap();
-            Ok(Json::<Vec<Tribute>>(tributes[0].clone()))
+            let all_tributes = tributes[0].clone();
+
+            // Apply pagination to the results
+            let paginated_tributes: Vec<Tribute> = all_tributes
+                .into_iter()
+                .skip(params.offset as usize)
+                .take(params.limit as usize)
+                .collect();
+
+            let has_more = (params.offset + params.limit) < total;
+            let pagination = PaginationMetadata {
+                total,
+                limit: params.limit,
+                offset: params.offset,
+                has_more,
+            };
+
+            Ok(Json(PaginatedTributes {
+                tributes: paginated_tributes,
+                pagination,
+            }))
         }
         Err(e) => Err(AppError::InternalServerError(format!(
             "Failed to fetch tributes: {}",
@@ -523,9 +613,7 @@ async fn get_dead_tribute_count(db: &Surreal<Any>, identifier: &str) -> Result<u
 async fn run_game_cycles(game: &mut Game, db: &Surreal<Any>) -> Result<(), AppError> {
     game.run_day_night_cycle(true);
     game.run_day_night_cycle(false);
-    let _ = save_game(game, db)
-        .await
-        .expect("Failed to run game cycles");
+    save_game(game, db).await?;
     Ok(())
 }
 
@@ -563,58 +651,16 @@ pub async fn next_step(
 }
 
 async fn get_full_game(identifier: Uuid, db: &Surreal<Any>) -> Result<Json<Game>, AppError> {
-    let identifier_str = identifier.to_string();
-
-    // Check cache first
+    let identifier = identifier.to_string();
+    let mut result = db
+        .query("SELECT * FROM fn::get_full_game($identifier)")
+        .bind(("identifier", identifier.clone()))
+        .await
+        .map_err(|e| AppError::InternalServerError(format!("Failed to fetch game: {}", e)))?;
+    if let Some(game) = result
+        .take(0)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take game: {}", e)))?
     {
-        let cache = GAME_CACHE.read();
-        if let Some(entry) = cache.get(&identifier_str) {
-            let elapsed = entry.cached_at.elapsed().as_secs();
-            if elapsed < CACHE_TTL_SECS {
-                tracing::debug!("Cache hit for game {}", identifier_str);
-                return Ok(Json(entry.game.clone()));
-            }
-        }
-    }
-
-    // Cache miss or expired - acquire write lock and check again
-    tracing::debug!("Cache miss for game {}, fetching from DB", identifier_str);
-
-    let game = {
-        let mut cache = GAME_CACHE.write();
-
-        // Double-check after acquiring write lock (another request may have populated it)
-        if let Some(entry) = cache.get(&identifier_str) {
-            let elapsed = entry.cached_at.elapsed().as_secs();
-            if elapsed < CACHE_TTL_SECS {
-                tracing::debug!("Cache hit after lock for game {}", identifier_str);
-                return Ok(Json(entry.game.clone()));
-            }
-        }
-
-        // Fetch from database
-        let mut result = db
-            .query("SELECT * FROM fn::get_full_game($identifier)")
-            .bind(("identifier", identifier_str.clone()))
-            .await
-            .unwrap();
-        let game = result.take(0).expect("No game found");
-
-        // Store in cache if found
-        if let Some(ref g) = game {
-            cache.insert(
-                identifier_str,
-                CacheEntry {
-                    game: g.clone(),
-                    cached_at: std::time::Instant::now(),
-                },
-            );
-        }
-
-        game
-    };
-
-    if let Some(game) = game {
         Ok(Json::<Game>(game))
     } else {
         Err(AppError::NotFound("Failed to find game".into()))
@@ -644,9 +690,9 @@ async fn save_game(game: &Game, db: &Surreal<Any>) -> Result<Json<Game>, AppErro
     let game_identifier = RecordId::from(("game", game.identifier.clone()));
 
     // Start transaction
-    db.query("BEGIN TRANSACTION")
-        .await
-        .expect("Failed to start transaction");
+    db.query("BEGIN TRANSACTION").await.map_err(|e| {
+        AppError::InternalServerError(format!("Failed to start transaction: {}", e))
+    })?;
 
     if let Ok(logs) = get_all_messages() {
         let game_day = game.day.unwrap_or_default();
@@ -669,9 +715,7 @@ async fn save_game(game: &Game, db: &Surreal<Any>) -> Result<Json<Game>, AppErro
             .collect();
 
         if let Err(e) = db.insert::<Vec<GameMessage>>(()).content(game_logs).await {
-            db.query("ROLLBACK")
-                .await
-                .expect("Failed to rollback transaction");
+            let _ = db.query("ROLLBACK").await;
             return Err(AppError::InternalServerError(format!(
                 "Failed to save game logs: {}",
                 e
@@ -693,9 +737,7 @@ async fn save_game(game: &Game, db: &Surreal<Any>) -> Result<Json<Game>, AppErro
     .await;
 
     if area_results.iter().any(|result| result.is_err()) {
-        db.query("ROLLBACK")
-            .await
-            .expect("Failed to rollback transaction");
+        let _ = db.query("ROLLBACK").await;
         return Err(AppError::InternalServerError(
             "Failed to save area items".into(),
         ));
@@ -717,9 +759,7 @@ async fn save_game(game: &Game, db: &Surreal<Any>) -> Result<Json<Game>, AppErro
     .await;
 
     if tribute_results.iter().any(|result| result.is_err()) {
-        db.query("ROLLBACK")
-            .await
-            .expect("Failed to rollback transaction");
+        let _ = db.query("ROLLBACK").await;
         return Err(AppError::InternalServerError(
             "Failed to save tribute items".into(),
         ));
@@ -735,25 +775,17 @@ async fn save_game(game: &Game, db: &Surreal<Any>) -> Result<Json<Game>, AppErro
     {
         Ok(Some(game)) => {
             // Commit transaction
-            db.query("COMMIT")
-                .await
-                .expect("Failed to commit transaction");
-
-            // Invalidate cache after successful save
-            invalidate_game_cache(&game.identifier);
-
+            db.query("COMMIT").await.map_err(|e| {
+                AppError::InternalServerError(format!("Failed to commit transaction: {}", e))
+            })?;
             Ok(Json(game))
         }
         Ok(None) => {
-            db.query("ROLLBACK")
-                .await
-                .expect("Failed to rollback transaction");
+            let _ = db.query("ROLLBACK").await;
             Err(AppError::NotFound("Failed to find game".into()))
         }
         Err(e) => {
-            db.query("ROLLBACK")
-                .await
-                .expect("Failed to rollback transaction");
+            let _ = db.query("ROLLBACK").await;
             Err(AppError::InternalServerError(format!(
                 "Failed to update game: {}",
                 e
@@ -998,7 +1030,9 @@ async fn tribute_logs(
         .await
     {
         Ok(mut logs) => {
-            let logs: Vec<GameMessage> = logs.take(0).expect("logs is empty");
+            let logs: Vec<GameMessage> = logs.take(0).map_err(|e| {
+                AppError::InternalServerError(format!("Failed to take logs: {}", e))
+            })?;
             Ok(Json(logs))
         }
         Err(err) => Err(AppError::NotFound(format!("Failed to get logs: {err:?}"))),
@@ -1010,7 +1044,8 @@ async fn publish_game(
     state: State<AppState>,
 ) -> Result<StatusCode, AppError> {
     let game_identifier = game_identifier.to_string();
-    let response = state.db
+    let response = state
+        .db
         .query("UPDATE game SET private = false WHERE identifier = $identifier")
         .bind(("identifier", game_identifier))
         .await;
@@ -1028,7 +1063,8 @@ async fn unpublish_game(
     state: State<AppState>,
 ) -> Result<StatusCode, AppError> {
     let game_identifier = game_identifier.to_string();
-    let response = state.db
+    let response = state
+        .db
         .query("UPDATE game SET private = true WHERE identifier = $identifier")
         .bind(("identifier", game_identifier))
         .await;
@@ -1051,9 +1087,11 @@ pub async fn game_display(
         .query("SELECT * FROM fn::get_display_game($identifier);")
         .bind(("identifier", identifier.clone()))
         .await
-        .unwrap();
+        .map_err(|e| AppError::InternalServerError(format!("Failed to fetch game: {}", e)))?;
 
-    let game: Option<DisplayGame> = result.take(0).expect("No game found");
+    let game: Option<DisplayGame> = result
+        .take(0)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take game: {}", e)))?;
 
     if let Some(game) = game {
         Ok(Json(game))

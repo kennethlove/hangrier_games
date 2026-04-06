@@ -89,49 +89,54 @@ fn initialize_logging() {
 async fn main() {
     initialize_logging();
 
-    let app_state = AppState {
-        db: Surreal::init(),
-    };
+    let db = Arc::new(Surreal::init());
 
-    app_state
-        .db
-        .connect(env::var("SURREAL_HOST").expect("No database host"))
-        .await
-        .expect("Database not found");
+    let host = env::var("SURREAL_HOST").map_err(|e| {
+        eprintln!("No database host: {}", e);
+        std::process::exit(1);
+    })?;
+    db.connect(&host).await.map_err(|e| {
+        eprintln!("Database not found: {}", e);
+        std::process::exit(1);
+    })?;
     tracing::debug!("connected to SurrealDB");
 
-    app_state
-        .db
-        .signin(Root {
-            username: env::var("SURREAL_USER").expect("No database user").as_str(),
-            password: env::var("SURREAL_PASS")
-                .expect("No database password")
-                .as_str(),
-        })
-        .await
-        .expect("Failed to authenticate to database");
+    let username = env::var("SURREAL_USER").map_err(|e| {
+        eprintln!("No database user: {}", e);
+        std::process::exit(1);
+    })?;
+    let password = env::var("SURREAL_PASS").map_err(|e| {
+        eprintln!("No database password: {}", e);
+        std::process::exit(1);
+    })?;
+
+    db.signin(Root {
+        username: username.as_str(),
+        password: password.as_str(),
+    })
+    .await
+    .map_err(|e| {
+        eprintln!("Failed to authenticate to database: {}", e);
+        std::process::exit(1);
+    })?;
     tracing::debug!("authenticated to SurrealDB");
 
-    app_state
-        .db
-        .use_ns("hangry-games")
+    db.use_ns("hangry-games")
         .use_db("games")
         .await
-        .expect("Failed to use database");
+        .map_err(|e| {
+            eprintln!("Failed to use database: {}", e);
+            std::process::exit(1);
+        })?;
     tracing::debug!("Using 'hangry-games' namespace and 'games' database");
 
-    MigrationRunner::new(&*db)
-        .up()
-        .await
-        .expect("Failed to apply migrations");
+    MigrationRunner::new(&*db).up().await.map_err(|e| {
+        eprintln!("Failed to apply migrations: {}", e);
+        std::process::exit(1);
+    })?;
     tracing::debug!("Applied migrations");
 
-    let allowed_origins: Vec<String> = std::env::var("ALLOWED_ORIGINS")
-        .unwrap_or_default()
-        .split(',')
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
-        .collect();
+    let app_state = AppState { db };
 
     let cors_layer = CorsLayer::new()
         .allow_methods(vec![

@@ -65,11 +65,10 @@ pub async fn create_tribute(
 
     let id = RecordId::from(("tribute", &tribute.identifier));
 
-    let new_tribute: Option<Tribute> = db
-        .create(&id)
-        .content(tribute)
-        .await
-        .expect("Failed to create Tribute record");
+    let new_tribute: Option<Tribute> =
+        db.create(&id).content(tribute).await.map_err(|e| {
+            AppError::InternalServerError(format!("Failed to create tribute: {}", e))
+        })?;
 
     let _: Vec<TributeGameEdge> = db
         .insert("playing_in")
@@ -78,7 +77,9 @@ pub async fn create_tribute(
             game: game_id.clone(),
         })
         .await
-        .expect("Failed to connect Tribute to game");
+        .map_err(|e| {
+            AppError::InternalServerError(format!("Failed to connect tribute to game: {}", e))
+        })?;
 
     let new_object: Item = Item::new_random(None);
     let new_object_id: RecordId = RecordId::from(("item", &new_object.identifier));
@@ -86,7 +87,7 @@ pub async fn create_tribute(
         .insert(new_object_id.clone())
         .content(new_object.clone())
         .await
-        .expect("Failed to update Item");
+        .map_err(|e| AppError::InternalServerError(format!("Failed to create item: {}", e)))?;
     let _: Vec<TributeItemEdge> = db
         .insert("owns")
         .relation(TributeItemEdge {
@@ -94,7 +95,9 @@ pub async fn create_tribute(
             item: new_object_id.clone(),
         })
         .await
-        .expect("Failed to update Owns relation");
+        .map_err(|e| {
+            AppError::InternalServerError(format!("Failed to create owns relation: {}", e))
+        })?;
 
     if let Some(tribute) = new_tribute {
         Ok(tribute)
@@ -113,7 +116,7 @@ pub async fn tribute_delete(
         .db
         .delete(("tribute", &tribute_identifier))
         .await
-        .expect("failed to delete tribute");
+        .map_err(|e| AppError::InternalServerError(format!("Failed to delete tribute: {}", e)))?;
     match tribute {
         Some(_) => Ok(StatusCode::NO_CONTENT),
         None => Err(AppError::InternalServerError(
@@ -127,11 +130,16 @@ pub async fn tribute_update(
     state: State<AppState>,
     Json(payload): Json<EditTribute>,
 ) -> Result<StatusCode, AppError> {
+    // Validate input - fail fast if invalid
+    payload
+        .validate()
+        .map_err(|e| AppError::BadRequest(format!("Validation failed: {}", e)))?;
+
     let response = state
         .db
         .query("UPDATE tribute SET name = $name WHERE identifier = $identifier;")
-        .bind(("identifier", payload.0))
-        .bind(("name", payload.1))
+        .bind(("identifier", payload.identifier))
+        .bind(("name", payload.name))
         .await;
 
     match response {
@@ -157,9 +165,11 @@ pub async fn tribute_detail(
         .query("SELECT * FROM fn::get_full_tribute($identifier);")
         .bind(("identifier", tribute_identifier))
         .await
-        .expect("Failed to find tribute");
+        .map_err(|e| AppError::InternalServerError(format!("Failed to fetch tribute: {}", e)))?;
 
-    let tribute: Option<Tribute> = result.take(0).expect("");
+    let tribute: Option<Tribute> = result
+        .take(0)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take tribute: {}", e)))?;
 
     if let Some(tribute) = tribute {
         Ok(Json(tribute.clone()))
@@ -178,8 +188,10 @@ pub async fn tribute_log(
         .query("SELECT * FROM fn::get_messages_by_tribute_id($identifier)")
         .bind(("identifier", identifier))
         .await
-        .expect("Failed to find log");
+        .map_err(|e| AppError::InternalServerError(format!("Failed to fetch logs: {}", e)))?;
 
-    let logs: Vec<GameMessage> = result.take(0).unwrap();
+    let logs: Vec<GameMessage> = result
+        .take(0)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take logs: {}", e)))?;
     Ok(Json(logs))
 }

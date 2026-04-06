@@ -13,10 +13,10 @@ pub(crate) enum QueryKey {
     Games,
     Tributes(String),
     Areas(String),
-    Tribute(String, String), // Game identifier, tribute identifier
-    _GameLog(String), // Game identifier
-    GameDayLog(String, u32), // Game identifier, day
-    TributeLog(String), // Tribute identifier
+    Tribute(String, String),     // Game identifier, tribute identifier
+    _GameLog(String),            // Game identifier
+    GameDayLog(String, u32),     // Game identifier, day
+    TributeLog(String),          // Tribute identifier
     _TributeDayLog(String, u32), // Tribute identifier, day
     _GameSummary(String),
     _GameDaySummary(String, u32), // Game identifier, day
@@ -50,6 +50,9 @@ pub(crate) enum QueryValue {
     Logs(Vec<GameMessage>),
     Summary(String),
     ServerVersion(String),
+    // Pagination variants
+    PaginatedGames(super::components::games_list::PaginatedGamesResponse),
+    PaginatedTributes(super::components::game_tributes::PaginatedTributesResponse),
 }
 
 #[allow(dead_code)]

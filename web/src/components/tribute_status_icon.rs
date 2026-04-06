@@ -1,36 +1,39 @@
-use crate::components::icons::game_icons_net::*;
+use crate::components::icons::svg_icon::SvgIcon;
 use dioxus::prelude::*;
 use game::tributes::statuses::TributeStatus;
 
-#[component]
-fn StatusIcon(status: TributeStatus, css_class: String) -> Element {
+/// Maps tribute status to icon names
+fn icon_name_for_status(status: &TributeStatus) -> String {
     match status {
-        TributeStatus::Broken => rsx!(BrokenBoneIcon { class: css_class }),
-        TributeStatus::Buried => rsx!(FallingRocksIcon { class: css_class }),
-        TributeStatus::Burned => rsx!(BurnedIcon { class: css_class }),
-        TributeStatus::Dead => rsx!(DeadIcon { class: css_class }),
-        TributeStatus::Dehydrated => rsx!(DehydratedIcon { class: css_class }),
-        TributeStatus::Drowned => rsx!(DrowningIcon { class: css_class }),
-        TributeStatus::Electrocuted => rsx!(ElectrocutedIcon { class: css_class }),
-        TributeStatus::Frozen => rsx!(FrozenBodyIcon { class: css_class }),
-        TributeStatus::Healthy => rsx!(HeartsIcon { class: css_class }),
-        TributeStatus::Infected => rsx!(InfectionIcon { class: css_class }),
-        TributeStatus::Overheated => rsx!(HeatHazeIcon { class: css_class }),
-        TributeStatus::Mauled(_) => rsx!(MauledIcon { class: css_class }),
-        TributeStatus::Poisoned => rsx!(PoisonBottleIcon { class: css_class }),
-        TributeStatus::RecentlyDead => rsx!(RecentlyDeadIcon { class: css_class }),
-        TributeStatus::Starving => rsx!(StarvingIcon { class: css_class }),
-        TributeStatus::Sick => rsx!(VomitingIcon { class: css_class }),
-        TributeStatus::Wounded => rsx!(WoundedIcon { class: css_class }),
+        TributeStatus::Broken => "broken_bone",
+        TributeStatus::Buried => "falling_rocks",
+        TributeStatus::Burned => "burned",
+        TributeStatus::Dead => "dead",
+        TributeStatus::Dehydrated => "dehydrated",
+        TributeStatus::Drowned => "drowning",
+        TributeStatus::Electrocuted => "electrocuted",
+        TributeStatus::Frozen => "frozen_body",
+        TributeStatus::Healthy => "hearts",
+        TributeStatus::Infected => "infection",
+        TributeStatus::Overheated => "heat_haze",
+        TributeStatus::Mauled(_) => "mauled",
+        TributeStatus::Poisoned => "poison_bottle",
+        TributeStatus::RecentlyDead => "recently_dead",
+        TributeStatus::Starving => "starving",
+        TributeStatus::Sick => "vomiting",
+        TributeStatus::Wounded => "wounded",
     }
+    .to_string()
 }
 
 #[component]
 pub fn TributeStatusIcon(status: TributeStatus, css_class: String) -> Element {
+    let icon_name = icon_name_for_status(&status);
+
     rsx! {
         span {
             title: status.to_string(),
-            StatusIcon { status: status.clone(), css_class },
+            SvgIcon { name: icon_name, class: css_class },
             span { class: "sr-only", "{status}"},
         }
     }

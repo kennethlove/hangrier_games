@@ -23,8 +23,10 @@ pub struct PaginatedTributes {
     pub pagination: PaginationMetadata,
 }
 use std::collections::HashMap;
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::LazyLock;
+use std::sync::RwLock;
 use strum::IntoEnumIterator;
 use surrealdb::engine::any::Any;
 use surrealdb::sql::Thing;
@@ -46,6 +48,20 @@ fn default_limit() -> u32 {
 fn default_offset() -> u32 {
     0
 }
+
+/// Cache entry with TTL tracking
+struct CacheEntry {
+    game: Game,
+    cached_at: std::time::Instant,
+}
+
+/// In-memory game cache with 5-minute TTL using RwLock
+static GAME_CACHE: LazyLock<RwLock<HashMap<String, CacheEntry>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+/// Cache TTL duration (5 minutes)
+const CACHE_TTL_SECS: u64 = 300;
+
 pub static GAMES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
     Router::new()
         .route("/", get(game_list).post(create_game))
@@ -649,6 +665,13 @@ async fn get_full_game(identifier: Uuid, db: &Surreal<Any>) -> Result<Json<Game>
     } else {
         Err(AppError::NotFound("Failed to find game".into()))
     }
+}
+
+/// Invalidate cache for a game (call on updates)
+fn invalidate_game_cache(identifier: &str) {
+    let mut cache = GAME_CACHE.write();
+    cache.remove(identifier);
+    tracing::debug!("Cache invalidated for game {}", identifier);
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

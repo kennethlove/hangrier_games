@@ -147,7 +147,13 @@ async fn main() {
             "POST".parse().unwrap(),
             "PUT".parse().unwrap(),
         ])
-        .allow_origin(AllowOrigin::any())
+        .allow_origin(
+            allowed_origins
+                .iter()
+                .map(|o| o.parse().unwrap())
+                .collect::<Vec<_>>(),
+        )
+        .allow_credentials(true)
         .allow_headers([
             ACCEPT,
             ACCEPT_ENCODING,

@@ -9,6 +9,7 @@ use thiserror::Error;
 
 pub mod games;
 pub mod logging;
+pub mod messages;
 pub mod tributes;
 pub mod users;
 

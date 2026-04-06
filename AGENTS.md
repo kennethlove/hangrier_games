@@ -1,40 +1,118 @@
 # Agent Instructions
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+## Project Structure
 
-## Quick Reference
+Rust workspace with 5 crates:
+- `game/` - Core simulation logic (pure Rust, no I/O)
+- `api/` - Axum REST API (SurrealDB backend)
+- `web/` - Dioxus frontend (compiles to WASM)
+- `shared/` - Shared types
+- `announcers/` - Ollama LLM integration for game commentary
 
+## Development Commands
+
+**Build & run API**:
 ```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work atomically
-bd close <id>         # Complete work
-bd dolt push          # Push beads data to remote
+cargo run --package api
+# Requires: SurrealDB running on SURREAL_HOST, .env file present
 ```
+
+**Build & run frontend** (requires Dioxus CLI):
+```bash
+# Install dx first: cargo install dioxus-cli@0.6.2 --locked
+cd web && dx serve
+# Requires: APP_API_HOST in .env, Tailwind CSS built
+```
+
+**Build frontend CSS**:
+```bash
+cd web/assets
+npm install
+npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css
+```
+
+**Run tests** (game crate has ~60 inline tests using rstest):
+```bash
+cargo test --package game
+# WARNING: Tests may be slow; workspace-wide `cargo test` can hang
+```
+
+**Format code** (custom edition=2024, fn_single_line=true):
+```bash
+cargo fmt
+```
+
+## Environment Setup
+
+Required `.env` at repo root (already exists):
+```bash
+ENV=development
+APP_API_HOST=http://127.0.0.1:3000    # Frontend → API
+SURREAL_HOST=ws://localhost:8000       # API → SurrealDB
+SURREAL_USER=root
+SURREAL_PASS=root
+```
+
+**Frontend build.rs codegen**: Web crate reads `APP_*` env vars at build time and generates `src/env.rs`. Change requires rebuild.
+
+## Critical Quirks
+
+**WASM build**: Frontend requires `RUSTFLAGS='--cfg getrandom_backend="wasm_js"'` and `wasm32-unknown-unknown` target.
+
+**SurrealDB migrations**: `schemas/*.surql` files + `migrations/definitions/_initial.json` define schema. Migrations run via `surrealdb-migrations` crate at API startup.
+
+**Announcer LLM**: Expects Ollama running locally with model named `announcers`. Create from `announcers/src/Modelfile.qwen`:
+```bash
+cd announcers/src
+ollama create announcers -f Modelfile.qwen
+```
+
+**Docker build order matters**: Frontend Dockerfile builds Tailwind first, then Dioxus. API Dockerfile uses build cache for faster rebuilds.
 
 ## Non-Interactive Shell Commands
 
-**ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
-
-Shell commands like `cp`, `mv`, and `rm` may be aliased to include `-i` (interactive) mode on some systems, causing the agent to hang indefinitely waiting for y/n input.
-
-**Use these forms instead:**
+**ALWAYS use `-f` flag** with file operations to avoid hanging on prompts:
 ```bash
-# Force overwrite without prompting
 cp -f source dest           # NOT: cp source dest
 mv -f source dest           # NOT: mv source dest
 rm -f file                  # NOT: rm file
-
-# For recursive operations
 rm -rf directory            # NOT: rm -r directory
-cp -rf source dest          # NOT: cp -r source dest
 ```
 
-**Other commands that may prompt:**
-- `scp` - use `-o BatchMode=yes` for non-interactive
-- `ssh` - use `-o BatchMode=yes` to fail instead of prompting
-- `apt-get` - use `-y` flag
-- `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
+System aliases may add `-i` (interactive) flag, causing indefinite hangs waiting for y/n input.
+
+## Version Control
+
+This project uses **jj (Jujutsu)** for version control with git coexistence (`.jj/` directory + `.git/` for GitHub integration).
+
+**Basic workflow**:
+```bash
+jj status                    # Show working copy changes
+jj diff                      # Show uncommitted changes
+jj commit -m "message"       # Create new commit
+jj git push                  # Push to GitHub (uses git backend)
+```
+
+**Branch operations**:
+```bash
+jj new                       # Create new change on top of current
+jj new main                  # Create change based on main
+jj rebase -d main            # Rebase current change onto main
+jj bookmark set feature-x    # Create/move bookmark (like git branch)
+```
+
+**Working with GitHub**:
+```bash
+jj git fetch                 # Fetch from origin
+jj git push                  # Push bookmarks to origin
+jj rebase -d main@origin     # Rebase onto remote main
+```
+
+**Key differences from git**:
+- Every change has a unique ID (not just commits)
+- `jj commit` creates immutable snapshot but keeps working copy
+- Use `jj new` to start fresh change (like `git commit && git checkout -b`)
+- Conflicts tracked explicitly; can defer resolution
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker
@@ -67,10 +145,11 @@ bd close <id>         # Complete work
 3. **Update issue status** - Close finished work, update in-progress items
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
-   git pull --rebase
-   bd dolt push
-   git push
-   git status  # MUST show "up to date with origin"
+   jj git fetch                # Sync with remote
+   jj rebase -d main@origin    # Rebase if needed
+   bd dolt push                # Push beads data
+   jj git push                 # Push commits to GitHub
+   jj log -r 'remote_bookmarks()'  # Verify push succeeded
    ```
 5. **Clean up** - Clear stashes, prune remote branches
 6. **Verify** - All changes committed AND pushed

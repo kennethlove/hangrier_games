@@ -18,6 +18,7 @@ use base64_url::decode;
 use serde_json::Value;
 use std::env;
 use std::string::String;
+use std::sync::Arc;
 use std::sync::LazyLock;
 use std::time::Duration;
 use surrealdb::Surreal;
@@ -31,7 +32,7 @@ use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-pub static DATABASE: LazyLock<Surreal<Any>> = LazyLock::new(Surreal::init);
+pub static DATABASE: LazyLock<Arc<Surreal<Any>>> = LazyLock::new(|| Arc::new(Surreal::init()));
 
 fn initialize_logging() {
     // a layer that logs events to stdout
@@ -119,7 +120,7 @@ async fn main() {
         .expect("Failed to use database");
     tracing::debug!("Using 'hangry-games' namespace and 'games' database");
 
-    MigrationRunner::new(&app_state.db)
+    MigrationRunner::new(&*db)
         .up()
         .await
         .expect("Failed to apply migrations");
@@ -233,19 +234,4 @@ async fn surreal_jwt(State(state): State<AppState>, request: Request, next: Next
         Ok(_) => next.run(request).await,
         Err(_) => StatusCode::UNAUTHORIZED.into_response(),
     }
-
-    // let token = request.headers().get("authorization");
-    // match token {
-    //     None => StatusCode::UNAUTHORIZED.into_response(),
-    //     Some(token) => {
-    //         let token = token.to_str().unwrap_or_default();
-    //         let token = token.strip_prefix("Bearer ").unwrap_or(token);
-    //
-    //         let token = surrealdb::opt::auth::Jwt::from(token);
-    //         match state.db.authenticate(token).await {
-    //             Ok(_) => { next.run(request).await },
-    //             Err(_) => { StatusCode::UNAUTHORIZED.into_response() }
-    //         }
-    //     }
-    // }
 }

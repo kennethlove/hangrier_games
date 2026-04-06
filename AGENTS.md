@@ -1,5 +1,16 @@
 # Agent Instructions
 
+## Repository Map
+
+A full codemap is available at `codemap.md` in the project root.
+
+Before working on any task, read `codemap.md` to understand:
+- Project architecture and entry points
+- Directory responsibilities and design patterns
+- Data flow and integration points between modules
+
+For deep work on a specific folder, also read that folder's `codemap.md`.
+
 ## Project Structure
 
 Rust workspace with 5 crates:
@@ -9,37 +20,56 @@ Rust workspace with 5 crates:
 - `shared/` - Shared types
 - `announcers/` - Ollama LLM integration for game commentary
 
+## Quick Commands
+
+This project uses [just](https://github.com/casey/just) for common development tasks. Run `just` to see all available recipes.
+
+**Most useful commands:**
+- `just dev` - Start SurrealDB, API, and web frontend in one command
+- `just api` - Run API server only
+- `just web` - Run frontend dev server only
+- `just build-css` - Build Tailwind CSS
+- `just test` - Run game crate tests
+- `just fmt` - Format all code
+- `just setup` - Install all dependencies (Dioxus CLI, Node packages, Ollama model)
+- `just quality` - Run all quality checks (format, check, clippy, test)
+
+See the `justfile` in the repository root for all available commands.
+
 ## Development Commands
 
 **Build & run API**:
 ```bash
-cargo run --package api
+just api
+# OR: cargo run --package api
 # Requires: SurrealDB running on SURREAL_HOST, .env file present
 ```
 
 **Build & run frontend** (requires Dioxus CLI):
 ```bash
-# Install dx first: cargo install dioxus-cli@0.6.2 --locked
-cd web && dx serve
+just web
+# OR: cd web && dx serve
+# Install dx first: just setup-dx
 # Requires: APP_API_HOST in .env, Tailwind CSS built
 ```
 
 **Build frontend CSS**:
 ```bash
-cd web/assets
-npm install
-npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css
+just build-css
+# OR: cd web/assets && npm install && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css
 ```
 
 **Run tests** (game crate has ~60 inline tests using rstest):
 ```bash
-cargo test --package game
+just test
+# OR: cargo test --package game
 # WARNING: Tests may be slow; workspace-wide `cargo test` can hang
 ```
 
 **Format code** (custom edition=2024, fn_single_line=true):
 ```bash
-cargo fmt
+just fmt
+# OR: cargo fmt
 ```
 
 ## Environment Setup

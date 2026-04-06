@@ -20,6 +20,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::env;
 use std::hash::{Hash, Hasher};
 use std::string::String;
+use std::sync::Arc;
 use std::sync::LazyLock;
 use std::time::Duration;
 use surrealdb::Surreal;
@@ -35,7 +36,7 @@ use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-pub static DATABASE: LazyLock<Surreal<Any>> = LazyLock::new(Surreal::init);
+pub static DATABASE: LazyLock<Arc<Surreal<Any>>> = LazyLock::new(|| Arc::new(Surreal::init()));
 
 fn initialize_logging() {
     // a layer that logs events to stdout
@@ -123,11 +124,13 @@ async fn main() {
         .expect("Failed to use database");
     tracing::debug!("Using 'hangry-games' namespace and 'games' database");
 
-    MigrationRunner::new(&app_state.db)
-        .up()
-        .await
-        .expect("Failed to apply migrations");
+    MigrationRunner::new(&*db).up().await.map_err(|e| {
+        eprintln!("Failed to apply migrations: {}", e);
+        std::process::exit(1);
+    })?;
     tracing::debug!("Applied migrations");
+
+    let app_state = AppState { db };
 
     let cors_layer = CorsLayer::new()
         .allow_methods(vec![
@@ -138,7 +141,13 @@ async fn main() {
             "POST".parse().unwrap(),
             "PUT".parse().unwrap(),
         ])
-        .allow_origin(AllowOrigin::any())
+        .allow_origin(
+            allowed_origins
+                .iter()
+                .map(|o| o.parse().unwrap())
+                .collect::<Vec<_>>(),
+        )
+        .allow_credentials(true)
         .allow_headers([
             ACCEPT,
             ACCEPT_ENCODING,
@@ -233,21 +242,6 @@ async fn surreal_jwt(State(state): State<AppState>, request: Request, next: Next
         Ok(_) => next.run(request).await,
         Err(_) => StatusCode::UNAUTHORIZED.into_response(),
     }
-
-    // let token = request.headers().get("authorization");
-    // match token {
-    //     None => StatusCode::UNAUTHORIZED.into_response(),
-    //     Some(token) => {
-    //         let token = token.to_str().unwrap_or_default();
-    //         let token = token.strip_prefix("Bearer ").unwrap_or(token);
-    //
-    //         let token = surrealdb::opt::auth::Jwt::from(token);
-    //         match state.db.authenticate(token).await {
-    //             Ok(_) => { next.run(request).await },
-    //             Err(_) => { StatusCode::UNAUTHORIZED.into_response() }
-    //         }
-    //     }
-    // }
 }
 
 /// Rate limiting key extractor that uses IP + user_id for JWT-protected routes

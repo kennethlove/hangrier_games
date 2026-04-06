@@ -5,30 +5,36 @@ use crate::components::icons::eye_open::EyeOpenIcon;
 use crate::components::{Button, CreateGameButton, CreateGameForm, DeleteGameModal, GameDelete};
 use crate::env::APP_API_HOST;
 use crate::routes::Routes;
-use crate::storage::{use_persistent, AppState};
+use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_get_query, use_query_client, QueryResult, QueryState};
-use shared::{DisplayGame, GameStatus};
+use dioxus_query::prelude::{QueryResult, QueryState, use_get_query, use_query_client};
+use shared::{DisplayGame, GameStatus, ListDisplayGame, PaginationMetadata};
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct PaginatedGamesResponse {
+    pub games: Vec<ListDisplayGame>,
+    pub pagination: PaginationMetadata,
+}
 
 async fn fetch_games(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::AllGames) = keys.first() {
         let client = reqwest::Client::new();
-        let request = client.request(
-            reqwest::Method::GET,
-            format!("{}/api/games", APP_API_HOST),
-        ).bearer_auth(token);
+        let request = client
+            .request(
+                reqwest::Method::GET,
+                format!("{}/api/games?limit=20&offset=0", APP_API_HOST),
+            )
+            .bearer_auth(token);
 
-        match request.send().await{
+        match request.send().await {
             Ok(request) => {
-                if let Ok(response) = request.json::<Vec<DisplayGame>>().await {
-                    Ok(QueryValue::DisplayGames(response))
+                if let Ok(response) = request.json::<PaginatedGamesResponse>().await {
+                    Ok(QueryValue::PaginatedGames(response))
                 } else {
                     Err(QueryError::BadJson)
                 }
-            },
-            Err(_) => {
-                Err(QueryError::NoGames)
             }
+            Err(_) => Err(QueryError::NoGames),
         }
     } else {
         Err(QueryError::Unknown)
@@ -51,7 +57,8 @@ pub fn GamesList() -> Element {
     let token = storage.get().jwt.expect("No JWT found");
     let games_query = use_get_query(
         [QueryKey::AllGames, QueryKey::Games],
-        move |keys: Vec<QueryKey>| { fetch_games(keys, token.clone()) });
+        move |keys: Vec<QueryKey>| fetch_games(keys, token.clone()),
+    );
 
     rsx! {
         div {
@@ -73,7 +80,8 @@ pub fn GamesList() -> Element {
         }
 
         match games_query.result().value() {
-            QueryState::Settled(Ok(QueryValue::DisplayGames(games))) => {
+            QueryState::Settled(Ok(QueryValue::PaginatedGames(response))) => {
+                let games = response.games.clone();
                 rsx! {
                     if games.is_empty() {
                         NoGames {}
@@ -86,6 +94,17 @@ pub fn GamesList() -> Element {
                             "#,
                             for game in games {
                                 GameListMember { game: game.clone() }
+                            }
+                        }
+
+                        // Pagination controls
+                        if response.pagination.has_more {
+                            div {
+                                class: "flex justify-center gap-2 mt-4",
+                                LoadMoreButton {
+                                    current_offset: response.pagination.offset,
+                                    limit: response.pagination.limit,
+                                }
                             }
                         }
                     }
@@ -132,7 +151,7 @@ fn RefreshButton() -> Element {
 }
 
 #[component]
-pub fn GameListMember(game: DisplayGame) -> Element {
+pub fn GameListMember(game: ListDisplayGame) -> Element {
     let created_by = game.clone().created_by;
     let is_mine = game.clone().is_mine;
 
@@ -276,6 +295,27 @@ pub fn GameListMember(game: DisplayGame) -> Element {
                     }
                 }
             }
+        }
+    }
+}
+
+#[component]
+fn LoadMoreButton(current_offset: u32, limit: u32) -> Element {
+    let storage = use_persistent("hangry-games", AppState::default);
+    let token = storage.get().jwt.expect("No JWT found");
+    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+
+    let next_offset = current_offset + limit;
+
+    let onclick = move |_| {
+        // TODO: Implement actual loading - for now just refresh to get next page
+        client.invalidate_queries(&[QueryKey::Games]);
+    };
+
+    rsx! {
+        Button {
+            onclick,
+            "Load More Games"
         }
     }
 }

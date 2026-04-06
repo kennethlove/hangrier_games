@@ -122,3 +122,17 @@ pub struct ListDisplayGame {
     pub is_mine: bool,
     pub created_by: CreatedBy,
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct PaginationMetadata {
+    pub total: u32,
+    pub limit: u32,
+    pub offset: u32,
+    pub has_more: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct PaginatedGames {
+    pub games: Vec<ListDisplayGame>,
+    pub pagination: PaginationMetadata,
+}

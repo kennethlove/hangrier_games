@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::Debug;
-use tracing::{Event, Id};
 use tracing::field::Field;
 use tracing::span::Attributes;
+use tracing::{Event, Id};
 use tracing_subscriber::Layer;
-use tracing_subscriber::layer::{Context};
+use tracing_subscriber::layer::Context;
 
 pub struct HangryGamesLogLayer;
 
@@ -61,43 +61,57 @@ struct JsonVisitor<'a>(&'a mut BTreeMap<String, serde_json::Value>);
 
 impl tracing::field::Visit for JsonVisitor<'_> {
     fn record_f64(&mut self, field: &Field, value: f64) {
-        self.0.insert(field.name().to_owned(), serde_json::json!(value));
+        self.0
+            .insert(field.name().to_owned(), serde_json::json!(value));
     }
 
     fn record_i64(&mut self, field: &Field, value: i64) {
-        self.0.insert(field.name().to_owned(), serde_json::json!(value));
+        self.0
+            .insert(field.name().to_owned(), serde_json::json!(value));
     }
 
     fn record_u64(&mut self, field: &Field, value: u64) {
-        self.0.insert(field.name().to_owned(), serde_json::json!(value));
+        self.0
+            .insert(field.name().to_owned(), serde_json::json!(value));
     }
 
     fn record_i128(&mut self, field: &Field, value: i128) {
-        self.0.insert(field.name().to_owned(), serde_json::json!(value));
+        self.0
+            .insert(field.name().to_owned(), serde_json::json!(value));
     }
 
     fn record_u128(&mut self, field: &Field, value: u128) {
-        self.0.insert(field.name().to_owned(), serde_json::json!(value));
+        self.0
+            .insert(field.name().to_owned(), serde_json::json!(value));
     }
 
     fn record_bool(&mut self, field: &Field, value: bool) {
-        self.0.insert(field.name().to_owned(), serde_json::json!(value));
+        self.0
+            .insert(field.name().to_owned(), serde_json::json!(value));
     }
 
     fn record_str(&mut self, field: &Field, value: &str) {
-        self.0.insert(field.name().to_owned(), serde_json::json!(value));
+        self.0
+            .insert(field.name().to_owned(), serde_json::json!(value));
     }
 
     fn record_bytes(&mut self, field: &Field, value: &[u8]) {
-        self.0.insert(field.name().to_owned(), serde_json::json!(value));
+        self.0
+            .insert(field.name().to_owned(), serde_json::json!(value));
     }
 
     fn record_error(&mut self, field: &Field, value: &(dyn Error + 'static)) {
-        self.0.insert(field.name().to_owned(), serde_json::json!(format!("{:?}", value)));
+        self.0.insert(
+            field.name().to_owned(),
+            serde_json::json!(format!("{:?}", value)),
+        );
     }
 
     fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
-        self.0.insert(field.name().to_owned(), serde_json::json!(format!("{:?}", value)));
+        self.0.insert(
+            field.name().to_owned(),
+            serde_json::json!(format!("{:?}", value)),
+        );
     }
 }
 

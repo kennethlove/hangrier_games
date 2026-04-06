@@ -760,7 +760,7 @@ async fn tribute_logs(Path((game_identifier, day, tribute_identifier)): Path<(Uu
 async fn publish_game(Path(game_identifier): Path<Uuid>, state: State<AppState>) -> Result<StatusCode, AppError> {
     let game_identifier = game_identifier.to_string();
     let response = state.db
-        .query("UPDATE game SET private = false WHERE identifier = '$identifier'")
+        .query("UPDATE game SET private = false WHERE identifier = $identifier")
         .bind(("identifier", game_identifier))
         .await;
 
@@ -775,7 +775,7 @@ async fn publish_game(Path(game_identifier): Path<Uuid>, state: State<AppState>)
 async fn unpublish_game(Path(game_identifier): Path<Uuid>, state: State<AppState>) -> Result<StatusCode, AppError> {
     let game_identifier = game_identifier.to_string();
     let response = state.db
-        .query("UPDATE game SET private = true WHERE identifier = '$identifier'")
+        .query("UPDATE game SET private = true WHERE identifier = $identifier")
         .bind(("identifier", game_identifier))
         .await;
 

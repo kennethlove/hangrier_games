@@ -1010,9 +1010,8 @@ async fn publish_game(
     state: State<AppState>,
 ) -> Result<StatusCode, AppError> {
     let game_identifier = game_identifier.to_string();
-    let response = state
-        .db
-        .query("UPDATE game SET private = false WHERE identifier = '$identifier'")
+    let response = state.db
+        .query("UPDATE game SET private = false WHERE identifier = $identifier")
         .bind(("identifier", game_identifier))
         .await;
 
@@ -1029,9 +1028,8 @@ async fn unpublish_game(
     state: State<AppState>,
 ) -> Result<StatusCode, AppError> {
     let game_identifier = game_identifier.to_string();
-    let response = state
-        .db
-        .query("UPDATE game SET private = true WHERE identifier = '$identifier'")
+    let response = state.db
+        .query("UPDATE game SET private = true WHERE identifier = $identifier")
         .bind(("identifier", game_identifier))
         .await;
 

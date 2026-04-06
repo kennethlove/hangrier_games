@@ -52,6 +52,11 @@ build-css:
     npm install
     npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css
 
+# Build the web frontend (debug mode - faster)
+build-web-dev:
+    cd web
+    RUSTFLAGS='--cfg getrandom_backend="wasm_js"' dx build
+
 # Build the web frontend (CSS + Dioxus)
 build-web: build-css
     #!/usr/bin/env bash
@@ -71,6 +76,18 @@ build-prod: build-css
 
 # Quality recipes
 # ==============
+
+# Fast check - just verify compilation without building
+check-fast:
+    cargo check --workspace --all-targets
+
+# Check web crate only (faster for frontend-only changes)
+check-web:
+    cargo check --package web --target wasm32-unknown-unknown
+
+# Check api crate only (faster for backend-only changes)
+check-api:
+    cargo check --package api
 
 # Run tests for the game crate (workspace-wide tests may hang)
 test:

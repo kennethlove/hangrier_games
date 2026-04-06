@@ -9,7 +9,6 @@ use thiserror::Error;
 pub mod games;
 pub mod tributes;
 pub mod logging;
-pub mod messages;
 pub mod users;
 
 #[derive(Clone)]

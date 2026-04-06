@@ -15,13 +15,28 @@ use serde::{Deserialize, Serialize};
 use shared::{DisplayGame, EditGame, GameStatus};
 use shared::{GameArea, ListDisplayGame};
 use std::collections::HashMap;
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::LazyLock;
+use std::sync::RwLock;
 use strum::IntoEnumIterator;
 use surrealdb::engine::any::Any;
 use surrealdb::sql::Thing;
 use surrealdb::{RecordId, Surreal};
 use uuid::Uuid;
+
+/// Cache entry with TTL tracking
+struct CacheEntry {
+    game: Game,
+    cached_at: std::time::Instant,
+}
+
+/// In-memory game cache with 5-minute TTL using RwLock
+static GAME_CACHE: LazyLock<RwLock<HashMap<String, CacheEntry>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+/// Cache TTL duration (5 minutes)
+const CACHE_TTL_SECS: u64 = 300;
 
 pub static GAMES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
     Router::new()
@@ -548,17 +563,69 @@ pub async fn next_step(
 }
 
 async fn get_full_game(identifier: Uuid, db: &Surreal<Any>) -> Result<Json<Game>, AppError> {
-    let identifier = identifier.to_string();
-    let mut result = db
-        .query("SELECT * FROM fn::get_full_game($identifier)")
-        .bind(("identifier", identifier.clone()))
-        .await
-        .unwrap();
-    if let Some(game) = result.take(0).expect("No game found") {
+    let identifier_str = identifier.to_string();
+
+    // Check cache first
+    {
+        let cache = GAME_CACHE.read();
+        if let Some(entry) = cache.get(&identifier_str) {
+            let elapsed = entry.cached_at.elapsed().as_secs();
+            if elapsed < CACHE_TTL_SECS {
+                tracing::debug!("Cache hit for game {}", identifier_str);
+                return Ok(Json(entry.game.clone()));
+            }
+        }
+    }
+
+    // Cache miss or expired - acquire write lock and check again
+    tracing::debug!("Cache miss for game {}, fetching from DB", identifier_str);
+
+    let game = {
+        let mut cache = GAME_CACHE.write();
+
+        // Double-check after acquiring write lock (another request may have populated it)
+        if let Some(entry) = cache.get(&identifier_str) {
+            let elapsed = entry.cached_at.elapsed().as_secs();
+            if elapsed < CACHE_TTL_SECS {
+                tracing::debug!("Cache hit after lock for game {}", identifier_str);
+                return Ok(Json(entry.game.clone()));
+            }
+        }
+
+        // Fetch from database
+        let mut result = db
+            .query("SELECT * FROM fn::get_full_game($identifier)")
+            .bind(("identifier", identifier_str.clone()))
+            .await
+            .unwrap();
+        let game = result.take(0).expect("No game found");
+
+        // Store in cache if found
+        if let Some(ref g) = game {
+            cache.insert(
+                identifier_str,
+                CacheEntry {
+                    game: g.clone(),
+                    cached_at: std::time::Instant::now(),
+                },
+            );
+        }
+
+        game
+    };
+
+    if let Some(game) = game {
         Ok(Json::<Game>(game))
     } else {
         Err(AppError::NotFound("Failed to find game".into()))
     }
+}
+
+/// Invalidate cache for a game (call on updates)
+fn invalidate_game_cache(identifier: &str) {
+    let mut cache = GAME_CACHE.write();
+    cache.remove(identifier);
+    tracing::debug!("Cache invalidated for game {}", identifier);
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -671,6 +738,10 @@ async fn save_game(game: &Game, db: &Surreal<Any>) -> Result<Json<Game>, AppErro
             db.query("COMMIT")
                 .await
                 .expect("Failed to commit transaction");
+
+            // Invalidate cache after successful save
+            invalidate_game_cache(&game.identifier);
+
             Ok(Json(game))
         }
         Ok(None) => {

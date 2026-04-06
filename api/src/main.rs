@@ -1,24 +1,28 @@
 extern crate core;
 
+use api::AppState;
 use api::games::GAMES_ROUTER;
 use api::users::USERS_ROUTER;
-use api::AppState;
 use axum::error_handling::HandleErrorLayer;
 use axum::extract::{Request, State};
-use axum::http::header::{ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_MAX_AGE, AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE, EXPIRES};
 use axum::http::StatusCode;
+use axum::http::header::{
+    ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, ACCESS_CONTROL_ALLOW_METHODS,
+    ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_MAX_AGE, AUTHORIZATION, CACHE_CONTROL,
+    CONTENT_TYPE, EXPIRES,
+};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use axum::{middleware, BoxError, Json, Router};
+use axum::{BoxError, Json, Router, middleware};
 use base64_url::decode;
 use serde_json::Value;
 use std::env;
 use std::string::String;
 use std::sync::LazyLock;
 use std::time::Duration;
+use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
 use surrealdb::opt::auth::{Jwt, Root};
-use surrealdb::Surreal;
 use surrealdb_migrations::MigrationRunner;
 use time::OffsetDateTime;
 use tower::ServiceBuilder;
@@ -42,9 +46,13 @@ fn initialize_logging() {
     let _log_targets = tracing_subscriber::filter::Targets::new()
         .with_target("api::game", tracing::Level::INFO)
         .with_target("api::tribute", tracing::Level::INFO);
-    
+
     let production = env::var("PRODUCTION").unwrap_or("true".to_string());
-    let tracing_level = if production == "true" { "info" } else { "debug" };
+    let tracing_level = if production == "true" {
+        "info"
+    } else {
+        "debug"
+    };
 
     tracing_subscriber::registry()
         .with(
@@ -70,28 +78,45 @@ fn initialize_logging() {
         //     HangryGamesLogLayer
         // ).init();
         .init();
-        // .with(
-        //     HangryGamesLogLayer
-        //         .with_filter(log_targets)
-        // )
+    // .with(
+    //     HangryGamesLogLayer
+    //         .with_filter(log_targets)
+    // )
 }
 
 #[tokio::main]
 async fn main() {
     initialize_logging();
 
-    let app_state = AppState { db: Surreal::init() };
+    let app_state = AppState {
+        db: Surreal::init(),
+    };
 
-    app_state.db.connect(env::var("SURREAL_HOST").expect("No database host")).await.expect("Database not found");
+    app_state
+        .db
+        .connect(env::var("SURREAL_HOST").expect("No database host"))
+        .await
+        .expect("Database not found");
     tracing::debug!("connected to SurrealDB");
 
-    app_state.db.signin(Root {
-        username: env::var("SURREAL_USER").expect("No database user").as_str(),
-        password: env::var("SURREAL_PASS").expect("No database password").as_str(),
-    }).await.expect("Failed to authenticate to database");
+    app_state
+        .db
+        .signin(Root {
+            username: env::var("SURREAL_USER").expect("No database user").as_str(),
+            password: env::var("SURREAL_PASS")
+                .expect("No database password")
+                .as_str(),
+        })
+        .await
+        .expect("Failed to authenticate to database");
     tracing::debug!("authenticated to SurrealDB");
 
-    app_state.db.use_ns("hangry-games").use_db("games").await.expect("Failed to use database");
+    app_state
+        .db
+        .use_ns("hangry-games")
+        .use_db("games")
+        .await
+        .expect("Failed to use database");
     tracing::debug!("Using 'hangry-games' namespace and 'games' database");
 
     MigrationRunner::new(&app_state.db)
@@ -99,6 +124,13 @@ async fn main() {
         .await
         .expect("Failed to apply migrations");
     tracing::debug!("Applied migrations");
+
+    let allowed_origins: Vec<String> = std::env::var("ALLOWED_ORIGINS")
+        .unwrap_or_default()
+        .split(',')
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect();
 
     let cors_layer = CorsLayer::new()
         .allow_methods(vec![
@@ -109,7 +141,13 @@ async fn main() {
             "POST".parse().unwrap(),
             "PUT".parse().unwrap(),
         ])
-        .allow_origin(AllowOrigin::any())
+        .allow_origin(
+            allowed_origins
+                .iter()
+                .map(|o| o.parse().unwrap())
+                .collect::<Vec<_>>(),
+        )
+        .allow_credentials(true)
         .allow_headers([
             ACCEPT,
             ACCEPT_ENCODING,
@@ -124,13 +162,21 @@ async fn main() {
         ]);
 
     let api_routes = Router::new()
-        .nest("/games", GAMES_ROUTER.clone()
-            .layer(middleware::from_fn_with_state(app_state.clone(), surreal_jwt)))
+        .nest(
+            "/games",
+            GAMES_ROUTER.clone().layer(middleware::from_fn_with_state(
+                app_state.clone(),
+                surreal_jwt,
+            )),
+        )
         .nest("/users", USERS_ROUTER.clone());
 
     let router = Router::new()
         .nest("/api", api_routes)
-        .route("/", axum::routing::get(move || async { Json(env!("CARGO_PKG_VERSION")) }))
+        .route(
+            "/",
+            axum::routing::get(move || async { Json(env!("CARGO_PKG_VERSION")) }),
+        )
         .with_state(app_state)
         .layer(
             ServiceBuilder::new()
@@ -147,7 +193,7 @@ async fn main() {
                 .timeout(Duration::from_secs(10))
                 .layer(TraceLayer::new_for_http())
                 .layer(cors_layer)
-                .into_inner()
+                .into_inner(),
         );
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -155,11 +201,7 @@ async fn main() {
     axum::serve(listener, router).await.unwrap();
 }
 
-async fn surreal_jwt(
-    State(state): State<AppState>,
-    request: Request,
-    next: Next,
-) -> Response {
+async fn surreal_jwt(State(state): State<AppState>, request: Request, next: Next) -> Response {
     let token = match request
         .headers()
         .get(AUTHORIZATION)
@@ -176,9 +218,7 @@ async fn surreal_jwt(
     }
 
     let payload_base64 = token_parts[1].trim_start_matches("=");
-    let payload_bytes = decode(payload_base64)
-        .map_err(|_| ())
-        .unwrap_or_default();
+    let payload_bytes = decode(payload_base64).map_err(|_| ()).unwrap_or_default();
     let payload_str = String::from_utf8(payload_bytes).unwrap_or_default();
     let payload: Value = serde_json::from_str(&payload_str).unwrap_or_default();
 

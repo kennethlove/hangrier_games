@@ -24,6 +24,7 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
 uuid = { version = "1.16.0", features = ["v4"] }
 time = { version = "0.3.41", features = ["serde"] }
+validator = { version = "0.18", features = ["derive"] }
 
 [target.'cfg(windows)'.dependencies]
 surrealdb = { version = "2.2.1", features = ["kv-mem"] }

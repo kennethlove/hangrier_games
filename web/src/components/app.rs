@@ -1,11 +1,12 @@
+use crate::LoadingState;
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::components::game_edit::EditGameModal;
+use crate::components::icons::svg_icon::SpriteSheetLoader;
 use crate::components::loading_modal::LoadingModal;
 use crate::components::server_version::ServerVersion;
 use crate::components::tribute_edit::EditTributeModal;
 use crate::routes::Routes;
-use crate::storage::{use_persistent, AppState, Colorscheme};
-use crate::LoadingState;
+use crate::storage::{AppState, Colorscheme, use_persistent};
 use dioxus::prelude::*;
 use dioxus_query::prelude::use_init_query_client;
 use game::games::Game;
@@ -67,6 +68,9 @@ pub fn App() -> Element {
         document::Stylesheet {
             href: asset!("/assets/dist/main.css")
         }
+
+        // Load the SVG sprite sheet for lazy-loaded icons
+        SpriteSheetLoader {}
 
         div {
             class: "{theme_signal.read()}",

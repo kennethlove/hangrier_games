@@ -89,24 +89,32 @@ fn initialize_logging() {
 async fn main() {
     initialize_logging();
 
-    let db = Arc::new(Surreal::init());
+    let app_state = AppState {
+        db: Surreal::init(),
+    };
 
-    db.connect(env::var("SURREAL_HOST").expect("No database host"))
+    app_state
+        .db
+        .connect(env::var("SURREAL_HOST").expect("No database host"))
         .await
         .expect("Database not found");
     tracing::debug!("connected to SurrealDB");
 
-    db.signin(Root {
-        username: env::var("SURREAL_USER").expect("No database user").as_str(),
-        password: env::var("SURREAL_PASS")
-            .expect("No database password")
-            .as_str(),
-    })
-    .await
-    .expect("Failed to authenticate to database");
+    app_state
+        .db
+        .signin(Root {
+            username: env::var("SURREAL_USER").expect("No database user").as_str(),
+            password: env::var("SURREAL_PASS")
+                .expect("No database password")
+                .as_str(),
+        })
+        .await
+        .expect("Failed to authenticate to database");
     tracing::debug!("authenticated to SurrealDB");
 
-    db.use_ns("hangry-games")
+    app_state
+        .db
+        .use_ns("hangry-games")
         .use_db("games")
         .await
         .expect("Failed to use database");
@@ -118,7 +126,12 @@ async fn main() {
         .expect("Failed to apply migrations");
     tracing::debug!("Applied migrations");
 
-    let app_state = AppState { db };
+    let allowed_origins: Vec<String> = std::env::var("ALLOWED_ORIGINS")
+        .unwrap_or_default()
+        .split(',')
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect();
 
     let cors_layer = CorsLayer::new()
         .allow_methods(vec![
@@ -129,7 +142,13 @@ async fn main() {
             "POST".parse().unwrap(),
             "PUT".parse().unwrap(),
         ])
-        .allow_origin(AllowOrigin::any())
+        .allow_origin(
+            allowed_origins
+                .iter()
+                .map(|o| o.parse().unwrap())
+                .collect::<Vec<_>>(),
+        )
+        .allow_credentials(true)
         .allow_headers([
             ACCEPT,
             ACCEPT_ENCODING,

@@ -426,10 +426,10 @@ pub async fn game_update(
     state: State<AppState>,
     Json(payload): Json<EditGame>,
 ) -> Result<Json<Game>, AppError> {
-    // Validate input - fail fast if invalid
-    payload
-        .validate()
-        .map_err(|e| AppError::BadRequest(format!("Validation failed: {}", e)))?;
+    // Validate input
+    if let Err(e) = validator::Validate::validate(&payload) {
+        return Err(AppError::BadRequest(format!("Invalid input: {}", e)));
+    }
 
     let response = state
         .db

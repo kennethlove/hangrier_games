@@ -130,10 +130,10 @@ pub async fn tribute_update(
     state: State<AppState>,
     Json(payload): Json<EditTribute>,
 ) -> Result<StatusCode, AppError> {
-    // Validate input - fail fast if invalid
-    payload
-        .validate()
-        .map_err(|e| AppError::BadRequest(format!("Validation failed: {}", e)))?;
+    // Validate input
+    if let Err(e) = validator::Validate::validate(&payload) {
+        return Err(AppError::BadRequest(format!("Invalid input: {}", e)));
+    }
 
     let response = state
         .db

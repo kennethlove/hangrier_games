@@ -18,40 +18,26 @@ pub type DeleteTribute = String;
 pub struct DeleteGame(pub String, pub String); // Identifier, name
 
 /// Used to edit a tribute. Contains the identifier, name, avatar, and game identifier of the tribute.
-// TODO: Change to named fields for clarity
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize, Validate)]
-pub struct EditTribute {
-    pub identifier: String,
-    #[validate(length(
-        min = 1,
-        max = 50,
-        message = "Tribute name must be between 1 and 50 characters"
-    ))]
-    #[validate(regex(
-        path = "TRIBUTE_NAME_REGEX",
-        message = "Tribute name must contain only alphanumeric characters and spaces"
-    ))]
-    pub name: String,
-    pub avatar: String,
-    pub game_identifier: String,
-}
+pub struct EditTribute(
+    #[validate(length(min = 1, message = "Tribute identifier required"))]
+    pub String,
+    #[validate(length(min = 1, max = 50, message = "Name must be 1-50 characters"))]
+    pub String,
+    pub String,
+    pub String,
+);
 
 /// This struct is used to edit a game
 /// It contains the identifier, name, and a boolean indicating if the game is private
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Validate)]
-pub struct EditGame {
-    pub identifier: String,
-    #[validate(length(
-        min = 1,
-        max = 100,
-        message = "Game name must be between 1 and 100 characters"
-    ))]
-    pub name: String,
-    pub private: bool,
-}
-
-/// Regex for validating tribute names: alphanumeric + spaces only
-const TRIBUTE_NAME_REGEX: &str = r"^[a-zA-Z0-9 ]*$";
+pub struct EditGame(
+    #[validate(length(min = 1, message = "Game identifier required"))]
+    pub String,
+    #[validate(length(min = 1, max = 100, message = "Name must be 1-100 characters"))]
+    pub String,
+    pub bool,
+);
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct GameArea {

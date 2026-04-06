@@ -1,19 +1,20 @@
-use axum::http::StatusCode;
 use axum::Json;
+use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde_json::json;
-use surrealdb::engine::any::Any;
+use std::sync::Arc;
 use surrealdb::Surreal;
+use surrealdb::engine::any::Any;
 use thiserror::Error;
 
 pub mod games;
-pub mod tributes;
 pub mod logging;
+pub mod tributes;
 pub mod users;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub db: Surreal<Any>,
+    pub db: Arc<Surreal<Any>>,
 }
 
 #[derive(Debug, Error)]
@@ -48,4 +49,3 @@ impl IntoResponse for AppError {
         (status, Json(json!({ "error": error_message }))).into_response()
     }
 }
-

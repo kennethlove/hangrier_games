@@ -1,24 +1,29 @@
 extern crate core;
 
+use api::AppState;
 use api::games::GAMES_ROUTER;
 use api::users::USERS_ROUTER;
-use api::AppState;
 use axum::error_handling::HandleErrorLayer;
 use axum::extract::{Request, State};
-use axum::http::header::{ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_MAX_AGE, AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE, EXPIRES};
 use axum::http::StatusCode;
+use axum::http::header::{
+    ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, ACCESS_CONTROL_ALLOW_METHODS,
+    ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_MAX_AGE, AUTHORIZATION, CACHE_CONTROL,
+    CONTENT_TYPE, EXPIRES,
+};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use axum::{middleware, BoxError, Json, Router};
+use axum::{BoxError, Json, Router, middleware};
 use base64_url::decode;
 use serde_json::Value;
 use std::env;
 use std::string::String;
+use std::sync::Arc;
 use std::sync::LazyLock;
 use std::time::Duration;
+use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
 use surrealdb::opt::auth::{Jwt, Root};
-use surrealdb::Surreal;
 use surrealdb_migrations::MigrationRunner;
 use time::OffsetDateTime;
 use tower::ServiceBuilder;
@@ -27,7 +32,7 @@ use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-pub static DATABASE: LazyLock<Surreal<Any>> = LazyLock::new(Surreal::init);
+pub static DATABASE: LazyLock<Arc<Surreal<Any>>> = LazyLock::new(|| Arc::new(Surreal::init()));
 
 fn initialize_logging() {
     // a layer that logs events to stdout
@@ -42,9 +47,13 @@ fn initialize_logging() {
     let _log_targets = tracing_subscriber::filter::Targets::new()
         .with_target("api::game", tracing::Level::INFO)
         .with_target("api::tribute", tracing::Level::INFO);
-    
+
     let production = env::var("PRODUCTION").unwrap_or("true".to_string());
-    let tracing_level = if production == "true" { "info" } else { "debug" };
+    let tracing_level = if production == "true" {
+        "info"
+    } else {
+        "debug"
+    };
 
     tracing_subscriber::registry()
         .with(
@@ -70,35 +79,64 @@ fn initialize_logging() {
         //     HangryGamesLogLayer
         // ).init();
         .init();
-        // .with(
-        //     HangryGamesLogLayer
-        //         .with_filter(log_targets)
-        // )
+    // .with(
+    //     HangryGamesLogLayer
+    //         .with_filter(log_targets)
+    // )
 }
 
 #[tokio::main]
 async fn main() {
     initialize_logging();
 
-    let app_state = AppState { db: Surreal::init() };
+    let db = Arc::new(Surreal::init());
 
-    app_state.db.connect(env::var("SURREAL_HOST").expect("No database host")).await.expect("Database not found");
+    let host = env::var("SURREAL_HOST").map_err(|e| {
+        eprintln!("No database host: {}", e);
+        std::process::exit(1);
+    })?;
+    db.connect(&host).await.map_err(|e| {
+        eprintln!("Database not found: {}", e);
+        std::process::exit(1);
+    })?;
     tracing::debug!("connected to SurrealDB");
 
-    app_state.db.signin(Root {
-        username: env::var("SURREAL_USER").expect("No database user").as_str(),
-        password: env::var("SURREAL_PASS").expect("No database password").as_str(),
-    }).await.expect("Failed to authenticate to database");
+    let username = env::var("SURREAL_USER").map_err(|e| {
+        eprintln!("No database user: {}", e);
+        std::process::exit(1);
+    })?;
+    let password = env::var("SURREAL_PASS").map_err(|e| {
+        eprintln!("No database password: {}", e);
+        std::process::exit(1);
+    })?;
+
+    db.signin(Root {
+        username: username.as_str(),
+        password: password.as_str(),
+    })
+    .await
+    .map_err(|e| {
+        eprintln!("Failed to authenticate to database: {}", e);
+        std::process::exit(1);
+    })?;
     tracing::debug!("authenticated to SurrealDB");
 
-    app_state.db.use_ns("hangry-games").use_db("games").await.expect("Failed to use database");
+    db.use_ns("hangry-games")
+        .use_db("games")
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to use database: {}", e);
+            std::process::exit(1);
+        })?;
     tracing::debug!("Using 'hangry-games' namespace and 'games' database");
 
-    MigrationRunner::new(&app_state.db)
-        .up()
-        .await
-        .expect("Failed to apply migrations");
+    MigrationRunner::new(&*db).up().await.map_err(|e| {
+        eprintln!("Failed to apply migrations: {}", e);
+        std::process::exit(1);
+    })?;
     tracing::debug!("Applied migrations");
+
+    let app_state = AppState { db };
 
     let cors_layer = CorsLayer::new()
         .allow_methods(vec![
@@ -124,13 +162,21 @@ async fn main() {
         ]);
 
     let api_routes = Router::new()
-        .nest("/games", GAMES_ROUTER.clone()
-            .layer(middleware::from_fn_with_state(app_state.clone(), surreal_jwt)))
+        .nest(
+            "/games",
+            GAMES_ROUTER.clone().layer(middleware::from_fn_with_state(
+                app_state.clone(),
+                surreal_jwt,
+            )),
+        )
         .nest("/users", USERS_ROUTER.clone());
 
     let router = Router::new()
         .nest("/api", api_routes)
-        .route("/", axum::routing::get(move || async { Json(env!("CARGO_PKG_VERSION")) }))
+        .route(
+            "/",
+            axum::routing::get(move || async { Json(env!("CARGO_PKG_VERSION")) }),
+        )
         .with_state(app_state)
         .layer(
             ServiceBuilder::new()
@@ -147,7 +193,7 @@ async fn main() {
                 .timeout(Duration::from_secs(10))
                 .layer(TraceLayer::new_for_http())
                 .layer(cors_layer)
-                .into_inner()
+                .into_inner(),
         );
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -155,11 +201,7 @@ async fn main() {
     axum::serve(listener, router).await.unwrap();
 }
 
-async fn surreal_jwt(
-    State(state): State<AppState>,
-    request: Request,
-    next: Next,
-) -> Response {
+async fn surreal_jwt(State(state): State<AppState>, request: Request, next: Next) -> Response {
     let token = match request
         .headers()
         .get(AUTHORIZATION)
@@ -176,9 +218,7 @@ async fn surreal_jwt(
     }
 
     let payload_base64 = token_parts[1].trim_start_matches("=");
-    let payload_bytes = decode(payload_base64)
-        .map_err(|_| ())
-        .unwrap_or_default();
+    let payload_bytes = decode(payload_base64).map_err(|_| ()).unwrap_or_default();
     let payload_str = String::from_utf8(payload_bytes).unwrap_or_default();
     let payload: Value = serde_json::from_str(&payload_str).unwrap_or_default();
 
@@ -193,19 +233,4 @@ async fn surreal_jwt(
         Ok(_) => next.run(request).await,
         Err(_) => StatusCode::UNAUTHORIZED.into_response(),
     }
-
-    // let token = request.headers().get("authorization");
-    // match token {
-    //     None => StatusCode::UNAUTHORIZED.into_response(),
-    //     Some(token) => {
-    //         let token = token.to_str().unwrap_or_default();
-    //         let token = token.strip_prefix("Bearer ").unwrap_or(token);
-    //
-    //         let token = surrealdb::opt::auth::Jwt::from(token);
-    //         match state.db.authenticate(token).await {
-    //             Ok(_) => { next.run(request).await },
-    //             Err(_) => { StatusCode::UNAUTHORIZED.into_response() }
-    //         }
-    //     }
-    // }
 }

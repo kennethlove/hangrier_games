@@ -185,6 +185,23 @@ async fn main() {
             "/",
             axum::routing::get(move || async { Json(env!("CARGO_PKG_VERSION")) }),
         )
+        .route(
+            "/health",
+            axum::routing::get(
+                axum::extract::State::<AppState>,
+                |State(state)| async move {
+                    let db_status = match state.db.health().await {
+                        Ok(_) => "connected",
+                        Err(_) => "disconnected",
+                    };
+                    Json(serde_json::json!({
+                        "status": "ok",
+                        "version": env!("CARGO_PKG_VERSION"),
+                        "db": db_status
+                    }))
+                },
+            ),
+        )
         .with_state(app_state)
         .layer(
             ServiceBuilder::new()

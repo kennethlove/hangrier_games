@@ -47,7 +47,9 @@ pub async fn summarize(log: &str) -> Result<String, AnnouncerError> {
     }
 }
 
-pub async fn summarize_stream(log: &str) -> Pin<Box<dyn Stream<Item = Result<String, String>> + Send>> {
+pub async fn summarize_stream(
+    log: &str,
+) -> Pin<Box<dyn Stream<Item = Result<String, String>> + Send>> {
     let log_prompt = prompt(log);
     let ollama = Ollama::default();
 

@@ -5,6 +5,7 @@ use api::auth::AUTH_ROUTER;
 use api::games::GAMES_ROUTER;
 use api::users::USERS_ROUTER;
 use axum::error_handling::HandleErrorLayer;
+use axum::extract::connect_info::ConnectInfo;
 use axum::extract::{Request, State};
 use axum::http::StatusCode;
 use axum::http::header::{
@@ -301,5 +302,3 @@ impl KeyExtractor for CompoundKeyExtractor {
         Ok(hasher.finish())
     }
 }
-
-use axum::extract::connect_info::ConnectInfo;

@@ -187,3 +187,40 @@ pub struct PaginatedGames {
     pub games: Vec<ListDisplayGame>,
     pub pagination: PaginationMetadata,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_short_username_validation() {
+        let user = RegistrationUser {
+            username: "ab".to_string(), // Too short (min 3)
+            password: "password123".to_string(),
+        };
+        let result = user.validate();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_invalid_uuid_validation() {
+        let tribute = EditTribute {
+            identifier: "not-a-uuid".to_string(),
+            name: "Test Tribute".to_string(),
+            avatar: "avatar.png".to_string(),
+            game_identifier: "also-not-a-uuid".to_string(),
+        };
+        let result = tribute.validate();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_password_max_length() {
+        let user = RegistrationUser {
+            username: "testuser".to_string(),
+            password: "a".repeat(73), // Exceeds max of 72
+        };
+        let result = user.validate();
+        assert!(result.is_err());
+    }
+}

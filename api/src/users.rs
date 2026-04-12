@@ -155,6 +155,6 @@ async fn user_authenticate(
             let token_pair = create_token_pair(&state, jwt, user.id, user.username).await?;
             Ok(Json(token_pair))
         }
-        Err(_) => Err(AppError::DbError("Failed to authenticate user".to_string())),
+        Err(_) => Err(AppError::Unauthorized("Invalid credentials".to_string())),
     }
 }

@@ -5,6 +5,7 @@ use api::auth::AUTH_ROUTER;
 use api::games::GAMES_ROUTER;
 use api::users::USERS_ROUTER;
 use axum::error_handling::HandleErrorLayer;
+use axum::extract::connect_info::ConnectInfo;
 use axum::extract::{Request, State};
 use axum::http::StatusCode;
 use axum::http::header::{
@@ -30,8 +31,9 @@ use surrealdb::opt::auth::{Jwt, Root};
 use surrealdb_migrations::MigrationRunner;
 use time::OffsetDateTime;
 use tower::ServiceBuilder;
+use tower_governor::GovernorLayer;
+use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::KeyExtractor;
-use tower_governor::{GovernorConfigBuilder, GovernorLayer};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
@@ -91,54 +93,33 @@ fn initialize_logging() {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     initialize_logging();
 
-    let app_state = AppState {
-        db: Surreal::init(),
-    };
+    let db = Arc::new(Surreal::init());
 
-    app_state
-        .db
-        .connect(env::var("SURREAL_HOST").expect("No database host"))
+    db.connect(env::var("SURREAL_HOST").expect("No database host"))
         .await
         .expect("Database not found");
     tracing::debug!("connected to SurrealDB");
 
-    app_state
-        .db
-        .signin(Root {
-            username: env::var("SURREAL_USER").expect("No database user").as_str(),
-            password: env::var("SURREAL_PASS")
-                .expect("No database password")
-                .as_str(),
-        })
-        .await
-        .expect("Failed to authenticate to database");
+    db.signin(Root {
+        username: env::var("SURREAL_USER").expect("No database user").as_str(),
+        password: env::var("SURREAL_PASS")
+            .expect("No database password")
+            .as_str(),
+    })
+    .await
+    .expect("Failed to authenticate to database");
     tracing::debug!("authenticated to SurrealDB");
 
-    app_state
-        .db
-        .use_ns("hangry-games")
+    db.use_ns("hangry-games")
         .use_db("games")
         .await
         .expect("Failed to use database");
     tracing::debug!("Using 'hangry-games' namespace and 'games' database");
 
-    MigrationRunner::new(&app_state.db)
-        .up()
-        .await
-        .map_err(|e| {
-            eprintln!("Failed to apply migrations: {}", e);
-            std::process::exit(1);
-        })
-        .unwrap();
-    tracing::debug!("Applied migrations");
-
-    let allowed_origins = vec![
-        "http://localhost:8080".to_string(),
-        "http://127.0.0.1:8080".to_string(),
-    ];
+    let allowed_origins = vec!["http://localhost:8080", "http://127.0.0.1:8080"];
 
     let cors_layer = CorsLayer::new()
         .allow_methods(vec![
@@ -196,20 +177,17 @@ async fn main() {
         )
         .route(
             "/health",
-            axum::routing::get(
-                axum::extract::State::<AppState>,
-                |State(state)| async move {
-                    let db_status = match state.db.health().await {
-                        Ok(_) => "connected",
-                        Err(_) => "disconnected",
-                    };
-                    Json(serde_json::json!({
-                        "status": "ok",
-                        "version": env!("CARGO_PKG_VERSION"),
-                        "db": db_status
-                    }))
-                },
-            ),
+            axum::routing::get(|State(state): State<AppState>| async move {
+                let db_status = match state.db.health().await {
+                    Ok(_) => "connected",
+                    Err(_) => "disconnected",
+                };
+                Json(serde_json::json!({
+                    "status": "ok",
+                    "version": env!("CARGO_PKG_VERSION"),
+                    "db": db_status
+                }))
+            }),
         )
         .with_state(app_state)
         .layer(
@@ -231,9 +209,16 @@ async fn main() {
                 .into_inner(),
         );
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    tracing::info!("listening on {}", listener.local_addr().unwrap());
-    axum::serve(listener, router).await.unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+        .await
+        .expect("Failed to bind to 0.0.0.0:3000");
+    tracing::info!(
+        "listening on {}",
+        listener.local_addr().expect("Failed to get local address")
+    );
+    axum::serve(listener, router).await.expect("Server error");
+
+    Ok(())
 }
 
 async fn surreal_jwt(State(state): State<AppState>, request: Request, next: Next) -> Response {
@@ -285,9 +270,9 @@ impl KeyExtractor for CompoundKeyExtractor {
         // Extract IP from remote_addr
         let ip = request
             .extensions()
-            .get::<axum::extract::connect_info::Connected<SeverConnectionInfo>>()
-            .and_then(|c| c.remote_addr().ip().to_string().as_str())
-            .unwrap_or("unknown");
+            .get::<axum::extract::connect_info::ConnectInfo<std::net::SocketAddr>>()
+            .map(|ci| ci.0.ip().to_string())
+            .unwrap_or_else(|| "unknown".to_string());
 
         // Try to extract user_id from JWT payload in Authorization header
         let user_id = request
@@ -307,8 +292,8 @@ impl KeyExtractor for CompoundKeyExtractor {
                 }
             })
             .and_then(|payload_str| serde_json::from_str::<Value>(&payload_str).ok())
-            .and_then(|payload| payload["sub"].as_str())
-            .unwrap_or("");
+            .and_then(|payload| payload["sub"].as_str().map(String::from))
+            .unwrap_or_default();
 
         // Combine IP and user_id into a single key using hash
         let mut hasher = DefaultHasher::new();
@@ -317,6 +302,3 @@ impl KeyExtractor for CompoundKeyExtractor {
         Ok(hasher.finish())
     }
 }
-
-use axum::extract::connect_info::Connected;
-use axum::extract::connect_info::SeverConnectionInfo;

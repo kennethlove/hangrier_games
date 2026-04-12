@@ -4,8 +4,6 @@ use api::AppState;
 use api::auth::AUTH_ROUTER;
 use api::games::GAMES_ROUTER;
 use api::users::USERS_ROUTER;
-use axum::error_handling::HandleErrorLayer;
-use axum::extract::connect_info::ConnectInfo;
 use axum::extract::{Request, State};
 use axum::http::StatusCode;
 use axum::http::header::{
@@ -15,7 +13,7 @@ use axum::http::header::{
 };
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use axum::{BoxError, Json, Router, middleware};
+use axum::{Json, Router, middleware};
 use base64_url::decode;
 use serde_json::Value;
 use std::collections::hash_map::DefaultHasher;
@@ -24,7 +22,6 @@ use std::hash::{Hash, Hasher};
 use std::string::String;
 use std::sync::Arc;
 use std::sync::LazyLock;
-use std::time::Duration;
 use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
 use surrealdb::opt::auth::{Jwt, Root};
@@ -34,7 +31,7 @@ use tower::ServiceBuilder;
 use tower_governor::GovernorLayer;
 use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::KeyExtractor;
-use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -96,45 +93,57 @@ fn initialize_logging() {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     initialize_logging();
 
-    let db = Arc::new(Surreal::init());
-
-    db.connect(env::var("SURREAL_HOST").expect("No database host"))
-        .await
-        .expect("Database not found");
+    let surreal_host =
+        env::var("SURREAL_HOST").map_err(|_| "SURREAL_HOST environment variable not set")?;
+    let db = Arc::new(
+        surrealdb::engine::any::connect(surreal_host)
+            .await
+            .map_err(|e| format!("Failed to connect to database: {}", e))?,
+    );
     tracing::debug!("connected to SurrealDB");
 
+    let surreal_user =
+        env::var("SURREAL_USER").map_err(|_| "SURREAL_USER environment variable not set")?;
+    let surreal_pass =
+        env::var("SURREAL_PASS").map_err(|_| "SURREAL_PASS environment variable not set")?;
+
     db.signin(Root {
-        username: env::var("SURREAL_USER").expect("No database user").as_str(),
-        password: env::var("SURREAL_PASS")
-            .expect("No database password")
-            .as_str(),
+        username: &surreal_user,
+        password: &surreal_pass,
     })
     .await
-    .expect("Failed to authenticate to database");
+    .map_err(|e| format!("Failed to authenticate to database: {}", e))?;
     tracing::debug!("authenticated to SurrealDB");
 
     db.use_ns("hangry-games")
         .use_db("games")
         .await
-        .expect("Failed to use database");
+        .map_err(|e| format!("Failed to use database: {}", e))?;
     tracing::debug!("Using 'hangry-games' namespace and 'games' database");
+
+    MigrationRunner::new(&db)
+        .up()
+        .await
+        .map_err(|e| format!("Failed to apply migrations: {}", e))?;
+    tracing::debug!("Applied migrations");
 
     let allowed_origins = vec!["http://localhost:8080", "http://127.0.0.1:8080"];
 
+    // These are safe to unwrap as they are static HTTP method strings that are guaranteed valid
     let cors_layer = CorsLayer::new()
         .allow_methods(vec![
-            "DELETE".parse().unwrap(),
-            "GET".parse().unwrap(),
-            "HEAD".parse().unwrap(),
-            "OPTIONS".parse().unwrap(),
-            "POST".parse().unwrap(),
-            "PUT".parse().unwrap(),
+            "DELETE".parse()?,
+            "GET".parse()?,
+            "HEAD".parse()?,
+            "OPTIONS".parse()?,
+            "POST".parse()?,
+            "PUT".parse()?,
         ])
         .allow_origin(
             allowed_origins
                 .iter()
-                .map(|o| o.parse().unwrap())
-                .collect::<Vec<_>>(),
+                .map(|o| o.parse())
+                .collect::<Result<Vec<_>, _>>()?,
         )
         .allow_credentials(true)
         .allow_headers([
@@ -150,13 +159,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             EXPIRES,
         ]);
 
-    let governor_config = GovernorConfigBuilder::default()
-        .requests_per_period(100)
-        .period(std::time::Duration::from_secs(60))
-        .burst_size(50)
-        .key_extractor(CompoundKeyExtractor)
-        .finish()
-        .expect("Failed to build GovernorConfig");
+    let governor_config = Arc::new(
+        GovernorConfigBuilder::default()
+            .per_second(2) // Allow 1 request every 0.5 seconds (2 per second, ~120 per minute)
+            .burst_size(50)
+            .key_extractor(CompoundKeyExtractor)
+            .finish()
+            .ok_or("Failed to build GovernorConfig")?,
+    );
+
+    let app_state = AppState { db: db.clone() };
 
     let api_routes = Router::new()
         .nest(
@@ -192,17 +204,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_state(app_state)
         .layer(
             ServiceBuilder::new()
-                .layer(HandleErrorLayer::new(|error: BoxError| async move {
-                    if error.is::<tower::timeout::error::Elapsed>() {
-                        Ok(StatusCode::REQUEST_TIMEOUT)
-                    } else {
-                        Err((
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            format!("Unhandled error: {error}"),
-                        ))
-                    }
-                }))
-                .timeout(Duration::from_secs(10))
                 .layer(TraceLayer::new_for_http())
                 .layer(GovernorLayer::new(governor_config))
                 .layer(cors_layer)
@@ -211,12 +212,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
         .await
-        .expect("Failed to bind to 0.0.0.0:3000");
-    tracing::info!(
-        "listening on {}",
-        listener.local_addr().expect("Failed to get local address")
-    );
-    axum::serve(listener, router).await.expect("Server error");
+        .map_err(|e| format!("Failed to bind to 0.0.0.0:3000: {}", e))?;
+    let local_addr = listener
+        .local_addr()
+        .map_err(|e| format!("Failed to get local address: {}", e))?;
+    tracing::info!("listening on {}", local_addr);
+
+    axum::serve(listener, router)
+        .await
+        .map_err(|e| format!("Server error: {}", e))?;
 
     Ok(())
 }

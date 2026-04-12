@@ -4,21 +4,17 @@ use axum::extract::State;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
+use shared::RegistrationUser;
 use std::sync::LazyLock;
 use surrealdb::opt::auth::Record;
 use surrealdb::sql::Thing;
+use validator::Validate;
 
 pub static USERS_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
     Router::new()
         .route("/", get(session).post(user_create))
         .route("/authenticate", post(user_authenticate))
 });
-
-#[derive(Serialize, Deserialize, Debug)]
-struct Params {
-    username: String,
-    password: String,
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct JwtResponse {
@@ -61,8 +57,13 @@ async fn session(state: State<AppState>) -> Result<Json<String>, AppError> {
 
 async fn user_create(
     state: State<AppState>,
-    Json(payload): Json<Params>,
+    Json(payload): Json<RegistrationUser>,
 ) -> Result<Json<TokenResponse>, AppError> {
+    // Validate the request
+    payload
+        .validate()
+        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+
     let username = payload.username;
     let password = payload.password;
 
@@ -72,7 +73,7 @@ async fn user_create(
             access: "user",
             namespace: "hangry-games",
             database: "games",
-            params: Params {
+            params: RegistrationUser {
                 username: username.clone(),
                 password: password.clone(),
             },
@@ -108,8 +109,13 @@ async fn user_create(
 
 async fn user_authenticate(
     state: State<AppState>,
-    Json(payload): Json<Params>,
+    Json(payload): Json<RegistrationUser>,
 ) -> Result<Json<TokenResponse>, AppError> {
+    // Validate the request
+    payload
+        .validate()
+        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+
     let username = payload.username;
     let password = payload.password;
 
@@ -119,7 +125,7 @@ async fn user_authenticate(
             access: "user",
             namespace: "hangry-games",
             database: "games",
-            params: Params {
+            params: RegistrationUser {
                 username: username.clone(),
                 password: password.clone(),
             },

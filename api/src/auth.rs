@@ -8,6 +8,7 @@ use std::sync::LazyLock;
 use surrealdb::sql::Thing;
 use time::OffsetDateTime;
 use uuid::Uuid;
+use validator::Validate;
 
 // JWT secret from schemas/users.surql
 const JWT_SECRET: &str =
@@ -21,13 +22,16 @@ pub struct RefreshToken {
     pub token: String,
     pub user_id: Thing,
     pub username: String,
-    pub expires_at: String,
+    #[serde(with = "time::serde::rfc3339")]
+    pub expires_at: OffsetDateTime,
     pub revoked: bool,
-    pub created_at: String,
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Validate)]
 pub struct RefreshTokenRequest {
+    #[validate(length(min = 36, max = 36, message = "Invalid refresh token format"))]
     pub refresh_token: String,
 }
 
@@ -48,9 +52,9 @@ impl RefreshToken {
             token,
             user_id,
             username,
-            expires_at: expires_at.to_string(),
+            expires_at,
             revoked: false,
-            created_at: now.to_string(),
+            created_at: now,
         }
     }
 
@@ -61,14 +65,7 @@ impl RefreshToken {
         }
 
         let now = OffsetDateTime::now_utc();
-        if let Ok(expires_at) = OffsetDateTime::parse(
-            &self.expires_at,
-            &time::format_description::well_known::Rfc3339,
-        ) {
-            expires_at > now
-        } else {
-            false
-        }
+        self.expires_at > now
     }
 }
 
@@ -119,11 +116,7 @@ pub async fn revoke_refresh_token(state: &AppState, token: &str) -> Result<(), A
 }
 
 /// Generate a new access token for a user
-async fn generate_access_token(
-    _state: &AppState,
-    user_id: &Thing,
-    username: &str,
-) -> Result<String, AppError> {
+fn generate_access_token(user_id: &Thing, username: &str) -> Result<String, AppError> {
     // Create JWT claims matching SurrealDB's format
     let now = OffsetDateTime::now_utc().unix_timestamp();
     let exp = now + 3600; // 1 hour expiration
@@ -157,6 +150,11 @@ async fn refresh_token(
     State(state): State<AppState>,
     Json(payload): Json<RefreshTokenRequest>,
 ) -> Result<Json<TokenResponse>, AppError> {
+    // Validate the request
+    payload
+        .validate()
+        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+
     // Retrieve the refresh token from the database
     let token = get_refresh_token(&state, &payload.refresh_token).await?;
 
@@ -175,10 +173,73 @@ async fn refresh_token(
     store_refresh_token(&state, &new_refresh_token).await?;
 
     // Generate new access token
-    let access_token = generate_access_token(&state, &token.user_id, &token.username).await?;
+    let access_token = generate_access_token(&token.user_id, &token.username)?;
 
     Ok(Json(TokenResponse {
         access_token,
         refresh_token: new_refresh_token.token,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_refresh_token_generation() {
+        let user_id = Thing::from(("user".to_string(), "test123".to_string()));
+        let username = "testuser".to_string();
+
+        let token = RefreshToken::new(user_id.clone(), username.clone());
+
+        assert_eq!(token.user_id, user_id);
+        assert_eq!(token.username, username);
+        assert_eq!(token.token.len(), 36); // UUID v4 length
+        assert!(!token.revoked);
+        assert!(token.expires_at > OffsetDateTime::now_utc());
+    }
+
+    #[test]
+    fn test_expired_token_invalid() {
+        let user_id = Thing::from(("user".to_string(), "test123".to_string()));
+        let username = "testuser".to_string();
+        let token_str = Uuid::new_v4().to_string();
+
+        // Create a token that expired 1 day ago
+        let now = OffsetDateTime::now_utc();
+        let expired = now - time::Duration::days(1);
+
+        let token = RefreshToken {
+            token: token_str,
+            user_id,
+            username,
+            expires_at: expired,
+            revoked: false,
+            created_at: now - time::Duration::days(8),
+        };
+
+        assert!(!token.is_valid());
+    }
+
+    #[test]
+    fn test_revoked_token_invalid() {
+        let user_id = Thing::from(("user".to_string(), "test123".to_string()));
+        let username = "testuser".to_string();
+        let token_str = Uuid::new_v4().to_string();
+
+        // Create a token that's not expired but is revoked
+        let now = OffsetDateTime::now_utc();
+        let expires_at = now + time::Duration::days(7);
+
+        let token = RefreshToken {
+            token: token_str,
+            user_id,
+            username,
+            expires_at,
+            revoked: true,
+            created_at: now,
+        };
+
+        assert!(!token.is_valid());
+    }
 }

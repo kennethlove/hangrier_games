@@ -34,6 +34,8 @@ pub enum AppError {
     DbError(String),
     #[error("Invalid status")]
     InvalidStatus(String),
+    #[error("Validation error")]
+    ValidationError(String),
 }
 
 impl IntoResponse for AppError {
@@ -46,6 +48,7 @@ impl IntoResponse for AppError {
             AppError::GameFull(message) => (StatusCode::BAD_REQUEST, message),
             AppError::DbError(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
             AppError::InvalidStatus(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
+            AppError::ValidationError(message) => (StatusCode::BAD_REQUEST, message),
         };
         (status, Json(json!({ "error": error_message }))).into_response()
     }

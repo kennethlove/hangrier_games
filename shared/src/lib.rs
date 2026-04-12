@@ -18,22 +18,13 @@ pub type DeleteTribute = String;
 pub struct DeleteGame(pub String, pub String); // Identifier, name
 
 /// Used to edit a tribute. Contains the identifier, name, avatar, and game identifier of the tribute.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize, Validate)]
-pub struct EditTribute(
-    #[validate(length(min = 1, message = "Tribute identifier required"))] pub String,
-    #[validate(length(min = 1, max = 50, message = "Name must be 1-50 characters"))] pub String,
-    pub String,
-    pub String,
-);
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct EditTribute(pub String, pub String, pub String, pub String);
 
 /// This struct is used to edit a game
 /// It contains the identifier, name, and a boolean indicating if the game is private
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Validate)]
-pub struct EditGame(
-    #[validate(length(min = 1, message = "Game identifier required"))] pub String,
-    #[validate(length(min = 1, max = 100, message = "Name must be 1-100 characters"))] pub String,
-    pub bool,
-);
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+pub struct EditGame(pub String, pub String, pub bool);
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct GameArea {
@@ -48,9 +39,11 @@ pub struct TributeKey {
     pub district: u32,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize, Validate)]
 pub struct RegistrationUser {
+    #[validate(length(min = 3, max = 50, message = "Username must be 3-50 characters"))]
     pub username: String,
+    #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
     pub password: String,
 }
 

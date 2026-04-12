@@ -37,7 +37,7 @@ pub struct Game {
     pub areas: Vec<AreaDetails>,
     #[serde(default)]
     pub tributes: Vec<Tribute>,
-    pub private: bool
+    pub private: bool,
 }
 
 impl Default for Game {
@@ -56,7 +56,7 @@ impl Default for Game {
             day: None,
             areas: vec![],
             tributes: vec![],
-            private: true
+            private: true,
         }
     }
 }
@@ -120,23 +120,19 @@ impl Game {
 
     /// Returns a random open area from the game.
     fn random_open_area(&self) -> Option<AreaDetails> {
-        self.open_areas()
-            .choose(&mut rand::rng())
-            .cloned()
+        self.open_areas().choose(&mut rand::rng()).cloned()
     }
 
     /// Returns a vec of open areas.
     fn open_areas(&self) -> Vec<AreaDetails> {
-        self.areas.iter()
-            .filter(|a| a.is_open())
-            .cloned()
-            .collect()
+        self.areas.iter().filter(|a| a.is_open()).cloned().collect()
     }
 
     /// Returns a vec of closed areas.
     #[allow(dead_code)]
     fn closed_areas(&self) -> Vec<AreaDetails> {
-        self.areas.iter()
+        self.areas
+            .iter()
             .filter(|a| !a.is_open())
             .cloned()
             .collect()
@@ -148,14 +144,16 @@ impl Game {
         if let Some(winner) = self.winner() {
             add_game_message(
                 self.identifier.as_str(),
-                format!("{}", GameOutput::TributeWins(winner.name.as_str()))
-            ).expect("Failed to add winner message");
+                format!("{}", GameOutput::TributeWins(winner.name.as_str())),
+            )
+            .expect("Failed to add winner message");
             self.end();
         } else if self.living_tributes().is_empty() {
             add_game_message(
                 self.identifier.as_str(),
-                format!("{}", GameOutput::NoOneWins)
-            ).expect("Failed to add no winner message");
+                format!("{}", GameOutput::NoOneWins),
+            )
+            .expect("Failed to add no winner message");
             self.end();
         }
     }
@@ -186,39 +184,51 @@ impl Game {
                     add_game_message(
                         self.identifier.as_str(),
                         format!("{}", GameOutput::FirstDayStart),
-                    ).expect("Failed to add first day message");
+                    )
+                    .expect("Failed to add first day message");
                 }
                 3 => {
                     add_game_message(
                         self.identifier.as_str(),
                         format!("{}", GameOutput::FeastDayStart),
-                    ).expect("Failed to add feast day message");
-                },
+                    )
+                    .expect("Failed to add feast day message");
+                }
                 _ => {}
             }
             add_game_message(
                 self.identifier.as_str(),
                 format!("{}", GameOutput::GameDayStart(self.clone().day.unwrap())),
-            ).expect("Failed to add day start message");
+            )
+            .expect("Failed to add day start message");
         } else {
             add_game_message(
                 self.identifier.as_str(),
                 format!("{}", GameOutput::GameNightStart(self.day.unwrap())),
-            ).expect("Failed to add night start message");
+            )
+            .expect("Failed to add night start message");
         }
 
         add_game_message(
             self.identifier.as_str(),
-            format!("{}", GameOutput::TributesLeft(self.living_tributes().len() as u32))
-        ).expect("");
+            format!(
+                "{}",
+                GameOutput::TributesLeft(self.living_tributes().len() as u32)
+            ),
+        )
+        .expect("");
     }
 
     /// Announces the end of a cycle
     fn announce_cycle_end(&self, day: bool) {
         add_game_message(
             self.identifier.as_str(),
-            format!("{}", GameOutput::TributesLeft(self.living_tributes().len() as u32)),
-        ).expect("Failed to add tributes left message");
+            format!(
+                "{}",
+                GameOutput::TributesLeft(self.living_tributes().len() as u32)
+            ),
+        )
+        .expect("Failed to add tributes left message");
 
         // Announce tribute deaths
         for tribute in self.recently_dead_tributes() {
@@ -226,19 +236,22 @@ impl Game {
             add_game_message(
                 self.identifier.as_str(),
                 format!("{}", GameOutput::DeathAnnouncement(name)),
-            ).expect("Failed to add tribute death message");
+            )
+            .expect("Failed to add tribute death message");
         }
 
         if day {
             add_game_message(
                 self.identifier.as_str(),
                 format!("{}", GameOutput::GameDayEnd(self.clone().day.unwrap())),
-            ).expect("Failed to add day end message");
+            )
+            .expect("Failed to add day end message");
         } else {
             add_game_message(
                 self.identifier.as_str(),
                 format!("{}", GameOutput::GameNightEnd(self.clone().day.unwrap())),
-            ).expect("Failed to add night end message");
+            )
+            .expect("Failed to add night end message");
         }
     }
 
@@ -272,16 +285,21 @@ impl Game {
                 add_area_message(
                     area_name.as_str(),
                     &self.identifier,
-                    format!("{}", GameOutput::AreaClose(area_name.as_str()))
-                ).expect("Failed to add area close message");
+                    format!("{}", GameOutput::AreaClose(area_name.as_str())),
+                )
+                .expect("Failed to add area close message");
 
                 for event in &area_details.events {
                     let event_name = event.to_string();
                     add_area_message(
                         area_name.as_str(),
                         &self.identifier,
-                        format!("{}", GameOutput::AreaEvent(event_name.as_str(), area_name.as_str()))
-                    ).expect("Failed to add area event message");
+                        format!(
+                            "{}",
+                            GameOutput::AreaEvent(event_name.as_str(), area_name.as_str())
+                        ),
+                    )
+                    .expect("Failed to add area event message");
                 }
             }
         }
@@ -298,7 +316,11 @@ impl Game {
 
     /// Triggers events for the current cycle.
     fn trigger_cycle_events(&mut self, day: bool, rng: &mut SmallRng) {
-        let frequency = if day { DAY_EVENT_FREQUENCY } else { NIGHT_EVENT_FREQUENCY };
+        let frequency = if day {
+            DAY_EVENT_FREQUENCY
+        } else {
+            NIGHT_EVENT_FREQUENCY
+        };
 
         // If it's nighttime, trigger an event
         // If it is daytime and not day #1 or day #3, trigger an event
@@ -312,15 +334,21 @@ impl Game {
                     add_area_message(
                         area_name.as_str(),
                         &self.identifier,
-                        format!("{}", GameOutput::AreaEvent(event_name.as_str(), area_name.as_str()))
-                    ).expect("Failed to add area event message");
+                        format!(
+                            "{}",
+                            GameOutput::AreaEvent(event_name.as_str(), area_name.as_str())
+                        ),
+                    )
+                    .expect("Failed to add area event message");
                 }
             }
         }
 
         // Day 3 is Feast Day, refill the Cornucopia with a random assortment of items
         if day && self.day == Some(3) {
-            let area_details = self.areas.iter_mut()
+            let area_details = self
+                .areas
+                .iter_mut()
                 .filter(|ad| ad.area.is_some())
                 .find(|ad| ad.area.clone().unwrap().to_string() == "Cornucopia")
                 .expect("Cannot find Cornucopia");
@@ -334,7 +362,6 @@ impl Game {
                 area_details.add_item(Item::new_random_consumable());
             }
         }
-
     }
 
     /// If the tribute count is low, constrain them by closing areas.
@@ -377,8 +404,12 @@ impl Game {
                     add_area_message(
                         area_name.as_str(),
                         &self.identifier,
-                        format!("{}", GameOutput::AreaEvent(event_name.as_str(), area_name.as_str()))
-                    ).expect("Failed to add area event message");
+                        format!(
+                            "{}",
+                            GameOutput::AreaEvent(event_name.as_str(), area_name.as_str())
+                        ),
+                    )
+                    .expect("Failed to add area event message");
                 }
             }
 
@@ -394,11 +425,24 @@ impl Game {
     }
 
     /// Runs the tributes' logic for the current cycle.
-    fn run_tribute_cycle(&mut self, day: bool, rng: &mut SmallRng, closed_areas: Vec<Area>, living_tributes: Vec<Tribute>, living_tributes_count: usize) {
+    fn run_tribute_cycle(
+        &mut self,
+        day: bool,
+        rng: &mut SmallRng,
+        closed_areas: Vec<Area>,
+        living_tributes: Vec<Tribute>,
+        living_tributes_count: usize,
+    ) {
         // Pre-compute global action suggestion
         let action_suggestion = match (self.day, day) {
-            (Some(1), true) => Some(ActionSuggestion { action: Action::Move(None), probability: Some(0.5) }),
-            (Some(3), true) => Some(ActionSuggestion { action: Action::Move(Some(Area::Cornucopia)), probability: Some(0.75) }),
+            (Some(1), true) => Some(ActionSuggestion {
+                action: Action::Move(None),
+                probability: Some(0.5),
+            }),
+            (Some(3), true) => Some(ActionSuggestion {
+                action: Action::Move(Some(Area::Cornucopia)),
+                probability: Some(0.75),
+            }),
             (_, _) => None,
         };
 
@@ -413,7 +457,8 @@ impl Game {
         // Group tributes by area for faster lookups
         let mut tributes_by_area: HashMap<Area, Vec<&Tribute>> = HashMap::new();
         for tribute in &living_tributes {
-            tributes_by_area.entry(tribute.area.clone())
+            tributes_by_area
+                .entry(tribute.area.clone())
                 .or_insert_with(Vec::new)
                 .push(tribute);
         }
@@ -446,12 +491,13 @@ impl Game {
             let nearby_tributes = {
                 match tributes_by_area.get(&tribute.area) {
                     Some(tributes) => tributes,
-                    None => &ev
+                    None => &ev,
                 }
             };
             let nearby_tributes_count = nearby_tributes.len() as u32;
 
-            let targets: Vec<Tribute> = nearby_tributes.iter()
+            let targets: Vec<Tribute> = nearby_tributes
+                .iter()
                 .filter(|t| t.is_visible() && t.identifier != tribute.identifier)
                 .cloned()
                 .cloned()
@@ -467,7 +513,7 @@ impl Game {
                 action_suggestion.clone(),
                 &mut environment_details,
                 encounter_context,
-                rng
+                rng,
             );
         }
     }
@@ -496,19 +542,23 @@ impl Game {
         self.constrain_areas(&mut rng);
 
         self.tributes.shuffle(&mut rng);
-        let closed_areas: Vec<Area> = self.closed_areas()
+        let closed_areas: Vec<Area> = self
+            .closed_areas()
             .iter()
             .filter(|ad| ad.area.is_some())
-            .map(|ad| {
-                ad.area.clone().unwrap()
-            })
+            .map(|ad| ad.area.clone().unwrap())
             .clone()
             .collect();
         let living_tributes = self.living_tributes();
         let living_tributes_count: usize = living_tributes.len();
 
-
-        self.run_tribute_cycle(day, &mut rng, closed_areas, living_tributes, living_tributes_count);
+        self.run_tribute_cycle(
+            day,
+            &mut rng,
+            closed_areas,
+            living_tributes,
+            living_tributes_count,
+        );
     }
 
     /// Any tributes who have died in the current cycle will be moved to the "dead" list,
@@ -516,8 +566,11 @@ impl Game {
     fn clean_up_recent_deaths(&mut self) {
         let tribute_count = self.tributes.len();
 
-        for i in 0..tribute_count {  // Using a for loop to avoid mutable borrow issues
-            if self.tributes[i].is_alive() { continue }
+        for i in 0..tribute_count {
+            // Using a for loop to avoid mutable borrow issues
+            if self.tributes[i].is_alive() {
+                continue;
+            }
             let tribute_items: Vec<Item> = self.tributes[i].items.clone();
 
             if self.tributes[i].status == TributeStatus::RecentlyDead {
@@ -537,7 +590,9 @@ impl Game {
 
     /// Get a mutable reference to the area details for a given area.
     fn get_area_details_mut(&mut self, area: Area) -> Option<&mut AreaDetails> {
-        self.areas.iter_mut().find(|ad| ad.area == Some(area.clone()))
+        self.areas
+            .iter_mut()
+            .find(|ad| ad.area == Some(area.clone()))
     }
 }
 
@@ -554,7 +609,7 @@ mod tests {
             day: Some(1),
             areas: vec![],
             tributes,
-            private: true
+            private: true,
         }
     }
 
@@ -654,7 +709,8 @@ mod tests {
     fn test_check_game_state_winner_exists() {
         let winner_tribute = create_tribute("Winner", true);
         let loser_tribute = create_tribute("Loser", false);
-        let mut game = create_test_game_with_tributes(vec![winner_tribute.clone(), loser_tribute.clone()]);
+        let mut game =
+            create_test_game_with_tributes(vec![winner_tribute.clone(), loser_tribute.clone()]);
 
         // Game should have only one living tribute and they should be the winner
         assert_eq!(game.living_tributes().len(), 1);
@@ -670,7 +726,8 @@ mod tests {
     fn test_check_game_state_no_survivors() {
         let loser_tribute = create_tribute("Loser", false);
         let loser2_tribute = create_tribute("Loser 2", false);
-        let mut game = create_test_game_with_tributes(vec![loser_tribute.clone(), loser2_tribute.clone()]);
+        let mut game =
+            create_test_game_with_tributes(vec![loser_tribute.clone(), loser2_tribute.clone()]);
 
         // Game should have only no living tributes and no winner
         assert!(game.living_tributes().is_empty());
@@ -686,7 +743,8 @@ mod tests {
     fn test_check_game_state_continues() {
         let living_tribute1 = create_tribute("Living1", true);
         let living_tribute2 = create_tribute("Living2", true);
-        let mut game = create_test_game_with_tributes(vec![living_tribute1.clone(), living_tribute2.clone()]);
+        let mut game =
+            create_test_game_with_tributes(vec![living_tribute1.clone(), living_tribute2.clone()]);
         let starting_state = game.status.clone();
 
         // Game should have only one living tribute and they should be the winner
@@ -795,7 +853,7 @@ mod tests {
     }
 
     #[test]
-    fn test_trigger_cycle_events() { }
+    fn test_trigger_cycle_events() {}
 
     #[test]
     fn test_constrain_areas() {
@@ -830,11 +888,22 @@ mod tests {
         let mut game = create_test_game_with_tributes(vec![tribute1.clone(), tribute2.clone()]);
         let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
         game.areas.push(area);
-        let closed_areas = game.areas.iter().filter(|ad| ad.area.is_some() & &!ad.is_open()).map(|ad| ad.area.clone().unwrap()).collect::<Vec<Area>>();
+        let closed_areas = game
+            .areas
+            .iter()
+            .filter(|ad| ad.area.is_some() & &!ad.is_open())
+            .map(|ad| ad.area.clone().unwrap())
+            .collect::<Vec<Area>>();
 
         // Run the tribute cycle
         let mut rng = SmallRng::from_rng(&mut rand::rng());
-        game.run_tribute_cycle(true, &mut rng, closed_areas, vec![tribute1.clone(), tribute2.clone()], 2);
+        game.run_tribute_cycle(
+            true,
+            &mut rng,
+            closed_areas,
+            vec![tribute1.clone(), tribute2.clone()],
+            2,
+        );
 
         // Check if the tributes are updated correctly
         let new_tribute1 = game.tributes[0].clone();

@@ -9,7 +9,7 @@ const SHIELD_ADJECTIVES: &[&str] = &[
 // Weapon nouns
 // <descriptor> _____
 const WEAPON_NOUNS: &[&str] = &[
-    "sword", "spear", "dagger", "knife", "net", "trident", "bow", "mace", "axe"
+    "sword", "spear", "dagger", "knife", "net", "trident", "bow", "mace", "axe",
 ];
 
 // Adjectives to come before a weapon noun

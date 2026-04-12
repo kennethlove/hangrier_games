@@ -193,6 +193,7 @@ dependencies = [
  "chrono",
  "futures",
  "game",
+ "jsonwebtoken",
  "serde",
  "serde_json",
  "shared",

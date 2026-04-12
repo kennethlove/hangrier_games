@@ -7,9 +7,9 @@ use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
 use thiserror::Error;
 
+pub mod auth;
 pub mod games;
 pub mod logging;
-pub mod messages;
 pub mod tributes;
 pub mod users;
 

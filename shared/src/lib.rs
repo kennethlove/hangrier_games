@@ -20,10 +20,8 @@ pub struct DeleteGame(pub String, pub String); // Identifier, name
 /// Used to edit a tribute. Contains the identifier, name, avatar, and game identifier of the tribute.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize, Validate)]
 pub struct EditTribute(
-    #[validate(length(min = 1, message = "Tribute identifier required"))]
-    pub String,
-    #[validate(length(min = 1, max = 50, message = "Name must be 1-50 characters"))]
-    pub String,
+    #[validate(length(min = 1, message = "Tribute identifier required"))] pub String,
+    #[validate(length(min = 1, max = 50, message = "Name must be 1-50 characters"))] pub String,
     pub String,
     pub String,
 );
@@ -32,10 +30,8 @@ pub struct EditTribute(
 /// It contains the identifier, name, and a boolean indicating if the game is private
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Validate)]
 pub struct EditGame(
-    #[validate(length(min = 1, message = "Game identifier required"))]
-    pub String,
-    #[validate(length(min = 1, max = 100, message = "Name must be 1-100 characters"))]
-    pub String,
+    #[validate(length(min = 1, message = "Game identifier required"))] pub String,
+    #[validate(length(min = 1, max = 100, message = "Name must be 1-100 characters"))] pub String,
     pub bool,
 );
 

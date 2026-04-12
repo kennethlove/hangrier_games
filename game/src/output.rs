@@ -78,7 +78,7 @@ pub enum GameOutput<'a> {
     AllAlone(&'a str),
 }
 
-impl <'a> Display for GameOutput<'a> {
+impl<'a> Display for GameOutput<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
             GameOutput::GameDayStart(day_number) => {
@@ -118,7 +118,11 @@ impl <'a> Display for GameOutput<'a> {
                 write!(f, "😪 {} rests", tribute)
             }
             GameOutput::TributeLongRest(tribute) => {
-                write!(f, "💤 {} rests and recovers a little health and sanity", tribute)
+                write!(
+                    f,
+                    "💤 {} rests and recovers a little health and sanity",
+                    tribute
+                )
             }
             GameOutput::TributeHide(tribute) => {
                 write!(f, "🫥 {} tries to hide", tribute)
@@ -136,10 +140,18 @@ impl <'a> Display for GameOutput<'a> {
             }
             GameOutput::TributeUseItem(tribute, item) => {
                 let object = indefinite(&item.name);
-                write!(f, "💊 {} uses {}, gains {} {}", tribute, object, item.effect, item.attribute)
+                write!(
+                    f,
+                    "💊 {} uses {}, gains {} {}",
+                    tribute, object, item.effect, item.attribute
+                )
             }
             GameOutput::TributeTravelTooTired(tribute, area) => {
-                write!(f, "😴 {} is too tired to move from {}, rests instead", tribute, area)
+                write!(
+                    f,
+                    "😴 {} is too tired to move from {}, rests instead",
+                    tribute, area
+                )
             }
             GameOutput::TributeTravelAlreadyThere(tribute, area) => {
                 write!(f, "🤔 {} is already in the {}, stays put", tribute, area)
@@ -157,7 +169,11 @@ impl <'a> Display for GameOutput<'a> {
                 write!(f, "🩸 {} bleeds from their wounds.", tribute)
             }
             GameOutput::TributeSick(tribute) => {
-                write!(f, "🤒 {} contracts dysentery, loses strength and speed", tribute)
+                write!(
+                    f,
+                    "🤒 {} contracts dysentery, loses strength and speed",
+                    tribute
+                )
             }
             GameOutput::TributeElectrocuted(tribute) => {
                 write!(f, "🌩️ {} is struck by lightning, loses health", tribute)
@@ -184,20 +200,39 @@ impl <'a> Display for GameOutput<'a> {
                 write!(f, "🦴 {} injures their leg, loses speed.", tribute)
             }
             GameOutput::TributeInfected(tribute) => {
-                write!(f, "🤢 {} gets an infection, loses health and sanity", tribute)
+                write!(
+                    f,
+                    "🤢 {} gets an infection, loses health and sanity",
+                    tribute
+                )
             }
             GameOutput::TributeDrowned(tribute) => {
-                write!(f, "🏊 {} partially drowns, loses health and sanity", tribute)
+                write!(
+                    f,
+                    "🏊 {} partially drowns, loses health and sanity",
+                    tribute
+                )
             }
             GameOutput::TributeMauled(tribute, count, animal, damage) => {
                 let animal = Animal::from_str(animal).unwrap();
-                write!(f, "🐾 {} is attacked by {} {}, takes {} damage!", tribute, count, animal.plural(), damage)
+                write!(
+                    f,
+                    "🐾 {} is attacked by {} {}, takes {} damage!",
+                    tribute,
+                    count,
+                    animal.plural(),
+                    damage
+                )
             }
             GameOutput::TributeBurned(tribute) => {
                 write!(f, "🔥 {} gets burned, loses health", tribute)
             }
             GameOutput::TributeHorrified(tribute, damage) => {
-                write!(f, "😱 {} is horrified by the violence, loses {} sanity.", tribute, damage)
+                write!(
+                    f,
+                    "😱 {} is horrified by the violence, loses {} sanity.",
+                    tribute, damage
+                )
             }
             GameOutput::TributeSuffer(tribute) => {
                 write!(f, "😭 {} suffers from loneliness and terror.", tribute)
@@ -221,7 +256,11 @@ impl <'a> Display for GameOutput<'a> {
                 write!(f, "🤣 {} attacks {}, but loses!", tribute, target)
             }
             GameOutput::TributeAttackLoseExtra(tribute, target) => {
-                write!(f, "🤣 {} attacks {}, but loses decisively!", tribute, target)
+                write!(
+                    f,
+                    "🤣 {} attacks {}, but loses decisively!",
+                    tribute, target
+                )
             }
             GameOutput::TributeAttackMiss(tribute, target) => {
                 write!(f, "😰 {} attacks {}, but misses!", tribute, target)
@@ -258,7 +297,11 @@ impl <'a> Display for GameOutput<'a> {
             }
             GameOutput::SponsorGift(tribute, item) => {
                 let object = indefinite(&item.name);
-                write!(f, "🎁 {} receives {} ({}x {} +{})", tribute, object, item.quantity, item.attribute, item.effect)
+                write!(
+                    f,
+                    "🎁 {} receives {} ({}x {} +{})",
+                    tribute, object, item.quantity, item.attribute, item.effect
+                )
             }
             GameOutput::AreaEvent(area_event, area) => {
                 let area_name = area.replace("The ", "");

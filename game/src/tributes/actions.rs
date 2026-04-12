@@ -113,9 +113,12 @@ mod tests {
 
     #[test]
     fn tribute_action_new() {
-        assert_eq!(TributeAction::new(Action::None, None), TributeAction {
-            action: Action::None,
-            target: None
-        });
+        assert_eq!(
+            TributeAction::new(Action::None, None),
+            TributeAction {
+                action: Action::None,
+                target: None
+            }
+        );
     }
 }

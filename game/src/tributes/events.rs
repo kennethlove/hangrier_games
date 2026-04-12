@@ -1,9 +1,9 @@
 use crate::threats::animals::Animal;
+use rand::prelude::SmallRng;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
-use rand::prelude::SmallRng;
 
 #[derive(Clone, Debug, PartialOrd, PartialEq, Serialize, Deserialize)]
 pub enum TributeEvent {
@@ -29,8 +29,12 @@ impl FromStr for TributeEvent {
             return if let Some(animal_name) = s.split_once(':').map(|x| x.1) {
                 if let Ok(animal) = Animal::from_str(animal_name.trim()) {
                     Ok(TributeEvent::AnimalAttack(animal))
-                } else { Err(()) }
-            } else { Err(()) }
+                } else {
+                    Err(())
+                }
+            } else {
+                Err(())
+            };
         }
 
         match s {

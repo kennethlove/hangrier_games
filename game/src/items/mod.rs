@@ -84,18 +84,14 @@ impl Item {
         match (item_type, name) {
             (ItemType::Consumable, Some(name)) => Self::new_consumable(name),
             (ItemType::Consumable, None) => Self::new_random_consumable(),
-            (ItemType::Weapon, Some(name)) => {
-                match is_shield {
-                    false => Self::new_weapon(name),
-                    true => Self::new_shield(name)
-                }
-            }
-            (ItemType::Weapon, None) => {
-                match is_shield {
-                    false => Self::new_random_weapon(),
-                    true => Self::new_random_shield()
-                }
-            }
+            (ItemType::Weapon, Some(name)) => match is_shield {
+                false => Self::new_weapon(name),
+                true => Self::new_shield(name),
+            },
+            (ItemType::Weapon, None) => match is_shield {
+                false => Self::new_random_weapon(),
+                true => Self::new_random_shield(),
+            },
         }
     }
 
@@ -121,13 +117,7 @@ impl Item {
         let attribute = Attribute::random();
         let effect = rng.random_range(1..=10);
 
-        Item::new(
-            name,
-            ItemType::Consumable,
-            quantity,
-            attribute,
-            effect,
-        )
+        Item::new(name, ItemType::Consumable, quantity, attribute, effect)
     }
 
     pub fn new_random_consumable() -> Item {
@@ -137,13 +127,7 @@ impl Item {
         let quantity = 1;
         let effect = rng.random_range(1..=10);
 
-        Item::new(
-            &name,
-            ItemType::Consumable,
-            quantity,
-            attribute,
-            effect,
-        )
+        Item::new(&name, ItemType::Consumable, quantity, attribute, effect)
     }
 
     pub fn new_shield(name: &str) -> Item {
@@ -238,19 +222,19 @@ impl ConsumableAttribute for Attribute {
     fn consumable_name(&self) -> String {
         match &self {
             // restore health
-            Attribute::Health => { "health kit".to_string() }
+            Attribute::Health => "health kit".to_string(),
             // restore sanity
-            Attribute::Sanity => { "memento".to_string() }
+            Attribute::Sanity => "memento".to_string(),
             // move further
-            Attribute::Movement => { "trail mix".to_string() }
+            Attribute::Movement => "trail mix".to_string(),
             // sure, you can win that fight
-            Attribute::Bravery => { "yayo".to_string() }
+            Attribute::Bravery => "yayo".to_string(),
             // move faster
-            Attribute::Speed => { "go-juice".to_string() }
+            Attribute::Speed => "go-juice".to_string(),
             // hit harder
-            Attribute::Strength => { "adrenaline".to_string() }
+            Attribute::Strength => "adrenaline".to_string(),
             // take hits better
-            Attribute::Defense => { "bear spray".to_string() }
+            Attribute::Defense => "bear spray".to_string(),
         }
     }
 }
@@ -305,13 +289,7 @@ mod tests {
 
     #[test]
     fn new_item() {
-        let item = Item::new(
-            "Test item",
-            ItemType::Weapon,
-            1,
-            Attribute::Defense,
-            10,
-        );
+        let item = Item::new("Test item", ItemType::Weapon, 1, Attribute::Defense, 10);
         assert_eq!(item.name, "Test item");
         assert_eq!(item.item_type, ItemType::Weapon);
         assert_eq!(item.quantity, 1);
@@ -408,7 +386,11 @@ mod tests {
     #[test]
     fn random_attribute() {
         let attribute = Attribute::random();
-        assert!(Attribute::iter().find(|a| *a == attribute.clone()).is_some());
+        assert!(
+            Attribute::iter()
+                .find(|a| *a == attribute.clone())
+                .is_some()
+        );
     }
 
     #[rstest]

@@ -1,5 +1,5 @@
-use crate::tributes::actions::Action;
 use crate::tributes::Tribute;
+use crate::tributes::actions::Action;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
@@ -96,19 +96,19 @@ impl Brain {
         let stats = (
             tribute.attributes.movement,
             tribute.attributes.sanity,
-            tribute.attributes.is_hidden
+            tribute.attributes.is_hidden,
         );
         match stats {
             // low movement, ok sanity, visible
-            (..LOW_MOVEMENT_LIMIT, MID_SANITY_LIMIT.., false) => { Action::Hide },
+            (..LOW_MOVEMENT_LIMIT, MID_SANITY_LIMIT.., false) => Action::Hide,
             // low movement, low sanity, any visibility
-            (..LOW_MOVEMENT_LIMIT, EXTREME_LOW_SANITY_LIMIT..MID_SANITY_LIMIT, _) => { Action::Attack },
+            (..LOW_MOVEMENT_LIMIT, EXTREME_LOW_SANITY_LIMIT..MID_SANITY_LIMIT, _) => Action::Attack,
             // any movement, ok sanity, visible
-            (_, MID_SANITY_LIMIT.., false) => { Action::Move(None) },
+            (_, MID_SANITY_LIMIT.., false) => Action::Move(None),
             // any movement, low sanity, visible
-            (_, ..MID_SANITY_LIMIT, false) => { Action::Attack },
+            (_, ..MID_SANITY_LIMIT, false) => Action::Attack,
             // any movement, any sanity, hidden
-            (_, _, true) => { Action::None },
+            (_, _, true) => Action::None,
         }
     }
 
@@ -127,7 +127,8 @@ impl Brain {
     }
 
     fn decide_action_many_enemies(&self, tribute: &Tribute) -> Action {
-        let recklessness: u32 = 100_u32.saturating_sub(tribute.attributes.intelligence)
+        let recklessness: u32 = 100_u32
+            .saturating_sub(tribute.attributes.intelligence)
             .saturating_sub(tribute.attributes.sanity);
         match recklessness {
             // Smart enough to know better, moves
@@ -143,8 +144,8 @@ impl Brain {
 #[cfg(test)]
 mod tests {
     use crate::items::Item;
-    use crate::tributes::actions::Action;
     use crate::tributes::Tribute;
+    use crate::tributes::actions::Action;
     use rand::prelude::*;
     use rstest::{fixture, rstest};
 
@@ -190,7 +191,10 @@ mod tests {
     }
 
     #[rstest]
-    fn decide_on_action_no_movement_surrounded_low_health(mut tribute: Tribute, mut small_rng: SmallRng) {
+    fn decide_on_action_no_movement_surrounded_low_health(
+        mut tribute: Tribute,
+        mut small_rng: SmallRng,
+    ) {
         // If the tribute has no movement and is not alone, they should hide
         tribute.attributes.movement = 1;
         tribute.attributes.health = 10;
@@ -263,7 +267,10 @@ mod tests {
     }
 
     #[rstest]
-    fn decide_on_action_surrounded_low_health_low_movement_low_sanity(mut tribute: Tribute, mut small_rng: SmallRng) {
+    fn decide_on_action_surrounded_low_health_low_movement_low_sanity(
+        mut tribute: Tribute,
+        mut small_rng: SmallRng,
+    ) {
         tribute.attributes.health = 10;
         tribute.attributes.movement = 0;
         tribute.attributes.sanity = 15;
@@ -272,7 +279,10 @@ mod tests {
     }
 
     #[rstest]
-    fn decide_on_action_surrounded_low_health_low_sanity(mut tribute: Tribute, mut small_rng: SmallRng) {
+    fn decide_on_action_surrounded_low_health_low_sanity(
+        mut tribute: Tribute,
+        mut small_rng: SmallRng,
+    ) {
         tribute.attributes.health = 15;
         tribute.attributes.sanity = 10;
         let action = tribute.brain.act(&tribute.clone(), 3, &mut small_rng);
@@ -280,7 +290,10 @@ mod tests {
     }
 
     #[rstest]
-    fn decide_on_action_surrounded_hidden_low_health(mut tribute: Tribute, mut small_rng: SmallRng) {
+    fn decide_on_action_surrounded_hidden_low_health(
+        mut tribute: Tribute,
+        mut small_rng: SmallRng,
+    ) {
         tribute.attributes.is_hidden = true;
         tribute.attributes.health = 10;
         let action = tribute.brain.act(&tribute.clone(), 3, &mut small_rng);
@@ -288,7 +301,10 @@ mod tests {
     }
 
     #[rstest]
-    fn decide_on_action_surrounded_ok_health_low_sanity(mut tribute: Tribute, mut small_rng: SmallRng) {
+    fn decide_on_action_surrounded_ok_health_low_sanity(
+        mut tribute: Tribute,
+        mut small_rng: SmallRng,
+    ) {
         tribute.attributes.health = 25;
         tribute.attributes.sanity = 15;
         let action = tribute.brain.act(&tribute.clone(), 3, &mut small_rng);
@@ -296,7 +312,10 @@ mod tests {
     }
 
     #[rstest]
-    fn decide_on_action_heavily_surrounded_normal_sanity_and_intelligence(mut tribute: Tribute, mut small_rng: SmallRng) {
+    fn decide_on_action_heavily_surrounded_normal_sanity_and_intelligence(
+        mut tribute: Tribute,
+        mut small_rng: SmallRng,
+    ) {
         tribute.attributes.intelligence = 50;
         tribute.attributes.sanity = 50;
         let action = tribute.brain.act(&tribute.clone(), 6, &mut small_rng);
@@ -304,7 +323,10 @@ mod tests {
     }
 
     #[rstest]
-    fn decide_on_action_heavily_surrounded_low_sanity_and_intelligence(mut tribute: Tribute, mut small_rng: SmallRng) {
+    fn decide_on_action_heavily_surrounded_low_sanity_and_intelligence(
+        mut tribute: Tribute,
+        mut small_rng: SmallRng,
+    ) {
         tribute.attributes.intelligence = 20;
         tribute.attributes.sanity = 20;
         let action = tribute.brain.act(&tribute.clone(), 6, &mut small_rng);
@@ -312,7 +334,10 @@ mod tests {
     }
 
     #[rstest]
-    fn decide_on_action_heavily_surrounded_no_sanity_and_intelligence(mut tribute: Tribute, mut small_rng: SmallRng) {
+    fn decide_on_action_heavily_surrounded_no_sanity_and_intelligence(
+        mut tribute: Tribute,
+        mut small_rng: SmallRng,
+    ) {
         tribute.attributes.intelligence = 10;
         tribute.attributes.sanity = 10;
         let action = tribute.brain.act(&tribute.clone(), 6, &mut small_rng);

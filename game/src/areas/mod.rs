@@ -64,7 +64,7 @@ impl Area {
             Area::East => vec![Area::Cornucopia, Area::North, Area::South],
             Area::South => vec![Area::Cornucopia, Area::East, Area::West],
             Area::West => vec![Area::Cornucopia, Area::North, Area::South],
-            Area::Cornucopia => vec![Area::North, Area::East, Area::South, Area::West]
+            Area::Cornucopia => vec![Area::North, Area::East, Area::South, Area::West],
         }
     }
 }
@@ -95,7 +95,7 @@ impl OwnsItems for AreaDetails {
 
         if used_item.quantity > 0 {
             Ok(())
-        } else if used_item.quantity == 0  {
+        } else if used_item.quantity == 0 {
             Err(ItemError::ItemNotFound)
         } else {
             Err(ItemError::ItemNotFound)
@@ -103,7 +103,10 @@ impl OwnsItems for AreaDetails {
     }
 
     fn remove_item(&mut self, item: &Item) -> Result<(), ItemError> {
-        let index = self.items.iter().position(|i| i.identifier == item.identifier);
+        let index = self
+            .items
+            .iter()
+            .position(|i| i.identifier == item.identifier);
         if let Some(index) = index {
             self.items.remove(index);
             Ok(())

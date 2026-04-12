@@ -1,6 +1,7 @@
 extern crate core;
 
 use api::AppState;
+use api::auth::AUTH_ROUTER;
 use api::games::GAMES_ROUTER;
 use api::users::USERS_ROUTER;
 use axum::error_handling::HandleErrorLayer;
@@ -124,13 +125,20 @@ async fn main() {
         .expect("Failed to use database");
     tracing::debug!("Using 'hangry-games' namespace and 'games' database");
 
-    MigrationRunner::new(&*db).up().await.map_err(|e| {
-        eprintln!("Failed to apply migrations: {}", e);
-        std::process::exit(1);
-    })?;
+    MigrationRunner::new(&app_state.db)
+        .up()
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to apply migrations: {}", e);
+            std::process::exit(1);
+        })
+        .unwrap();
     tracing::debug!("Applied migrations");
 
-    let app_state = AppState { db };
+    let allowed_origins = vec![
+        "http://localhost:8080".to_string(),
+        "http://127.0.0.1:8080".to_string(),
+    ];
 
     let cors_layer = CorsLayer::new()
         .allow_methods(vec![
@@ -177,7 +185,8 @@ async fn main() {
                 surreal_jwt,
             )),
         )
-        .nest("/users", USERS_ROUTER.clone());
+        .nest("/users", USERS_ROUTER.clone())
+        .nest("/auth", AUTH_ROUTER.clone());
 
     let router = Router::new()
         .nest("/api", api_routes)

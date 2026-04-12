@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(tag="type", content="value")]
+#[serde(tag = "type", content = "value")]
 pub enum MessageSource {
     #[serde(rename = "Game")]
     Game(String), // Game identifier
@@ -110,10 +110,6 @@ pub fn get_messages_by_day(day: u32) -> Result<Vec<GameMessage>, String> {
 }
 
 pub fn clear_messages() -> Result<(), String> {
-    GLOBAL_MESSAGES
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clear();
+    GLOBAL_MESSAGES.lock().map_err(|e| e.to_string())?.clear();
     Ok(())
 }
-

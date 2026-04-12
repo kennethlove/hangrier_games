@@ -8,9 +8,7 @@ async fn _fetch_game_day_summary(keys: Vec<QueryKey>) -> QueryResult<QueryValue,
     if let Some(QueryKey::_GameDaySummary(identifier, day)) = keys.first() {
         let response = reqwest::get(format!(
             "{}/api/games/{}/summarize/{}",
-            APP_API_HOST,
-            identifier,
-            day
+            APP_API_HOST, identifier, day
         ))
         .await
         .unwrap();

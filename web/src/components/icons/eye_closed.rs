@@ -21,5 +21,3 @@ pub fn EyeClosedIcon(class: String) -> Element {
         }
     }
 }
-
-

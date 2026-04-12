@@ -1,9 +1,9 @@
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
 use dioxus::prelude::*;
 use gloo_storage::{LocalStorage, Storage};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 
 /// A persistent storage hook that can be used to store data across application reloads.
 pub fn use_persistent<T: Serialize + DeserializeOwned + Default + 'static>(
@@ -38,9 +38,9 @@ impl<T> Clone for UsePersistent<T> {
     }
 }
 
-impl <T> Copy for UsePersistent<T> {}
+impl<T> Copy for UsePersistent<T> {}
 
-impl <T: Serialize + DeserializeOwned + Clone + 'static> UsePersistent<T> {
+impl<T: Serialize + DeserializeOwned + Clone + 'static> UsePersistent<T> {
     /// Returns a reference to the value
     pub fn get(&self) -> T {
         self.inner.read().value.clone()
@@ -65,9 +65,15 @@ pub enum Colorscheme {
 impl Display for Colorscheme {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Colorscheme::One => { write!(f, "theme1") }
-            Colorscheme::Two => { write!(f, "theme2") }
-            Colorscheme::Three => { write!(f, "theme3") }
+            Colorscheme::One => {
+                write!(f, "theme1")
+            }
+            Colorscheme::Two => {
+                write!(f, "theme2")
+            }
+            Colorscheme::Three => {
+                write!(f, "theme3")
+            }
         }
     }
 }
@@ -80,7 +86,7 @@ impl FromStr for Colorscheme {
             "theme1" => Ok(Colorscheme::One),
             "theme2" => Ok(Colorscheme::Two),
             "theme3" => Ok(Colorscheme::Three),
-            _ => Err("invalid colorscheme".into())
+            _ => Err("invalid colorscheme".into()),
         }
     }
 }

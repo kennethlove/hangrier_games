@@ -4,9 +4,9 @@ use crate::components::icons::lock_open::LockOpenIcon;
 use crate::components::item_icon::ItemIcon;
 use crate::components::map::Map;
 use crate::env::APP_API_HOST;
-use crate::storage::{use_persistent, AppState};
+use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_get_query, QueryResult, QueryState};
+use dioxus_query::prelude::{QueryResult, QueryState, use_get_query};
 use game::areas::AreaDetails;
 use shared::DisplayGame;
 
@@ -14,23 +14,19 @@ async fn fetch_areas(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryVal
     if let Some(QueryKey::Areas(identifier)) = keys.first() {
         let client = reqwest::Client::new();
 
-        let request = client.request(
-            reqwest::Method::GET,
-            format!("{}/api/games/{}/areas", APP_API_HOST, identifier))
+        let request = client
+            .request(
+                reqwest::Method::GET,
+                format!("{}/api/games/{}/areas", APP_API_HOST, identifier),
+            )
             .bearer_auth(token);
 
         match request.send().await {
-            Ok(response) => {
-                match response.json::<Vec<AreaDetails>>().await {
-                    Ok(areas) => {
-                        Ok(QueryValue::Areas(areas))
-                    }
-                    Err(_) => Err(QueryError::GameNotFound(identifier.to_string())),
-                }
-            }
-            Err(_) => {
-                Err(QueryError::GameNotFound(identifier.to_string()))
-            }
+            Ok(response) => match response.json::<Vec<AreaDetails>>().await {
+                Ok(areas) => Ok(QueryValue::Areas(areas)),
+                Err(_) => Err(QueryError::GameNotFound(identifier.to_string())),
+            },
+            Err(_) => Err(QueryError::GameNotFound(identifier.to_string())),
         }
     } else {
         Err(QueryError::Unknown)
@@ -48,9 +44,9 @@ pub fn GameAreaList(game: DisplayGame) -> Element {
         [
             QueryKey::Areas(identifier.clone()),
             QueryKey::Game(identifier.clone()),
-            QueryKey::Games
+            QueryKey::Games,
         ],
-        move |keys: Vec<QueryKey>| { fetch_areas(keys, token.clone()) },
+        move |keys: Vec<QueryKey>| fetch_areas(keys, token.clone()),
     );
 
     match area_query.result().value() {
@@ -201,6 +197,8 @@ pub fn GameAreaList(game: DisplayGame) -> Element {
         QueryState::Loading(_) => {
             rsx! { p { "Loading..." } }
         }
-        _ => { rsx! {} }
+        _ => {
+            rsx! {}
+        }
     }
 }

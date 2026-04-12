@@ -3,13 +3,15 @@ use crate::components::icons::edit::EditIcon;
 use crate::components::modal::{Modal, Props as ModalProps};
 use crate::components::{Button, Input};
 use crate::env::APP_API_HOST;
-use crate::storage::{use_persistent, AppState};
+use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult, MutationState};
+use dioxus_query::prelude::{MutationResult, MutationState, use_mutation, use_query_client};
 use shared::EditTribute;
 use std::ops::Deref;
 
-async fn edit_tribute(args: (EditTribute, String, String)) -> MutationResult<MutationValue, MutationError> {
+async fn edit_tribute(
+    args: (EditTribute, String, String),
+) -> MutationResult<MutationValue, MutationError> {
     let tribute = args.clone().0;
     let identifier = args.clone().0.0;
     let game_identifier = args.clone().1;
@@ -18,16 +20,15 @@ async fn edit_tribute(args: (EditTribute, String, String)) -> MutationResult<Mut
     let client = reqwest::Client::new();
     let url: String = format!(
         "{}/api/games/{}/tributes/{}",
-        APP_API_HOST,
-        game_identifier,
-        identifier
+        APP_API_HOST, game_identifier, identifier
     );
 
     let response = client
         .put(url)
         .bearer_auth(token)
         .json(&tribute.clone())
-        .send().await;
+        .send()
+        .await;
 
     if response
         .expect("Failed to update tribute")
@@ -41,7 +42,12 @@ async fn edit_tribute(args: (EditTribute, String, String)) -> MutationResult<Mut
 }
 
 #[component]
-pub fn TributeEdit(identifier: String, name: String, avatar: String, game_identifier: String) -> Element {
+pub fn TributeEdit(
+    identifier: String,
+    name: String,
+    avatar: String,
+    game_identifier: String,
+) -> Element {
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
 
     let onclick = move |_| {
@@ -130,13 +136,25 @@ pub fn EditTributeForm() -> Element {
         let name = data.get("name").expect("No name value").0[0].clone();
 
         if !name.is_empty() {
-            let edit_tribute = EditTribute(identifier.clone(), name.clone(), avatar.clone(), game_identifier.clone());
+            let edit_tribute = EditTribute(
+                identifier.clone(),
+                name.clone(),
+                avatar.clone(),
+                game_identifier.clone(),
+            );
             spawn(async move {
-                mutate.mutate_async((edit_tribute.clone(), game_identifier.clone(), token)).await;
+                mutate
+                    .mutate_async((edit_tribute.clone(), game_identifier.clone(), token))
+                    .await;
                 edit_tribute_signal.set(Some(edit_tribute));
 
-                if let MutationState::Settled(Ok(MutationValue::TributeUpdated(identifier))) = mutate.result().deref() {
-                    client.invalidate_queries(&[QueryKey::Tribute(game_identifier.clone(), identifier.clone())]);
+                if let MutationState::Settled(Ok(MutationValue::TributeUpdated(identifier))) =
+                    mutate.result().deref()
+                {
+                    client.invalidate_queries(&[QueryKey::Tribute(
+                        game_identifier.clone(),
+                        identifier.clone(),
+                    )]);
                     edit_tribute_signal.set(None);
                 }
             });

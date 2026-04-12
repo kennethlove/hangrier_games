@@ -14,8 +14,11 @@ use validator::Validate;
 const JWT_SECRET: &str =
     "6dxLjU0m8ZmAzaLEk_qAeMpeD5ZAjGYlCjlvDi5DcgdJLATIHuCReUu7CbGyCDhRSp3btd7Ezob7RPYe6fUtsA";
 
-pub static AUTH_ROUTER: LazyLock<Router<AppState>> =
-    LazyLock::new(|| Router::new().route("/refresh", post(refresh_token)));
+pub static AUTH_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
+    Router::new()
+        .route("/refresh", post(refresh_token))
+        .route("/logout", post(logout))
+});
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RefreshToken {
@@ -181,6 +184,23 @@ async fn refresh_token(
         access_token,
         refresh_token: new_refresh_token.token,
     }))
+}
+
+/// Logout endpoint: explicitly revoke a refresh token
+async fn logout(
+    State(state): State<AppState>,
+    Json(payload): Json<RefreshTokenRequest>,
+) -> Result<axum::http::StatusCode, AppError> {
+    // Validate the request
+    payload
+        .validate()
+        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+
+    // Revoke the refresh token
+    revoke_refresh_token(&state, &payload.refresh_token).await?;
+
+    // Return 204 No Content on success
+    Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
 #[cfg(test)]

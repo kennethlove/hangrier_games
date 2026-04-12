@@ -7,3 +7,4 @@ publish = false
 [dependencies]
 serde = { version = "1.0.219", features = ["derive"] }
 validator = { version = "0.18", features = ["derive"] }
+uuid = { version = "1.16.0", features = ["v4"] }

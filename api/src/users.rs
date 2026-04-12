@@ -111,10 +111,10 @@ async fn user_authenticate(
     state: State<AppState>,
     Json(payload): Json<RegistrationUser>,
 ) -> Result<Json<TokenResponse>, AppError> {
-    // Validate the request
+    // Validate the request - use generic error to not leak validation details
     payload
         .validate()
-        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+        .map_err(|_| AppError::Unauthorized("Invalid credentials".to_string()))?;
 
     let username = payload.username;
     let password = payload.password;
@@ -155,6 +155,6 @@ async fn user_authenticate(
             let token_pair = create_token_pair(&state, jwt, user.id, user.username).await?;
             Ok(Json(token_pair))
         }
-        Err(_) => Err(AppError::DbError("Failed to authenticate user".to_string())),
+        Err(_) => Err(AppError::Unauthorized("Invalid credentials".to_string())),
     }
 }

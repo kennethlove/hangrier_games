@@ -13,8 +13,10 @@ use game::messages::{GameMessage, MessageSource, get_all_messages};
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
 use shared::{
-    DisplayGame, EditGame, GameStatus, ListDisplayGame, PaginatedGames, PaginationMetadata,
+    CreateGame, DisplayGame, EditGame, GameArea, GameStatus, ListDisplayGame, PaginatedGames,
+    PaginationMetadata,
 };
+use validator::Validate;
 
 // Local type for paginated tributes - can't use shared since it would require game crate dependency
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -22,7 +24,6 @@ pub struct PaginatedTributes {
     pub tributes: Vec<Tribute>,
     pub pagination: PaginationMetadata,
 }
-use std::collections::HashMap;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::LazyLock;
@@ -33,11 +34,13 @@ use surrealdb::sql::Thing;
 use surrealdb::{RecordId, Surreal};
 use uuid::Uuid;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct PaginationParams {
     #[serde(default = "default_limit")]
+    #[validate(range(min = 1, max = 100))]
     limit: u32,
     #[serde(default = "default_offset")]
+    #[validate(range(max = 10000))]
     offset: u32,
 }
 
@@ -179,18 +182,36 @@ async fn create_game_area_edge(
 
 pub async fn create_game(
     state: State<AppState>,
-    Json(payload): Json<Game>,
+    Json(payload): Json<CreateGame>,
 ) -> Result<Json<Game>, AppError> {
-    let game_identifier = payload.clone().identifier;
+    // Validate input
+    payload
+        .validate()
+        .map_err(|e| AppError::ValidationError(format!("{}", e)))?;
 
-    let game: Option<Game> = state
+    // Generate server-controlled fields
+    let game_identifier = Uuid::new_v4().to_string();
+    let game_name = payload.name.unwrap_or_else(|| "Unnamed Game".to_string());
+
+    // Construct Game with server-controlled fields
+    let game = Game {
+        identifier: game_identifier.clone(),
+        name: game_name,
+        status: GameStatus::NotStarted,
+        day: None,
+        tributes: vec![],
+        areas: vec![],
+        private: true, // Default to private
+    };
+
+    let created_game: Option<Game> = state
         .db
         .create(("game", &game_identifier))
-        .content(payload.clone())
+        .content(game)
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create game: {}", e)))?;
 
-    let game = game.ok_or_else(|| {
+    let created_game = created_game.ok_or_else(|| {
         AppError::InternalServerError("Game creation returned empty result".into())
     })?;
 
@@ -218,7 +239,7 @@ pub async fn create_game(
         )));
     }
 
-    Ok(Json(game))
+    Ok(Json(created_game))
 }
 
 pub async fn create_area(
@@ -359,7 +380,12 @@ pub async fn game_list(
     state: State<AppState>,
     Query(params): Query<PaginationParams>,
 ) -> Result<Json<PaginatedGames>, AppError> {
-    let mut result = state
+    // Validate pagination parameters
+    params
+        .validate()
+        .map_err(|e| AppError::ValidationError(format!("{}", e)))?;
+
+    let result = state
         .db
         .query("SELECT * FROM fn::get_list_games($limit, $offset)")
         .bind(("limit", params.limit))
@@ -428,7 +454,7 @@ pub async fn game_update(
 ) -> Result<Json<Game>, AppError> {
     // Validate input
     if let Err(e) = validator::Validate::validate(&payload) {
-        return Err(AppError::BadRequest(format!("Invalid input: {}", e)));
+        return Err(AppError::ValidationError(format!("{}", e)));
     }
 
     let response = state
@@ -496,6 +522,11 @@ pub async fn game_tributes(
     state: State<AppState>,
     Query(params): Query<PaginationParams>,
 ) -> Result<Json<PaginatedTributes>, AppError> {
+    // Validate pagination parameters
+    params
+        .validate()
+        .map_err(|e| AppError::ValidationError(format!("{}", e)))?;
+
     let game_identifier = identifier.to_string();
 
     // Get total count
@@ -669,9 +700,10 @@ async fn get_full_game(identifier: Uuid, db: &Surreal<Any>) -> Result<Json<Game>
 
 /// Invalidate cache for a game (call on updates)
 fn invalidate_game_cache(identifier: &str) {
-    let mut cache = GAME_CACHE.write();
-    cache.remove(identifier);
-    tracing::debug!("Cache invalidated for game {}", identifier);
+    if let Ok(mut cache) = GAME_CACHE.write() {
+        cache.remove(identifier);
+        tracing::debug!("Cache invalidated for game {}", identifier);
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

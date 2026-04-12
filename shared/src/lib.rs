@@ -1,7 +1,14 @@
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 use std::str::FromStr;
-use validator::Validate;
+use validator::{Validate, ValidationError};
+
+/// Custom validator to ensure a string is a valid UUID
+fn validate_uuid(value: &str) -> Result<(), ValidationError> {
+    uuid::Uuid::parse_str(value)
+        .map(|_| ())
+        .map_err(|_| ValidationError::new("invalid_uuid"))
+}
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct CreateGame {
@@ -18,13 +25,50 @@ pub type DeleteTribute = String;
 pub struct DeleteGame(pub String, pub String); // Identifier, name
 
 /// Used to edit a tribute. Contains the identifier, name, avatar, and game identifier of the tribute.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-pub struct EditTribute(pub String, pub String, pub String, pub String);
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize, Validate)]
+pub struct EditTribute {
+    #[validate(custom(function = "validate_uuid"))]
+    pub identifier: String,
+    #[validate(length(min = 1, max = 50, message = "Name must be 1-50 characters"))]
+    pub name: String,
+    #[validate(length(max = 500, message = "Avatar URL must be 500 characters or less"))]
+    pub avatar: String,
+    #[validate(custom(function = "validate_uuid"))]
+    pub game_identifier: String,
+}
+
+impl EditTribute {
+    /// Create EditTribute from tuple format (for backward compatibility)
+    pub fn from_tuple(data: (String, String, String, String)) -> Self {
+        Self {
+            identifier: data.0,
+            name: data.1,
+            avatar: data.2,
+            game_identifier: data.3,
+        }
+    }
+
+    /// Convert to tuple format
+    pub fn to_tuple(&self) -> (String, String, String, String) {
+        (
+            self.identifier.clone(),
+            self.name.clone(),
+            self.avatar.clone(),
+            self.game_identifier.clone(),
+        )
+    }
+}
 
 /// This struct is used to edit a game
 /// It contains the identifier, name, and a boolean indicating if the game is private
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
-pub struct EditGame(pub String, pub String, pub bool);
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Validate)]
+pub struct EditGame {
+    #[validate(custom(function = "validate_uuid"))]
+    pub identifier: String,
+    #[validate(length(min = 1, max = 100, message = "Name must be 1-100 characters"))]
+    pub name: String,
+    pub private: bool,
+}
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct GameArea {
@@ -43,7 +87,7 @@ pub struct TributeKey {
 pub struct RegistrationUser {
     #[validate(length(min = 3, max = 50, message = "Username must be 3-50 characters"))]
     pub username: String,
-    #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
+    #[validate(length(min = 8, max = 72, message = "Password must be 8-72 characters"))]
     pub password: String,
 }
 
@@ -142,4 +186,41 @@ pub struct PaginationMetadata {
 pub struct PaginatedGames {
     pub games: Vec<ListDisplayGame>,
     pub pagination: PaginationMetadata,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_short_username_validation() {
+        let user = RegistrationUser {
+            username: "ab".to_string(), // Too short (min 3)
+            password: "password123".to_string(),
+        };
+        let result = user.validate();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_invalid_uuid_validation() {
+        let tribute = EditTribute {
+            identifier: "not-a-uuid".to_string(),
+            name: "Test Tribute".to_string(),
+            avatar: "avatar.png".to_string(),
+            game_identifier: "also-not-a-uuid".to_string(),
+        };
+        let result = tribute.validate();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_password_max_length() {
+        let user = RegistrationUser {
+            username: "testuser".to_string(),
+            password: "a".repeat(73), // Exceeds max of 72
+        };
+        let result = user.validate();
+        assert!(result.is_err());
+    }
 }

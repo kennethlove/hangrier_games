@@ -132,14 +132,14 @@ pub async fn tribute_update(
 ) -> Result<StatusCode, AppError> {
     // Validate input
     if let Err(e) = validator::Validate::validate(&payload) {
-        return Err(AppError::BadRequest(format!("Invalid input: {}", e)));
+        return Err(AppError::ValidationError(format!("{}", e)));
     }
 
     let response = state
         .db
         .query("UPDATE tribute SET name = $name WHERE identifier = $identifier;")
-        .bind(("identifier", payload.identifier))
-        .bind(("name", payload.name))
+        .bind(("identifier", payload.identifier.clone()))
+        .bind(("name", payload.name.clone()))
         .await;
 
     match response {

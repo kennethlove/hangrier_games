@@ -181,6 +181,18 @@ pub async fn create_game(
     state: State<AppState>,
     Json(payload): Json<Game>,
 ) -> Result<Json<Game>, AppError> {
+    // Validate game name
+    if payload.name.is_empty() {
+        return Err(AppError::ValidationError(
+            "Game name cannot be empty".to_string(),
+        ));
+    }
+    if payload.name.len() > 100 {
+        return Err(AppError::ValidationError(
+            "Game name must be 100 characters or less".to_string(),
+        ));
+    }
+
     let game_identifier = payload.clone().identifier;
 
     let game: Option<Game> = state
@@ -428,7 +440,7 @@ pub async fn game_update(
 ) -> Result<Json<Game>, AppError> {
     // Validate input
     if let Err(e) = validator::Validate::validate(&payload) {
-        return Err(AppError::BadRequest(format!("Invalid input: {}", e)));
+        return Err(AppError::ValidationError(format!("{}", e)));
     }
 
     let response = state

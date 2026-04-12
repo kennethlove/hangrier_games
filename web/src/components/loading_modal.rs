@@ -1,7 +1,7 @@
-use crate::components::modal::{Modal, Props as ModalProps};
 use crate::LoadingState;
-use dioxus::prelude::*;
 use crate::components::icons::loading::LoadingIcon;
+use crate::components::modal::{Modal, Props as ModalProps};
+use dioxus::prelude::*;
 
 #[component]
 pub fn LoadingModal() -> Element {
@@ -20,7 +20,7 @@ pub fn LoadingModal() -> Element {
                 class: "flex justify-center pb-4",
                 LoadingIcon {}
             }
-        })
+        }),
     };
 
     rsx! {

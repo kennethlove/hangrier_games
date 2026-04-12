@@ -1,5 +1,5 @@
-use dioxus::prelude::*;
 use crate::components::icons::mockingjay_arrow::MockingjayArrow;
+use dioxus::prelude::*;
 
 #[component]
 pub fn LoadingIcon() -> Element {

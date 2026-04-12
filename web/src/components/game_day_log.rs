@@ -1,18 +1,23 @@
 use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::env::APP_API_HOST;
-use crate::storage::{use_persistent, AppState};
+use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::messages::GameMessage;
 use shared::DisplayGame;
 
-async fn fetch_game_day_log(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
+async fn fetch_game_day_log(
+    keys: Vec<QueryKey>,
+    token: String,
+) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::GameDayLog(identifier, day)) = keys.first() {
         let client = reqwest::Client::new();
 
-        let request = client.request(
-            reqwest::Method::GET,
-            format!("{}/api/games/{}/log/{}", APP_API_HOST, identifier, day))
+        let request = client
+            .request(
+                reqwest::Method::GET,
+                format!("{}/api/games/{}/log/{}", APP_API_HOST, identifier, day),
+            )
             .bearer_auth(token);
 
         match request.send().await {
@@ -23,9 +28,7 @@ async fn fetch_game_day_log(keys: Vec<QueryKey>, token: String) -> QueryResult<Q
                     QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
                 }
             }
-            Err(_) => {
-                QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
-            }
+            Err(_) => QueryResult::Err(QueryError::GameNotFound(identifier.to_string())),
         }
     } else {
         QueryResult::Err(QueryError::Unknown)
@@ -43,9 +46,9 @@ pub fn GameDayLog(game: DisplayGame, day: u32) -> Element {
         [
             QueryKey::GameDayLog(identifier.clone(), day),
             QueryKey::DisplayGame(identifier.clone()),
-            QueryKey::Games
+            QueryKey::Games,
         ],
-        move |keys: Vec<QueryKey>| { fetch_game_day_log(keys, token.clone()) },
+        move |keys: Vec<QueryKey>| fetch_game_day_log(keys, token.clone()),
     );
 
     match log_query.result().value() {
@@ -71,6 +74,8 @@ pub fn GameDayLog(game: DisplayGame, day: u32) -> Element {
         QueryState::Loading(_) => {
             rsx! { p { class: "theme1:text-green-200 theme2:text-green-200", "Loading..." } }
         }
-        _ => { rsx! {} }
+        _ => {
+            rsx! {}
+        }
     }
 }

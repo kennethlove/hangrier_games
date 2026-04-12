@@ -15,4 +15,3 @@ pub fn EditIcon(class: String) -> Element {
         }
     }
 }
-

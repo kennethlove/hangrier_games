@@ -1,12 +1,12 @@
-use std::ops::Deref;
-use dioxus::prelude::*;
-use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult, MutationState};
-use shared::{AuthenticatedUser, RegistrationUser};
-use crate::env::APP_API_HOST;
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use crate::components::{Input, ThemedButton};
+use crate::env::APP_API_HOST;
 use crate::routes::Routes;
-use crate::storage::{use_persistent, AppState};
+use crate::storage::{AppState, use_persistent};
+use dioxus::prelude::*;
+use dioxus_query::prelude::{MutationResult, MutationState, use_mutation, use_query_client};
+use shared::{AuthenticatedUser, RegistrationUser};
+use std::ops::Deref;
 
 async fn register_user(user: RegistrationUser) -> MutationResult<MutationValue, MutationError> {
     let client = reqwest::Client::new();
@@ -15,21 +15,17 @@ async fn register_user(user: RegistrationUser) -> MutationResult<MutationValue, 
         "password": user.password,
     });
 
-    let response = client.post(format!("{}/api/users", APP_API_HOST))
+    let response = client
+        .post(format!("{}/api/users", APP_API_HOST))
         .json(&json_body)
-        .send().await;
+        .send()
+        .await;
 
     match response {
-        Ok(response) => {
-            match response.json::<AuthenticatedUser>().await {
-                Ok(user) => {
-                    MutationResult::Ok(MutationValue::User(user))
-                }
-                Err(_) => {
-                    MutationResult::Err(MutationError::UnableToRegisterUser)
-                }
-            }
-        }
+        Ok(response) => match response.json::<AuthenticatedUser>().await {
+            Ok(user) => MutationResult::Ok(MutationValue::User(user)),
+            Err(_) => MutationResult::Err(MutationError::UnableToRegisterUser),
+        },
         Err(e) => {
             dioxus_logger::tracing::error!("error creating user: {:?}", e);
             MutationResult::Err(MutationError::UnableToRegisterUser)
@@ -44,21 +40,17 @@ async fn authenticate_user(user: RegistrationUser) -> MutationResult<MutationVal
         "password": user.password,
     });
 
-    let response = client.post(format!("{}/api/users/authenticate", APP_API_HOST))
+    let response = client
+        .post(format!("{}/api/users/authenticate", APP_API_HOST))
         .json(&json_body)
-        .send().await;
+        .send()
+        .await;
 
     match response {
-        Ok(response) => {
-            match response.json::<AuthenticatedUser>().await {
-                Ok(user) => {
-                    MutationResult::Ok(MutationValue::User(user))
-                }
-                Err(_) => {
-                    MutationResult::Err(MutationError::UnableToAuthenticateUser)
-                }
-            }
-        }
+        Ok(response) => match response.json::<AuthenticatedUser>().await {
+            Ok(user) => MutationResult::Ok(MutationValue::User(user)),
+            Err(_) => MutationResult::Err(MutationError::UnableToAuthenticateUser),
+        },
         Err(e) => {
             dioxus_logger::tracing::error!("error authenticating user: {:?}", e);
             MutationResult::Err(MutationError::UnableToAuthenticateUser)
@@ -398,7 +390,10 @@ fn RegisterForm() -> Element {
 fn LogoutButton() -> Element {
     let mut storage = use_persistent("hangry-games", AppState::default);
     let state = storage.get();
-    let username = state.username.clone().unwrap_or("whoever you are".to_string());
+    let username = state
+        .username
+        .clone()
+        .unwrap_or("whoever you are".to_string());
 
     rsx! {
         form {

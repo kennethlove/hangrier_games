@@ -1,12 +1,12 @@
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
-use crate::components::icons::delete::DeleteIcon;
 use crate::components::Button;
+use crate::components::icons::delete::DeleteIcon;
 use crate::env::APP_API_HOST;
+use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult, MutationState};
+use dioxus_query::prelude::{MutationResult, MutationState, use_mutation, use_query_client};
 use shared::DeleteGame;
 use std::ops::Deref;
-use crate::storage::{use_persistent, AppState};
 
 async fn delete_game(args: (DeleteGame, String)) -> MutationResult<MutationValue, MutationError> {
     let identifier = args.0.0;
@@ -15,10 +15,7 @@ async fn delete_game(args: (DeleteGame, String)) -> MutationResult<MutationValue
     let client = reqwest::Client::new();
     let url: String = format!("{}/api/games/{}", APP_API_HOST, identifier);
 
-    let response = client
-        .delete(url)
-        .bearer_auth(token)
-        .send().await;
+    let response = client.delete(url).bearer_auth(token).send().await;
 
     if response.unwrap().status().is_success() {
         MutationResult::Ok(MutationValue::GameDeleted(identifier, name))
@@ -64,7 +61,9 @@ pub fn DeleteGameModal() -> Element {
     let name = {
         if let Some(details) = delete_game_info.clone() {
             details.1
-        } else { String::new() }
+        } else {
+            String::new()
+        }
     };
 
     let dismiss = move |_| {
@@ -78,7 +77,9 @@ pub fn DeleteGameModal() -> Element {
             let token = storage.get().jwt.expect("No JWT found");
             spawn(async move {
                 mutate.mutate_async((dg.clone(), token)).await;
-                if let MutationState::Settled(Ok(MutationValue::GameDeleted(_, _))) = mutate.result().deref() {
+                if let MutationState::Settled(Ok(MutationValue::GameDeleted(_, _))) =
+                    mutate.result().deref()
+                {
                     client.invalidate_queries(&[QueryKey::Games]);
                     delete_game_signal.set(None);
                 }

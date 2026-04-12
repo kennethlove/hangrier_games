@@ -5,9 +5,9 @@ use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_status_icon::TributeStatusIcon;
 use crate::env::APP_API_HOST;
 use crate::routes::Routes;
-use crate::storage::{use_persistent, AppState};
+use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_get_query, QueryResult, QueryState};
+use dioxus_query::prelude::{QueryResult, QueryState, use_get_query};
 use game::messages::GameMessage;
 use game::tributes::{Attributes, Tribute};
 
@@ -16,25 +16,34 @@ async fn fetch_tribute(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryV
         if let Some(QueryKey::DisplayGame(game_identifier)) = keys.last() {
             let client = reqwest::Client::new();
 
-            let request = client.request(
-                reqwest::Method::GET,
-                format!("{}/api/games/{}/tributes/{}", APP_API_HOST, game_identifier, tribute_identifier))
+            let request = client
+                .request(
+                    reqwest::Method::GET,
+                    format!(
+                        "{}/api/games/{}/tributes/{}",
+                        APP_API_HOST, game_identifier, tribute_identifier
+                    ),
+                )
                 .bearer_auth(token);
 
             match request.send().await {
                 Ok(response) => {
                     if response.status().is_success() {
                         match response.json::<Option<Tribute>>().await {
-                            Ok(Some(tribute)) => QueryResult::Ok(QueryValue::Tribute(Box::new(tribute))),
-                            _ => QueryResult::Err(QueryError::TributeNotFound(tribute_identifier.to_string()))
+                            Ok(Some(tribute)) => {
+                                QueryResult::Ok(QueryValue::Tribute(Box::new(tribute)))
+                            }
+                            _ => QueryResult::Err(QueryError::TributeNotFound(
+                                tribute_identifier.to_string(),
+                            )),
                         }
                     } else {
-                        QueryResult::Err(QueryError::TributeNotFound(tribute_identifier.to_string()))
+                        QueryResult::Err(QueryError::TributeNotFound(
+                            tribute_identifier.to_string(),
+                        ))
                     }
                 }
-                Err(_) => {
-                    QueryResult::Err(QueryError::Unknown)
-                }
+                Err(_) => QueryResult::Err(QueryError::Unknown),
             }
         } else {
             QueryResult::Err(QueryError::Unknown)
@@ -44,37 +53,38 @@ async fn fetch_tribute(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryV
     }
 }
 
-async fn fetch_tribute_log(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
+async fn fetch_tribute_log(
+    keys: Vec<QueryKey>,
+    token: String,
+) -> QueryResult<QueryValue, QueryError> {
     if let Some(QueryKey::TributeLog(identifier)) = keys.first() {
         if let Some(QueryKey::DisplayGame(game_identifier)) = keys.last() {
             let client = reqwest::Client::new();
 
-            let request = client.request(
-                reqwest::Method::GET,
-                format!("{}/api/games/{}/tributes/{}/log", APP_API_HOST, game_identifier, identifier))
+            let request = client
+                .request(
+                    reqwest::Method::GET,
+                    format!(
+                        "{}/api/games/{}/tributes/{}/log",
+                        APP_API_HOST, game_identifier, identifier
+                    ),
+                )
                 .bearer_auth(token);
 
             match request.send().await {
-                Ok(response) => {
-                    match response.json::<Vec<GameMessage>>().await {
-                        Ok(logs) => {
-                            QueryResult::Ok(QueryValue::Logs(logs))
-                        }
-                        Err(_) => {
-                            QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
-                        }
-                    }
-                }
-                Err(_) => {
-                    QueryResult::Err(QueryError::TributeNotFound(identifier.to_string()))
-                }
+                Ok(response) => match response.json::<Vec<GameMessage>>().await {
+                    Ok(logs) => QueryResult::Ok(QueryValue::Logs(logs)),
+                    Err(_) => QueryResult::Err(QueryError::TributeNotFound(identifier.to_string())),
+                },
+                Err(_) => QueryResult::Err(QueryError::TributeNotFound(identifier.to_string())),
             }
-        } else { QueryResult::Err(QueryError::Unknown) }
+        } else {
+            QueryResult::Err(QueryError::Unknown)
+        }
     } else {
         QueryResult::Err(QueryError::Unknown)
     }
 }
-
 
 #[component]
 pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Element {
@@ -87,7 +97,7 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
             QueryKey::Tributes(game_identifier.clone()),
             QueryKey::DisplayGame(game_identifier.clone()),
         ],
-        move|keys: Vec<QueryKey>| { fetch_tribute(keys, token.clone()) },
+        move |keys: Vec<QueryKey>| fetch_tribute(keys, token.clone()),
     );
 
     match tribute_query.result().value() {
@@ -237,7 +247,9 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
         QueryState::Loading(_) => {
             rsx! { p { "Loading..." } }
         }
-        _ => { rsx! { } }
+        _ => {
+            rsx! {}
+        }
     }
 }
 
@@ -249,9 +261,9 @@ fn TributeLog(game_identifier: String, identifier: String) -> Element {
     let log_query = use_get_query(
         [
             QueryKey::TributeLog(identifier.clone()),
-            QueryKey::DisplayGame(game_identifier.clone())
+            QueryKey::DisplayGame(game_identifier.clone()),
         ],
-        move |keys: Vec<QueryKey>| { fetch_tribute_log(keys, token.clone()) },
+        move |keys: Vec<QueryKey>| fetch_tribute_log(keys, token.clone()),
     );
 
     match log_query.result().value() {
@@ -271,9 +283,15 @@ fn TributeLog(game_identifier: String, identifier: String) -> Element {
                 }
             }
         }
-        QueryState::Settled(Err(_)) => { rsx! { p { "Failed to load." }  } }
-        QueryState::Loading(_) => { rsx! { p { "Loading..." }  } }
-        _ => { rsx! {} }
+        QueryState::Settled(Err(_)) => {
+            rsx! { p { "Failed to load." }  }
+        }
+        QueryState::Loading(_) => {
+            rsx! { p { "Loading..." }  }
+        }
+        _ => {
+            rsx! {}
+        }
     }
 }
 

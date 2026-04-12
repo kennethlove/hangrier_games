@@ -3,9 +3,9 @@ use crate::components::icons::edit::EditIcon;
 use crate::components::modal::{Modal, Props as ModalProps};
 use crate::components::{Button, Input};
 use crate::env::APP_API_HOST;
-use crate::storage::{use_persistent, AppState};
+use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult, MutationState};
+use dioxus_query::prelude::{MutationResult, MutationState, use_mutation, use_query_client};
 use shared::EditGame;
 use std::ops::Deref;
 
@@ -20,9 +20,14 @@ async fn edit_game(args: (EditGame, String)) -> MutationResult<MutationValue, Mu
         .put(url)
         .bearer_auth(token)
         .json(&args.0.clone())
-        .send().await;
+        .send()
+        .await;
 
-    if response.expect("Failed to update game").status().is_success() {
+    if response
+        .expect("Failed to update game")
+        .status()
+        .is_success()
+    {
         Ok(MutationValue::GameUpdated(identifier))
     } else {
         Err(MutationError::Unknown)
@@ -37,7 +42,11 @@ pub fn GameEdit(identifier: String, name: String, icon_class: String, private: b
     let onclick = move |_| {
         let name = name.clone();
         let private = private.clone();
-        edit_game_signal.set(Some(EditGame(identifier.clone(), name.clone(), private.clone())));
+        edit_game_signal.set(Some(EditGame(
+            identifier.clone(),
+            name.clone(),
+            private.clone(),
+        )));
     };
 
     rsx! {
@@ -101,7 +110,10 @@ pub fn EditGameForm() -> Element {
         let data = e.data().values();
         let name = data.get("name").expect("No name value").0[0].clone();
         let private = {
-            match data.get("private").expect("No private value").0[0].clone().as_str() {
+            match data.get("private").expect("No private value").0[0]
+                .clone()
+                .as_str()
+            {
                 "on" => true,
                 _ => false,
             }
@@ -113,8 +125,14 @@ pub fn EditGameForm() -> Element {
                 mutate.mutate_async((edit_game.clone(), token)).await;
                 edit_game_signal.set(Some(edit_game.clone()));
 
-                if let MutationState::Settled(MutationResult::Ok(MutationValue::GameUpdated(identifier))) = mutate.result().deref() {
-                    client.invalidate_queries(&[QueryKey::DisplayGame(identifier.clone()), QueryKey::Games]);
+                if let MutationState::Settled(MutationResult::Ok(MutationValue::GameUpdated(
+                    identifier,
+                ))) = mutate.result().deref()
+                {
+                    client.invalidate_queries(&[
+                        QueryKey::DisplayGame(identifier.clone()),
+                        QueryKey::Games,
+                    ]);
                     edit_game_signal.set(None);
                 }
             });

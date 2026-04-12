@@ -14,4 +14,3 @@ pub fn LockClosedIcon(class: String) -> Element {
         }
     }
 }
-

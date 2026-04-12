@@ -1,6 +1,8 @@
-use crate::components::{Accounts, AccountsPage, Credits, GamePage, Games, GamesList, Home, IconsPage, Navbar, TributeDetail};
+use crate::components::{
+    Accounts, AccountsPage, Credits, GamePage, Games, GamesList, Home, IconsPage, Navbar,
+    TributeDetail,
+};
 use dioxus::prelude::*;
-
 
 #[component]
 fn PageNotFound(route: Vec<String>) -> Element {

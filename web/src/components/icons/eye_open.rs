@@ -20,4 +20,3 @@ pub fn EyeOpenIcon(class: String) -> Element {
         }
     }
 }
-

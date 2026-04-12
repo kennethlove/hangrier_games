@@ -2,7 +2,7 @@ use crate::components::icons::mockingjay::Mockingjay;
 use crate::components::icons::mockingjay_arrow::MockingjayArrow;
 use crate::components::icons::mockingjay_flight::MockingjayFlight;
 use crate::routes::Routes;
-use crate::storage::{use_persistent, AppState, Colorscheme};
+use crate::storage::{AppState, Colorscheme, use_persistent};
 use dioxus::prelude::*;
 
 #[component]

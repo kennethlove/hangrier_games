@@ -15,4 +15,3 @@ pub fn MapPinIcon(class: String) -> Element {
         }
     }
 }
-

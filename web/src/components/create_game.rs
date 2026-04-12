@@ -1,39 +1,34 @@
+use crate::LoadingState;
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use crate::components::{Input, ThemedButton};
-use crate::LoadingState;
 use crate::env::APP_API_HOST;
+use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{use_mutation, use_query_client, MutationResult, MutationState};
+use dioxus_query::prelude::{MutationResult, MutationState, use_mutation, use_query_client};
 use game::games::Game;
 use std::ops::Deref;
-use crate::storage::{use_persistent, AppState};
 
-async fn create_game(args: (Option<String>, String)) -> MutationResult<MutationValue, MutationError> {
+async fn create_game(
+    args: (Option<String>, String),
+) -> MutationResult<MutationValue, MutationError> {
     let name = args.0.clone();
     let token = args.1.clone();
     let client = reqwest::Client::new();
     let json_body = match name {
         Some(name) => Game::new(&name),
-        None => Game::default()
+        None => Game::default(),
     };
 
-    let response = client.request(
-        reqwest::Method::POST,
-        format!("{}/api/games", APP_API_HOST))
+    let response = client
+        .request(reqwest::Method::POST, format!("{}/api/games", APP_API_HOST))
         .bearer_auth(token)
         .json(&json_body);
 
     match response.send().await {
-        Ok(response) => {
-            match response.json::<Game>().await {
-                Ok(game) => {
-                    MutationResult::Ok(MutationValue::NewGame(game))
-                }
-                Err(_) => {
-                    MutationResult::Err(MutationError::UnableToCreateGame)
-                }
-            }
-        }
+        Ok(response) => match response.json::<Game>().await {
+            Ok(game) => MutationResult::Ok(MutationValue::NewGame(game)),
+            Err(_) => MutationResult::Err(MutationError::UnableToCreateGame),
+        },
         Err(e) => {
             dioxus_logger::tracing::error!("error creating game: {:?}", e);
             MutationResult::Err(MutationError::UnableToCreateGame)
@@ -82,7 +77,9 @@ pub fn CreateGameForm() -> Element {
     let onsubmit = move |_| {
         let token = storage.get().jwt.expect("No JWT found");
         let name = game_name_signal.peek().clone();
-        if name.is_empty() { return; }
+        if name.is_empty() {
+            return;
+        }
         loading_signal.set(LoadingState::Loading);
 
         spawn(async move {

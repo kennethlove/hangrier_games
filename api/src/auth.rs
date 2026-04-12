@@ -77,7 +77,7 @@ pub async fn store_refresh_token(
     let _: Option<RefreshToken> = state
         .db
         .create("refresh_token")
-        .content(refresh_token)
+        .content(refresh_token.clone())
         .await
         .map_err(|e| AppError::DbError(format!("Failed to store refresh token: {}", e)))?;
     Ok(())
@@ -85,10 +85,11 @@ pub async fn store_refresh_token(
 
 /// Retrieve a refresh token from the database by token string
 pub async fn get_refresh_token(state: &AppState, token: &str) -> Result<RefreshToken, AppError> {
+    let token_owned = token.to_string();
     let mut result = state
         .db
         .query("SELECT * FROM refresh_token WHERE token = $token LIMIT 1")
-        .bind(("token", token))
+        .bind(("token", token_owned))
         .await
         .map_err(|e| AppError::DbError(format!("Failed to query refresh token: {}", e)))?;
 
@@ -104,10 +105,11 @@ pub async fn get_refresh_token(state: &AppState, token: &str) -> Result<RefreshT
 
 /// Revoke a refresh token in the database
 pub async fn revoke_refresh_token(state: &AppState, token: &str) -> Result<(), AppError> {
+    let token_owned = token.to_string();
     let _: Option<RefreshToken> = state
         .db
         .query("UPDATE refresh_token SET revoked = true WHERE token = $token")
-        .bind(("token", token))
+        .bind(("token", token_owned))
         .await
         .map_err(|e| AppError::DbError(format!("Failed to revoke refresh token: {}", e)))?
         .take(0)

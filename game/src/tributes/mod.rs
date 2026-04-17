@@ -125,6 +125,10 @@ pub struct Tribute {
     /// Terrain types this tribute is familiar with
     #[serde(default)]
     pub terrain_affinity: Vec<crate::terrain::BaseTerrain>,
+    /// Current stamina for actions
+    pub stamina: u32,
+    /// Maximum stamina capacity
+    pub max_stamina: u32,
 }
 
 impl Default for Tribute {
@@ -214,6 +218,8 @@ impl Tribute {
             events: vec![],
             editable: true,
             terrain_affinity,
+            stamina: 100,
+            max_stamina: 100,
         }
     }
 
@@ -325,6 +331,12 @@ impl Tribute {
         self.short_rests();
         self.heals(DEFAULT_HEAL);
         self.heals_mental_damage(DEFAULT_MENTAL_HEAL);
+    }
+
+    /// Restores stamina to maximum capacity
+    /// Should be called at the start of each turn
+    pub fn restore_stamina(&mut self) {
+        self.stamina = self.max_stamina;
     }
 
     /// Marks the tribute as dead and reveals them.
@@ -1205,6 +1217,52 @@ fn calculate_violence_stress(kills: u32, wins: u32, current_sanity: u32) -> u32 
     } else {
         0
     }
+}
+
+/// Calculates the stamina cost for a tribute action based on:
+/// - Base action cost
+/// - Terrain movement multiplier
+/// - Terrain affinity modifier (0.8 if tribute has affinity, 1.0 otherwise)
+/// - Desperation multiplier based on health (1.0 + 0.5 * (1.0 - health%))
+pub fn calculate_stamina_cost(
+    action: &Action,
+    terrain: &crate::terrain::TerrainType,
+    tribute: &Tribute,
+) -> u32 {
+    // Base costs for each action type
+    let base_cost: f32 = match action {
+        Action::Move(_) => 20.0,
+        Action::Hide => 15.0,
+        Action::TakeItem => 10.0,
+        Action::Attack => 25.0,
+        Action::Rest | Action::None => 0.0,
+        Action::UseItem(_) => 10.0,
+    };
+
+    // If base cost is 0, no need to calculate multipliers
+    if base_cost == 0.0 {
+        return 0;
+    }
+
+    // Terrain multiplier from movement_cost
+    let terrain_multiplier = terrain.base.movement_cost();
+
+    // Affinity modifier: 0.8 if tribute has affinity for this terrain, else 1.0
+    let affinity_modifier = if tribute.terrain_affinity.contains(&terrain.base) {
+        0.8
+    } else {
+        1.0
+    };
+
+    // Desperation multiplier: 1.0 + (0.5 × (1.0 - health%))
+    let health_percent = tribute.attributes.health as f32 / 100.0;
+    let desperation_multiplier = 1.0 + (0.5 * (1.0 - health_percent));
+
+    // Calculate final cost with all multipliers
+    let final_cost = base_cost * terrain_multiplier * affinity_modifier * desperation_multiplier;
+
+    // Round to nearest integer
+    final_cost.round() as u32
 }
 
 /// Generate attack data for each tribute.
@@ -2186,10 +2244,10 @@ mod tests {
     async fn do_day_night_happy_path() {
         let mut rng = SmallRng::seed_from_u64(42);
         let mut cornucopia = AreaDetails::new(Some("Cornucopia".to_string()), Cornucopia);
-        let mut tribute1 = Tribute::new("Katniss".to_string(), None, None);
+        let mut tribute1 = Tribute::new("Katniss".to_string(), Some(11), None);
         tribute1.area = Cornucopia;
         let clone = tribute1.clone();
-        let mut tribute2 = Tribute::new("Peeta".to_string(), None, None);
+        let mut tribute2 = Tribute::new("Peeta".to_string(), Some(12), None);
         tribute2.area = Cornucopia;
 
         let mut game = Game::default();

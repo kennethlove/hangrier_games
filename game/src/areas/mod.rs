@@ -3,6 +3,7 @@ pub mod events;
 use crate::areas::events::AreaEvent;
 use crate::items::OwnsItems;
 use crate::items::{Item, ItemError};
+use crate::terrain::{BaseTerrain, TerrainType};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
@@ -69,7 +70,7 @@ impl Area {
     }
 }
 
-#[derive(Clone, Serialize, Default, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct AreaDetails {
     pub identifier: String,
     pub name: String,
@@ -78,6 +79,20 @@ pub struct AreaDetails {
     pub items: Vec<Item>,
     #[serde(default)]
     pub events: Vec<AreaEvent>,
+    pub terrain: TerrainType,
+}
+
+impl Default for AreaDetails {
+    fn default() -> Self {
+        Self {
+            identifier: Uuid::new_v4().to_string(),
+            name: String::new(),
+            area: None,
+            items: vec![],
+            events: vec![],
+            terrain: TerrainType::new(BaseTerrain::Clearing, vec![]).unwrap(),
+        }
+    }
 }
 
 impl OwnsItems for AreaDetails {
@@ -124,6 +139,18 @@ impl AreaDetails {
             area: Some(area),
             items: vec![],
             events: vec![],
+            terrain: TerrainType::new(BaseTerrain::Clearing, vec![]).unwrap(),
+        }
+    }
+
+    pub fn new_with_terrain(name: Option<String>, area: Area, terrain: TerrainType) -> Self {
+        Self {
+            identifier: Uuid::new_v4().to_string(),
+            name: name.unwrap_or(area.to_string()),
+            area: Some(area),
+            items: vec![],
+            events: vec![],
+            terrain,
         }
     }
 

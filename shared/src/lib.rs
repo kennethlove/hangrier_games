@@ -3,6 +3,48 @@ use std::fmt::{Debug, Display};
 use std::str::FromStr;
 use validator::{Validate, ValidationError};
 
+/// Item quantity preset for game customization.
+/// Controls the base number of items spawned in each area.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+pub enum ItemQuantity {
+    Scarce, // 1-2 items per area
+    #[default]
+    Normal, // 3 items per area (default)
+    Abundant, // 5-6 items per area
+}
+
+impl ItemQuantity {
+    /// Returns the base item count for an area based on this preset.
+    pub fn base_item_count(&self) -> u32 {
+        match self {
+            ItemQuantity::Scarce => 1,
+            ItemQuantity::Normal => 3,
+            ItemQuantity::Abundant => 5,
+        }
+    }
+}
+
+/// Event frequency preset for game customization.
+/// Controls how often random events occur during the game.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+pub enum EventFrequency {
+    Rare, // 10% event probability per turn
+    #[default]
+    Normal, // 25% event probability per turn (default)
+    Frequent, // 50% event probability per turn
+}
+
+impl EventFrequency {
+    /// Returns the probability (0.0 - 1.0) of an event occurring per turn.
+    pub fn event_probability(&self) -> f32 {
+        match self {
+            EventFrequency::Rare => 0.1,
+            EventFrequency::Normal => 0.25,
+            EventFrequency::Frequent => 0.5,
+        }
+    }
+}
+
 /// Custom validator to ensure a string is a valid UUID
 fn validate_uuid(value: &str) -> Result<(), ValidationError> {
     uuid::Uuid::parse_str(value)
@@ -18,6 +60,17 @@ pub struct CreateGame {
         message = "Game name must be between 1 and 100 characters"
     ))]
     pub name: Option<String>,
+
+    /// Item spawn quantity preset (Scarce, Normal, Abundant)
+    #[serde(default)]
+    pub item_quantity: ItemQuantity,
+
+    /// Random event frequency preset (Rare, Normal, Frequent)
+    #[serde(default)]
+    pub event_frequency: EventFrequency,
+
+    /// Starting health range for tributes (optional, defaults to 80-100)
+    pub starting_health_range: Option<(u32, u32)>,
 }
 
 pub type DeleteTribute = String;

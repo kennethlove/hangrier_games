@@ -12,6 +12,9 @@ DEFINE FIELD OVERWRITE area ON tribute;
 DEFINE FIELD OVERWRITE player_name ON tribute;
 DEFINE FIELD OVERWRITE statistics ON tribute;
 DEFINE FIELD OVERWRITE attributes ON tribute;
+DEFINE FIELD OVERWRITE stamina ON tribute;
+DEFINE FIELD OVERWRITE max_stamina ON tribute;
+DEFINE FIELD OVERWRITE terrain_affinity ON tribute;
 DEFINE FIELD OVERWRITE created_by ON tribute VALUE $auth READONLY;
 
 DEFINE INDEX OVERWRITE tribute_identifier ON tribute FIELDS identifier UNIQUE;

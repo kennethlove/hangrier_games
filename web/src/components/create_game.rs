@@ -8,6 +8,16 @@ use dioxus_query::prelude::{MutationResult, MutationState, use_mutation, use_que
 use game::games::Game;
 use std::ops::Deref;
 
+// TODO: Game Customization Enhancement
+// To add ItemQuantity and EventFrequency dropdowns:
+// 1. Import: use shared::{ItemQuantity, EventFrequency};
+// 2. Add signals in CreateGameForm:
+//    let mut item_quantity: Signal<ItemQuantity> = use_signal(|| ItemQuantity::Normal);
+//    let mut event_frequency: Signal<EventFrequency> = use_signal(|| EventFrequency::Normal);
+// 3. Create dropdown components for each option
+// 4. Modify create_game() to accept and send these parameters to the API
+// 5. Update Game::new() to accept CreateGame DTO instead of just name
+
 async fn create_game(
     args: (Option<String>, String),
 ) -> MutationResult<MutationValue, MutationError> {

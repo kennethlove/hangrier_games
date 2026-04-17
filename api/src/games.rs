@@ -10,6 +10,7 @@ use game::areas::{Area, AreaDetails};
 use game::games::Game;
 use game::items::Item;
 use game::messages::{GameMessage, MessageSource, get_all_messages};
+use game::terrain::BaseTerrain;
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
 use shared::{
@@ -227,9 +228,18 @@ pub async fn create_game(
         )));
     }
 
-    // Create areas concurrently
-    let area_futures =
-        Area::iter().map(|area| create_area(game_identifier.as_str(), area.clone(), 3, &state.db));
+    // Apply game customization settings
+    let base_item_count = payload.item_quantity.base_item_count();
+
+    // Create areas concurrently with customized item count
+    let area_futures = Area::iter().map(|area| {
+        create_area(
+            game_identifier.as_str(),
+            area.clone(),
+            base_item_count,
+            &state.db,
+        )
+    });
     let area_results = futures::future::join_all(area_futures).await;
 
     if let Some(err) = area_results.into_iter().find_map(Result::err) {
@@ -251,7 +261,7 @@ pub async fn create_area(
     let game_uuid = Uuid::from_str(game_identifier)
         .map_err(|e| AppError::BadRequest(format!("Invalid game UUID: {}", e)))?;
     if let Ok(game_area) = create_game_area_edge(area.clone(), game_uuid, &db).await {
-        let item_futures = (0..num_items).map(|_| add_item_to_area(&game_area, &db));
+        let item_futures = (0..num_items).map(|_| add_item_to_area(&game_area, None, &db));
         let item_results = futures::future::join_all(item_futures).await;
         if let Some(err) = item_results.into_iter().find_map(Result::err) {
             return Err(AppError::InternalServerError(format!(
@@ -270,10 +280,14 @@ pub async fn create_area(
 
 pub async fn add_item_to_area(
     game_area_edge: &GameAreaEdge,
+    terrain: Option<BaseTerrain>,
     db: &Surreal<Any>,
 ) -> Result<(), AppError> {
-    // Insert an item
-    let new_item: Item = Item::new_random(None);
+    // Insert an item using terrain-based weights if terrain is provided
+    let new_item: Item = match terrain {
+        Some(t) => Item::new_random_with_terrain(t, None),
+        None => Item::new_random(None),
+    };
     let new_item_id: RecordId = RecordId::from(("item", &new_item.identifier));
     if let Err(e) = db
         .insert::<Option<Item>>(new_item_id.clone())

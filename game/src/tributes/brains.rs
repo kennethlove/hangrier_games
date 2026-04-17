@@ -1,3 +1,5 @@
+use crate::areas::{Area, AreaDetails};
+use crate::terrain::{BaseTerrain, Harshness, TerrainType, Visibility};
 use crate::tributes::Tribute;
 use crate::tributes::actions::Action;
 use rand::Rng;
@@ -65,6 +67,195 @@ impl Brain {
             self.decide_action_few_enemies(tribute)
         } else {
             self.decide_action_many_enemies(tribute)
+        }
+    }
+
+    /// Choose the best destination from available areas based on terrain scoring.
+    /// Returns the Area enum variant of the highest-scoring area.
+    ///
+    /// Scoring factors:
+    /// - +20 if area has terrain in tribute's affinity
+    /// - -10 per harshness tier (Mild=0, Moderate=-10, Harsh=-20)
+    /// - +5 if terrain visibility is Concealed (good for hiding)
+    /// - +3 if area has items
+    /// - +60 (3.0x * 20) if tribute health < 30 and area has affinity terrain (desperate behavior)
+    pub fn choose_destination(&self, areas: &[AreaDetails], tribute: &Tribute) -> Option<Area> {
+        if areas.is_empty() {
+            return None;
+        }
+
+        let is_desperate = tribute.attributes.health < 30;
+
+        let mut best_score = i32::MIN;
+        let mut best_area: Option<Area> = None;
+
+        for area_details in areas {
+            let mut score = 0i32;
+
+            // Affinity bonus: +20 if terrain matches tribute's affinity
+            let has_affinity = tribute
+                .terrain_affinity
+                .contains(&area_details.terrain.base);
+            if has_affinity {
+                score += 20;
+
+                // Desperate behavior: 3.0x boost to affinity terrain (additional +40)
+                if is_desperate {
+                    score += 40; // Total 60 for desperate + affinity
+                }
+            }
+
+            // Harshness penalty: -10 per tier
+            let harshness_penalty = match area_details.terrain.base.harshness() {
+                Harshness::Mild => 0,
+                Harshness::Moderate => -10,
+                Harshness::Harsh => -20,
+            };
+            score += harshness_penalty;
+
+            // Concealed visibility bonus: +5 (good for hiding)
+            if matches!(
+                area_details.terrain.base.visibility(),
+                Visibility::Concealed
+            ) {
+                score += 5;
+            }
+
+            // Items bonus: +3 if area has items
+            if !area_details.items.is_empty() {
+                score += 3;
+            }
+
+            if score > best_score {
+                best_score = score;
+                best_area = area_details.area.clone();
+            }
+        }
+
+        best_area
+    }
+
+    /// Decide action with terrain awareness. Modifies action weights based on terrain.
+    ///
+    /// Terrain-based weight modifications:
+    /// - Boost Search weight by 2.0x in Desert/Tundra/Badlands (resource-scarce)
+    /// - Boost Hide weight by 1.5x in Forest/Jungle/Wetlands (Concealed visibility)
+    pub fn decide_action_with_terrain(
+        &self,
+        tribute: &Tribute,
+        nearby_tributes: u32,
+        terrain: TerrainType,
+        rng: &mut impl Rng,
+    ) -> Action {
+        if !tribute.is_alive() {
+            return Action::None;
+        }
+
+        // Check for preferred action first
+        if let Some(ref preferred_action) = self.preferred_action {
+            if rng.random_bool(self.preferred_action_percentage) {
+                return preferred_action.clone();
+            }
+        }
+
+        // Check if we have consumables
+        let has_consumables = !tribute.consumables().is_empty();
+        if has_consumables {
+            return Action::UseItem(None);
+        }
+
+        // Check if terrain is resource-scarce (should boost search/movement)
+        let is_resource_scarce = matches!(
+            terrain.base,
+            BaseTerrain::Desert | BaseTerrain::Tundra | BaseTerrain::Badlands
+        );
+
+        // Check if terrain is concealed (should boost hiding)
+        let is_concealed = matches!(terrain.base.visibility(), Visibility::Concealed);
+
+        // Decide base action
+        let base_action = if nearby_tributes == 0 {
+            self.decide_action_no_enemies(tribute)
+        } else if nearby_tributes < LOW_ENEMY_LIMIT {
+            self.decide_action_few_enemies_with_terrain(tribute, is_concealed)
+        } else {
+            self.decide_action_many_enemies_with_terrain(tribute, is_concealed)
+        };
+
+        // Apply terrain modifiers to action choices
+        match base_action {
+            Action::Move(None) if is_resource_scarce => {
+                // In resource-scarce terrain, stay focused on movement/search
+                Action::Move(None)
+            }
+            Action::Hide if is_concealed => {
+                // Concealed terrain makes hiding more effective
+                Action::Hide
+            }
+            other => other,
+        }
+    }
+
+    fn decide_action_few_enemies_with_terrain(
+        &self,
+        tribute: &Tribute,
+        is_concealed: bool,
+    ) -> Action {
+        match tribute.attributes.health {
+            1..LOW_HEALTH_LIMIT => {
+                self.decide_action_few_enemies_low_health_with_terrain(tribute, is_concealed)
+            }
+            LOW_HEALTH_LIMIT..=MID_HEALTH_LIMIT => {
+                // Boost hiding in concealed terrain
+                if tribute.attributes.sanity > LOW_SANITY_LIMIT && is_concealed {
+                    Action::Hide
+                } else if tribute.attributes.sanity > LOW_SANITY_LIMIT {
+                    Action::Move(None)
+                } else {
+                    Action::Attack
+                }
+            }
+            // High health - normally would attack, but concealed terrain makes hiding attractive
+            _ if is_concealed && tribute.attributes.sanity > LOW_SANITY_LIMIT => Action::Hide,
+            _ => Action::Attack,
+        }
+    }
+
+    fn decide_action_few_enemies_low_health_with_terrain(
+        &self,
+        tribute: &Tribute,
+        is_concealed: bool,
+    ) -> Action {
+        let stats = (
+            tribute.attributes.movement,
+            tribute.attributes.sanity,
+            tribute.attributes.is_hidden,
+        );
+        match stats {
+            // Boost hiding in concealed terrain with low movement
+            (..LOW_MOVEMENT_LIMIT, MID_SANITY_LIMIT.., false) if is_concealed => Action::Hide,
+            (..LOW_MOVEMENT_LIMIT, MID_SANITY_LIMIT.., false) => Action::Hide,
+            (..LOW_MOVEMENT_LIMIT, EXTREME_LOW_SANITY_LIMIT..MID_SANITY_LIMIT, _) => Action::Attack,
+            (_, MID_SANITY_LIMIT.., false) => Action::Move(None),
+            (_, ..MID_SANITY_LIMIT, false) => Action::Attack,
+            (_, _, true) => Action::None,
+        }
+    }
+
+    fn decide_action_many_enemies_with_terrain(
+        &self,
+        tribute: &Tribute,
+        is_concealed: bool,
+    ) -> Action {
+        let recklessness: u32 = 100_u32
+            .saturating_sub(tribute.attributes.intelligence)
+            .saturating_sub(tribute.attributes.sanity);
+        match recklessness {
+            ..HIGH_INTELLIGENCE_LIMIT => Action::Move(None),
+            LOW_INTELLIGENCE_LIMIT.. => Action::Attack,
+            // Boost hiding in concealed terrain for average intelligence
+            _ if is_concealed => Action::Hide,
+            _ => Action::Hide,
         }
     }
 

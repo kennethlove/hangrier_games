@@ -2,6 +2,7 @@ extern crate core;
 
 use api::AppState;
 use api::auth::AUTH_ROUTER;
+use api::cleanup::start_cleanup_scheduler;
 use api::games::GAMES_ROUTER;
 use api::users::USERS_ROUTER;
 use axum::extract::{Request, State};
@@ -216,6 +217,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let app_state = AppState { db: db.clone() };
+
+    // Start cleanup scheduler for refresh tokens
+    let _cleanup_scheduler = start_cleanup_scheduler(app_state.clone())
+        .await
+        .map_err(|e| format!("Failed to start cleanup scheduler: {}", e))?;
+    tracing::info!("Cleanup scheduler initialized");
 
     let api_routes = Router::new()
         .nest(

@@ -8,6 +8,7 @@ use surrealdb::engine::any::Any;
 use thiserror::Error;
 
 pub mod auth;
+pub mod cleanup;
 pub mod games;
 pub mod logging;
 // pub mod messages; // TODO: Module file missing

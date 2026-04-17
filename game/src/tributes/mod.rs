@@ -1127,6 +1127,9 @@ impl Tribute {
                 AreaEvent::Blizzard => self.set_status(TributeStatus::Frozen),
                 AreaEvent::Landslide => self.set_status(TributeStatus::Buried),
                 AreaEvent::Heatwave => self.set_status(TributeStatus::Overheated),
+                AreaEvent::Sandstorm => self.set_status(TributeStatus::Burned), // Sand burns and abrades
+                AreaEvent::Drought => self.set_status(TributeStatus::Overheated), // Dehydration effect
+                AreaEvent::Rockslide => self.set_status(TributeStatus::Buried), // Similar to landslide
             }
         }
     }

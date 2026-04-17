@@ -122,6 +122,9 @@ pub struct Tribute {
     pub events: Vec<TributeEvent>,
     #[serde(default)]
     pub editable: bool,
+    /// Terrain types this tribute is familiar with
+    #[serde(default)]
+    pub terrain_affinity: Vec<crate::terrain::BaseTerrain>,
 }
 
 impl Default for Tribute {
@@ -188,6 +191,14 @@ impl Tribute {
 
         let id: String = Uuid::new_v4().to_string();
 
+        // Assign terrain affinity based on district
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+        let terrain_affinity = if district >= 1 && district <= 12 {
+            crate::districts::assign_terrain_affinity(district as u8, &mut rng)
+        } else {
+            vec![]
+        };
+
         Self {
             identifier: id,
             area: Area::Cornucopia,
@@ -202,6 +213,7 @@ impl Tribute {
             items: vec![],
             events: vec![],
             editable: true,
+            terrain_affinity,
         }
     }
 

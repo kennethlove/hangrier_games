@@ -1,4 +1,5 @@
 pub mod areas;
+pub mod districts;
 pub mod games;
 pub mod items;
 pub mod messages;

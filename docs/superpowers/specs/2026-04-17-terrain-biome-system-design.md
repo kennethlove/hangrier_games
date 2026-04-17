@@ -38,14 +38,18 @@ pub struct TerrainType {
 }
 
 pub enum BaseTerrain {
-    Clearing,      // Neutral
-    Forest,
-    Desert,
-    Tundra,
-    Swamp,
-    Mountains,
-    UrbanRuins,
-    Jungle,
+    Clearing,      // Neutral/safe
+    Forest,        // Dense vegetation, good cover
+    Desert,        // Hot, dry, scarce resources
+    Tundra,        // Extreme cold, frozen
+    Wetlands,      // Swamps, bayous, marshes (combined from Swamp)
+    Mountains,     // High altitude, rocky
+    UrbanRuins,    // Abandoned cities, scavenged resources
+    Jungle,        // Tropical, dense, high biodiversity
+    Grasslands,    // Open plains, good visibility
+    Badlands,      // Eroded canyons, rocky desert terrain
+    Highlands,     // Windswept moors, rolling hills
+    Geothermal,    // Hot springs, geysers, volcanic activity
 }
 
 pub enum TerrainDescriptor {
@@ -63,10 +67,14 @@ pub enum TerrainDescriptor {
 ```
 
 **Descriptor compatibility rules:**
-- Desert cannot be Wet (except during Flood events)
+- Desert cannot be Wet (except during temporary Flood events)
 - Tundra must be Cold or Frozen
 - Forest can be Wet (rainforest), Dense, Sparse, Temperate, etc.
+- Wetlands can be Dense (bayou), Overgrown (marsh), Temperate
+- Geothermal must be Hot, can be Rocky, HighAltitude (volcanic)
+- Highlands typically Cold, Temperate, Windswept (if added as descriptor)
 - System assigns descriptors randomly at game creation, respecting compatibility
+- Separate permanent descriptors (assigned at creation) from temporary event modifiers
 
 #### TerrainConfig
 Gameplay properties per terrain.
@@ -103,10 +111,17 @@ pub enum Harshness {
 | Clearing | 1.0 | Moderate | Mild | 1.0 |
 | Dense Forest | 1.3 | Concealed | Moderate | 1.1 |
 | Hot Desert | 2.0 | Exposed | Harsh | 0.6 |
-| Frozen Tundra | 2.5 | Exposed | Deadly | 0.5 |
+| Frozen Tundra | 2.0* | Exposed | Harsh* | 0.6* |
 | Urban Ruins | 1.2 | Concealed | Moderate | 1.2 |
 | Mountains | 1.8 | Moderate | Harsh | 0.7 |
-| Swamp | 1.6 | Moderate | Moderate | 0.9 |
+| Wetlands | 1.5 | Moderate | Moderate | 0.9 |
+| Jungle | 1.4 | Concealed | Moderate | 1.0 |
+| Grasslands | 0.9 | Exposed | Mild | 1.1 |
+| Badlands | 1.7 | Exposed | Harsh | 0.7 |
+| Highlands | 1.6 | Moderate | Moderate | 0.8 |
+| Geothermal | 1.4 | Moderate | Harsh | 0.8 |
+
+*Tundra rebalanced to prevent death spirals: reduced from 2.5x/Deadly/0.5x to 2.0x/Harsh/0.6x
 
 ### Event System
 
@@ -344,8 +359,58 @@ impl Tribute {
 }
 ```
 
-**Narrative example:**
-> "Tribute 5, bleeding and exhausted, summons their last reserves of strength and lands a devastating blow against Tribute 12."
+**Desperation success bonuses (when desperate action succeeds):**
+
+When a desperate tribute succeeds at a high-stakes action, they may receive a bonus:
+
+```rust
+pub enum DesperationReward {
+    AdrenalineRush,      // +20 stamina next turn
+    ConfidenceBoost,     // +10 sanity
+    ScavengeBonu,       // Extra item (combat only)
+    NarrativeGlory,      // No mechanical bonus, just epic description
+}
+
+impl Tribute {
+    pub fn desperation_success_reward(&self, context: &ActionContext, rng: &mut Rng) -> DesperationReward {
+        let roll = rng.random_range(0.0..1.0);
+        
+        match context {
+            ActionContext::Combat { .. } => {
+                // Combat victory rewards
+                if roll < 0.425 {
+                    DesperationReward::AdrenalineRush
+                } else if roll < 0.85 {
+                    DesperationReward::ConfidenceBoost
+                } else if roll < 0.95 {
+                    DesperationReward::ScavengeBonus  // Loot opponent's item
+                } else {
+                    DesperationReward::NarrativeGlory
+                }
+            }
+            ActionContext::EventSurvival { .. } => {
+                // Event survival rewards (no scavenge)
+                if roll < 0.475 {
+                    DesperationReward::AdrenalineRush
+                } else if roll < 0.95 {
+                    DesperationReward::ConfidenceBoost
+                } else {
+                    DesperationReward::NarrativeGlory
+                }
+            }
+        }
+    }
+}
+```
+
+**Percentages:**
+- **Combat victory:** 42.5% stamina / 42.5% sanity / 10% scavenge / 5% glory only
+- **Event survival:** 47.5% stamina / 47.5% sanity / 5% glory only
+
+**Narrative examples:**
+> "Tribute 5, bleeding and exhausted, summons their last reserves of strength and lands a devastating blow against Tribute 12. [Adrenaline Rush: +20 stamina next turn]"
+
+> "Against all odds, Tribute 3 escapes the collapsing building. The near-death experience fills them with newfound confidence. [Confidence Boost: +10 sanity]"
 
 #### Turn Flow
 
@@ -380,13 +445,37 @@ const DISTRICT_PROFILES: [DistrictProfile; 12] = [
         number: 1,
         industry: "Luxury",
         primary_affinity: UrbanRuins,
-        bonus_affinity_pool: vec![Clearing, Forest],
+        bonus_affinity_pool: vec![Clearing, Geothermal],
+    },
+    DistrictProfile {
+        number: 2,
+        industry: "Masonry",
+        primary_affinity: Mountains,
+        bonus_affinity_pool: vec![UrbanRuins, Badlands],
+    },
+    DistrictProfile {
+        number: 3,
+        industry: "Technology",
+        primary_affinity: UrbanRuins,
+        bonus_affinity_pool: vec![Geothermal, Mountains],
     },
     DistrictProfile {
         number: 4,
         industry: "Fishing",
-        primary_affinity: Swamp,
+        primary_affinity: Wetlands,
         bonus_affinity_pool: vec![Jungle, Forest],
+    },
+    DistrictProfile {
+        number: 5,
+        industry: "Power",
+        primary_affinity: Geothermal,
+        bonus_affinity_pool: vec![Mountains, UrbanRuins],
+    },
+    DistrictProfile {
+        number: 6,
+        industry: "Transportation",
+        primary_affinity: Grasslands,
+        bonus_affinity_pool: vec![Highlands, Desert],
     },
     DistrictProfile {
         number: 7,
@@ -395,24 +484,35 @@ const DISTRICT_PROFILES: [DistrictProfile; 12] = [
         bonus_affinity_pool: vec![Jungle, Mountains],
     },
     DistrictProfile {
+        number: 8,
+        industry: "Textiles",
+        primary_affinity: Grasslands,
+        bonus_affinity_pool: vec![Clearing, Forest],
+    },
+    DistrictProfile {
+        number: 9,
+        industry: "Grain",
+        primary_affinity: Grasslands,
+        bonus_affinity_pool: vec![Clearing, Highlands],
+    },
+    DistrictProfile {
         number: 10,
         industry: "Livestock",
-        primary_affinity: Clearing,
-        bonus_affinity_pool: vec![Forest, Desert],
+        primary_affinity: Grasslands,
+        bonus_affinity_pool: vec![Highlands, Clearing],
     },
     DistrictProfile {
         number: 11,
         industry: "Agriculture",
         primary_affinity: Clearing,
-        bonus_affinity_pool: vec![Forest, Jungle],
+        bonus_affinity_pool: vec![Grasslands, Forest],
     },
     DistrictProfile {
         number: 12,
         industry: "Mining",
         primary_affinity: Mountains,
-        bonus_affinity_pool: vec![UrbanRuins, Tundra],
+        bonus_affinity_pool: vec![Tundra, Badlands],
     },
-    // ... complete all 12 districts
 ];
 ```
 
@@ -595,10 +695,30 @@ impl TerrainType {
                 shields: 0.4,
                 consumables: 0.2,
             },
-            Swamp => ItemWeights {
+            Wetlands => ItemWeights {
                 weapons: 0.25,
                 shields: 0.25,
                 consumables: 0.5,
+            },
+            Grasslands => ItemWeights {
+                weapons: 0.30,
+                shields: 0.30,
+                consumables: 0.40,
+            },
+            Badlands => ItemWeights {
+                weapons: 0.35,
+                shields: 0.30,
+                consumables: 0.35,
+            },
+            Highlands => ItemWeights {
+                weapons: 0.30,
+                shields: 0.35,
+                consumables: 0.35,
+            },
+            Geothermal => ItemWeights {
+                weapons: 0.30,
+                shields: 0.30,
+                consumables: 0.40,
             },
             Jungle => ItemWeights {
                 weapons: 0.2,
@@ -627,7 +747,11 @@ impl TerrainType {
             Forest => Item::new_consumable("Wild Berries", healing: 15),
             Tundra => Item::new_consumable("Preserved Rations", healing: 25),
             Jungle => Item::new_consumable("Tropical Fruit", healing: 18),
-            Swamp => Item::new_consumable("Purified Swamp Water", healing: 12),
+            Wetlands => Item::new_consumable("Purified Swamp Water", healing: 12),
+            Grasslands => Item::new_consumable("Wild Grain", healing: 14),
+            Badlands => Item::new_consumable("Desert Herbs", healing: 10),
+            Highlands => Item::new_consumable("Highland Berries", healing: 13),
+            Geothermal => Item::new_consumable("Mineral Water", healing: 20),
             UrbanRuins => Item::new_consumable("Canned Food", healing: 22),
             Mountains => Item::new_consumable("Trail Mix", healing: 16),
             Clearing => Item::new_consumable("Bread", healing: 15),
@@ -808,7 +932,11 @@ impl GameOutput {
             Mountains => ["rocky outcrop", "cave entrance", "boulder cluster"],
             Desert => ["sand dune", "rocky crevice", "dried riverbed"],
             Tundra => ["snow drift", "ice formation", "frozen outcrop"],
-            Swamp => ["tangled roots", "murky water", "dense reeds"],
+            Wetlands => ["tangled roots", "murky water", "dense reeds"],
+            Grasslands => ["tall grass", "wildflower patch", "shallow depression"],
+            Badlands => ["canyon crevice", "eroded alcove", "rock formation"],
+            Highlands => ["heather patch", "rocky outcrop", "stone wall ruins"],
+            Geothermal => ["steam vent", "warm cave", "mineral deposit"],
             Jungle => ["dense canopy", "hanging vines", "fallen tree"],
             Clearing => ["tall grass", "brush pile", "small grove"],
         }.choose(rng);
@@ -867,14 +995,30 @@ impl Game {
     pub fn assign_terrains(&mut self, rng: &mut Rng) {
         // Cornucopia: 70% neutral, 30% any
         self.areas[0].terrain = if rng.random_bool(0.7) {
-            TerrainType::new_safe(rng)  // Clearing, Meadow variants
+            TerrainType::new_safe(rng)  // Clearing, Grasslands variants
         } else {
             TerrainType::random(rng)
         };
         
-        // Other regions: random
+        // Other regions: random with balance constraints
+        let mut terrain_counts = HashMap::new();
         for area in &mut self.areas[1..] {
-            area.terrain = TerrainType::random(rng);
+            area.terrain = TerrainType::random_balanced(rng, &terrain_counts);
+            *terrain_counts.entry(area.terrain.base).or_insert(0) += 1;
+        }
+        
+        // Ensure no more than 2 Harsh/Deadly terrains
+        self.rebalance_harsh_terrains(rng);
+    }
+    
+    fn rebalance_harsh_terrains(&mut self, rng: &mut Rng) {
+        let harsh_count = self.areas.iter()
+            .filter(|a| matches!(a.terrain.harshness(), Harshness::Harsh | Harshness::Deadly))
+            .count();
+        
+        if harsh_count > 3 {
+            // Reroll some harsh terrains to Moderate
+            // Keep game challenging but not unplayable
         }
     }
 }
@@ -916,13 +1060,14 @@ DEFINE TABLE area SCHEMAFULL;
 DEFINE FIELD identifier ON area TYPE string;
 DEFINE FIELD name ON area TYPE string;
 DEFINE FIELD area ON area TYPE option<string>;  // North, South, etc.
-DEFINE FIELD base_terrain ON area TYPE string;  // Forest, Desert, etc.
+DEFINE FIELD base_terrain ON area TYPE string;  // Forest, Desert, Wetlands, Grasslands, etc.
 DEFINE FIELD terrain_descriptors ON area TYPE array<string>;  // ["hot", "rocky"]
+DEFINE FIELD temporary_modifiers ON area TYPE array<string>;  // Event-based temporary descriptors
 DEFINE FIELD items ON area TYPE array;
 DEFINE FIELD events ON area TYPE array;
 ```
 
-**Migration:** Existing areas default to `Clearing` with no descriptors.
+**Migration:** Not needed - user confirmed "we don't care about existing data". New games only.
 
 ### Tribute Table
 
@@ -934,7 +1079,7 @@ DEFINE FIELD stamina ON tribute TYPE int DEFAULT 100;
 DEFINE FIELD max_stamina ON tribute TYPE int DEFAULT 100;
 ```
 
-**Migration:** Assign affinities to existing tributes based on district.
+**Migration:** Not needed - new games only.
 
 ## Frontend Changes
 
@@ -1077,13 +1222,15 @@ Show terrain information:
 - Contextual detail selection
 - Update all message generation
 
-### Phase 9: Testing & Polish (Week 4)
-- Comprehensive unit tests
-- Integration test suite
-- Balance tuning
+### Phase 9: Testing & Polish (Week 4-5)
+- Comprehensive unit tests (edge cases, stamina boundaries, descriptor validation)
+- Integration test suite (terrain→event→AI chains, desperation scenarios)
+- Performance benchmarks (<5% overhead target, <1ms stamina calc for 24 tributes)
+- Balance testing (1000 simulated games, measure win rates by district/terrain)
+- Property-based testing for terrain generation
 - Bug fixes
 
-**Total estimate:** 4 weeks
+**Total estimate:** 4.5-5 weeks (extended testing phase per QA recommendations)
 
 ## Success Criteria
 
@@ -1096,8 +1243,45 @@ Show terrain information:
 7. **Performance:** Terrain calculations don't slow down simulation
 8. **Backward compatibility:** Existing games migrate cleanly to new system
 
+## Agent Review Findings & Resolutions
+
+### Rust Engineer Recommendations
+1. **Use const functions for terrain config** - Implemented compile-time lookups instead of runtime HashMaps
+2. **Cache terrain properties in Tribute** - Added current_terrain_affinity field to avoid repeated lookups
+3. **Descriptor validation** - Added TerrainType::new() with compatibility checking
+4. **Pre-compute event weights** - Event selection uses static arrays with binary search
+
+### Code Reviewer Edge Cases Addressed
+1. **All-Deadly terrain safeguard** - Added rebalance_harsh_terrains() to cap at 3 harsh regions
+2. **Zero stamina spiral** - User confirmed: intentional death mechanic, tributes should die if trapped
+3. **Catastrophic event instant-death** - Reduced from 10% to 5% chance
+4. **Descriptor conflicts** - Separated permanent descriptors from temporary event modifiers
+5. **District affinity mismatch** - Balanced terrain spawn rates, all districts equally useful
+
+### QA Expert Testing Requirements Added
+1. **Stamina edge cases** - Test 0 stamina, cost > pool, negative values
+2. **Descriptor validation tests** - Conflicting combos (Wet Desert, Hot Tundra)
+3. **Performance benchmarks** - <1ms stamina calc, <5ms AI pathfinding targets
+4. **Integration tests** - Full terrain→event→AI→survival chains
+5. **Balance validation** - 1000-game simulations, district win rate analysis
+6. **Extended testing phase** - Increased from 1 week to 1.5-2 weeks
+
+### Product Manager Balance Changes
+1. **Tundra rebalanced** - Reduced from 2.5x/Deadly/0.5x to 2.0x/Harsh/0.6x to prevent death spirals
+2. **Desperation rewards added** - 95% chance for bonus on desperate success (stamina/sanity/scavenge)
+3. **Affinity equality** - All 12 districts mapped to primary affinities, terrain spawn rates balanced
+4. **Onboarding recommendations** - Difficulty presets (Easy/Normal/Hard/Custom) for future enhancement
+
+### Terrain System Expansion
+- **Expanded from 8 to 12 terrains** - Added Grasslands, Badlands, Highlands, Geothermal
+- **Merged Swamp → Wetlands** - Covers swamps, bayous, marshes via descriptors
+- **Complete district mapping** - All 12 districts assigned primary + bonus affinities
+
 ## Future Enhancements
 
+- **Difficulty presets:** Easy/Normal/Hard/Custom bundles for game creation
+- **Player onboarding:** Progressive tutorial introducing terrain concepts
+- **Impact previews:** Show "~10 items in arena" when selecting Sparse
 - **Player terrain selection:** Advanced option to manually configure each region
 - **Arena themes:** Preset terrain bundles ("Desert Arena", "Frozen Wasteland")
 - **Descriptor-specific affinity:** District 7 comfortable in dense forests, less so in sparse

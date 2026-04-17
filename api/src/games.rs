@@ -106,6 +106,9 @@ async fn create_game_area(area: Area, db: &Surreal<Any>) -> Result<GameArea, App
     let identifier = Uuid::new_v4().to_string();
     let area_id: RecordId = RecordId::from(("area", identifier.to_string()));
 
+    // Assign random terrain to the area
+    let terrain = BaseTerrain::random();
+
     // create the `area` record
     let game_area: Option<GameArea> = db
         .insert::<Option<GameArea>>(area_id.clone())
@@ -113,6 +116,7 @@ async fn create_game_area(area: Area, db: &Surreal<Any>) -> Result<GameArea, App
             identifier: identifier.to_string(),
             name: area.to_string(),
             area: area.to_string(),
+            terrain: Some(terrain.to_string()),
         })
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create area: {}", e)))?;
@@ -261,7 +265,17 @@ pub async fn create_area(
     let game_uuid = Uuid::from_str(game_identifier)
         .map_err(|e| AppError::BadRequest(format!("Invalid game UUID: {}", e)))?;
     if let Ok(game_area) = create_game_area_edge(area.clone(), game_uuid, &db).await {
-        let item_futures = (0..num_items).map(|_| add_item_to_area(&game_area, None, &db));
+        // Fetch the area record to get terrain
+        let area_record: Option<GameArea> = db
+            .select(game_area.area.clone())
+            .await
+            .map_err(|e| AppError::InternalServerError(format!("Failed to fetch area: {}", e)))?;
+
+        let terrain = area_record
+            .and_then(|a| a.terrain)
+            .and_then(|t| BaseTerrain::from_str(&t).ok());
+
+        let item_futures = (0..num_items).map(|_| add_item_to_area(&game_area, terrain, &db));
         let item_results = futures::future::join_all(item_futures).await;
         if let Some(err) = item_results.into_iter().find_map(Result::err) {
             return Err(AppError::InternalServerError(format!(

@@ -9,7 +9,7 @@ use axum::http::StatusCode;
 use axum::http::header::{
     ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, ACCESS_CONTROL_ALLOW_METHODS,
     ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_MAX_AGE, AUTHORIZATION, CACHE_CONTROL,
-    CONTENT_TYPE, EXPIRES,
+    CONTENT_TYPE, EXPIRES, HeaderName,
 };
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
@@ -127,7 +127,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|e| format!("Failed to apply migrations: {}", e))?;
     tracing::debug!("Applied migrations");
 
-    let allowed_origins = vec!["http://localhost:8080", "http://127.0.0.1:8080"];
+    // CORS Configuration
+    let env_mode = env::var("ENV").unwrap_or_else(|_| "production".to_string());
+    let is_production = env_mode == "production";
+
+    let allowed_origins_str = env::var("ALLOWED_ORIGINS")
+        .unwrap_or_else(|_| "http://localhost:8080,http://127.0.0.1:8080".to_string());
+
+    let allowed_origins: Vec<String> = allowed_origins_str
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .collect();
+
+    // Validate CORS configuration in production
+    if is_production {
+        for origin in &allowed_origins {
+            if origin == "*" || origin.contains("*") {
+                return Err(format!(
+                    "Wildcard CORS origins are not allowed in production. Found: {}. \
+                    Please set ALLOWED_ORIGINS to specific domains.",
+                    origin
+                )
+                .into());
+            }
+        }
+        tracing::info!(
+            "Production CORS validation passed. Allowed origins: {:?}",
+            allowed_origins
+        );
+    } else {
+        tracing::debug!("Development mode. Allowed origins: {:?}", allowed_origins);
+    }
 
     // These are safe to unwrap as they are static HTTP method strings that are guaranteed valid
     let cors_layer = CorsLayer::new()
@@ -159,10 +189,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             EXPIRES,
         ]);
 
+    // Rate Limiting Configuration
+    let rate_limit_per_second = env::var("RATE_LIMIT_PER_SECOND")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(2); // Default: 2 requests per second (~120 per minute)
+
+    let rate_limit_burst = env::var("RATE_LIMIT_BURST")
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(50); // Default: burst size of 50
+
+    tracing::info!(
+        "Rate limiting configured: {} req/sec, burst size: {}",
+        rate_limit_per_second,
+        rate_limit_burst
+    );
+
     let governor_config = Arc::new(
         GovernorConfigBuilder::default()
-            .per_second(2) // Allow 1 request every 0.5 seconds (2 per second, ~120 per minute)
-            .burst_size(50)
+            .per_second(rate_limit_per_second)
+            .burst_size(rate_limit_burst)
             .key_extractor(CompoundKeyExtractor)
             .finish()
             .ok_or("Failed to build GovernorConfig")?,
@@ -205,6 +252,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
+                .layer(middleware::from_fn(add_rate_limit_headers))
                 .layer(GovernorLayer::new(governor_config))
                 .layer(cors_layer)
                 .into_inner(),
@@ -257,6 +305,46 @@ async fn surreal_jwt(State(state): State<AppState>, request: Request, next: Next
         Ok(_) => next.run(request).await,
         Err(_) => StatusCode::UNAUTHORIZED.into_response(),
     }
+}
+
+/// Middleware to add rate limit headers to responses
+async fn add_rate_limit_headers(request: Request, next: Next) -> Response {
+    let mut response = next.run(request).await;
+
+    // Read rate limit config from environment (same as main config)
+    let rate_limit_per_second = env::var("RATE_LIMIT_PER_SECOND")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(2);
+    let rate_limit_burst = env::var("RATE_LIMIT_BURST")
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(50);
+
+    // Calculate the limit per minute for header
+    let limit_per_minute = rate_limit_per_second * 60;
+
+    // Add rate limit headers
+    let headers = response.headers_mut();
+    headers.insert(
+        HeaderName::from_static("x-ratelimit-limit"),
+        limit_per_minute
+            .to_string()
+            .parse()
+            .unwrap_or_else(|_| "120".parse().unwrap()),
+    );
+
+    // Note: We can't easily get the remaining count from tower-governor without more complex integration
+    // For now, we'll document the limit. A future enhancement could track this more precisely.
+    headers.insert(
+        HeaderName::from_static("x-ratelimit-burst"),
+        rate_limit_burst
+            .to_string()
+            .parse()
+            .unwrap_or_else(|_| "50".parse().unwrap()),
+    );
+
+    response
 }
 
 /// Rate limiting key extractor that uses IP + user_id for JWT-protected routes

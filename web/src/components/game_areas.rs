@@ -90,6 +90,9 @@ pub fn GameAreaList(game: DisplayGame) -> Element {
                                     "#,
 
                                     "{area.name}"
+                                    // TODO: Display terrain information alongside area name
+                                    // Example: "{area.name} ({area.terrain.base_terrain})"
+                                    // Requires terrain data to be properly populated from backend
                                 }
                                 div {
                                     if area.is_open() {

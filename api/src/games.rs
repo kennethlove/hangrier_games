@@ -228,9 +228,18 @@ pub async fn create_game(
         )));
     }
 
-    // Create areas concurrently
-    let area_futures =
-        Area::iter().map(|area| create_area(game_identifier.as_str(), area.clone(), 3, &state.db));
+    // Apply game customization settings
+    let base_item_count = payload.item_quantity.base_item_count();
+
+    // Create areas concurrently with customized item count
+    let area_futures = Area::iter().map(|area| {
+        create_area(
+            game_identifier.as_str(),
+            area.clone(),
+            base_item_count,
+            &state.db,
+        )
+    });
     let area_results = futures::future::join_all(area_futures).await;
 
     if let Some(err) = area_results.into_iter().find_map(Result::err) {

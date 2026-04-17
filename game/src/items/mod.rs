@@ -1,6 +1,7 @@
 mod name_generator;
 
 use crate::items::name_generator::{generate_shield_name, generate_weapon_name};
+use crate::terrain::BaseTerrain;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
@@ -92,6 +93,54 @@ impl Item {
                 false => Self::new_random_weapon(),
                 true => Self::new_random_shield(),
             },
+        }
+    }
+
+    /// Create a random item using terrain-based weights for item type distribution.
+    ///
+    /// Uses the terrain's `item_weights()` to determine the probability of creating
+    /// weapons, shields, or consumables, making item spawning terrain-appropriate.
+    ///
+    /// # Arguments
+    /// * `terrain` - The terrain type that influences item distribution
+    /// * `name` - Optional item name; generates one if None
+    ///
+    /// # Example
+    /// ```
+    /// use hangrier_games::items::Item;
+    /// use hangrier_games::terrain::BaseTerrain;
+    ///
+    /// // Desert terrain favors consumables (0.6 weight)
+    /// let item = Item::new_random_with_terrain(BaseTerrain::Desert, None);
+    ///
+    /// // Urban ruins favor weapons (0.5 weight)
+    /// let item = Item::new_random_with_terrain(BaseTerrain::UrbanRuins, None);
+    /// ```
+    pub fn new_random_with_terrain(terrain: BaseTerrain, name: Option<&str>) -> Item {
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+        let weights = terrain.item_weights();
+
+        // Use weighted random selection based on terrain
+        let roll: f32 = rng.random();
+
+        if roll < weights.weapons {
+            // Generate weapon
+            match name {
+                Some(n) => Self::new_weapon(n),
+                None => Self::new_random_weapon(),
+            }
+        } else if roll < weights.weapons + weights.shields {
+            // Generate shield
+            match name {
+                Some(n) => Self::new_shield(n),
+                None => Self::new_random_shield(),
+            }
+        } else {
+            // Generate consumable
+            match name {
+                Some(n) => Self::new_consumable(n),
+                None => Self::new_random_consumable(),
+            }
         }
     }
 

@@ -1,8 +1,9 @@
-use crate::auth::{RefreshToken, TokenResponse, store_refresh_token};
+use crate::auth::{JWT_SECRET, RefreshToken, TokenResponse, store_refresh_token};
 use crate::{AppError, AppState};
 use axum::extract::State;
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 use serde::{Deserialize, Serialize};
 use shared::RegistrationUser;
 use std::sync::LazyLock;
@@ -22,9 +23,33 @@ struct JwtResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct UserRecord {
-    id: Thing,
+struct JwtClaims {
+    id: String,
+    #[serde(rename = "sub")]
     username: String,
+}
+
+/// Helper function to extract user ID and username from JWT token
+fn extract_user_from_jwt(jwt: &str) -> Result<(Thing, String), AppError> {
+    // Decode JWT with validation disabled since we trust our own tokens
+    let mut validation = Validation::new(Algorithm::HS512);
+    validation.validate_exp = false; // We just created this token, no need to validate expiration
+
+    let token_data = decode::<JwtClaims>(
+        jwt,
+        &DecodingKey::from_secret(JWT_SECRET.as_bytes()),
+        &validation,
+    )
+    .map_err(|e| AppError::InternalServerError(format!("Failed to decode JWT: {}", e)))?;
+
+    let claims = token_data.claims;
+
+    // Parse the id claim into a Thing
+    let user_id: Thing = surrealdb::sql::thing(&claims.id).map_err(|e| {
+        AppError::InternalServerError(format!("Failed to parse user ID from JWT: {}", e))
+    })?;
+
+    Ok((user_id, claims.username))
 }
 
 /// Helper function to create both access and refresh tokens
@@ -83,24 +108,10 @@ async fn user_create(
         Ok(auth_result) => {
             let jwt = auth_result.into_insecure_token();
 
-            // Query the user to get their ID
-            let mut result = state
-                .db
-                .query("SELECT id, username FROM user WHERE username = $username LIMIT 1")
-                .bind(("username", username.clone()))
-                .await
-                .map_err(|e| AppError::DbError(format!("Failed to query user: {}", e)))?;
+            // Extract user ID directly from JWT instead of querying the database
+            let (user_id, username) = extract_user_from_jwt(&jwt)?;
 
-            let users: Vec<UserRecord> = result
-                .take(0)
-                .map_err(|e| AppError::DbError(format!("Failed to parse user: {}", e)))?;
-
-            let user = users
-                .into_iter()
-                .next()
-                .ok_or_else(|| AppError::DbError("User created but not found".to_string()))?;
-
-            let token_pair = create_token_pair(&state, jwt, user.id, user.username).await?;
+            let token_pair = create_token_pair(&state, jwt, user_id, username).await?;
             Ok(Json(token_pair))
         }
         Err(_) => Err(AppError::DbError("Failed to create user".to_string())),
@@ -135,24 +146,10 @@ async fn user_authenticate(
         Ok(auth_result) => {
             let jwt = auth_result.into_insecure_token();
 
-            // Query the user to get their ID
-            let mut result = state
-                .db
-                .query("SELECT id, username FROM user WHERE username = $username LIMIT 1")
-                .bind(("username", username.clone()))
-                .await
-                .map_err(|e| AppError::DbError(format!("Failed to query user: {}", e)))?;
+            // Extract user ID directly from JWT instead of querying the database
+            let (user_id, username) = extract_user_from_jwt(&jwt)?;
 
-            let users: Vec<UserRecord> = result
-                .take(0)
-                .map_err(|e| AppError::DbError(format!("Failed to parse user: {}", e)))?;
-
-            let user = users
-                .into_iter()
-                .next()
-                .ok_or_else(|| AppError::Unauthorized("User not found".to_string()))?;
-
-            let token_pair = create_token_pair(&state, jwt, user.id, user.username).await?;
+            let token_pair = create_token_pair(&state, jwt, user_id, username).await?;
             Ok(Json(token_pair))
         }
         Err(_) => Err(AppError::Unauthorized("Invalid credentials".to_string())),

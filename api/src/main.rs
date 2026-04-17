@@ -48,10 +48,6 @@ fn initialize_logging() {
     //     .with_writer(Arc::new(file))
     //     .json();
 
-    let _log_targets = tracing_subscriber::filter::Targets::new()
-        .with_target("api::game", tracing::Level::INFO)
-        .with_target("api::tribute", tracing::Level::INFO);
-
     let production = env::var("PRODUCTION").unwrap_or("true".to_string());
     let tracing_level = if production == "true" {
         "info"
@@ -66,27 +62,8 @@ fn initialize_logging() {
                         env!("CARGO_CRATE_NAME")).into()
             })
         )
-        // only log INFO and above to stdout unless the span or event
-        // has the `api` target prefix.
-        // .with(stdout_log.with_filter(log_targets))
         .with(stdout_log)
-        // log everything enabled by the global filter to `debug_log.json`.
-        // .with(debug_log)
-        // configure a global filter for the whole subscriber stack. This will
-        // control what spans and events are recorded by both the `debug_log`
-        // and the `stdout_log` layers, and `stdout_log` will *also* be
-        // filtered by its per-layer filter.
-        // .with(
-        //     tracing_subscriber::filter::Targets::default()
-        //         .with_target("api", tracing::Level::INFO)
-        // ).with(
-        //     HangryGamesLogLayer
-        // ).init();
-        .init();
-    // .with(
-    //     HangryGamesLogLayer
-    //         .with_filter(log_targets)
-    // )
+        .init()
 }
 
 #[tokio::main]

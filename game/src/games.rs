@@ -7,7 +7,9 @@ use crate::output::GameOutput;
 use crate::tributes::actions::Action;
 use crate::tributes::events::TributeEvent;
 use crate::tributes::statuses::TributeStatus;
-use crate::tributes::{ActionSuggestion, EncounterContext, EnvironmentContext, Tribute};
+use crate::tributes::{
+    ActionSuggestion, EncounterContext, EnvironmentContext, Tribute, calculate_stamina_cost,
+};
 use rand::prelude::*;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -478,12 +480,40 @@ impl Game {
                 Some(&idx) => idx,
                 None => continue,
             };
+
+            // Build available destinations BEFORE taking mutable borrow of area_details
+            let available_destinations = tribute
+                .area
+                .neighbors()
+                .into_iter()
+                .filter_map(|neighbor_area| {
+                    // Find the AreaDetails for this neighbor
+                    self.areas
+                        .iter()
+                        .find(|ad| ad.area == Some(neighbor_area.clone()))
+                        .map(|ad| {
+                            // Calculate stamina cost to move to this area
+                            let move_action = Action::Move(Some(neighbor_area.clone()));
+                            let stamina_cost =
+                                calculate_stamina_cost(&move_action, &ad.terrain, &tribute);
+
+                            crate::areas::DestinationInfo {
+                                area: neighbor_area,
+                                terrain: ad.terrain.clone(),
+                                active_events: ad.events.clone(),
+                                stamina_cost,
+                            }
+                        })
+                })
+                .collect();
+
             let area_details = &mut self.areas[area_index];
 
             let mut environment_details = EnvironmentContext {
                 is_day: day,
                 area_details,
                 closed_areas: &closed_areas,
+                available_destinations,
             };
 
             // Get nearby tributes using the pre-computed map

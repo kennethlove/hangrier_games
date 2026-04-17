@@ -81,6 +81,7 @@ pub struct EnvironmentContext<'a> {
     pub is_day: bool,
     pub area_details: &'a mut AreaDetails,
     pub closed_areas: &'a [Area],
+    pub available_destinations: Vec<crate::areas::DestinationInfo>,
 }
 
 #[derive(Clone, Debug)]

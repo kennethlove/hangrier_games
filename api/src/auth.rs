@@ -11,7 +11,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 // JWT secret from schemas/users.surql
-const JWT_SECRET: &str =
+pub const JWT_SECRET: &str =
     "6dxLjU0m8ZmAzaLEk_qAeMpeD5ZAjGYlCjlvDi5DcgdJLATIHuCReUu7CbGyCDhRSp3btd7Ezob7RPYe6fUtsA";
 
 pub static AUTH_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {

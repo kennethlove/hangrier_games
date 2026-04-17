@@ -28,6 +28,9 @@ uuid = { version = "1.16.0", features = ["v4"] }
 time = { version = "0.3.41", features = ["serde", "macros"] }
 validator = { version = "0.18", features = ["derive"] }
 
+[dev-dependencies]
+axum-test = "20.0.0"
+
 [target.'cfg(windows)'.dependencies]
 surrealdb = { version = "2.2.1", features = ["kv-mem"] }
 

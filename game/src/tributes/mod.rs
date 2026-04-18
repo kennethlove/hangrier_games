@@ -81,6 +81,7 @@ pub struct EnvironmentContext<'a> {
     pub is_day: bool,
     pub area_details: &'a mut AreaDetails,
     pub closed_areas: &'a [Area],
+    pub available_destinations: Vec<crate::areas::DestinationInfo>,
 }
 
 #[derive(Clone, Debug)]
@@ -820,7 +821,12 @@ impl Tribute {
 
         // Get tribute action
         let number_of_nearby_tributes = encounter_context.nearby_tributes_count;
-        let action = self.brain.act(&self, number_of_nearby_tributes, rng);
+        let action = self.brain.act(
+            &self,
+            number_of_nearby_tributes,
+            &environment_details.available_destinations,
+            rng,
+        );
 
         let closed_areas = environment_details.closed_areas;
 
@@ -832,8 +838,38 @@ impl Tribute {
                 };
 
                 match travel_result {
-                    TravelResult::Success(area) => {
-                        self.area = area;
+                    TravelResult::Success(destination) => {
+                        // Find destination info from available_destinations
+                        let dest_info = environment_details
+                            .available_destinations
+                            .iter()
+                            .find(|d| d.area == destination);
+
+                        match dest_info {
+                            Some(info) => {
+                                // Check if tribute has enough stamina
+                                if self.stamina >= info.stamina_cost {
+                                    // Move and deduct stamina
+                                    self.area = destination;
+                                    self.stamina = self.stamina.saturating_sub(info.stamina_cost);
+                                } else {
+                                    // Insufficient stamina - exhausted
+                                    self.short_rests();
+                                    self.try_log_action(
+                                        GameOutput::TributeTravelExhausted(
+                                            self.name.as_str(),
+                                            &self.area.to_string(),
+                                        ),
+                                        "too exhausted to move",
+                                    );
+                                }
+                            }
+                            None => {
+                                // Destination not in available_destinations (shouldn't happen)
+                                // This means travels() returned non-adjacent area or adjacency check failed
+                                self.short_rests();
+                            }
+                        }
                     }
                     TravelResult::Failure => {
                         self.short_rests();
@@ -2258,6 +2294,7 @@ mod tests {
             is_day: true,
             area_details: &mut cornucopia,
             closed_areas: &[],
+            available_destinations: vec![],
         };
         let encounter_context = EncounterContext {
             nearby_tributes_count: 1,
@@ -2292,6 +2329,7 @@ mod tests {
             is_day: true,
             area_details: &mut cornucopia,
             closed_areas: &[],
+            available_destinations: vec![],
         };
         let encounter_context = EncounterContext {
             nearby_tributes_count: 1,

@@ -70,6 +70,15 @@ impl Area {
     }
 }
 
+/// Information about a destination area that tributes can use to make movement decisions
+#[derive(Clone, Debug)]
+pub struct DestinationInfo {
+    pub area: Area,
+    pub terrain: TerrainType,
+    pub active_events: Vec<AreaEvent>,
+    pub stamina_cost: u32,
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct AreaDetails {
     pub identifier: String,

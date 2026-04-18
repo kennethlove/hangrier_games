@@ -27,6 +27,7 @@ pub enum GameOutput<'a> {
     TributeCannotUseItem(&'a str, &'a str),
     TributeUseItem(&'a str, &'a Item),
     TributeTravelTooTired(&'a str, &'a str),
+    TributeTravelExhausted(&'a str, &'a str),
     TributeTravelAlreadyThere(&'a str, &'a str),
     TributeTravelFollow(&'a str, &'a str),
     TributeTravelStay(&'a str, &'a str),
@@ -150,6 +151,13 @@ impl<'a> Display for GameOutput<'a> {
                 write!(
                     f,
                     "😴 {} is too tired to move from {}, rests instead",
+                    tribute, area
+                )
+            }
+            GameOutput::TributeTravelExhausted(tribute, area) => {
+                write!(
+                    f,
+                    "🥵 {} is too exhausted to move from {}, lacks stamina",
                     tribute, area
                 )
             }

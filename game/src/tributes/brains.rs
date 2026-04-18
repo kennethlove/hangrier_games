@@ -42,7 +42,13 @@ impl Brain {
     }
 
     /// The AI for a tribute. Automatic decisions based on the current state of the tribute.
-    pub fn act(&self, tribute: &Tribute, nearby_tributes: u32, rng: &mut impl Rng) -> Action {
+    pub fn act(
+        &self,
+        tribute: &Tribute,
+        nearby_tributes: u32,
+        available_destinations: &[crate::areas::DestinationInfo],
+        rng: &mut impl Rng,
+    ) -> Action {
         if !tribute.is_alive() {
             return Action::None;
         }
@@ -61,12 +67,49 @@ impl Brain {
             return Action::UseItem(None);
         }
 
-        if nearby_tributes == 0 {
+        let action = if nearby_tributes == 0 {
             self.decide_action_no_enemies(tribute)
         } else if nearby_tributes < LOW_ENEMY_LIMIT {
             self.decide_action_few_enemies(tribute)
         } else {
             self.decide_action_many_enemies(tribute)
+        };
+
+        // If the action is Move(None), choose smart destination based on terrain
+        match action {
+            Action::Move(None) => {
+                // If no destinations available, keep Move(None) for backward compatibility
+                if available_destinations.is_empty() {
+                    return Action::Move(None);
+                }
+
+                // Convert DestinationInfo to AreaDetails for choose_destination
+                let area_details: Vec<AreaDetails> = available_destinations
+                    .iter()
+                    .map(|dest| {
+                        let mut ad = AreaDetails::default();
+                        ad.area = Some(dest.area.clone());
+                        ad.terrain = dest.terrain.clone();
+                        ad.events = dest.active_events.clone();
+                        ad
+                    })
+                    .collect();
+
+                // Choose best destination using terrain scoring
+                if let Some(best_area) = self.choose_destination(&area_details, tribute) {
+                    // Also check if tribute has enough stamina
+                    if let Some(dest_info) =
+                        available_destinations.iter().find(|d| d.area == best_area)
+                    {
+                        if tribute.stamina >= dest_info.stamina_cost {
+                            return Action::Move(Some(best_area));
+                        }
+                    }
+                }
+                // Fall back to rest if no good destination or insufficient stamina
+                Action::Rest
+            }
+            other => other,
         }
     }
 
@@ -353,7 +396,7 @@ mod tests {
     #[rstest]
     fn decide_on_action_default(tribute: Tribute, mut small_rng: SmallRng) {
         // If there are no enemies nearby, the tribute should move
-        let action = tribute.brain.act(&tribute.clone(), 0, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 0, &[], &mut small_rng);
         assert_eq!(action, Action::Move(None));
     }
 
@@ -361,7 +404,7 @@ mod tests {
     fn decide_on_action_low_health(mut tribute: Tribute, mut small_rng: SmallRng) {
         // If the tribute has low health, they should rest
         tribute.attributes.health = 10;
-        let action = tribute.brain.act(&tribute.clone(), 2, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 2, &[], &mut small_rng);
         assert_eq!(action, Action::Move(None));
     }
 
@@ -369,7 +412,7 @@ mod tests {
     fn decide_on_action_no_health(mut tribute: Tribute, mut small_rng: SmallRng) {
         // If the tribute has no health, they should do nothing
         tribute.attributes.health = 0;
-        let action = tribute.brain.act(&tribute.clone(), 2, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 2, &[], &mut small_rng);
         assert_eq!(action, Action::None);
     }
 
@@ -377,7 +420,7 @@ mod tests {
     fn decide_on_action_no_movement_alone(mut tribute: Tribute, mut small_rng: SmallRng) {
         // If the tribute has no movement and is alone, they should rest
         tribute.attributes.movement = 0;
-        let action = tribute.brain.act(&tribute.clone(), 0, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 0, &[], &mut small_rng);
         assert_eq!(action, Action::Rest);
     }
 
@@ -389,14 +432,14 @@ mod tests {
         // If the tribute has no movement and is not alone, they should hide
         tribute.attributes.movement = 1;
         tribute.attributes.health = 10;
-        let action = tribute.brain.act(&tribute.clone(), 5, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 5, &[], &mut small_rng);
         assert_eq!(action, Action::Hide);
     }
 
     #[rstest]
     fn decide_on_action_enemies(tribute: Tribute, mut small_rng: SmallRng) {
         // If there are enemies nearby, the tribute should attack
-        let action = tribute.brain.act(&tribute.clone(), 2, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 2, &[], &mut small_rng);
         assert_eq!(action, Action::Attack);
     }
 
@@ -405,14 +448,14 @@ mod tests {
         // If there are enemies nearby, but the tribute is low on health
         // the tribute should hide
         tribute.attributes.health = 20;
-        let action = tribute.brain.act(&tribute.clone(), 2, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 2, &[], &mut small_rng);
         assert_eq!(action, Action::Move(None));
     }
 
     #[rstest]
     fn decide_on_action_preferred_action(mut tribute: Tribute, mut small_rng: SmallRng) {
         tribute.brain.set_preferred_action(Action::Rest, 1.0);
-        let action = tribute.brain.act(&tribute.clone(), 0, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 0, &[], &mut small_rng);
         assert_eq!(action, Action::Rest);
     }
 
@@ -431,14 +474,14 @@ mod tests {
     fn prefer_to_use_item_if_available(mut tribute: Tribute, mut small_rng: SmallRng) {
         let item = Item::new_random_consumable();
         tribute.items.push(item.clone());
-        let action = tribute.brain.act(&tribute.clone(), 0, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 0, &[], &mut small_rng);
         assert_eq!(action, Action::UseItem(None));
     }
 
     #[rstest]
     fn prefer_to_hide_at_mid_health_and_visible(mut tribute: Tribute, mut small_rng: SmallRng) {
         tribute.attributes.health = 25;
-        let action = tribute.brain.act(&tribute.clone(), 0, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 0, &[], &mut small_rng);
         assert_eq!(action, Action::Hide);
     }
 
@@ -446,14 +489,14 @@ mod tests {
     fn prefer_to_move_at_mid_health_and_low_sanity(mut tribute: Tribute, mut small_rng: SmallRng) {
         tribute.attributes.health = 25;
         tribute.attributes.sanity = 15;
-        let action = tribute.brain.act(&tribute.clone(), 0, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 0, &[], &mut small_rng);
         assert_eq!(action, Action::Move(None));
     }
 
     #[rstest]
     fn decide_on_action_alone_healthy_no_movement(mut tribute: Tribute, mut small_rng: SmallRng) {
         tribute.attributes.movement = 0;
-        let action = tribute.brain.act(&tribute.clone(), 0, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 0, &[], &mut small_rng);
         assert_eq!(action, Action::Rest);
     }
 
@@ -465,7 +508,7 @@ mod tests {
         tribute.attributes.health = 10;
         tribute.attributes.movement = 0;
         tribute.attributes.sanity = 15;
-        let action = tribute.brain.act(&tribute.clone(), 3, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 3, &[], &mut small_rng);
         assert_eq!(action, Action::Attack);
     }
 
@@ -476,7 +519,7 @@ mod tests {
     ) {
         tribute.attributes.health = 15;
         tribute.attributes.sanity = 10;
-        let action = tribute.brain.act(&tribute.clone(), 3, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 3, &[], &mut small_rng);
         assert_eq!(action, Action::Attack);
     }
 
@@ -487,7 +530,7 @@ mod tests {
     ) {
         tribute.attributes.is_hidden = true;
         tribute.attributes.health = 10;
-        let action = tribute.brain.act(&tribute.clone(), 3, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 3, &[], &mut small_rng);
         assert_eq!(action, Action::None);
     }
 
@@ -498,7 +541,7 @@ mod tests {
     ) {
         tribute.attributes.health = 25;
         tribute.attributes.sanity = 15;
-        let action = tribute.brain.act(&tribute.clone(), 3, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 3, &[], &mut small_rng);
         assert_eq!(action, Action::Attack);
     }
 
@@ -509,7 +552,7 @@ mod tests {
     ) {
         tribute.attributes.intelligence = 50;
         tribute.attributes.sanity = 50;
-        let action = tribute.brain.act(&tribute.clone(), 6, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 6, &[], &mut small_rng);
         assert_eq!(action, Action::Move(None));
     }
 
@@ -520,7 +563,7 @@ mod tests {
     ) {
         tribute.attributes.intelligence = 20;
         tribute.attributes.sanity = 20;
-        let action = tribute.brain.act(&tribute.clone(), 6, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 6, &[], &mut small_rng);
         assert_eq!(action, Action::Hide);
     }
 
@@ -531,7 +574,7 @@ mod tests {
     ) {
         tribute.attributes.intelligence = 10;
         tribute.attributes.sanity = 10;
-        let action = tribute.brain.act(&tribute.clone(), 6, &mut small_rng);
+        let action = tribute.brain.act(&tribute.clone(), 6, &[], &mut small_rng);
         assert_eq!(action, Action::Attack);
     }
 }

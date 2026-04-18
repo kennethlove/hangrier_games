@@ -35,6 +35,9 @@ use surrealdb::sql::Thing;
 use surrealdb::{RecordId, Surreal};
 use uuid::Uuid;
 
+/// Maximum number of messages to retain per game to prevent OOM
+const MAX_MESSAGES: usize = 10000;
+
 #[derive(Debug, Deserialize, Validate)]
 pub struct PaginationParams {
     #[serde(default = "default_limit")]
@@ -488,7 +491,9 @@ pub async fn game_update(
 
     match response {
         Ok(mut response) => {
-            let game: Option<Game> = response.take(0).unwrap();
+            let game: Option<Game> = response.take(0).map_err(|e| {
+                AppError::InternalServerError(format!("Failed to take game: {}", e))
+            })?;
             if let Some(game) = game {
                 Ok(Json::<Game>(game))
             } else if let None = game {

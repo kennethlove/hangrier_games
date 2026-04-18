@@ -123,13 +123,6 @@ pub struct EditGame {
     pub private: bool,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-pub struct GameArea {
-    pub identifier: String,
-    pub name: String,
-    pub area: String,
-}
-
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct GameArea {
     pub identifier: String,

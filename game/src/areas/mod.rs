@@ -10,7 +10,9 @@ use std::str::FromStr;
 use strum_macros::EnumIter;
 use uuid::Uuid;
 
-#[derive(Clone, Debug, Eq, PartialEq, EnumIter, Hash, Deserialize, Serialize, Ord, PartialOrd)]
+#[derive(
+    Copy, Clone, Debug, Eq, PartialEq, EnumIter, Hash, Deserialize, Serialize, Ord, PartialOrd,
+)]
 pub enum Area {
     Cornucopia,
     North,

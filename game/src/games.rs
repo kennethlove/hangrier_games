@@ -246,7 +246,7 @@ impl Game {
             }
             add_game_message(
                 self.identifier.as_str(),
-                format!("{}", GameOutput::GameDayStart(self.clone().day.unwrap())),
+                format!("{}", GameOutput::GameDayStart(self.day.unwrap())),
             )
             .map_err(|e| {
                 GameError::MessageError(format!("Failed to add day start message: {}", e))
@@ -302,7 +302,7 @@ impl Game {
         if day {
             add_game_message(
                 self.identifier.as_str(),
-                format!("{}", GameOutput::GameDayEnd(self.clone().day.unwrap())),
+                format!("{}", GameOutput::GameDayEnd(self.day.unwrap())),
             )
             .map_err(|e| {
                 GameError::MessageError(format!("Failed to add day end message: {}", e))
@@ -310,7 +310,7 @@ impl Game {
         } else {
             add_game_message(
                 self.identifier.as_str(),
-                format!("{}", GameOutput::GameNightEnd(self.clone().day.unwrap())),
+                format!("{}", GameOutput::GameNightEnd(self.day.unwrap())),
             )
             .map_err(|e| {
                 GameError::MessageError(format!("Failed to add night end message: {}", e))
@@ -631,7 +631,7 @@ impl Game {
             }
 
             // Add events to each area and announce them
-            for (area_name, (mut area_details, events)) in area_events.clone() {
+            for (area_name, (mut area_details, events)) in area_events.drain() {
                 for event in events {
                     area_details.events.push(event.clone());
                     let event_name = event.to_string();
@@ -649,14 +649,14 @@ impl Game {
                         GameError::MessageError(format!("Failed to add area event message: {}", e))
                     })?;
                 }
-            }
 
-            // Update the areas with the new events
-            for area_details in self.areas.iter_mut() {
-                let key = area_details.area.clone().unwrap().to_string();
-                if area_events.contains_key(&key) {
-                    let events = area_events[&key].1.clone();
-                    area_details.events.extend(events);
+                // Update the corresponding area with the new events
+                for area in self.areas.iter_mut() {
+                    let key = area.area.clone().unwrap().to_string();
+                    if key == area_name {
+                        area.events = area_details.events;
+                        break;
+                    }
                 }
             }
         }

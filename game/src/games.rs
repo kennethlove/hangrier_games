@@ -442,15 +442,23 @@ impl Game {
             NIGHT_EVENT_FREQUENCY
         };
 
+        // Collect events to trigger (avoid borrow conflicts)
+        let mut events_to_process: Vec<(Area, AreaEvent)> = Vec::new();
+
         // If it's nighttime, trigger an event
         // If it is daytime and not day #1 or day #3, trigger an event
         if !day || ![1, 3].contains(&self.day.unwrap_or(1)) {
             for area_details in self.areas.iter_mut() {
                 if rng.random_bool(frequency) {
                     let area_event = AreaEvent::random();
+                    let area = area_details.area.clone().unwrap();
+
+                    // Add event to area
                     area_details.events.push(area_event.clone());
+
+                    // Announce event
                     let event_name = area_event.to_string();
-                    let area_name = area_details.area.clone().unwrap().to_string();
+                    let area_name = area.to_string();
                     add_area_message(
                         area_name.as_str(),
                         &self.identifier,
@@ -460,8 +468,16 @@ impl Game {
                         ),
                     )
                     .expect("Failed to add area event message");
+
+                    // Collect for processing
+                    events_to_process.push((area, area_event));
                 }
             }
+        }
+
+        // Process survival checks for all triggered events
+        for (area, event) in events_to_process {
+            self.process_event_for_area(&area, &event);
         }
 
         // Day 3 is Feast Day, refill the Cornucopia with a random assortment of items

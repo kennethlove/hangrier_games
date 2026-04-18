@@ -821,7 +821,12 @@ impl Tribute {
 
         // Get tribute action
         let number_of_nearby_tributes = encounter_context.nearby_tributes_count;
-        let action = self.brain.act(&self, number_of_nearby_tributes, rng);
+        let action = self.brain.act(
+            &self,
+            number_of_nearby_tributes,
+            &environment_details.available_destinations,
+            rng,
+        );
 
         let closed_areas = environment_details.closed_areas;
 
@@ -2289,6 +2294,7 @@ mod tests {
             is_day: true,
             area_details: &mut cornucopia,
             closed_areas: &[],
+            available_destinations: vec![],
         };
         let encounter_context = EncounterContext {
             nearby_tributes_count: 1,
@@ -2323,6 +2329,7 @@ mod tests {
             is_day: true,
             area_details: &mut cornucopia,
             closed_areas: &[],
+            available_destinations: vec![],
         };
         let encounter_context = EncounterContext {
             nearby_tributes_count: 1,

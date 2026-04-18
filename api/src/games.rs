@@ -35,6 +35,9 @@ use surrealdb::sql::Thing;
 use surrealdb::{RecordId, Surreal};
 use uuid::Uuid;
 
+/// Maximum number of messages to retain per game to prevent OOM
+const MAX_MESSAGES: usize = 10000;
+
 #[derive(Debug, Deserialize, Validate)]
 pub struct PaginationParams {
     #[serde(default = "default_limit")]

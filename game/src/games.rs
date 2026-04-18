@@ -68,6 +68,8 @@ pub struct Game {
     #[serde(default)]
     pub tributes: Vec<Tribute>,
     pub private: bool,
+    #[serde(default)]
+    pub config: crate::config::GameConfig,
 }
 
 impl Default for Game {

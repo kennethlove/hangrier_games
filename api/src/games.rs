@@ -66,6 +66,9 @@ static GAME_CACHE: LazyLock<RwLock<HashMap<String, CacheEntry>>> =
 /// Cache TTL duration (5 minutes)
 const CACHE_TTL_SECS: u64 = 300;
 
+/// Maximum number of messages to retain per game to prevent OOM
+const MAX_MESSAGES: usize = 10000;
+
 pub static GAMES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
     Router::new()
         .route("/", get(game_list).post(create_game))
@@ -345,11 +348,11 @@ pub async fn game_delete(
     let area_pieces: Option<HashMap<String, Vec<Thing>>> = result
         .take(1)
         .map_err(|e| AppError::InternalServerError(format!("Failed to take area pieces: {}", e)))?;
-    if game_pieces.is_some() {
-        delete_pieces(game_pieces.unwrap(), &state.db).await?
+    if let Some(pieces) = game_pieces {
+        delete_pieces(pieces, &state.db).await?
     };
-    if area_pieces.is_some() {
-        delete_pieces(area_pieces.unwrap(), &state.db).await?
+    if let Some(pieces) = area_pieces {
+        delete_pieces(pieces, &state.db).await?
     };
 
     let game: Option<Game> = state
@@ -488,7 +491,9 @@ pub async fn game_update(
 
     match response {
         Ok(mut response) => {
-            let game: Option<Game> = response.take(0).unwrap();
+            let game: Option<Game> = response.take(0).map_err(|e| {
+                AppError::InternalServerError(format!("Failed to take game: {}", e))
+            })?;
             if let Some(game) = game {
                 Ok(Json::<Game>(game))
             } else if let None = game {
@@ -522,7 +527,9 @@ SELECT (
 
     match response {
         Ok(mut response) => {
-            let areas: Vec<Vec<AreaDetails>> = response.take("areas").unwrap();
+            let areas: Vec<Vec<AreaDetails>> = response.take("areas").map_err(|e| {
+                AppError::InternalServerError(format!("Failed to take areas: {}", e))
+            })?;
             Ok(Json::<Vec<AreaDetails>>(areas[0].clone()))
         }
         Err(e) => Err(AppError::InternalServerError(format!(
@@ -563,7 +570,9 @@ pub async fn game_tributes(
 
     match response {
         Ok(mut response) => {
-            let tributes: Vec<Vec<Tribute>> = response.take("tributes").unwrap();
+            let tributes: Vec<Vec<Tribute>> = response.take("tributes").map_err(|e| {
+                AppError::InternalServerError(format!("Failed to take tributes: {}", e))
+            })?;
             let all_tributes = tributes[0].clone();
 
             // Apply pagination to the results
@@ -806,6 +815,63 @@ async fn save_game(
             })
             .collect();
 
+        // Check current message count for this game
+        let current_count: u32 = db
+            .query(
+                "RETURN count(SELECT id FROM message WHERE string::starts_with(subject, $game_id))",
+            )
+            .bind(("game_id", game.identifier.clone()))
+            .await
+            .ok()
+            .and_then(|mut r| r.take(0).ok().flatten())
+            .unwrap_or(0);
+
+        let new_messages_count = game_logs.len();
+        let total_after_insert = current_count as usize + new_messages_count;
+
+        // Log warning if approaching limit
+        if current_count >= 9000 && current_count < MAX_MESSAGES as u32 {
+            tracing::warn!(
+                game_id = %game.identifier,
+                current_count = %current_count,
+                "Game message count approaching limit (9000+)"
+            );
+        }
+
+        // Rotate messages if total would exceed MAX_MESSAGES
+        if total_after_insert > MAX_MESSAGES {
+            let messages_to_delete = total_after_insert - MAX_MESSAGES;
+            tracing::info!(
+                game_id = %game.identifier,
+                current_count = %current_count,
+                new_count = %new_messages_count,
+                deleting = %messages_to_delete,
+                "Rotating old messages to maintain {} message limit", MAX_MESSAGES
+            );
+
+            // Delete oldest messages for this game
+            if let Err(e) = db
+                .query(
+                    r#"
+                    DELETE message
+                    WHERE string::starts_with(subject, $game_id)
+                    ORDER BY timestamp ASC
+                    LIMIT $delete_count
+                    "#,
+                )
+                .bind(("game_id", game.identifier.clone()))
+                .bind(("delete_count", messages_to_delete))
+                .await
+            {
+                tracing::error!(
+                    game_id = %game.identifier,
+                    error = %e,
+                    "Failed to rotate old messages"
+                );
+                // Continue anyway - this is not critical enough to fail the save
+            }
+        }
+
         if let Err(e) = db.insert::<Vec<GameMessage>>(()).content(game_logs).await {
             let _ = db.query("ROLLBACK").await;
             return Err(AppError::InternalServerError(format!(
@@ -914,7 +980,11 @@ async fn save_area_items(
     // Find items to delete (in DB but not in new items or quantity is 0)
     let mut items_to_delete = Vec::new();
     for id in existing_map.keys() {
-        if !new_map.contains_key(id) || new_map.get(id).unwrap().quantity == 0 {
+        if let Some(item) = new_map.get(id) {
+            if item.quantity == 0 {
+                items_to_delete.push(id.clone());
+            }
+        } else {
             items_to_delete.push(id.clone());
         }
     }
@@ -922,10 +992,14 @@ async fn save_area_items(
     // Find items to update (in DB and in new items with different values)
     let mut items_to_update = Vec::new();
     for (id, item) in &new_map {
-        if item.quantity > 0
-            && (!existing_map.contains_key(id) || existing_map.get(id).unwrap() != item)
-        {
-            items_to_update.push(item.clone());
+        if item.quantity > 0 {
+            if let Some(existing) = existing_map.get(id) {
+                if existing != item {
+                    items_to_update.push(item.clone());
+                }
+            } else {
+                items_to_update.push(item.clone());
+            }
         }
     }
 
@@ -1026,7 +1100,11 @@ async fn save_tribute_items(
     // Find items to delete (in DB but not in new items or quantity is 0)
     let mut items_to_delete = Vec::new();
     for id in existing_map.keys() {
-        if !new_map.contains_key(id) || new_map.get(id).unwrap().quantity == 0 {
+        if let Some(item) = new_map.get(id) {
+            if item.quantity == 0 {
+                items_to_delete.push(id.clone());
+            }
+        } else {
             items_to_delete.push(id.clone());
         }
     }
@@ -1034,10 +1112,14 @@ async fn save_tribute_items(
     // Find items to update (in DB and in new items with different values)
     let mut items_to_update = Vec::new();
     for (id, item) in &new_map {
-        if item.quantity > 0
-            && (!existing_map.contains_key(id) || existing_map.get(id).unwrap() != item)
-        {
-            items_to_update.push(item.clone());
+        if item.quantity > 0 {
+            if let Some(existing) = existing_map.get(id) {
+                if existing != item {
+                    items_to_update.push(item.clone());
+                }
+            } else {
+                items_to_update.push(item.clone());
+            }
         }
     }
 

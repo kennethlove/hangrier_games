@@ -12,13 +12,13 @@ pub struct TestDb {
 }
 
 impl TestDb {
-    /// Create a new test database connection
+    /// Create a new test database connection (in-memory)
     pub async fn new() -> Self {
-        // Connect to test SurrealDB instance
+        // Use in-memory database for tests (no external dependencies)
         let db = Arc::new(
-            surrealdb::engine::any::connect("ws://localhost:8000")
+            surrealdb::engine::any::connect("mem://")
                 .await
-                .expect("Failed to connect to test database"),
+                .expect("Failed to create in-memory database"),
         );
 
         // Sign in as root

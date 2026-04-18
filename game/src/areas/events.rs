@@ -277,6 +277,7 @@ impl AreaEvent {
     /// * `has_item_bonus` - Whether tribute has relevant protective item (+2 bonus)
     /// * `is_desperate` - Whether tribute is in desperate state (health < 30%, +5 bonus)
     /// * `current_health` - Tribute's current health for desperation rewards
+    /// * `rng` - Random number generator for deterministic simulation
     ///
     /// # Returns
     /// SurvivalResult containing survival status and any rewards
@@ -287,8 +288,8 @@ impl AreaEvent {
         has_item_bonus: bool,
         is_desperate: bool,
         current_health: u32,
+        rng: &mut impl Rng,
     ) -> SurvivalResult {
-        let mut rng = SmallRng::from_rng(&mut rand::rng());
         let severity = self.severity_in_terrain(terrain);
 
         // Base survival DC by severity

@@ -263,7 +263,7 @@ impl Game {
     }
 
     /// Process survival checks for all tributes in an area when an event occurs
-    pub fn process_event_for_area(&mut self, area: &Area, event: &AreaEvent) {
+    pub fn process_event_for_area(&mut self, area: &Area, event: &AreaEvent, rng: &mut impl Rng) {
         // Get area terrain and events
         let (terrain, area_events) = {
             let area_idx = self
@@ -329,6 +329,7 @@ impl Game {
                 has_item_bonus,
                 is_desperate,
                 current_health,
+                rng,
             );
 
             // Apply results
@@ -489,7 +490,7 @@ impl Game {
 
         // Process survival checks for all triggered events
         for (area, event) in events_to_process {
-            self.process_event_for_area(&area, &event);
+            self.process_event_for_area(&area, &event, rng);
         }
 
         // Day 3 is Feast Day, refill the Cornucopia with a random assortment of items

@@ -64,8 +64,11 @@ impl FromStr for Action {
 pub enum AttackResult {
     AttackerWins,
     AttackerWinsDecisively,
+    CriticalHit, // Natural 20 on attack roll - triple damage
     DefenderWins,
     DefenderWinsDecisively,
+    PerfectBlock,   // Natural 20 on defense roll - counter attack
+    CriticalFumble, // Natural 1 on attack roll - attacker takes damage
     Miss,
 }
 

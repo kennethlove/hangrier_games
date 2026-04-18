@@ -57,6 +57,56 @@ impl Tribute {
         let target_name = target.name.clone();
         // `self` is the attacker
         match attack_contest(self, target, rng) {
+            AttackResult::CriticalHit => {
+                // Triple damage on critical hit!
+                self.try_log_action(
+                    GameOutput::TributeCriticalHit(tribute_name.as_str(), target_name.as_str()),
+                    "critical hit",
+                );
+                apply_combat_results(
+                    self,
+                    target,
+                    self.attributes.strength * 3, // triple damage
+                    GameOutput::TributeAttackWin(tribute_name.as_str(), target_name.as_str()),
+                    "critical hit damage",
+                );
+            }
+            AttackResult::CriticalFumble => {
+                // Fumble! Attacker hurts themself
+                self.try_log_action(
+                    GameOutput::TributeCriticalFumble(tribute_name.as_str()),
+                    "critical fumble",
+                );
+                self.takes_physical_damage(5); // Fixed fumble damage
+                self.statistics.defeats += 1;
+
+                // If the attacker killed themselves with the fumble
+                if self.attributes.health == 0 {
+                    self.statistics.killed_by = Some("themselves (fumble)".to_string());
+                    self.status = crate::tributes::statuses::TributeStatus::RecentlyDead;
+                    self.try_log_action(
+                        GameOutput::TributeAttackDied(tribute_name.as_str(), "themselves"),
+                        "died from fumble",
+                    );
+                    return AttackOutcome::Kill(target.clone(), self.clone());
+                }
+
+                return AttackOutcome::Wound(self.clone(), target.clone());
+            }
+            AttackResult::PerfectBlock => {
+                // Perfect block! Defender counters
+                self.try_log_action(
+                    GameOutput::TributePerfectBlock(target_name.as_str(), tribute_name.as_str()),
+                    "perfect block",
+                );
+                apply_combat_results(
+                    target,
+                    self,
+                    target.attributes.strength * 2, // double damage counter
+                    GameOutput::TributeAttackLose(tribute_name.as_str(), target_name.as_str()),
+                    "perfect block counter",
+                );
+            }
             AttackResult::AttackerWins => {
                 apply_combat_results(
                     self,
@@ -192,13 +242,17 @@ fn calculate_violence_stress(kills: u32, wins: u32, current_sanity: u32) -> u32 
 /// Strength and any weapon are added to the attack roll.
 /// Defense and any shield are added to the defense roll.
 /// If either roll is more than 1.5x the other, that triggers a "decisive" victory.
+/// Natural 1 on attack = critical fumble (attacker takes damage).
+/// Natural 20 on attack = critical hit (triple damage).
+/// Natural 20 on defense = perfect block (defender counters).
 pub fn attack_contest(
     attacker: &mut Tribute,
     target: &mut Tribute,
     rng: &mut impl Rng,
 ) -> AttackResult {
     // Get attack roll and strength modifier
-    let mut attack_roll: i32 = rng.random_range(1..=20); // Base roll
+    let base_attack_roll: i32 = rng.random_range(1..=20); // Base roll
+    let mut attack_roll = base_attack_roll;
     attack_roll += attacker.attributes.strength as i32; // Add strength
 
     // If the attacker has a weapon, use it
@@ -217,7 +271,8 @@ pub fn attack_contest(
     }
 
     // Get defense roll and defense modifier
-    let mut defense_roll: i32 = rng.random_range(1..=20); // Base roll
+    let base_defense_roll: i32 = rng.random_range(1..=20); // Base roll
+    let mut defense_roll = base_defense_roll;
     defense_roll += target.attributes.defense as i32; // Add defense
 
     // If the defender has a shield, use it
@@ -235,28 +290,38 @@ pub fn attack_contest(
         }
     }
 
-    // Compare attack vs. defense
-    match attack_roll.cmp(&defense_roll) {
-        Ordering::Less => {
-            // If the defender wins
-            let difference = defense_roll as f64 - (attack_roll as f64 * DECISIVE_WIN_MULTIPLIER);
-            if difference > 0.0 {
-                // Defender wins significantly
-                AttackResult::DefenderWinsDecisively
-            } else {
-                AttackResult::DefenderWins
-            }
-        }
-        Ordering::Equal => AttackResult::Miss, // If they tie
-        Ordering::Greater => {
-            // If the attacker wins
-            let difference = attack_roll as f64 - (defense_roll as f64 * DECISIVE_WIN_MULTIPLIER);
+    // Check for critical outcomes based on natural rolls (before modifiers)
+    match (base_attack_roll, base_defense_roll) {
+        (1, _) => AttackResult::CriticalFumble, // Natural 1 on attack - fumble!
+        (20, _) => AttackResult::CriticalHit,   // Natural 20 on attack - crit!
+        (_, 20) => AttackResult::PerfectBlock,  // Natural 20 on defense - perfect block!
+        _ => {
+            // Normal combat resolution - compare attack vs. defense
+            match attack_roll.cmp(&defense_roll) {
+                Ordering::Less => {
+                    // If the defender wins
+                    let difference =
+                        defense_roll as f64 - (attack_roll as f64 * DECISIVE_WIN_MULTIPLIER);
+                    if difference > 0.0 {
+                        // Defender wins significantly
+                        AttackResult::DefenderWinsDecisively
+                    } else {
+                        AttackResult::DefenderWins
+                    }
+                }
+                Ordering::Equal => AttackResult::Miss, // If they tie
+                Ordering::Greater => {
+                    // If the attacker wins
+                    let difference =
+                        attack_roll as f64 - (defense_roll as f64 * DECISIVE_WIN_MULTIPLIER);
 
-            if difference > 0.0 {
-                // Attacker wins significantly
-                AttackResult::AttackerWinsDecisively
-            } else {
-                AttackResult::AttackerWins
+                    if difference > 0.0 {
+                        // Attacker wins significantly
+                        AttackResult::AttackerWinsDecisively
+                    } else {
+                        AttackResult::AttackerWins
+                    }
+                }
             }
         }
     }
@@ -300,6 +365,7 @@ pub fn update_stats(attacker: &mut Tribute, defender: &mut Tribute, result: Atta
 mod tests {
     use super::*;
     use crate::tributes::Tribute;
+    use rand::RngCore;
     use rand::SeedableRng;
     use rand::rngs::SmallRng;
     use rstest::*;
@@ -436,5 +502,146 @@ mod tests {
 
         let result = attacker.attacks(&mut target, &mut small_rng);
         assert_eq!(result, AttackOutcome::Miss(attacker, target));
+    }
+
+    #[rstest]
+    fn test_critical_hit() {
+        // Use a custom RNG that returns 20 for the attack roll
+        struct CritRng;
+        impl RngCore for CritRng {
+            fn next_u32(&mut self) -> u32 {
+                20
+            }
+            fn next_u64(&mut self) -> u64 {
+                20
+            }
+            fn fill_bytes(&mut self, dest: &mut [u8]) {
+                for byte in dest.iter_mut() {
+                    *byte = 20;
+                }
+            }
+            fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+                self.fill_bytes(dest);
+                Ok(())
+            }
+        }
+
+        let mut crit_rng = CritRng;
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut target = Tribute::new("Peeta".to_string(), None, None);
+
+        attacker.attributes.strength = 10;
+        target.attributes.health = 100;
+
+        let result = attack_contest(&mut attacker, &mut target, &mut crit_rng);
+        assert_eq!(result, AttackResult::CriticalHit);
+    }
+
+    #[rstest]
+    fn test_critical_fumble() {
+        // Use a custom RNG that returns 1 for the attack roll
+        struct FumbleRng;
+        impl RngCore for FumbleRng {
+            fn next_u32(&mut self) -> u32 {
+                1
+            }
+            fn next_u64(&mut self) -> u64 {
+                1
+            }
+            fn fill_bytes(&mut self, dest: &mut [u8]) {
+                for byte in dest.iter_mut() {
+                    *byte = 1;
+                }
+            }
+            fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+                self.fill_bytes(dest);
+                Ok(())
+            }
+        }
+
+        let mut fumble_rng = FumbleRng;
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut target = Tribute::new("Peeta".to_string(), None, None);
+
+        let result = attack_contest(&mut attacker, &mut target, &mut fumble_rng);
+        assert_eq!(result, AttackResult::CriticalFumble);
+    }
+
+    #[rstest]
+    fn test_perfect_block() {
+        // Use a custom RNG that returns 10 for attack, 20 for defense
+        struct BlockRng {
+            call_count: std::cell::Cell<usize>,
+        }
+        impl BlockRng {
+            fn new() -> Self {
+                BlockRng {
+                    call_count: std::cell::Cell::new(0),
+                }
+            }
+        }
+        impl RngCore for BlockRng {
+            fn next_u32(&mut self) -> u32 {
+                let count = self.call_count.get();
+                self.call_count.set(count + 1);
+                if count == 0 { 10 } else { 20 } // First call: 10, second: 20
+            }
+            fn next_u64(&mut self) -> u64 {
+                self.next_u32() as u64
+            }
+            fn fill_bytes(&mut self, dest: &mut [u8]) {
+                for byte in dest.iter_mut() {
+                    *byte = self.next_u32() as u8;
+                }
+            }
+            fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+                self.fill_bytes(dest);
+                Ok(())
+            }
+        }
+
+        let mut block_rng = BlockRng::new();
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut target = Tribute::new("Peeta".to_string(), None, None);
+
+        let result = attack_contest(&mut attacker, &mut target, &mut block_rng);
+        assert_eq!(result, AttackResult::PerfectBlock);
+    }
+
+    #[rstest]
+    fn test_critical_hit_triple_damage(mut small_rng: SmallRng) {
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut target = Tribute::new("Peeta".to_string(), None, None);
+
+        attacker.attributes.strength = 20;
+        target.attributes.health = 100;
+        let initial_health = target.attributes.health;
+
+        // Manually test the damage application for critical hit
+        apply_combat_results(
+            &mut attacker,
+            &mut target,
+            attacker.attributes.strength * 3, // Triple damage
+            GameOutput::TributeAttackWin("Katniss", "Peeta"),
+            "critical hit test",
+        );
+
+        // Verify triple damage was applied
+        assert_eq!(
+            target.attributes.health,
+            initial_health - (attacker.attributes.strength * 3)
+        );
+    }
+
+    #[rstest]
+    fn test_fumble_self_damage(mut small_rng: SmallRng) {
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        attacker.attributes.health = 100;
+        let initial_health = attacker.attributes.health;
+
+        // Simulate fumble damage
+        attacker.takes_physical_damage(5);
+
+        assert_eq!(attacker.attributes.health, initial_health - 5);
     }
 }

@@ -200,9 +200,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     storage.init().await?;
     tracing::info!("Storage initialized at: {}", storage_path);
 
+    // Initialize WebSocket broadcaster
+    use api::websocket::GameBroadcaster;
+    let broadcaster = Arc::new(GameBroadcaster::default());
+    tracing::info!("WebSocket broadcaster initialized");
+
     let app_state = AppState {
         db: db.clone(),
         storage,
+        broadcaster,
     };
 
     // Start cleanup scheduler for refresh tokens
@@ -228,6 +234,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "/uploads",
             tower_http::services::ServeDir::new(&storage_path),
         )
+        .route("/ws", axum::routing::get(api::websocket::websocket_handler))
         .route(
             "/",
             axum::routing::get(move || async { Json(env!("CARGO_PKG_VERSION")) }),

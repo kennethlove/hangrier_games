@@ -106,9 +106,6 @@ async fn create_game_area(area: Area, db: &Surreal<Any>) -> Result<GameArea, App
     let identifier = Uuid::new_v4().to_string();
     let area_id: RecordId = RecordId::from(("area", identifier.to_string()));
 
-    // Assign random terrain to the area
-    let terrain = BaseTerrain::random();
-
     // create the `area` record
     let game_area: Option<GameArea> = db
         .insert::<Option<GameArea>>(area_id.clone())
@@ -116,7 +113,6 @@ async fn create_game_area(area: Area, db: &Surreal<Any>) -> Result<GameArea, App
             identifier: identifier.to_string(),
             name: area.to_string(),
             area: area.to_string(),
-            terrain: Some(terrain.to_string()),
         })
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create area: {}", e)))?;
@@ -265,17 +261,8 @@ pub async fn create_area(
     let game_uuid = Uuid::from_str(game_identifier)
         .map_err(|e| AppError::BadRequest(format!("Invalid game UUID: {}", e)))?;
     if let Ok(game_area) = create_game_area_edge(area.clone(), game_uuid, &db).await {
-        // Fetch the area record to get terrain
-        let area_record: Option<GameArea> = db
-            .select(game_area.area.clone())
-            .await
-            .map_err(|e| AppError::InternalServerError(format!("Failed to fetch area: {}", e)))?;
-
-        let terrain = area_record
-            .and_then(|a| a.terrain)
-            .and_then(|t| BaseTerrain::from_str(&t).ok());
-
-        let item_futures = (0..num_items).map(|_| add_item_to_area(&game_area, terrain, &db));
+        // Create initial items for the area (terrain will be assigned by game engine)
+        let item_futures = (0..num_items).map(|_| add_item_to_area(&game_area, None, &db));
         let item_results = futures::future::join_all(item_futures).await;
         if let Some(err) = item_results.into_iter().find_map(Result::err) {
             return Err(AppError::InternalServerError(format!(
@@ -669,10 +656,14 @@ async fn get_dead_tribute_count(db: &Surreal<Any>, identifier: &str) -> Result<u
     }
 }
 
-async fn run_game_cycles(game: &mut Game, db: &Surreal<Any>) -> Result<(), AppError> {
+async fn run_game_cycles(
+    game: &mut Game,
+    db: &Surreal<Any>,
+    broadcaster: &crate::websocket::GameBroadcaster,
+) -> Result<(), AppError> {
     game.run_day_night_cycle(true);
     game.run_day_night_cycle(false);
-    save_game(game, db).await?;
+    save_game(game, db, broadcaster).await?;
     Ok(())
 }
 
@@ -690,6 +681,14 @@ pub async fn next_step(
             update_game_status(&state.db, &record_id, GameStatus::InProgress).await?;
             let mut game = get_full_game(identifier, &state.db).await?.0;
             game.status = GameStatus::InProgress;
+
+            // Broadcast game started
+            crate::websocket::broadcast_game_started(
+                &state.broadcaster,
+                &game.identifier,
+                game.day.unwrap_or(1),
+            );
+
             Ok(Json(Some(game)))
         }
         GameStatus::InProgress => {
@@ -697,10 +696,20 @@ pub async fn next_step(
 
             if dead_tribute_count >= 24 {
                 update_game_status(&state.db, &record_id, GameStatus::Finished).await?;
+
+                // Find and broadcast winner
+                let game = get_full_game(identifier, &state.db).await?.0;
+                let winner = game
+                    .tributes
+                    .iter()
+                    .find(|t| t.is_alive())
+                    .map(|t| t.name.clone());
+                crate::websocket::broadcast_game_finished(&state.broadcaster, &id, winner);
+
                 Ok(Json(None))
             } else {
                 let mut game = get_full_game(identifier, &state.db).await?.0;
-                run_game_cycles(&mut game, &state.db).await?;
+                run_game_cycles(&mut game, &state.db, &state.broadcaster).await?;
 
                 Ok(Json(Some(game)))
             }
@@ -746,7 +755,11 @@ struct GameLog {
     pub content: String,
 }
 
-async fn save_game(game: &Game, db: &Surreal<Any>) -> Result<Json<Game>, AppError> {
+async fn save_game(
+    game: &Game,
+    db: &Surreal<Any>,
+    broadcaster: &crate::websocket::GameBroadcaster,
+) -> Result<Json<Game>, AppError> {
     let game_identifier = RecordId::from(("game", game.identifier.clone()));
 
     // Start transaction
@@ -756,6 +769,23 @@ async fn save_game(game: &Game, db: &Surreal<Any>) -> Result<Json<Game>, AppErro
 
     if let Ok(logs) = get_all_messages() {
         let game_day = game.day.unwrap_or_default();
+
+        // Broadcast messages to WebSocket clients
+        for log in &logs {
+            let source_str = match &log.source {
+                MessageSource::Game(id) => format!("game:{}", id),
+                MessageSource::Area(area) => format!("area:{}", area),
+                MessageSource::Tribute(trib) => format!("tribute:{}", trib),
+            };
+
+            crate::websocket::broadcast_game_message(
+                broadcaster,
+                &game.identifier,
+                &source_str,
+                &log.content,
+                game_day,
+            );
+        }
 
         let game_logs: Vec<GameLog> = logs
             .iter()

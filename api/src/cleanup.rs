@@ -11,8 +11,9 @@ pub async fn cleanup_refresh_tokens(state: &AppState) -> Result<usize, AppError>
         .map_err(|e| AppError::DbError(format!("Failed to cleanup refresh tokens: {}", e)))?;
 
     // Extract the number of deleted tokens
+    let mut result = result;
     let deleted: Vec<serde_json::Value> = result
-        .check()
+        .take(0)
         .map_err(|e| AppError::DbError(format!("Failed to check cleanup result: {}", e)))?;
 
     // Count the number of deleted records

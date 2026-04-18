@@ -833,8 +833,38 @@ impl Tribute {
                 };
 
                 match travel_result {
-                    TravelResult::Success(area) => {
-                        self.area = area;
+                    TravelResult::Success(destination) => {
+                        // Find destination info from available_destinations
+                        let dest_info = environment_details
+                            .available_destinations
+                            .iter()
+                            .find(|d| d.area == destination);
+
+                        match dest_info {
+                            Some(info) => {
+                                // Check if tribute has enough stamina
+                                if self.stamina >= info.stamina_cost {
+                                    // Move and deduct stamina
+                                    self.area = destination;
+                                    self.stamina = self.stamina.saturating_sub(info.stamina_cost);
+                                } else {
+                                    // Insufficient stamina - exhausted
+                                    self.short_rests();
+                                    self.try_log_action(
+                                        GameOutput::TributeTravelExhausted(
+                                            self.name.as_str(),
+                                            &self.area.to_string(),
+                                        ),
+                                        "too exhausted to move",
+                                    );
+                                }
+                            }
+                            None => {
+                                // Destination not in available_destinations (shouldn't happen)
+                                // This means travels() returned non-adjacent area or adjacency check failed
+                                self.short_rests();
+                            }
+                        }
                     }
                     TravelResult::Failure => {
                         self.short_rests();

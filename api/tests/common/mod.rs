@@ -12,13 +12,13 @@ pub struct TestDb {
 }
 
 impl TestDb {
-    /// Create a new test database connection
+    /// Create a new test database connection (in-memory)
     pub async fn new() -> Self {
-        // Connect to test SurrealDB instance
+        // Use in-memory database for tests (no external dependencies)
         let db = Arc::new(
-            surrealdb::engine::any::connect("ws://localhost:8000")
+            surrealdb::engine::any::connect("mem://")
                 .await
-                .expect("Failed to connect to test database"),
+                .expect("Failed to create in-memory database"),
         );
 
         // Sign in as root
@@ -50,8 +50,13 @@ impl TestDb {
 
     /// Get the AppState for testing
     pub fn app_state(&self) -> AppState {
+        use api::storage::LocalStorage;
+        use api::websocket::GameBroadcaster;
+
         AppState {
             db: self.db.clone(),
+            storage: Arc::new(LocalStorage::new("test_uploads", "/uploads")),
+            broadcaster: Arc::new(GameBroadcaster::default()),
         }
     }
 
@@ -68,7 +73,9 @@ pub fn create_test_router(state: AppState) -> Router {
     use api::auth::AUTH_ROUTER;
     use api::games::GAMES_ROUTER;
     use api::users::USERS_ROUTER;
+    use api::websocket::websocket_handler;
     use axum::middleware;
+    use axum::routing::get;
 
     let api_routes = Router::new()
         .nest(
@@ -82,6 +89,7 @@ pub fn create_test_router(state: AppState) -> Router {
 
     Router::new()
         .nest("/api", api_routes)
+        .route("/ws", get(websocket_handler))
         .route(
             "/health",
             axum::routing::get(|| async { axum::Json(serde_json::json!({"status": "ok"})) }),

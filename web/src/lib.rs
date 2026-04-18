@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 mod cache;
 pub mod components;
 pub(crate) mod env;
+pub mod hooks;
 mod routes;
 mod storage;
 

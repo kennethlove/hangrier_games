@@ -128,8 +128,6 @@ pub struct GameArea {
     pub identifier: String,
     pub name: String,
     pub area: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub terrain: Option<String>, // Serialized terrain type name
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize, Validate)]

@@ -436,8 +436,8 @@ mod tests {
             *counts.entry(event).or_insert(0) += 1;
         }
         // Desert should have high sandstorm/heatwave, no blizzard
-        assert!(counts.get(&AreaEvent::Sandstorm).unwrap_or(&0) >= &30);
-        assert!(counts.get(&AreaEvent::Heatwave).unwrap_or(&0) >= &20);
+        assert!(counts.get(&AreaEvent::Sandstorm).unwrap_or(&0) >= &28); // 40% prob -> ~70%
+        assert!(counts.get(&AreaEvent::Heatwave).unwrap_or(&0) >= &21); // 30% prob -> ~70%
         assert_eq!(counts.get(&AreaEvent::Blizzard).unwrap_or(&0), &0);
     }
 
@@ -450,8 +450,8 @@ mod tests {
             *counts.entry(event).or_insert(0) += 1;
         }
         // Mountains should have high avalanche/rockslide, no floods
-        assert!(counts.get(&AreaEvent::Avalanche).unwrap_or(&0) >= &25);
-        assert!(counts.get(&AreaEvent::Rockslide).unwrap_or(&0) >= &20);
+        assert!(counts.get(&AreaEvent::Avalanche).unwrap_or(&0) >= &24); // 35% prob -> ~70%
+        assert!(counts.get(&AreaEvent::Rockslide).unwrap_or(&0) >= &21); // 30% prob -> ~70%
         assert_eq!(counts.get(&AreaEvent::Flood).unwrap_or(&0), &0);
     }
 
@@ -464,7 +464,7 @@ mod tests {
             *counts.entry(event).or_insert(0) += 1;
         }
         // Wetlands should have high flood, no avalanche
-        assert!(counts.get(&AreaEvent::Flood).unwrap_or(&0) >= &40);
+        assert!(counts.get(&AreaEvent::Flood).unwrap_or(&0) >= &35); // 50% prob -> ~70%
         assert_eq!(counts.get(&AreaEvent::Avalanche).unwrap_or(&0), &0);
         assert_eq!(counts.get(&AreaEvent::Blizzard).unwrap_or(&0), &0);
     }
@@ -478,8 +478,8 @@ mod tests {
             *counts.entry(event).or_insert(0) += 1;
         }
         // Tundra should have high blizzard/avalanche, no sandstorm
-        assert!(counts.get(&AreaEvent::Blizzard).unwrap_or(&0) >= &35);
-        assert!(counts.get(&AreaEvent::Avalanche).unwrap_or(&0) >= &15);
+        assert!(counts.get(&AreaEvent::Blizzard).unwrap_or(&0) >= &31); // 45% prob -> ~70%
+        assert!(counts.get(&AreaEvent::Avalanche).unwrap_or(&0) >= &17); // 25% prob -> ~70%
         assert_eq!(counts.get(&AreaEvent::Sandstorm).unwrap_or(&0), &0);
         assert_eq!(counts.get(&AreaEvent::Flood).unwrap_or(&0), &0);
     }
@@ -493,7 +493,7 @@ mod tests {
             *counts.entry(event).or_insert(0) += 1;
         }
         // Forest should have high wildfire, no sandstorm
-        assert!(counts.get(&AreaEvent::Wildfire).unwrap_or(&0) >= &30);
+        assert!(counts.get(&AreaEvent::Wildfire).unwrap_or(&0) >= &28); // 40% prob -> ~70%
         assert_eq!(counts.get(&AreaEvent::Sandstorm).unwrap_or(&0), &0);
         assert_eq!(counts.get(&AreaEvent::Drought).unwrap_or(&0), &0);
     }
@@ -507,8 +507,8 @@ mod tests {
             *counts.entry(event).or_insert(0) += 1;
         }
         // Grasslands should have high wildfire/drought, no avalanche
-        assert!(counts.get(&AreaEvent::Wildfire).unwrap_or(&0) >= &25);
-        assert!(counts.get(&AreaEvent::Drought).unwrap_or(&0) >= &15);
+        assert!(counts.get(&AreaEvent::Wildfire).unwrap_or(&0) >= &24); // 35% prob -> ~70%
+        assert!(counts.get(&AreaEvent::Drought).unwrap_or(&0) >= &17); // 25% prob -> ~70%
         assert_eq!(counts.get(&AreaEvent::Avalanche).unwrap_or(&0), &0);
         assert_eq!(counts.get(&AreaEvent::Blizzard).unwrap_or(&0), &0);
     }
@@ -522,7 +522,7 @@ mod tests {
             *counts.entry(event).or_insert(0) += 1;
         }
         // Clearing should have balanced events, no avalanche
-        assert!(counts.get(&AreaEvent::Wildfire).unwrap_or(&0) >= &20);
+        assert!(counts.get(&AreaEvent::Wildfire).unwrap_or(&0) >= &21); // 30% prob -> ~70%
         assert_eq!(counts.get(&AreaEvent::Avalanche).unwrap_or(&0), &0);
         assert_eq!(counts.get(&AreaEvent::Blizzard).unwrap_or(&0), &0);
     }
@@ -536,8 +536,8 @@ mod tests {
             *counts.entry(event).or_insert(0) += 1;
         }
         // Badlands should have high sandstorm/rockslide, no flood/avalanche
-        assert!(counts.get(&AreaEvent::Sandstorm).unwrap_or(&0) >= &25);
-        assert!(counts.get(&AreaEvent::Rockslide).unwrap_or(&0) >= &15);
+        assert!(counts.get(&AreaEvent::Sandstorm).unwrap_or(&0) >= &24); // 35% prob -> ~70%
+        assert!(counts.get(&AreaEvent::Rockslide).unwrap_or(&0) >= &17); // 25% prob -> ~70%
         assert_eq!(counts.get(&AreaEvent::Flood).unwrap_or(&0), &0);
         assert_eq!(counts.get(&AreaEvent::Avalanche).unwrap_or(&0), &0);
     }
@@ -551,8 +551,8 @@ mod tests {
             *counts.entry(event).or_insert(0) += 1;
         }
         // Highlands should have high rockslide/landslide, no flood/wildfire
-        assert!(counts.get(&AreaEvent::Rockslide).unwrap_or(&0) >= &20);
-        assert!(counts.get(&AreaEvent::Landslide).unwrap_or(&0) >= &15);
+        assert!(counts.get(&AreaEvent::Rockslide).unwrap_or(&0) >= &21); // 30% prob -> ~70%
+        assert!(counts.get(&AreaEvent::Landslide).unwrap_or(&0) >= &17); // 25% prob -> ~70%
         assert_eq!(counts.get(&AreaEvent::Flood).unwrap_or(&0), &0);
         assert_eq!(counts.get(&AreaEvent::Wildfire).unwrap_or(&0), &0);
     }
@@ -566,8 +566,8 @@ mod tests {
             *counts.entry(event).or_insert(0) += 1;
         }
         // Jungle should have high wildfire/flood, no sandstorm/blizzard
-        assert!(counts.get(&AreaEvent::Wildfire).unwrap_or(&0) >= &25);
-        assert!(counts.get(&AreaEvent::Flood).unwrap_or(&0) >= &20);
+        assert!(counts.get(&AreaEvent::Wildfire).unwrap_or(&0) >= &24); // 35% prob -> ~70%
+        assert!(counts.get(&AreaEvent::Flood).unwrap_or(&0) >= &21); // 30% prob -> ~70% (FIXED: was 20)
         assert_eq!(counts.get(&AreaEvent::Sandstorm).unwrap_or(&0), &0);
         assert_eq!(counts.get(&AreaEvent::Blizzard).unwrap_or(&0), &0);
     }
@@ -581,8 +581,8 @@ mod tests {
             *counts.entry(event).or_insert(0) += 1;
         }
         // UrbanRuins should have high earthquake/wildfire, no avalanche/drought
-        assert!(counts.get(&AreaEvent::Earthquake).unwrap_or(&0) >= &25);
-        assert!(counts.get(&AreaEvent::Wildfire).unwrap_or(&0) >= &15);
+        assert!(counts.get(&AreaEvent::Earthquake).unwrap_or(&0) >= &24); // 35% prob -> ~70%
+        assert!(counts.get(&AreaEvent::Wildfire).unwrap_or(&0) >= &17); // 25% prob -> ~70%
         assert_eq!(counts.get(&AreaEvent::Avalanche).unwrap_or(&0), &0);
         assert_eq!(counts.get(&AreaEvent::Drought).unwrap_or(&0), &0);
     }
@@ -596,8 +596,8 @@ mod tests {
             *counts.entry(event).or_insert(0) += 1;
         }
         // Geothermal should have high heatwave/earthquake, no blizzard/flood
-        assert!(counts.get(&AreaEvent::Heatwave).unwrap_or(&0) >= &30);
-        assert!(counts.get(&AreaEvent::Earthquake).unwrap_or(&0) >= &20);
+        assert!(counts.get(&AreaEvent::Heatwave).unwrap_or(&0) >= &28); // 40% prob -> ~70%
+        assert!(counts.get(&AreaEvent::Earthquake).unwrap_or(&0) >= &21); // 30% prob -> ~70%
         assert_eq!(counts.get(&AreaEvent::Blizzard).unwrap_or(&0), &0);
         assert_eq!(counts.get(&AreaEvent::Flood).unwrap_or(&0), &0);
     }

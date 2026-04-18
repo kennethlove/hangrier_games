@@ -2,7 +2,7 @@ use crate::areas::events::AreaEvent;
 use crate::areas::{Area, AreaDetails};
 use crate::items::Item;
 use crate::items::OwnsItems;
-use crate::messages::{add_area_message, add_game_message, clear_messages};
+use crate::messages::{add_area_message, add_game_message, add_tribute_message, clear_messages};
 use crate::output::GameOutput;
 use crate::tributes::actions::Action;
 use crate::tributes::events::TributeEvent;
@@ -254,6 +254,124 @@ impl Game {
                 format!("{}", GameOutput::GameNightEnd(self.clone().day.unwrap())),
             )
             .expect("Failed to add night end message");
+        }
+    }
+
+    /// Process survival checks for all tributes in an area when an event occurs
+    pub fn process_event_for_area(&mut self, area: &Area, event: &AreaEvent) {
+        // Get area terrain and events in a single lookup
+        let (terrain, area_events) = {
+            let area_details = self.areas.iter().find(|a| a.area.as_ref() == Some(area));
+
+            match area_details {
+                Some(a) => (a.terrain.base.clone(), a.events.clone()),
+                None => return, // Area not found
+            }
+        };
+
+        // Find all alive tributes in this area
+        let tribute_indices: Vec<usize> = self
+            .tributes
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| t.is_alive() && &t.area == area)
+            .map(|(idx, _)| idx)
+            .collect();
+
+        if tribute_indices.is_empty() {
+            return; // No tributes in area, nothing to do
+        }
+
+        let most_severe_event = if area_events.len() > 1 {
+            // Find event with highest severity
+            area_events
+                .iter()
+                .max_by_key(|e| e.severity_in_terrain(&terrain))
+                .cloned()
+                .unwrap_or_else(|| event.clone())
+        } else {
+            event.clone()
+        };
+
+        // Process each tribute's survival check
+        for tribute_idx in tribute_indices {
+            let tribute = &mut self.tributes[tribute_idx];
+
+            // Check modifiers
+            let has_affinity = tribute.terrain_affinity.contains(&terrain);
+
+            // Check for protective items (shields only for physical events)
+            let is_physical_event = matches!(
+                most_severe_event,
+                AreaEvent::Avalanche | AreaEvent::Rockslide | AreaEvent::Earthquake
+            );
+            let has_item_bonus =
+                is_physical_event && tribute.items.iter().any(|item| item.is_defensive());
+
+            let is_desperate = tribute.attributes.health < 30;
+            let current_health = tribute.attributes.health;
+
+            // Run survival check
+            let result = most_severe_event.survival_check(
+                &terrain,
+                has_affinity,
+                has_item_bonus,
+                is_desperate,
+                current_health,
+            );
+
+            // Apply results
+            if !result.survived {
+                tribute.attributes.health = 0;
+
+                let message = if result.instant_death {
+                    format!(
+                        "{} is instantly killed by the catastrophic {}!",
+                        tribute.name, most_severe_event
+                    )
+                } else {
+                    format!("{} dies from the {}", tribute.name, most_severe_event)
+                };
+
+                add_tribute_message(&tribute.identifier, &self.identifier, message)
+                    .expect("Failed to add tribute death message");
+            } else {
+                // Survivor - apply rewards if any
+                if result.stamina_restored > 0 {
+                    tribute.stamina = tribute.stamina.saturating_add(result.stamina_restored);
+                    let message = format!(
+                        "{} survives the {}, recovering {} stamina",
+                        tribute.name, most_severe_event, result.stamina_restored
+                    );
+                    add_tribute_message(&tribute.identifier, &self.identifier, message)
+                        .expect("Failed to add tribute message");
+                }
+
+                if result.sanity_restored > 0 {
+                    tribute.attributes.sanity = tribute
+                        .attributes
+                        .sanity
+                        .saturating_add(result.sanity_restored);
+                    let message = format!(
+                        "{} survives the {}, recovering {} sanity",
+                        tribute.name, most_severe_event, result.sanity_restored
+                    );
+                    add_tribute_message(&tribute.identifier, &self.identifier, message)
+                        .expect("Failed to add tribute message");
+                }
+
+                if result.reward_item.is_some() {
+                    let item = Item::new_random_consumable();
+                    let item_name = item.name.clone();
+                    tribute.items.push(item);
+                    let message = format!(
+                        "{} survives the {} and finds a {}",
+                        tribute.name, most_severe_event, item_name
+                    );
+                    add_tribute_message(&tribute.identifier, &self.identifier, message)
+                        .expect("Failed to add tribute message");
+                }
+            }
         }
     }
 
@@ -808,6 +926,9 @@ mod tests {
 
     #[test]
     fn test_announce_cycle_start() {
+        // Clear any messages from other tests running in parallel
+        clear_messages().unwrap();
+
         let tribute1 = create_tribute("Tribute1", true);
         let tribute2 = create_tribute("Tribute2", true);
         let mut game = create_test_game_with_tributes(vec![tribute1.clone(), tribute2.clone()]);
@@ -825,6 +946,9 @@ mod tests {
 
     #[test]
     fn test_announce_cycle_end() {
+        // Clear any messages from other tests running in parallel
+        clear_messages().unwrap();
+
         let tribute1 = create_tribute("Tribute1", true);
         let mut tribute2 = create_tribute("Tribute2", false);
         tribute2.set_status(TributeStatus::RecentlyDead);
@@ -843,6 +967,9 @@ mod tests {
 
     #[test]
     fn test_announce_area_events() {
+        // Clear any messages from other tests running in parallel
+        clear_messages().unwrap();
+
         let mut game = Game::new("Test Game");
         let mut area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
         area.events.push(AreaEvent::random());
@@ -850,8 +977,6 @@ mod tests {
         game.areas.push(area);
 
         assert!(!game.areas[0].is_open());
-
-        clear_messages().unwrap();
         game.announce_area_events();
         let messages = get_all_messages().unwrap();
         // Area closed message

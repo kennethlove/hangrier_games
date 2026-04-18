@@ -14,11 +14,13 @@ pub mod games;
 pub mod storage;
 pub mod tributes;
 pub mod users;
+pub mod websocket;
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: Arc<Surreal<Any>>,
     pub storage: Arc<dyn storage::StorageBackend>,
+    pub broadcaster: Arc<websocket::GameBroadcaster>,
 }
 
 #[derive(Debug, Error)]

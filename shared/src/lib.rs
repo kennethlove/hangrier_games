@@ -3,6 +3,54 @@ use std::fmt::{Debug, Display};
 use std::str::FromStr;
 use validator::{Validate, ValidationError};
 
+/// WebSocket message protocol for real-time game updates
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type")]
+pub enum WebSocketMessage {
+    /// Client subscribes to game updates
+    Subscribe { game_id: String },
+    /// Client unsubscribes from game updates
+    Unsubscribe { game_id: String },
+    /// Server sends game event to subscribed clients
+    GameEvent { game_id: String, event: GameEvent },
+    /// Server sends error message
+    Error { message: String },
+}
+
+/// Real-time game events broadcast to WebSocket clients
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "event_type")]
+pub enum GameEvent {
+    /// Game has started
+    GameStarted { day: u32 },
+    /// Game has finished
+    GameFinished { winner: Option<String> },
+    /// New day has started
+    DayStarted { day: u32 },
+    /// Night phase has started
+    NightStarted { day: u32 },
+    /// Tribute died
+    TributeDied {
+        tribute_id: String,
+        name: String,
+        cause: String,
+    },
+    /// Area event occurred
+    AreaEvent { area: String, event: String },
+    /// Combat occurred
+    Combat {
+        attacker: String,
+        defender: String,
+        outcome: String,
+    },
+    /// Generic message (tribute action, announcement, etc.)
+    Message {
+        source: String,
+        content: String,
+        game_day: u32,
+    },
+}
+
 /// Item quantity preset for game customization.
 /// Controls the base number of items spawned in each area.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]

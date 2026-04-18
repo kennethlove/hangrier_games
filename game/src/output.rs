@@ -58,6 +58,9 @@ pub enum GameOutput<'a> {
     TributeAttackDied(&'a str, &'a str),
     TributeAttackSuccessKill(&'a str, &'a str),
     TributeAttackHidden(&'a str, &'a str),
+    TributeCriticalHit(&'a str, &'a str), // Natural 20 on attack
+    TributeCriticalFumble(&'a str),       // Natural 1 on attack
+    TributePerfectBlock(&'a str, &'a str), // Natural 20 on defense
     TributeDiesFromStatus(&'a str, &'a str),
     TributeDiesFromAreaEvent(&'a str, &'a str), // Died in area
     TributeDiesFromTributeEvent(&'a str, &'a str),
@@ -281,6 +284,23 @@ impl<'a> Display for GameOutput<'a> {
             }
             GameOutput::TributeAttackHidden(tribute, target) => {
                 write!(f, "🤔 {} can't attack {}, they're hidden", tribute, target)
+            }
+            GameOutput::TributeCriticalHit(tribute, target) => {
+                write!(f, "💥 {} lands a CRITICAL HIT on {}!", tribute, target)
+            }
+            GameOutput::TributeCriticalFumble(tribute) => {
+                write!(
+                    f,
+                    "😵 {} fumbles their attack badly and hurts themself!",
+                    tribute
+                )
+            }
+            GameOutput::TributePerfectBlock(tribute, target) => {
+                write!(
+                    f,
+                    "🛡️ {} perfectly blocks {}'s attack and counters!",
+                    tribute, target
+                )
             }
             GameOutput::TributeDiesFromStatus(tribute, status) => {
                 write!(f, "💀 {} dies from {}", tribute, status)

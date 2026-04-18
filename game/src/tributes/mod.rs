@@ -591,23 +591,24 @@ impl Default for Attributes {
 }
 
 impl Attributes {
-    /// Provides a randomized set of Attributes
+    /// Provides a randomized set of Attributes using default config values
     pub fn new() -> Self {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
+        let config = crate::config::GameConfig::default();
 
         Self {
-            health: rng.random_range(50..=MAX_HEALTH),
-            sanity: rng.random_range(50..=MAX_SANITY),
-            movement: MAX_MOVEMENT,
-            strength: rng.random_range(1..=MAX_STRENGTH),
-            defense: rng.random_range(1..=MAX_DEFENSE),
-            bravery: rng.random_range(1..=MAX_BRAVERY),
-            loyalty: rng.random_range(1..=MAX_LOYALTY),
-            speed: rng.random_range(1..=MAX_SPEED),
-            dexterity: rng.random_range(1..=MAX_DEXTERITY),
-            intelligence: rng.random_range(1..=MAX_INTELLIGENCE),
-            persuasion: rng.random_range(1..=MAX_PERSUASION),
-            luck: rng.random_range(1..=MAX_LUCK),
+            health: rng.random_range(50..=config.max_health),
+            sanity: rng.random_range(50..=config.max_sanity),
+            movement: config.max_movement,
+            strength: rng.random_range(1..=config.max_strength),
+            defense: rng.random_range(1..=config.max_defense),
+            bravery: rng.random_range(1..=config.max_bravery),
+            loyalty: rng.random_range(1..=config.max_loyalty),
+            speed: rng.random_range(1..=config.max_speed),
+            dexterity: rng.random_range(1..=config.max_dexterity),
+            intelligence: rng.random_range(1..=config.max_intelligence),
+            persuasion: rng.random_range(1..=config.max_persuasion),
+            luck: rng.random_range(1..=config.max_luck),
             is_hidden: false,
         }
     }

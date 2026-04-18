@@ -19,5 +19,10 @@ tracing = "0.1.41"
 uuid = { version = "1.13.2", features = ["v4", "js"] }
 
 [dev-dependencies]
+criterion = "0.5"
 rstest = "0.25.0"
 tokio = { version = "1.45.0", features = ["macros", "rt"] }
+
+[[bench]]
+name = "game_cycle_bench"
+harness = false

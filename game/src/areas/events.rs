@@ -74,15 +74,13 @@ impl Display for AreaEvent {
 }
 
 impl AreaEvent {
-    pub fn random() -> AreaEvent {
-        let mut rng = SmallRng::from_rng(&mut rand::rng());
-        Self::iter().choose(&mut rng).unwrap().clone()
+    pub fn random(rng: &mut impl Rng) -> AreaEvent {
+        Self::iter().choose(rng).unwrap().clone()
     }
 
     /// Generate a terrain-appropriate random event with weighted probabilities
-    pub fn random_for_terrain(terrain: &BaseTerrain) -> AreaEvent {
+    pub fn random_for_terrain(terrain: &BaseTerrain, rng: &mut impl Rng) -> AreaEvent {
         use BaseTerrain::*;
-        let mut rng = SmallRng::from_rng(&mut rand::rng());
 
         // Define weights for each terrain (percentages out of 100)
         let weights: Vec<(AreaEvent, u32)> = match terrain {
@@ -386,7 +384,8 @@ mod tests {
 
     #[test]
     fn random_area_event() {
-        let random_event = AreaEvent::random();
+        let mut rng = rand::thread_rng();
+        let random_event = AreaEvent::random(&mut rng);
         assert!(AreaEvent::iter().position(|a| a == random_event).is_some());
     }
 
@@ -431,8 +430,9 @@ mod tests {
     fn test_desert_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        let mut rng = rand::thread_rng();
         for _ in 0..100 {
-            let event = AreaEvent::random_for_terrain(&BaseTerrain::Desert);
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Desert, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
         }
         // Desert should have high sandstorm/heatwave, no blizzard
@@ -445,8 +445,9 @@ mod tests {
     fn test_mountains_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        let mut rng = rand::thread_rng();
         for _ in 0..100 {
-            let event = AreaEvent::random_for_terrain(&BaseTerrain::Mountains);
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Mountains, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
         }
         // Mountains should have high avalanche/rockslide, no floods
@@ -459,8 +460,9 @@ mod tests {
     fn test_wetlands_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        let mut rng = rand::thread_rng();
         for _ in 0..100 {
-            let event = AreaEvent::random_for_terrain(&BaseTerrain::Wetlands);
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Wetlands, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
         }
         // Wetlands should have high flood, no avalanche
@@ -473,8 +475,9 @@ mod tests {
     fn test_tundra_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        let mut rng = rand::thread_rng();
         for _ in 0..100 {
-            let event = AreaEvent::random_for_terrain(&BaseTerrain::Tundra);
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Tundra, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
         }
         // Tundra should have high blizzard/avalanche, no sandstorm
@@ -488,8 +491,9 @@ mod tests {
     fn test_forest_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        let mut rng = rand::thread_rng();
         for _ in 0..100 {
-            let event = AreaEvent::random_for_terrain(&BaseTerrain::Forest);
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Forest, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
         }
         // Forest should have high wildfire, no sandstorm
@@ -502,8 +506,9 @@ mod tests {
     fn test_grasslands_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        let mut rng = rand::thread_rng();
         for _ in 0..100 {
-            let event = AreaEvent::random_for_terrain(&BaseTerrain::Grasslands);
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Grasslands, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
         }
         // Grasslands should have high wildfire/drought, no avalanche
@@ -517,8 +522,9 @@ mod tests {
     fn test_clearing_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        let mut rng = rand::thread_rng();
         for _ in 0..100 {
-            let event = AreaEvent::random_for_terrain(&BaseTerrain::Clearing);
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Clearing, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
         }
         // Clearing should have balanced events, no avalanche
@@ -531,8 +537,9 @@ mod tests {
     fn test_badlands_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        let mut rng = rand::thread_rng();
         for _ in 0..100 {
-            let event = AreaEvent::random_for_terrain(&BaseTerrain::Badlands);
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Badlands, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
         }
         // Badlands should have high sandstorm/rockslide, no flood/avalanche
@@ -546,8 +553,9 @@ mod tests {
     fn test_highlands_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        let mut rng = rand::thread_rng();
         for _ in 0..100 {
-            let event = AreaEvent::random_for_terrain(&BaseTerrain::Highlands);
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Highlands, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
         }
         // Highlands should have high rockslide/landslide, no flood/wildfire
@@ -561,8 +569,9 @@ mod tests {
     fn test_jungle_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        let mut rng = rand::thread_rng();
         for _ in 0..100 {
-            let event = AreaEvent::random_for_terrain(&BaseTerrain::Jungle);
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Jungle, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
         }
         // Jungle should have high wildfire/flood, no sandstorm/blizzard
@@ -576,8 +585,9 @@ mod tests {
     fn test_urbanruins_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        let mut rng = rand::thread_rng();
         for _ in 0..100 {
-            let event = AreaEvent::random_for_terrain(&BaseTerrain::UrbanRuins);
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::UrbanRuins, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
         }
         // UrbanRuins should have high earthquake/wildfire, no avalanche/drought
@@ -591,8 +601,9 @@ mod tests {
     fn test_geothermal_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        let mut rng = rand::thread_rng();
         for _ in 0..100 {
-            let event = AreaEvent::random_for_terrain(&BaseTerrain::Geothermal);
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Geothermal, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
         }
         // Geothermal should have high heatwave/earthquake, no blizzard/flood

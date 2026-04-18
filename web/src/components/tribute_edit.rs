@@ -113,6 +113,10 @@ pub fn EditTributeForm() -> Element {
     let name = tribute_details.1.clone();
     let avatar = tribute_details.2.clone();
     let game_identifier = tribute_details.3.clone();
+    let identifier = tribute_details.0.clone();
+
+    let mut avatar_preview = use_signal(|| avatar.clone());
+    let mut upload_status = use_signal(|| String::new());
 
     let mutate = use_mutation(edit_tribute);
 
@@ -130,7 +134,7 @@ pub fn EditTributeForm() -> Element {
             .clone()
             .expect("No details provided");
         let identifier = tribute_details.0.clone();
-        let avatar = tribute_details.2.clone();
+        let current_avatar = avatar_preview.read().clone();
 
         let data = e.data().values();
         let name = data.get("name").expect("No name value").0[0].clone();
@@ -139,7 +143,7 @@ pub fn EditTributeForm() -> Element {
             let edit_tribute = EditTribute(
                 identifier.clone(),
                 name.clone(),
-                avatar.clone(),
+                current_avatar,
                 game_identifier.clone(),
             );
             spawn(async move {
@@ -159,6 +163,60 @@ pub fn EditTributeForm() -> Element {
                 }
             });
         }
+    };
+
+    let upload_avatar = move |e: Event<FormData>| {
+        let token = storage.get().jwt.expect("No JWT found");
+        let game_id = game_identifier.clone();
+        let tribute_id = identifier.clone();
+
+        upload_status.set("Uploading...".to_string());
+
+        spawn(async move {
+            let files = e.files();
+
+            if let Some(file_engine) = files {
+                if let Some(file_name) = file_engine.files().into_iter().next() {
+                    if let Some(file_data) = file_engine.read_file(&file_name).await {
+                        // Upload file using multipart/form-data
+                        let client = reqwest::Client::new();
+                        let url = format!(
+                            "{}/api/games/{}/tributes/{}/avatar",
+                            APP_API_HOST, game_id, tribute_id
+                        );
+
+                        let part =
+                            reqwest::multipart::Part::bytes(file_data).file_name(file_name.clone());
+
+                        let form = reqwest::multipart::Form::new().part("avatar", part);
+
+                        let response = client
+                            .post(&url)
+                            .bearer_auth(token)
+                            .multipart(form)
+                            .send()
+                            .await;
+
+                        match response {
+                            Ok(resp) if resp.status().is_success() => {
+                                if let Ok(json) = resp.json::<serde_json::Value>().await {
+                                    if let Some(url) = json.get("url").and_then(|v| v.as_str()) {
+                                        avatar_preview.set(url.to_string());
+                                        upload_status.set("Upload successful!".to_string());
+                                    }
+                                }
+                            }
+                            Ok(resp) => {
+                                upload_status.set(format!("Upload failed: {}", resp.status()));
+                            }
+                            Err(e) => {
+                                upload_status.set(format!("Upload error: {}", e));
+                            }
+                        }
+                    }
+                }
+            }
+        });
     };
 
     rsx! {
@@ -191,17 +249,45 @@ pub fn EditTributeForm() -> Element {
                         value: name,
                     }
                 }
-                label {
-                    "Avatar",
+            }
 
-                    Input {
-                        class: "border ml-2 px-2 py-1",
-                        r#type: "url",
+            div {
+                label {
+                    class: "block mb-2",
+                    "Avatar"
+                }
+
+                // Show current avatar if exists
+                if !avatar_preview.read().is_empty() {
+                    img {
+                        class: "w-32 h-32 object-cover rounded mb-2",
+                        src: "{avatar_preview}",
+                        alt: "Tribute avatar"
+                    }
+                }
+
+                // File upload form
+                form {
+                    class: "mb-2",
+                    onchange: upload_avatar,
+                    prevent_default: "onsubmit",
+
+                    input {
+                        r#type: "file",
                         name: "avatar",
-                        value: avatar.clone(),
+                        accept: "image/jpeg,image/png,image/webp",
+                        class: "border px-2 py-1"
+                    }
+                }
+
+                if !upload_status.read().is_empty() {
+                    p {
+                        class: "text-sm italic",
+                        "{upload_status}"
                     }
                 }
             }
+
             div {
                 class: "flex justify-end gap-2",
                 Button {

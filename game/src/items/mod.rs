@@ -10,6 +10,56 @@ use strum::{EnumIter, IntoEnumIterator};
 use thiserror::Error;
 use uuid::Uuid;
 
+/// Item rarity determines effect strength and spawn probability.
+/// Distribution: Common 60%, Uncommon 25%, Rare 12%, Legendary 3%
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+pub enum ItemRarity {
+    Common,
+    Uncommon,
+    Rare,
+    Legendary,
+}
+
+impl ItemRarity {
+    /// Roll for item rarity using weighted distribution.
+    pub fn random() -> ItemRarity {
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+        let roll: f32 = rng.random();
+
+        if roll < 0.60 {
+            ItemRarity::Common
+        } else if roll < 0.85 {
+            ItemRarity::Uncommon
+        } else if roll < 0.97 {
+            ItemRarity::Rare
+        } else {
+            ItemRarity::Legendary
+        }
+    }
+
+    /// Get effect range for this rarity tier.
+    pub fn effect_range(&self) -> (i32, i32) {
+        match self {
+            ItemRarity::Common => (1, 3),
+            ItemRarity::Uncommon => (3, 5),
+            ItemRarity::Rare => (5, 8),
+            ItemRarity::Legendary => (8, 12),
+        }
+    }
+}
+
+impl Display for ItemRarity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ItemRarity::Common => write!(f, "Common"),
+            ItemRarity::Uncommon => write!(f, "Uncommon"),
+            ItemRarity::Rare => write!(f, "Rare"),
+            ItemRarity::Legendary => write!(f, "Legendary"),
+        }
+    }
+}
+
+
 #[derive(Debug, Clone, PartialEq, Error)]
 pub enum ItemError {
     #[error("Item not found")]
@@ -32,6 +82,7 @@ pub struct Item {
     pub identifier: String,
     pub name: String,
     pub item_type: ItemType,
+    pub rarity: ItemRarity,
     pub quantity: u32,
     pub attribute: Attribute,
     pub effect: i32,
@@ -39,7 +90,7 @@ pub struct Item {
 
 impl Display for Item {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name)
+        write!(f, "{} ({})", self.name, self.rarity)
     }
 }
 
@@ -50,6 +101,7 @@ impl Default for Item {
             identifier,
             name: String::from("Useless health potion"),
             item_type: ItemType::Consumable,
+            rarity: ItemRarity::Common,
             quantity: 1,
             attribute: Attribute::Health,
             effect: 0,
@@ -61,6 +113,7 @@ impl Item {
     pub fn new(
         name: &str,
         item_type: ItemType,
+        rarity: ItemRarity,
         quantity: u32,
         attribute: Attribute,
         effect: i32,
@@ -70,6 +123,7 @@ impl Item {
             identifier,
             name: name.to_string(),
             item_type,
+            rarity,
             quantity,
             attribute,
             effect,
@@ -147,11 +201,13 @@ impl Item {
     pub fn new_weapon(name: &str) -> Item {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
 
+        let rarity = ItemRarity::random();
         let quantity = 1;
         let attribute = Attribute::Strength;
-        let effect = rng.random_range(1..=5);
+        let (min, max) = rarity.effect_range();
+        let effect = rng.random_range(min..=max);
 
-        Item::new(name, ItemType::Weapon, quantity, attribute, effect)
+        Item::new(name, ItemType::Weapon, rarity, quantity, attribute, effect)
     }
 
     pub fn new_random_weapon() -> Item {
@@ -162,32 +218,38 @@ impl Item {
     pub fn new_consumable(name: &str) -> Item {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
 
+        let rarity = ItemRarity::random();
         let quantity = 1;
         let attribute = Attribute::random();
-        let effect = rng.random_range(1..=10);
+        let (min, max) = rarity.effect_range();
+        let effect = rng.random_range(min..=max);
 
-        Item::new(name, ItemType::Consumable, quantity, attribute, effect)
+        Item::new(name, ItemType::Consumable, rarity, quantity, attribute, effect)
     }
 
     pub fn new_random_consumable() -> Item {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
+        let rarity = ItemRarity::random();
         let attribute = Attribute::random();
         let name = attribute.consumable_name();
         let quantity = 1;
-        let effect = rng.random_range(1..=10);
+        let (min, max) = rarity.effect_range();
+        let effect = rng.random_range(min..=max);
 
-        Item::new(&name, ItemType::Consumable, quantity, attribute, effect)
+        Item::new(&name, ItemType::Consumable, rarity, quantity, attribute, effect)
     }
 
     pub fn new_shield(name: &str) -> Item {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
 
+        let rarity = ItemRarity::random();
         let item_type = ItemType::Weapon;
         let quantity = 1;
         let attribute = Attribute::Defense;
-        let effect = rng.random_range(1..=7);
+        let (min, max) = rarity.effect_range();
+        let effect = rng.random_range(min..=max);
 
-        Item::new(name, item_type, quantity, attribute, effect)
+        Item::new(name, item_type, rarity, quantity, attribute, effect)
     }
 
     pub fn new_random_shield() -> Item {
@@ -333,14 +395,15 @@ mod tests {
     #[test]
     fn item_to_string() {
         let item = Item::default();
-        assert_eq!(item.to_string(), "Useless health potion".to_string());
+        assert_eq!(item.to_string(), "Useless health potion (Common)".to_string());
     }
 
     #[test]
     fn new_item() {
-        let item = Item::new("Test item", ItemType::Weapon, 1, Attribute::Defense, 10);
+        let item = Item::new("Test item", ItemType::Weapon, ItemRarity::Rare, 1, Attribute::Defense, 10);
         assert_eq!(item.name, "Test item");
         assert_eq!(item.item_type, ItemType::Weapon);
+        assert_eq!(item.rarity, ItemRarity::Rare);
         assert_eq!(item.quantity, 1);
         assert_eq!(item.attribute, Attribute::Defense);
         assert_eq!(item.effect, 10);
@@ -481,5 +544,96 @@ mod tests {
     #[case(Attribute::Defense, "bear spray")]
     fn attribute_to_consumable_name(#[case] attribute: Attribute, #[case] expected: String) {
         assert_eq!(attribute.consumable_name(), expected);
+    }
+
+    #[test]
+    fn rarity_random_distribution() {
+        // Test that random() returns valid rarities
+        for _ in 0..100 {
+            let rarity = ItemRarity::random();
+            assert!([
+                ItemRarity::Common,
+                ItemRarity::Uncommon,
+                ItemRarity::Rare,
+                ItemRarity::Legendary
+            ]
+            .contains(&rarity));
+        }
+    }
+
+    #[rstest]
+    #[case(ItemRarity::Common, (1, 3))]
+    #[case(ItemRarity::Uncommon, (3, 5))]
+    #[case(ItemRarity::Rare, (5, 8))]
+    #[case(ItemRarity::Legendary, (8, 12))]
+    fn rarity_effect_ranges(#[case] rarity: ItemRarity, #[case] expected: (i32, i32)) {
+        assert_eq!(rarity.effect_range(), expected);
+    }
+
+    #[rstest]
+    #[case(ItemRarity::Common, "Common")]
+    #[case(ItemRarity::Uncommon, "Uncommon")]
+    #[case(ItemRarity::Rare, "Rare")]
+    #[case(ItemRarity::Legendary, "Legendary")]
+    fn rarity_to_string(#[case] rarity: ItemRarity, #[case] expected: &str) {
+        assert_eq!(rarity.to_string(), expected);
+    }
+
+    #[test]
+    fn weapon_has_rarity() {
+        let weapon = Item::new_weapon("Test weapon");
+        // Verify rarity is set
+        assert!([
+            ItemRarity::Common,
+            ItemRarity::Uncommon,
+            ItemRarity::Rare,
+            ItemRarity::Legendary
+        ]
+        .contains(&weapon.rarity));
+    }
+
+    #[test]
+    fn weapon_effect_matches_rarity() {
+        for _ in 0..100 {
+            let weapon = Item::new_random_weapon();
+            let (min, max) = weapon.rarity.effect_range();
+            assert!(
+                weapon.effect >= min && weapon.effect <= max,
+                "Effect {} not in range {}..={}",
+                weapon.effect,
+                min,
+                max
+            );
+        }
+    }
+
+    #[test]
+    fn consumable_effect_matches_rarity() {
+        for _ in 0..100 {
+            let consumable = Item::new_random_consumable();
+            let (min, max) = consumable.rarity.effect_range();
+            assert!(
+                consumable.effect >= min && consumable.effect <= max,
+                "Effect {} not in range {}..={}",
+                consumable.effect,
+                min,
+                max
+            );
+        }
+    }
+
+    #[test]
+    fn shield_effect_matches_rarity() {
+        for _ in 0..100 {
+            let shield = Item::new_random_shield();
+            let (min, max) = shield.rarity.effect_range();
+            assert!(
+                shield.effect >= min && shield.effect <= max,
+                "Effect {} not in range {}..={}",
+                shield.effect,
+                min,
+                max
+            );
+        }
     }
 }

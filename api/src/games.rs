@@ -661,8 +661,10 @@ async fn run_game_cycles(
     db: &Surreal<Any>,
     broadcaster: &crate::websocket::GameBroadcaster,
 ) -> Result<(), AppError> {
-    game.run_day_night_cycle(true);
-    game.run_day_night_cycle(false);
+    game.run_day_night_cycle(true)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to run day cycle: {}", e)))?;
+    game.run_day_night_cycle(false)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to run night cycle: {}", e)))?;
     save_game(game, db, broadcaster).await?;
     Ok(())
 }

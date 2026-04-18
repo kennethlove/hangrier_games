@@ -20,6 +20,35 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use uuid::Uuid;
 
+/// Errors that can occur during game operations.
+#[derive(Debug, Clone, PartialEq)]
+pub enum GameError {
+    /// Error related to message operations
+    MessageError(String),
+    /// Area not found in game
+    AreaNotFound(String),
+    /// Tribute not found in game
+    TributeNotFound(String),
+}
+
+impl Display for GameError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GameError::MessageError(msg) => write!(f, "Message error: {}", msg),
+            GameError::AreaNotFound(msg) => write!(f, "Area not found: {}", msg),
+            GameError::TributeNotFound(msg) => write!(f, "Tribute not found: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for GameError {}
+
+impl From<String> for GameError {
+    fn from(error: String) -> Self {
+        GameError::MessageError(error)
+    }
+}
+
 const LOW_TRIBUTE_THRESHOLD: u32 = 8;
 const FEAST_WEAPON_COUNT: u32 = 2;
 const FEAST_SHIELD_COUNT: u32 = 2;
@@ -83,9 +112,11 @@ impl Game {
     }
 
     /// Runs at the start of the game.
-    pub fn start(&mut self) {
+    pub fn start(&mut self) -> Result<(), GameError> {
         self.status = GameStatus::InProgress;
-        clear_messages().expect("Failed to clear messages");
+        clear_messages()
+            .map_err(|e| GameError::MessageError(format!("Failed to clear messages: {}", e)))?;
+        Ok(())
     }
 
     /// Returns the tributes that are alive.
@@ -147,30 +178,35 @@ impl Game {
 
     /// Checks if the game has concluded (i.e., if there is a winner or if all tributes are dead).
     /// If concluded, it updates the game status, posts the final messages, and returns the game.
-    fn check_for_winner(&mut self) {
+    fn check_for_winner(&mut self) -> Result<(), GameError> {
         if let Some(winner) = self.winner() {
             add_game_message(
                 self.identifier.as_str(),
                 format!("{}", GameOutput::TributeWins(winner.name.as_str())),
             )
-            .expect("Failed to add winner message");
+            .map_err(|e| GameError::MessageError(format!("Failed to add winner message: {}", e)))?;
             self.end();
         } else if self.living_tributes_count() == 0 {
             add_game_message(
                 self.identifier.as_str(),
                 format!("{}", GameOutput::NoOneWins),
             )
-            .expect("Failed to add no winner message");
+            .map_err(|e| {
+                GameError::MessageError(format!("Failed to add no winner message: {}", e))
+            })?;
             self.end();
         }
+        Ok(())
     }
 
     /// Prepares the game state for a new cycle.
     /// Clears old messages and area events.
     /// Increments day count by 1 if it's a day cycle.
-    fn prepare_cycle(&mut self, day: bool) {
+    fn prepare_cycle(&mut self, day: bool) -> Result<(), GameError> {
         if day {
-            clear_messages().expect("Failed to clear messages for day");
+            clear_messages().map_err(|e| {
+                GameError::MessageError(format!("Failed to clear messages for day: {}", e))
+            })?;
             self.day = Some(self.day.unwrap_or(0) + 1);
         }
 
@@ -178,10 +214,11 @@ impl Game {
         for area in self.areas.iter_mut() {
             area.events.clear();
         }
+        Ok(())
     }
 
     /// Announces the start of the cycle.
-    fn announce_cycle_start(&self, day: bool) {
+    fn announce_cycle_start(&self, day: bool) -> Result<(), GameError> {
         let current_day = self.day.unwrap_or(1);
 
         if day {
@@ -192,14 +229,18 @@ impl Game {
                         self.identifier.as_str(),
                         format!("{}", GameOutput::FirstDayStart),
                     )
-                    .expect("Failed to add first day message");
+                    .map_err(|e| {
+                        GameError::MessageError(format!("Failed to add first day message: {}", e))
+                    })?;
                 }
                 3 => {
                     add_game_message(
                         self.identifier.as_str(),
                         format!("{}", GameOutput::FeastDayStart),
                     )
-                    .expect("Failed to add feast day message");
+                    .map_err(|e| {
+                        GameError::MessageError(format!("Failed to add feast day message: {}", e))
+                    })?;
                 }
                 _ => {}
             }
@@ -207,13 +248,17 @@ impl Game {
                 self.identifier.as_str(),
                 format!("{}", GameOutput::GameDayStart(self.clone().day.unwrap())),
             )
-            .expect("Failed to add day start message");
+            .map_err(|e| {
+                GameError::MessageError(format!("Failed to add day start message: {}", e))
+            })?;
         } else {
             add_game_message(
                 self.identifier.as_str(),
                 format!("{}", GameOutput::GameNightStart(self.day.unwrap())),
             )
-            .expect("Failed to add night start message");
+            .map_err(|e| {
+                GameError::MessageError(format!("Failed to add night start message: {}", e))
+            })?;
         }
 
         add_game_message(
@@ -223,11 +268,14 @@ impl Game {
                 GameOutput::TributesLeft(self.living_tributes_count() as u32)
             ),
         )
-        .expect("");
+        .map_err(|e| {
+            GameError::MessageError(format!("Failed to add tributes left message: {}", e))
+        })?;
+        Ok(())
     }
 
     /// Announces the end of a cycle
-    fn announce_cycle_end(&self, day: bool) {
+    fn announce_cycle_end(&self, day: bool) -> Result<(), GameError> {
         add_game_message(
             self.identifier.as_str(),
             format!(
@@ -235,7 +283,9 @@ impl Game {
                 GameOutput::TributesLeft(self.living_tributes_count() as u32)
             ),
         )
-        .expect("Failed to add tributes left message");
+        .map_err(|e| {
+            GameError::MessageError(format!("Failed to add tributes left message: {}", e))
+        })?;
 
         // Announce tribute deaths
         for tribute in self.recently_dead_tributes() {
@@ -244,7 +294,9 @@ impl Game {
                 self.identifier.as_str(),
                 format!("{}", GameOutput::DeathAnnouncement(name)),
             )
-            .expect("Failed to add tribute death message");
+            .map_err(|e| {
+                GameError::MessageError(format!("Failed to add tribute death message: {}", e))
+            })?;
         }
 
         if day {
@@ -252,18 +304,28 @@ impl Game {
                 self.identifier.as_str(),
                 format!("{}", GameOutput::GameDayEnd(self.clone().day.unwrap())),
             )
-            .expect("Failed to add day end message");
+            .map_err(|e| {
+                GameError::MessageError(format!("Failed to add day end message: {}", e))
+            })?;
         } else {
             add_game_message(
                 self.identifier.as_str(),
                 format!("{}", GameOutput::GameNightEnd(self.clone().day.unwrap())),
             )
-            .expect("Failed to add night end message");
+            .map_err(|e| {
+                GameError::MessageError(format!("Failed to add night end message: {}", e))
+            })?;
         }
+        Ok(())
     }
 
     /// Process survival checks for all tributes in an area when an event occurs
-    pub fn process_event_for_area(&mut self, area: &Area, event: &AreaEvent, rng: &mut impl Rng) {
+    pub fn process_event_for_area(
+        &mut self,
+        area: &Area,
+        event: &AreaEvent,
+        rng: &mut impl Rng,
+    ) -> Result<(), GameError> {
         // Get area terrain and events
         let (terrain, area_events) = {
             let area_idx = self
@@ -276,7 +338,7 @@ impl Game {
                     self.areas[idx].terrain.base.clone(),
                     self.areas[idx].events.clone(),
                 ),
-                None => return, // Area not found
+                None => return Ok(()), // Area not found
             }
         };
 
@@ -290,7 +352,7 @@ impl Game {
             .collect();
 
         if tribute_indices.is_empty() {
-            return; // No tributes in area, nothing to do
+            return Ok(()); // No tributes in area, nothing to do
         }
 
         let most_severe_event = if area_events.len() > 1 {
@@ -345,8 +407,14 @@ impl Game {
                     format!("{} dies from the {}", tribute.name, most_severe_event)
                 };
 
-                add_tribute_message(&tribute.identifier, &self.identifier, message)
-                    .expect("Failed to add tribute death message");
+                add_tribute_message(&tribute.identifier, &self.identifier, message).map_err(
+                    |e| {
+                        GameError::MessageError(format!(
+                            "Failed to add tribute death message: {}",
+                            e
+                        ))
+                    },
+                )?;
             } else {
                 // Survivor - apply rewards if any
                 if result.stamina_restored > 0 {
@@ -355,8 +423,11 @@ impl Game {
                         "{} survives the {}, recovering {} stamina",
                         tribute.name, most_severe_event, result.stamina_restored
                     );
-                    add_tribute_message(&tribute.identifier, &self.identifier, message)
-                        .expect("Failed to add tribute message");
+                    add_tribute_message(&tribute.identifier, &self.identifier, message).map_err(
+                        |e| {
+                            GameError::MessageError(format!("Failed to add tribute message: {}", e))
+                        },
+                    )?;
                 }
 
                 if result.sanity_restored > 0 {
@@ -368,8 +439,11 @@ impl Game {
                         "{} survives the {}, recovering {} sanity",
                         tribute.name, most_severe_event, result.sanity_restored
                     );
-                    add_tribute_message(&tribute.identifier, &self.identifier, message)
-                        .expect("Failed to add tribute message");
+                    add_tribute_message(&tribute.identifier, &self.identifier, message).map_err(
+                        |e| {
+                            GameError::MessageError(format!("Failed to add tribute message: {}", e))
+                        },
+                    )?;
                 }
 
                 if result.reward_item.is_some() {
@@ -380,37 +454,42 @@ impl Game {
                         "{} survives the {} and finds a {}",
                         tribute.name, most_severe_event, item_name
                     );
-                    add_tribute_message(&tribute.identifier, &self.identifier, message)
-                        .expect("Failed to add tribute message");
+                    add_tribute_message(&tribute.identifier, &self.identifier, message).map_err(
+                        |e| {
+                            GameError::MessageError(format!("Failed to add tribute message: {}", e))
+                        },
+                    )?;
                 }
             }
         }
+        Ok(())
     }
 
     /// Runs the day and night cycles of one game round.
-    pub fn run_day_night_cycle(&mut self, day: bool) {
+    pub fn run_day_night_cycle(&mut self, day: bool) -> Result<(), GameError> {
         // Check if the game is over, and if so, end it.
         // This will also post the final messages.
-        self.check_for_winner();
+        self.check_for_winner()?;
 
         // Prepare the game for a new cycle
-        self.prepare_cycle(day);
+        self.prepare_cycle(day)?;
 
         // Announce the start of the cycle
-        self.announce_cycle_start(day);
+        self.announce_cycle_start(day)?;
 
         // Run the day
-        self.do_a_cycle(day);
+        self.do_a_cycle(day)?;
 
         // Announce the end of the cycle
-        self.announce_cycle_end(day);
+        self.announce_cycle_end(day)?;
 
         // Clean up any deaths
         self.clean_up_recent_deaths();
+        Ok(())
     }
 
     /// Announce events in closed areas.
-    fn announce_area_events(&self) {
+    fn announce_area_events(&self) -> Result<(), GameError> {
         for area_details in &self.areas {
             let area_name = area_details.area.clone().unwrap().to_string();
             if !area_details.is_open() {
@@ -419,7 +498,9 @@ impl Game {
                     &self.identifier,
                     format!("{}", GameOutput::AreaClose(area_name.as_str())),
                 )
-                .expect("Failed to add area close message");
+                .map_err(|e| {
+                    GameError::MessageError(format!("Failed to add area close message: {}", e))
+                })?;
 
                 for event in &area_details.events {
                     let event_name = event.to_string();
@@ -431,10 +512,13 @@ impl Game {
                             GameOutput::AreaEvent(event_name.as_str(), area_name.as_str())
                         ),
                     )
-                    .expect("Failed to add area event message");
+                    .map_err(|e| {
+                        GameError::MessageError(format!("Failed to add area event message: {}", e))
+                    })?;
                 }
             }
         }
+        Ok(())
     }
 
     /// Ensures at least one area is open. If not, opens a random area by clearing its events.
@@ -447,7 +531,7 @@ impl Game {
     }
 
     /// Triggers events for the current cycle.
-    fn trigger_cycle_events(&mut self, day: bool, rng: &mut SmallRng) {
+    fn trigger_cycle_events(&mut self, day: bool, rng: &mut SmallRng) -> Result<(), GameError> {
         let frequency = if day {
             DAY_EVENT_FREQUENCY
         } else {
@@ -480,7 +564,9 @@ impl Game {
                             GameOutput::AreaEvent(event_name.as_str(), area_name.as_str())
                         ),
                     )
-                    .expect("Failed to add area event message");
+                    .map_err(|e| {
+                        GameError::MessageError(format!("Failed to add area event message: {}", e))
+                    })?;
 
                     // Collect for processing
                     events_to_process.push((area, area_event));
@@ -490,7 +576,7 @@ impl Game {
 
         // Process survival checks for all triggered events
         for (area, event) in events_to_process {
-            self.process_event_for_area(&area, &event, rng);
+            self.process_event_for_area(&area, &event, rng)?;
         }
 
         // Day 3 is Feast Day, refill the Cornucopia with a random assortment of items
@@ -511,11 +597,12 @@ impl Game {
                 }
             }
         }
+        Ok(())
     }
 
     /// If the tribute count is low, constrain them by closing areas.
     /// We achieve this by spawning events in open areas.
-    fn constrain_areas(&mut self, rng: &mut SmallRng) {
+    fn constrain_areas(&mut self, rng: &mut SmallRng) -> Result<(), GameError> {
         let tribute_count = self.living_tributes_count() as u32;
         let odds = tribute_count as f64 / 24.0;
         let mut area_events: HashMap<String, (AreaDetails, Vec<AreaEvent>)> = HashMap::new();
@@ -558,7 +645,9 @@ impl Game {
                             GameOutput::AreaEvent(event_name.as_str(), area_name.as_str())
                         ),
                     )
-                    .expect("Failed to add area event message");
+                    .map_err(|e| {
+                        GameError::MessageError(format!("Failed to add area event message: {}", e))
+                    })?;
                 }
             }
 
@@ -571,6 +660,7 @@ impl Game {
                 }
             }
         }
+        Ok(())
     }
 
     /// Runs the tributes' logic for the current cycle.
@@ -581,7 +671,7 @@ impl Game {
         closed_areas: Vec<Area>,
         living_tributes: Vec<Tribute>,
         living_tributes_count: usize,
-    ) {
+    ) -> Result<(), GameError> {
         // Pre-compute global action suggestion
         let action_suggestion = match (self.day, day) {
             (Some(1), true) => Some(ActionSuggestion {
@@ -692,6 +782,7 @@ impl Game {
                 rng,
             );
         }
+        Ok(())
     }
 
     /// Runs a cycle of the game, either day or night.
@@ -702,20 +793,20 @@ impl Game {
     /// 5. Close more areas by spawning more events if the tributes are getting low.
     /// 6. Run the tribute cycle.
     /// 7. Update the tributes in the game.
-    fn do_a_cycle(&mut self, day: bool) {
+    fn do_a_cycle(&mut self, day: bool) -> Result<(), GameError> {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
 
         // Announce area events
-        self.announce_area_events();
+        self.announce_area_events()?;
 
         // If there are no open areas, we need to open one.
         self.ensure_open_area();
 
         // Trigger any events for this cycle
-        self.trigger_cycle_events(day, &mut rng);
+        self.trigger_cycle_events(day, &mut rng)?;
 
         // If the tribute count is low, constrain them by closing areas.
-        self.constrain_areas(&mut rng);
+        self.constrain_areas(&mut rng)?;
 
         self.tributes.shuffle(&mut rng);
         let closed_areas: Vec<Area> = self
@@ -734,7 +825,8 @@ impl Game {
             closed_areas,
             living_tributes,
             living_tributes_count,
-        );
+        )?;
+        Ok(())
     }
 
     /// Any tributes who have died in the current cycle will be moved to the "dead" list,
@@ -813,7 +905,7 @@ mod tests {
     #[test]
     fn test_game_start() {
         let mut game = Game::new("Test Game");
-        game.start();
+        game.start().expect("Failed to start game");
         assert_eq!(game.status, GameStatus::InProgress);
         assert_eq!(game.day, None);
     }
@@ -821,7 +913,7 @@ mod tests {
     #[test]
     fn test_game_end() {
         let mut game = Game::new("Test Game");
-        game.start();
+        game.start().expect("Failed to start game");
         game.end();
         assert_eq!(game.status, GameStatus::Finished);
     }
@@ -847,7 +939,7 @@ mod tests {
         let t2 = Tribute::default();
         game.tributes.push(t1);
         game.tributes.push(t2.clone());
-        game.start();
+        game.start().expect("Failed to start game");
         assert_eq!(game.winner(), None);
         game.tributes[0].status = TributeStatus::Dead;
         assert_eq!(game.winner().unwrap().name, t2.name);

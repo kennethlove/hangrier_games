@@ -1,0 +1,207 @@
+//! Movement and travel functionality for tributes.
+//!
+//! This module handles tribute movement between areas including:
+//! - Travel mechanics and validation
+//! - Movement restrictions based on attributes
+//! - Area selection logic
+
+use crate::areas::Area;
+use crate::output::GameOutput;
+use crate::tributes::Tribute;
+use rand::prelude::*;
+use rand::rngs::SmallRng;
+
+#[derive(Debug, PartialEq)]
+pub enum TravelResult {
+    Success(Area),
+    Failure,
+}
+
+impl Tribute {
+    /// Moves a tribute to a new area.
+    /// If the tribute has no movement, they cannot move.
+    /// If the tribute is already in the suggested area, they stay put.
+    /// If the tribute has low movement, they can only move to the suggested area or stay put.
+    /// If the tribute has high movement, they can move to any open neighbor or the suggested area.
+    pub(crate) fn travels(
+        &self,
+        closed_areas: &[Area],
+        suggested_area: Option<Area>,
+    ) -> TravelResult {
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+        // Where is the tribute?
+        let current_area = self.area.clone();
+
+        // 1. Can the tribute move at all?
+        if self.attributes.movement == 0 {
+            let current_area = self.area.to_string();
+            self.try_log_action(
+                GameOutput::TributeTravelTooTired(self.name.as_str(), current_area.as_str()),
+                "too tired",
+            );
+            return TravelResult::Failure;
+        }
+
+        // 2. Determine the target area based on suggestion and validity.
+        let mut target_area: Option<Area> = None;
+        if let Some(suggestion) = suggested_area {
+            if !closed_areas.contains(&suggestion) {
+                if suggestion == current_area {
+                    let suggestion = suggestion.to_string();
+                    self.try_log_action(
+                        GameOutput::TributeTravelAlreadyThere(
+                            self.name.as_str(),
+                            suggestion.as_str(),
+                        ),
+                        "already there",
+                    );
+                    return TravelResult::Failure;
+                }
+                target_area = Some(suggestion);
+            }
+        }
+
+        // 3. Handle movement based on tribute's movement attribute.
+        match self.attributes.movement {
+            // Low movement: can only move to suggested_area if it's valid and set.
+            1..=10 => {
+                if let Some(new_area) = target_area {
+                    let current_area = current_area.to_string();
+                    let new_area_name = new_area.to_string();
+                    self.try_log_action(
+                        GameOutput::TributeTravel(
+                            self.name.as_str(),
+                            current_area.as_str(),
+                            new_area_name.as_str(),
+                        ),
+                        "travel",
+                    );
+                    TravelResult::Success(new_area)
+                } else {
+                    let current_area = current_area.to_string();
+                    self.try_log_action(
+                        GameOutput::TributeTravelTooTired(
+                            self.name.as_str(),
+                            current_area.as_str(),
+                        ),
+                        "too tired",
+                    );
+                    TravelResult::Failure
+                }
+            }
+            // High movement: can move to any open neighbor or the suggested area.
+            _ => {
+                if let Some(new_area) = target_area {
+                    let current_area = current_area.to_string();
+                    let new_area_name = new_area.to_string();
+                    self.try_log_action(
+                        GameOutput::TributeTravel(
+                            self.name.as_str(),
+                            current_area.as_str(),
+                            new_area_name.as_str(),
+                        ),
+                        "travel",
+                    );
+                    return TravelResult::Success(new_area);
+                }
+
+                let neighbors = current_area.neighbors();
+                let available_neighbors: Vec<Area> = neighbors
+                    .into_iter()
+                    .filter(|area| area != &current_area && !closed_areas.contains(area))
+                    .collect();
+
+                if available_neighbors.is_empty() {
+                    let current_area_name = current_area.to_string();
+                    self.try_log_action(
+                        GameOutput::TributeTravelNoOptions(
+                            self.name.as_str(),
+                            current_area_name.as_str(),
+                        ),
+                        "no options",
+                    );
+                    return TravelResult::Success(current_area.clone());
+                }
+
+                // TODO: Loyalty bit goes here
+
+                let chosen_neighbor = available_neighbors.choose(&mut rng).unwrap();
+                let current_area_name = current_area.to_string();
+                let chosen_area_name = chosen_neighbor.to_string();
+                self.try_log_action(
+                    GameOutput::TributeTravel(
+                        self.name.as_str(),
+                        current_area_name.as_str(),
+                        chosen_area_name.as_str(),
+                    ),
+                    "travel",
+                );
+                TravelResult::Success(chosen_neighbor.clone())
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::areas::Area::*;
+    use crate::areas::AreaDetails;
+    use crate::tributes::Tribute;
+    use rstest::*;
+
+    #[fixture]
+    fn tribute() -> Tribute {
+        Tribute::new("Katniss".to_string(), None, None)
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn travels_success(tribute: Tribute) {
+        let open_area = AreaDetails::new(Some("Forest".to_string()), Cornucopia);
+        let result = tribute.travels(&[East, South, North, West], None);
+        assert_eq!(result, TravelResult::Success(open_area.area.unwrap()));
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn travels_fail_no_movement(mut tribute: Tribute) {
+        tribute.attributes.movement = 0;
+        let result = tribute.travels(&[], None);
+        assert_eq!(result, TravelResult::Failure);
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn travels_fail_already_there(mut tribute: Tribute) {
+        tribute.area = North;
+        let result = tribute.travels(&[Cornucopia, East, West, South], Some(North));
+        assert_eq!(result, TravelResult::Failure);
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn travels_fail_low_movement_no_suggestion(mut tribute: Tribute) {
+        tribute.attributes.movement = 5;
+        let result = tribute.travels(&[Cornucopia, East, West, North], None);
+        assert_eq!(result, TravelResult::Failure);
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn travels_fail_low_movement_suggestion(mut tribute: Tribute) {
+        tribute.attributes.movement = 5;
+        let result = tribute.travels(&[Cornucopia, East, West, North], Some(North));
+        assert_eq!(result, TravelResult::Failure);
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn travels_success_low_movement_suggestion(mut tribute: Tribute) {
+        tribute.area = North;
+        tribute.attributes.movement = 5;
+        let open_area = AreaDetails::new(Some("Forest".to_string()), Cornucopia);
+        let result = tribute.travels(&[East, South], Some(Cornucopia));
+        assert_eq!(result, TravelResult::Success(open_area.area.unwrap()));
+    }
+}

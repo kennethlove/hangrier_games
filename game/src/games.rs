@@ -18,7 +18,6 @@ use shared::GameStatus;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::ops::Index;
 use uuid::Uuid;
 
 const LOW_TRIBUTE_THRESHOLD: u32 = 8;
@@ -98,6 +97,11 @@ impl Game {
             .collect()
     }
 
+    /// Returns the count of living tributes without cloning.
+    pub fn living_tributes_count(&self) -> usize {
+        self.tributes.iter().filter(|t| t.is_alive()).count()
+    }
+
     /// Returns the tributes that are recently dead, i.e., died in the current round.
     fn recently_dead_tributes(&self) -> Vec<Tribute> {
         self.tributes
@@ -109,8 +113,9 @@ impl Game {
 
     /// Returns the tribute that is the winner of the game if there is one.
     pub fn winner(&self) -> Option<Tribute> {
-        match self.living_tributes().len() {
-            1 => Some(self.living_tributes().index(0).clone()),
+        let living: Vec<&Tribute> = self.tributes.iter().filter(|t| t.is_alive()).collect();
+        match living.len() {
+            1 => Some(living[0].clone()),
             _ => None,
         }
     }
@@ -150,7 +155,7 @@ impl Game {
             )
             .expect("Failed to add winner message");
             self.end();
-        } else if self.living_tributes().is_empty() {
+        } else if self.living_tributes_count() == 0 {
             add_game_message(
                 self.identifier.as_str(),
                 format!("{}", GameOutput::NoOneWins),
@@ -215,7 +220,7 @@ impl Game {
             self.identifier.as_str(),
             format!(
                 "{}",
-                GameOutput::TributesLeft(self.living_tributes().len() as u32)
+                GameOutput::TributesLeft(self.living_tributes_count() as u32)
             ),
         )
         .expect("");
@@ -227,7 +232,7 @@ impl Game {
             self.identifier.as_str(),
             format!(
                 "{}",
-                GameOutput::TributesLeft(self.living_tributes().len() as u32)
+                GameOutput::TributesLeft(self.living_tributes_count() as u32)
             ),
         )
         .expect("Failed to add tributes left message");
@@ -259,12 +264,18 @@ impl Game {
 
     /// Process survival checks for all tributes in an area when an event occurs
     pub fn process_event_for_area(&mut self, area: &Area, event: &AreaEvent) {
-        // Get area terrain and events in a single lookup
+        // Get area terrain and events
         let (terrain, area_events) = {
-            let area_details = self.areas.iter().find(|a| a.area.as_ref() == Some(area));
+            let area_idx = self
+                .areas
+                .iter()
+                .position(|a| a.area.as_ref() == Some(area));
 
-            match area_details {
-                Some(a) => (a.terrain.base.clone(), a.events.clone()),
+            match area_idx {
+                Some(idx) => (
+                    self.areas[idx].terrain.base.clone(),
+                    self.areas[idx].events.clone(),
+                ),
                 None => return, // Area not found
             }
         };
@@ -451,7 +462,7 @@ impl Game {
             for area_details in self.areas.iter_mut() {
                 if rng.random_bool(frequency) {
                     // Generate terrain-appropriate event
-                    let area_event = AreaEvent::random_for_terrain(&area_details.terrain.base);
+                    let area_event = AreaEvent::random_for_terrain(&area_details.terrain.base, rng);
                     let area = area_details.area.clone().unwrap();
 
                     // Add event to area
@@ -483,20 +494,20 @@ impl Game {
 
         // Day 3 is Feast Day, refill the Cornucopia with a random assortment of items
         if day && self.day == Some(3) {
-            let area_details = self
+            if let Some(area_details) = self
                 .areas
                 .iter_mut()
-                .filter(|ad| ad.area.is_some())
-                .find(|ad| ad.area.clone().unwrap().to_string() == "Cornucopia")
-                .expect("Cannot find Cornucopia");
-            for _ in 0..rng.random_range(1..=FEAST_WEAPON_COUNT) {
-                area_details.add_item(Item::new_random_weapon());
-            }
-            for _ in 0..rng.random_range(1..=FEAST_SHIELD_COUNT) {
-                area_details.add_item(Item::new_random_shield());
-            }
-            for _ in 0..rng.random_range(1..=FEAST_CONSUMABLE_COUNT) {
-                area_details.add_item(Item::new_random_consumable());
+                .find(|ad| ad.area == Some(Area::Cornucopia))
+            {
+                for _ in 0..rng.random_range(1..=FEAST_WEAPON_COUNT) {
+                    area_details.add_item(Item::new_random_weapon());
+                }
+                for _ in 0..rng.random_range(1..=FEAST_SHIELD_COUNT) {
+                    area_details.add_item(Item::new_random_shield());
+                }
+                for _ in 0..rng.random_range(1..=FEAST_CONSUMABLE_COUNT) {
+                    area_details.add_item(Item::new_random_consumable());
+                }
             }
         }
     }
@@ -504,14 +515,14 @@ impl Game {
     /// If the tribute count is low, constrain them by closing areas.
     /// We achieve this by spawning events in open areas.
     fn constrain_areas(&mut self, rng: &mut SmallRng) {
-        let tribute_count = self.living_tributes().len() as u32;
+        let tribute_count = self.living_tributes_count() as u32;
         let odds = tribute_count as f64 / 24.0;
         let mut area_events: HashMap<String, (AreaDetails, Vec<AreaEvent>)> = HashMap::new();
 
         if (1..LOW_TRIBUTE_THRESHOLD).contains(&tribute_count) {
             // If there is an open area, close it.
             if let Some(area_details) = self.random_open_area() {
-                let event = AreaEvent::random();
+                let event = AreaEvent::random(rng);
                 let area_name = area_details.area.clone().unwrap().to_string();
                 area_events.insert(area_name, (area_details.clone(), vec![event.clone()]));
             }
@@ -519,7 +530,7 @@ impl Game {
             if rng.random_bool(odds) {
                 // Assuming there's still an open area.
                 if let Some(area_details) = self.random_open_area() {
-                    let event = AreaEvent::random();
+                    let event = AreaEvent::random(rng);
                     let area_name = area_details.area.clone().unwrap().to_string();
                     if area_events.get(&area_name.clone()).is_some() {
                         let mut events = area_events[&area_name].1.clone();
@@ -664,8 +675,7 @@ impl Game {
             let targets: Vec<Tribute> = nearby_tributes
                 .iter()
                 .filter(|t| t.is_visible() && t.identifier != tribute.identifier)
-                .cloned()
-                .cloned()
+                .map(|&t| t.clone())
                 .collect();
 
             let encounter_context = EncounterContext {
@@ -850,7 +860,8 @@ mod tests {
         game.areas.push(area1);
         game.areas.push(area2.clone());
         assert!(game.random_area().is_some());
-        let event = AreaEvent::random();
+        let mut rng = rand::rng();
+        let event = AreaEvent::random(&mut rng);
         game.areas[0].events.push(event.clone());
         assert_eq!(game.random_open_area().unwrap(), area2);
     }
@@ -926,7 +937,8 @@ mod tests {
     fn test_prepare_cycle() {
         let mut game = Game::new("Test Game");
         let area = AreaDetails::new(Some("Lake".to_string()), Area::North);
-        let event = AreaEvent::random();
+        let mut rng = rand::rng();
+        let event = AreaEvent::random(&mut rng);
         game.day = Some(1);
         game.areas.push(area);
         game.areas[0].events.push(event.clone());
@@ -989,8 +1001,9 @@ mod tests {
 
         let mut game = Game::new("Test Game");
         let mut area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
-        area.events.push(AreaEvent::random());
-        area.events.push(AreaEvent::random());
+        let mut rng = rand::rng();
+        area.events.push(AreaEvent::random(&mut rng));
+        area.events.push(AreaEvent::random(&mut rng));
         game.areas.push(area);
 
         assert!(!game.areas[0].is_open());
@@ -1014,8 +1027,9 @@ mod tests {
         assert!(game.random_open_area().is_some());
 
         // Close the areas
-        game.areas[0].events.push(AreaEvent::random());
-        game.areas[1].events.push(AreaEvent::random());
+        let mut rng = rand::rng();
+        game.areas[0].events.push(AreaEvent::random(&mut rng));
+        game.areas[1].events.push(AreaEvent::random(&mut rng));
 
         assert!(game.random_open_area().is_none());
 
@@ -1096,7 +1110,8 @@ mod tests {
         assert!(game.closed_areas().is_empty());
 
         // Close one area
-        game.areas[0].events.push(AreaEvent::random());
+        let mut rng = rand::rng();
+        game.areas[0].events.push(AreaEvent::random(&mut rng));
 
         assert_eq!(game.open_areas().len(), 1);
         assert_eq!(game.closed_areas().len(), 1);

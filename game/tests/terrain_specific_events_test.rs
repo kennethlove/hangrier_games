@@ -47,8 +47,9 @@ fn test_game_loop_generates_terrain_appropriate_events() {
 
         // Manually trigger events (we can't directly call private trigger_cycle_events)
         // Instead, we'll directly test the terrain-specific generation
+        let mut rng = rand::rng();
         for area_detail in &mut game.areas {
-            let event = AreaEvent::random_for_terrain(&area_detail.terrain.base);
+            let event = AreaEvent::random_for_terrain(&area_detail.terrain.base, &mut rng);
             area_detail.events.push(event.clone());
 
             let area_name = area_detail.area.as_ref().unwrap().to_string();
@@ -108,17 +109,19 @@ fn test_game_loop_generates_terrain_appropriate_events() {
 /// Test that different terrain types get different event distributions
 #[test]
 fn test_terrain_event_diversity() {
+    let mut rng = rand::rng();
+
     // Forest events
     let mut forest_events = HashMap::new();
     for _ in 0..100 {
-        let event = AreaEvent::random_for_terrain(&BaseTerrain::Forest);
+        let event = AreaEvent::random_for_terrain(&BaseTerrain::Forest, &mut rng);
         *forest_events.entry(event.to_string()).or_insert(0) += 1;
     }
 
     // Desert events
     let mut desert_events = HashMap::new();
     for _ in 0..100 {
-        let event = AreaEvent::random_for_terrain(&BaseTerrain::Desert);
+        let event = AreaEvent::random_for_terrain(&BaseTerrain::Desert, &mut rng);
         *desert_events.entry(event.to_string()).or_insert(0) += 1;
     }
 

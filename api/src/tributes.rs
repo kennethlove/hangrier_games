@@ -1,8 +1,9 @@
 use crate::games::game_tributes;
+use crate::storage::{UploadConstraints, validate_upload};
 use crate::{AppError, AppState};
-use axum::extract::{Path, State};
+use axum::extract::{Multipart, Path, State};
 use axum::http::StatusCode;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use game::items::Item;
 use game::messages::GameMessage;
@@ -24,6 +25,7 @@ pub static TRIBUTES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
                 .delete(tribute_delete)
                 .put(tribute_update),
         )
+        .route("/{identifier}/avatar", post(upload_avatar))
         .route("/{identifier}/log", get(tribute_log))
 });
 
@@ -137,9 +139,10 @@ pub async fn tribute_update(
 
     let response = state
         .db
-        .query("UPDATE tribute SET name = $name WHERE identifier = $identifier;")
+        .query("UPDATE tribute SET name = $name, avatar = $avatar WHERE identifier = $identifier;")
         .bind(("identifier", payload.identifier.clone()))
         .bind(("name", payload.name.clone()))
+        .bind(("avatar", Some(payload.avatar.clone())))
         .await;
 
     match response {
@@ -194,4 +197,85 @@ pub async fn tribute_log(
         .take(0)
         .map_err(|e| AppError::InternalServerError(format!("Failed to take logs: {}", e)))?;
     Ok(Json(logs))
+}
+
+/// Upload avatar for a tribute
+/// Accepts multipart/form-data with a file field named "avatar"
+pub async fn upload_avatar(
+    Path((_, tribute_identifier)): Path<(Uuid, Uuid)>,
+    State(state): State<AppState>,
+    mut multipart: Multipart,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let tribute_identifier = tribute_identifier.to_string();
+
+    // Find the file field
+    let mut file_data: Option<Vec<u8>> = None;
+    let mut filename: Option<String> = None;
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("Failed to read multipart field: {}", e)))?
+    {
+        let field_name = field.name().unwrap_or("").to_string();
+
+        if field_name == "avatar" {
+            filename = field.file_name().map(|s| s.to_string());
+            file_data = Some(
+                field
+                    .bytes()
+                    .await
+                    .map_err(|e| AppError::BadRequest(format!("Failed to read file data: {}", e)))?
+                    .to_vec(),
+            );
+            break;
+        }
+    }
+
+    let file_data = file_data.ok_or_else(|| {
+        AppError::BadRequest("No file uploaded. Field 'avatar' required.".to_string())
+    })?;
+
+    let filename =
+        filename.ok_or_else(|| AppError::BadRequest("No filename provided".to_string()))?;
+
+    // Validate upload
+    let constraints = UploadConstraints::default();
+    validate_upload(&file_data, &filename, &constraints)?;
+
+    // Generate storage path: avatars/{tribute_id}.{extension}
+    let extension = std::path::Path::new(&filename)
+        .extension()
+        .and_then(|e| e.to_str())
+        .ok_or_else(|| AppError::ValidationError("Invalid filename".to_string()))?;
+
+    let storage_path = format!("avatars/{}.{}", tribute_identifier, extension);
+
+    // Save file
+    let saved_path = state.storage.save(&storage_path, &file_data).await?;
+    let public_url = state.storage.public_url(&saved_path);
+
+    // Update tribute avatar field in database
+    let response = state
+        .db
+        .query("UPDATE tribute SET avatar = $avatar WHERE identifier = $identifier;")
+        .bind(("identifier", tribute_identifier.clone()))
+        .bind(("avatar", Some(saved_path.clone())))
+        .await;
+
+    match response {
+        Ok(mut response) => match response.take::<Option<Tribute>>(0).unwrap() {
+            Some(_) => Ok(Json(serde_json::json!({
+                "url": public_url,
+                "path": saved_path
+            }))),
+            None => Err(AppError::InternalServerError(
+                "Failed to update tribute avatar".into(),
+            )),
+        },
+        Err(e) => Err(AppError::InternalServerError(format!(
+            "Failed to update tribute: {}",
+            e
+        ))),
+    }
 }

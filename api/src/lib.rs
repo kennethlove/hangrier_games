@@ -11,12 +11,14 @@ pub mod auth;
 pub mod cleanup;
 pub mod games;
 // pub mod messages; // TODO: Module file missing
+pub mod storage;
 pub mod tributes;
 pub mod users;
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: Arc<Surreal<Any>>,
+    pub storage: Arc<dyn storage::StorageBackend>,
 }
 
 #[derive(Debug, Error)]

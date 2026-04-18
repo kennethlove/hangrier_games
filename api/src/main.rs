@@ -193,7 +193,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .ok_or("Failed to build GovernorConfig")?,
     );
 
-    let app_state = AppState { db: db.clone() };
+    // Initialize storage backend
+    use api::storage::{LocalStorage, StorageBackend};
+    let storage_path = env::var("STORAGE_PATH").unwrap_or_else(|_| "uploads".to_string());
+    let storage = Arc::new(LocalStorage::new(&storage_path, "/uploads"));
+    storage.init().await?;
+    tracing::info!("Storage initialized at: {}", storage_path);
+
+    let app_state = AppState {
+        db: db.clone(),
+        storage,
+    };
 
     // Start cleanup scheduler for refresh tokens
     let _cleanup_scheduler = start_cleanup_scheduler(app_state.clone())
@@ -214,6 +224,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let router = Router::new()
         .nest("/api", api_routes)
+        .nest_service(
+            "/uploads",
+            tower_http::services::ServeDir::new(&storage_path),
+        )
         .route(
             "/",
             axum::routing::get(move || async { Json(env!("CARGO_PKG_VERSION")) }),

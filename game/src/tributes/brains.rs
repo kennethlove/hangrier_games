@@ -6,17 +6,111 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 const LOW_ENEMY_LIMIT: u32 = 6;
-const LOW_HEALTH_LIMIT: u32 = 20;
-const MID_HEALTH_LIMIT: u32 = 40;
-const EXTREME_LOW_SANITY_LIMIT: u32 = 10;
-const LOW_SANITY_LIMIT: u32 = 20;
-const MID_SANITY_LIMIT: u32 = 35;
-const LOW_MOVEMENT_LIMIT: u32 = 10;
-const HIGH_INTELLIGENCE_LIMIT: u32 = 35;
-const LOW_INTELLIGENCE_LIMIT: u32 = 80;
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum BrainPersonality {
+    Aggressive,
+    Defensive,
+    Balanced,
+    Cautious,
+    Reckless,
+}
+
+impl BrainPersonality {
+    pub fn random(rng: &mut impl Rng) -> Self {
+        match rng.gen_range(0..5) {
+            0 => BrainPersonality::Aggressive,
+            1 => BrainPersonality::Defensive,
+            2 => BrainPersonality::Balanced,
+            3 => BrainPersonality::Cautious,
+            _ => BrainPersonality::Reckless,
+        }
+    }
+
+    pub fn low_health_limit(&self) -> u32 {
+        match self {
+            BrainPersonality::Aggressive => 15,
+            BrainPersonality::Defensive => 30,
+            BrainPersonality::Balanced => 20,
+            BrainPersonality::Cautious => 35,
+            BrainPersonality::Reckless => 10,
+        }
+    }
+
+    pub fn mid_health_limit(&self) -> u32 {
+        match self {
+            BrainPersonality::Aggressive => 30,
+            BrainPersonality::Defensive => 50,
+            BrainPersonality::Balanced => 40,
+            BrainPersonality::Cautious => 55,
+            BrainPersonality::Reckless => 25,
+        }
+    }
+
+    pub fn extreme_low_sanity_limit(&self) -> u32 {
+        match self {
+            BrainPersonality::Aggressive => 8,
+            BrainPersonality::Defensive => 15,
+            BrainPersonality::Balanced => 10,
+            BrainPersonality::Cautious => 18,
+            BrainPersonality::Reckless => 5,
+        }
+    }
+
+    pub fn low_sanity_limit(&self) -> u32 {
+        match self {
+            BrainPersonality::Aggressive => 15,
+            BrainPersonality::Defensive => 25,
+            BrainPersonality::Balanced => 20,
+            BrainPersonality::Cautious => 30,
+            BrainPersonality::Reckless => 10,
+        }
+    }
+
+    pub fn mid_sanity_limit(&self) -> u32 {
+        match self {
+            BrainPersonality::Aggressive => 25,
+            BrainPersonality::Defensive => 45,
+            BrainPersonality::Balanced => 35,
+            BrainPersonality::Cautious => 50,
+            BrainPersonality::Reckless => 20,
+        }
+    }
+
+    pub fn low_movement_limit(&self) -> u32 {
+        match self {
+            BrainPersonality::Aggressive => 8,
+            BrainPersonality::Defensive => 15,
+            BrainPersonality::Balanced => 10,
+            BrainPersonality::Cautious => 18,
+            BrainPersonality::Reckless => 5,
+        }
+    }
+
+    pub fn high_intelligence_limit(&self) -> u32 {
+        match self {
+            BrainPersonality::Aggressive => 30,
+            BrainPersonality::Defensive => 40,
+            BrainPersonality::Balanced => 35,
+            BrainPersonality::Cautious => 45,
+            BrainPersonality::Reckless => 25,
+        }
+    }
+
+    pub fn low_intelligence_limit(&self) -> u32 {
+        match self {
+            BrainPersonality::Aggressive => 75,
+            BrainPersonality::Defensive => 85,
+            BrainPersonality::Balanced => 80,
+            BrainPersonality::Cautious => 90,
+            BrainPersonality::Reckless => 70,
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Brain {
+    pub personality: BrainPersonality,
     pub preferred_action: Option<Action>,
     pub preferred_action_percentage: f64,
 }
@@ -24,6 +118,17 @@ pub struct Brain {
 impl Default for Brain {
     fn default() -> Self {
         Self {
+            personality: BrainPersonality::Balanced,
+            preferred_action: None,
+            preferred_action_percentage: 0.0,
+        }
+    }
+}
+
+impl Brain {
+    pub fn new_with_random_personality(rng: &mut impl Rng) -> Self {
+        Self {
+            personality: BrainPersonality::random(rng),
             preferred_action: None,
             preferred_action_percentage: 0.0,
         }
@@ -244,22 +349,26 @@ impl Brain {
         tribute: &Tribute,
         is_concealed: bool,
     ) -> Action {
+        let low_health = self.personality.low_health_limit();
+        let mid_health = self.personality.mid_health_limit();
+        let low_sanity = self.personality.low_sanity_limit();
+
         match tribute.attributes.health {
-            1..LOW_HEALTH_LIMIT => {
+            h if h < low_health => {
                 self.decide_action_few_enemies_low_health_with_terrain(tribute, is_concealed)
             }
-            LOW_HEALTH_LIMIT..=MID_HEALTH_LIMIT => {
+            h if h >= low_health && h <= mid_health => {
                 // Boost hiding in concealed terrain
-                if tribute.attributes.sanity > LOW_SANITY_LIMIT && is_concealed {
+                if tribute.attributes.sanity > low_sanity && is_concealed {
                     Action::Hide
-                } else if tribute.attributes.sanity > LOW_SANITY_LIMIT {
+                } else if tribute.attributes.sanity > low_sanity {
                     Action::Move(None)
                 } else {
                     Action::Attack
                 }
             }
             // High health - normally would attack, but concealed terrain makes hiding attractive
-            _ if is_concealed && tribute.attributes.sanity > LOW_SANITY_LIMIT => Action::Hide,
+            _ if is_concealed && tribute.attributes.sanity > low_sanity => Action::Hide,
             _ => Action::Attack,
         }
     }
@@ -269,6 +378,10 @@ impl Brain {
         tribute: &Tribute,
         is_concealed: bool,
     ) -> Action {
+        let low_movement = self.personality.low_movement_limit();
+        let mid_sanity = self.personality.mid_sanity_limit();
+        let extreme_low_sanity = self.personality.extreme_low_sanity_limit();
+
         let stats = (
             tribute.attributes.movement,
             tribute.attributes.sanity,
@@ -276,12 +389,15 @@ impl Brain {
         );
         match stats {
             // Boost hiding in concealed terrain with low movement
-            (..LOW_MOVEMENT_LIMIT, MID_SANITY_LIMIT.., false) if is_concealed => Action::Hide,
-            (..LOW_MOVEMENT_LIMIT, MID_SANITY_LIMIT.., false) => Action::Hide,
-            (..LOW_MOVEMENT_LIMIT, EXTREME_LOW_SANITY_LIMIT..MID_SANITY_LIMIT, _) => Action::Attack,
-            (_, MID_SANITY_LIMIT.., false) => Action::Move(None),
-            (_, ..MID_SANITY_LIMIT, false) => Action::Attack,
+            (m, s, false) if m < low_movement && s >= mid_sanity && is_concealed => Action::Hide,
+            (m, s, false) if m < low_movement && s >= mid_sanity => Action::Hide,
+            (m, s, _) if m < low_movement && s >= extreme_low_sanity && s < mid_sanity => {
+                Action::Attack
+            }
+            (_, s, false) if s >= mid_sanity => Action::Move(None),
+            (_, s, false) if s < mid_sanity => Action::Attack,
             (_, _, true) => Action::None,
+            (_, _, false) => Action::Move(None), // Catch-all for visible tributes
         }
     }
 
@@ -290,12 +406,15 @@ impl Brain {
         tribute: &Tribute,
         is_concealed: bool,
     ) -> Action {
+        let high_intelligence = self.personality.high_intelligence_limit();
+        let low_intelligence = self.personality.low_intelligence_limit();
+
         let recklessness: u32 = 100_u32
             .saturating_sub(tribute.attributes.intelligence)
             .saturating_sub(tribute.attributes.sanity);
         match recklessness {
-            ..HIGH_INTELLIGENCE_LIMIT => Action::Move(None),
-            LOW_INTELLIGENCE_LIMIT.. => Action::Attack,
+            r if r < high_intelligence => Action::Move(None),
+            r if r >= low_intelligence => Action::Attack,
             // Boost hiding in concealed terrain for average intelligence
             _ if is_concealed => Action::Hide,
             _ => Action::Hide,
@@ -303,13 +422,17 @@ impl Brain {
     }
 
     fn decide_action_no_enemies(&self, tribute: &Tribute) -> Action {
+        let low_health = self.personality.low_health_limit();
+        let mid_health = self.personality.mid_health_limit();
+        let low_sanity = self.personality.low_sanity_limit();
+
         match tribute.attributes.health {
             // health is low, rest
-            1..LOW_HEALTH_LIMIT => Action::Rest,
+            h if h < low_health => Action::Rest,
             // health isn't great, hide
             // unless sanity is also low, then move
-            LOW_HEALTH_LIMIT..=MID_HEALTH_LIMIT => {
-                if tribute.attributes.sanity > LOW_SANITY_LIMIT && tribute.is_visible() {
+            h if h >= low_health && h <= mid_health => {
+                if tribute.attributes.sanity > low_sanity && tribute.is_visible() {
                     Action::Hide
                 } else {
                     Action::Move(None)
@@ -327,6 +450,10 @@ impl Brain {
     }
 
     fn decide_action_few_enemies_low_health(&self, tribute: &Tribute) -> Action {
+        let low_movement = self.personality.low_movement_limit();
+        let mid_sanity = self.personality.mid_sanity_limit();
+        let extreme_low_sanity = self.personality.extreme_low_sanity_limit();
+
         let stats = (
             tribute.attributes.movement,
             tribute.attributes.sanity,
@@ -334,23 +461,30 @@ impl Brain {
         );
         match stats {
             // low movement, ok sanity, visible
-            (..LOW_MOVEMENT_LIMIT, MID_SANITY_LIMIT.., false) => Action::Hide,
+            (m, s, false) if m < low_movement && s >= mid_sanity => Action::Hide,
             // low movement, low sanity, any visibility
-            (..LOW_MOVEMENT_LIMIT, EXTREME_LOW_SANITY_LIMIT..MID_SANITY_LIMIT, _) => Action::Attack,
+            (m, s, _) if m < low_movement && s >= extreme_low_sanity && s < mid_sanity => {
+                Action::Attack
+            }
             // any movement, ok sanity, visible
-            (_, MID_SANITY_LIMIT.., false) => Action::Move(None),
+            (_, s, false) if s >= mid_sanity => Action::Move(None),
             // any movement, low sanity, visible
-            (_, ..MID_SANITY_LIMIT, false) => Action::Attack,
+            (_, s, false) if s < mid_sanity => Action::Attack,
             // any movement, any sanity, hidden
             (_, _, true) => Action::None,
+            (_, _, false) => Action::Move(None), // Catch-all for visible tributes
         }
     }
 
     fn decide_action_few_enemies(&self, tribute: &Tribute) -> Action {
+        let low_health = self.personality.low_health_limit();
+        let mid_health = self.personality.mid_health_limit();
+        let low_sanity = self.personality.low_sanity_limit();
+
         match tribute.attributes.health {
-            1..LOW_HEALTH_LIMIT => self.decide_action_few_enemies_low_health(tribute),
-            LOW_HEALTH_LIMIT..=MID_HEALTH_LIMIT => {
-                if tribute.attributes.sanity > LOW_SANITY_LIMIT {
+            h if h < low_health => self.decide_action_few_enemies_low_health(tribute),
+            h if h >= low_health && h <= mid_health => {
+                if tribute.attributes.sanity > low_sanity {
                     Action::Move(None)
                 } else {
                     Action::Attack
@@ -361,14 +495,17 @@ impl Brain {
     }
 
     fn decide_action_many_enemies(&self, tribute: &Tribute) -> Action {
+        let high_intelligence = self.personality.high_intelligence_limit();
+        let low_intelligence = self.personality.low_intelligence_limit();
+
         let recklessness: u32 = 100_u32
             .saturating_sub(tribute.attributes.intelligence)
             .saturating_sub(tribute.attributes.sanity);
         match recklessness {
             // Smart enough to know better, moves
-            ..HIGH_INTELLIGENCE_LIMIT => Action::Move(None),
+            r if r < high_intelligence => Action::Move(None),
             // Too dumb to know better, attacks
-            LOW_INTELLIGENCE_LIMIT.. => Action::Attack,
+            r if r >= low_intelligence => Action::Attack,
             // Average intelligence, hides
             _ => Action::Hide,
         }
@@ -576,5 +713,77 @@ mod tests {
         tribute.attributes.sanity = 10;
         let action = tribute.brain.act(&tribute.clone(), 6, &[], &mut small_rng);
         assert_eq!(action, Action::Attack);
+    }
+
+    #[test]
+    fn test_personality_thresholds_aggressive() {
+        let personality = BrainPersonality::Aggressive;
+        assert_eq!(personality.low_health_limit(), 15);
+        assert_eq!(personality.mid_health_limit(), 30);
+        assert!(personality.low_health_limit() < BrainPersonality::Balanced.low_health_limit());
+    }
+
+    #[test]
+    fn test_personality_thresholds_defensive() {
+        let personality = BrainPersonality::Defensive;
+        assert_eq!(personality.low_health_limit(), 30);
+        assert_eq!(personality.mid_health_limit(), 50);
+        assert!(personality.low_health_limit() > BrainPersonality::Balanced.low_health_limit());
+    }
+
+    #[test]
+    fn test_personality_thresholds_reckless() {
+        let personality = BrainPersonality::Reckless;
+        assert_eq!(personality.low_health_limit(), 10);
+        assert!(personality.low_health_limit() < BrainPersonality::Aggressive.low_health_limit());
+    }
+
+    #[test]
+    fn test_personality_thresholds_cautious() {
+        let personality = BrainPersonality::Cautious;
+        assert_eq!(personality.low_health_limit(), 35);
+        assert!(personality.low_health_limit() > BrainPersonality::Defensive.low_health_limit());
+    }
+
+    #[test]
+    fn test_personality_random_distribution() {
+        let mut rng = SmallRng::seed_from_u64(42);
+        let mut counts = std::collections::HashMap::new();
+
+        for _ in 0..100 {
+            let personality = BrainPersonality::random(&mut rng);
+            *counts.entry(format!("{:?}", personality)).or_insert(0) += 1;
+        }
+
+        // Should have all 5 personality types
+        assert_eq!(counts.len(), 5);
+        // Each should appear at least once (with high probability)
+        for count in counts.values() {
+            assert!(*count > 0);
+        }
+    }
+
+    #[rstest]
+    fn test_aggressive_fights_at_lower_health(mut small_rng: SmallRng) {
+        let mut tribute = Tribute::default();
+        tribute.brain.personality = BrainPersonality::Aggressive;
+        tribute.attributes.health = 18; // Between aggressive (15) and balanced (20)
+        tribute.attributes.sanity = 40;
+
+        let action = tribute.brain.act(&tribute.clone(), 1, &[], &mut small_rng);
+        // Aggressive should still attack/move at this health
+        assert!(matches!(action, Action::Attack | Action::Move(_)));
+    }
+
+    #[rstest]
+    fn test_defensive_retreats_earlier(mut small_rng: SmallRng) {
+        let mut tribute = Tribute::default();
+        tribute.brain.personality = BrainPersonality::Defensive;
+        tribute.attributes.health = 25; // Above balanced limit but below defensive
+        tribute.attributes.sanity = 40;
+
+        let action = tribute.brain.decide_action_few_enemies(&tribute);
+        // Defensive should prefer moving/hiding at this health
+        assert!(matches!(action, Action::Move(_) | Action::Hide));
     }
 }

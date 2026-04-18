@@ -116,15 +116,15 @@ impl Default for Tribute {
 impl Tribute {
     /// Creates a new Tribute with full health, sanity, and movement.
     pub fn new(name: String, district: Option<u32>, avatar: Option<String>) -> Self {
-        let brain = Brain::default();
         let district = district.unwrap_or(0);
         let attributes = Attributes::new();
         let statistics = Statistics::default();
 
         let id: String = Uuid::new_v4().to_string();
 
-        // Assign terrain affinity based on district
+        // Assign terrain affinity and personality based on district
         let mut rng = SmallRng::from_rng(&mut rand::rng());
+        let brain = Brain::new_with_random_personality(&mut rng);
         let terrain_affinity = if district >= 1 && district <= 12 {
             crate::districts::assign_terrain_affinity(district as u8, &mut rng)
         } else {

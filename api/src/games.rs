@@ -927,64 +927,70 @@ async fn save_area_items(
         }
     }
 
-    // Batch delete operations
-    let mut delete_failed = false;
-    for id in &items_to_delete {
-        let item_id = RecordId::from(("item", id.clone()));
-        if let Err(_) = db.delete::<Option<Item>>(item_id).await {
-            delete_failed = true;
-        }
-    }
-
-    if delete_failed {
-        return Err(AppError::InternalServerError(
-            "Failed to delete items".into(),
-        ));
-    }
-
-    // Batch update operations
-    let mut update_failed = false;
-    for item in &items_to_update {
-        let item_id = RecordId::from(("item", item.identifier.clone()));
-        if let Err(_) = db
-            .update::<Option<Item>>(item_id)
-            .content(item.clone())
-            .await
-        {
-            update_failed = true;
-        }
-    }
-
-    if update_failed {
-        return Err(AppError::InternalServerError(
-            "Failed to update items".into(),
-        ));
-    }
-
     // Update relations - first delete existing relations
     db.query("DELETE FROM items WHERE in = $owner")
         .bind(("owner", owner.clone()))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to delete items: {}", e)))?;
 
-    for item in &items_to_update {
-        let item_id = RecordId::from(("item", item.identifier.clone()));
-        match db
-            .insert::<Vec<AreaItemEdge>>("items")
-            .relation(AreaItemEdge {
-                area: owner.clone(),
-                item: item_id.clone(),
-            })
+    // Batch delete operations
+    if !items_to_delete.is_empty() {
+        let delete_ids: Vec<String> = items_to_delete
+            .iter()
+            .map(|id| format!("item:{}", id))
+            .collect();
+
+        db.query("DELETE item WHERE id IN $ids")
+            .bind(("ids", delete_ids))
             .await
-        {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(AppError::InternalServerError(format!(
-                    "Failed to create items relation: {}",
-                    e
-                )));
-            }
-        };
+            .map_err(|e| {
+                AppError::InternalServerError(format!("Failed to batch delete items: {}", e))
+            })?;
+    }
+
+    // Batch update operations
+    if !items_to_update.is_empty() {
+        // Build bulk update query
+        let mut query_parts = Vec::new();
+        for item in &items_to_update {
+            query_parts.push(format!(
+                "UPDATE item:{} CONTENT {{
+                    identifier: '{}',
+                    name: '{}',
+                    item_type: '{}',
+                    effect: {},
+                    quantity: {},
+                    attribute: '{}'
+                }}",
+                item.identifier,
+                item.identifier,
+                item.name.replace("'", "\\'"),
+                format!("{:?}", item.item_type),
+                item.effect,
+                item.quantity,
+                format!("{:?}", item.attribute)
+            ));
+        }
+
+        let bulk_query = query_parts.join(";\n");
+        db.query(&bulk_query).await.map_err(|e| {
+            AppError::InternalServerError(format!("Failed to batch update items: {}", e))
+        })?;
+
+        // Batch insert relations
+        let mut relation_parts = Vec::new();
+        for item in &items_to_update {
+            relation_parts.push(format!(
+                "RELATE {}->items->item:{}",
+                owner.to_string(),
+                item.identifier
+            ));
+        }
+
+        let bulk_relations = relation_parts.join(";\n");
+        db.query(&bulk_relations).await.map_err(|e| {
+            AppError::InternalServerError(format!("Failed to batch create relations: {}", e))
+        })?;
     }
 
     Ok(())
@@ -1039,32 +1045,64 @@ async fn save_tribute_items(
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to delete items: {}", e)))?;
 
-    // Process delete operations
-    for id in &items_to_delete {
-        let item_id = RecordId::from(("item", id.clone()));
-        db.delete::<Option<Item>>(item_id)
-            .await
-            .map_err(|e| AppError::InternalServerError(format!("Failed to delete items: {}", e)))?;
-    }
+    // Batch delete operations
+    if !items_to_delete.is_empty() {
+        let delete_ids: Vec<String> = items_to_delete
+            .iter()
+            .map(|id| format!("item:{}", id))
+            .collect();
 
-    // Process update operations
-    for item in &items_to_update {
-        let item_id = RecordId::from(("item", item.identifier.clone()));
-        db.update::<Option<Item>>(&item_id)
-            .content(item.clone())
-            .await
-            .map_err(|e| AppError::InternalServerError(format!("Failed to update items: {}", e)))?;
-
-        // Create new relation
-        db.insert::<Vec<TributeItemEdge>>("owns")
-            .relation(TributeItemEdge {
-                tribute: owner.clone(),
-                item: item_id.clone(),
-            })
+        db.query("DELETE item WHERE id IN $ids")
+            .bind(("ids", delete_ids))
             .await
             .map_err(|e| {
-                AppError::InternalServerError(format!("Failed to create items relation: {}", e))
+                AppError::InternalServerError(format!("Failed to batch delete items: {}", e))
             })?;
+    }
+
+    // Batch update operations
+    if !items_to_update.is_empty() {
+        // Build bulk update query
+        let mut query_parts = Vec::new();
+        for item in &items_to_update {
+            query_parts.push(format!(
+                "UPDATE item:{} CONTENT {{
+                    identifier: '{}',
+                    name: '{}',
+                    item_type: '{}',
+                    effect: {},
+                    quantity: {},
+                    attribute: '{}'
+                }}",
+                item.identifier,
+                item.identifier,
+                item.name.replace("'", "\\'"),
+                format!("{:?}", item.item_type),
+                item.effect,
+                item.quantity,
+                format!("{:?}", item.attribute)
+            ));
+        }
+
+        let bulk_query = query_parts.join(";\n");
+        db.query(&bulk_query).await.map_err(|e| {
+            AppError::InternalServerError(format!("Failed to batch update items: {}", e))
+        })?;
+
+        // Batch insert relations
+        let mut relation_parts = Vec::new();
+        for item in &items_to_update {
+            relation_parts.push(format!(
+                "RELATE {}->owns->item:{}",
+                owner.to_string(),
+                item.identifier
+            ));
+        }
+
+        let bulk_relations = relation_parts.join(";\n");
+        db.query(&bulk_relations).await.map_err(|e| {
+            AppError::InternalServerError(format!("Failed to batch create relations: {}", e))
+        })?;
     }
 
     Ok(())

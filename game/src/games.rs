@@ -450,7 +450,8 @@ impl Game {
         if !day || ![1, 3].contains(&self.day.unwrap_or(1)) {
             for area_details in self.areas.iter_mut() {
                 if rng.random_bool(frequency) {
-                    let area_event = AreaEvent::random();
+                    // Generate terrain-appropriate event
+                    let area_event = AreaEvent::random_for_terrain(&area_details.terrain.base);
                     let area = area_details.area.clone().unwrap();
 
                     // Add event to area

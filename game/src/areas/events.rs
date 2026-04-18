@@ -5,7 +5,7 @@ use std::fmt::Display;
 use std::str::FromStr;
 use strum::{EnumIter, IntoEnumIterator};
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, EnumIter)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, EnumIter)]
 pub enum AreaEvent {
     Wildfire,
     Flood,
@@ -77,6 +77,114 @@ impl AreaEvent {
     pub fn random() -> AreaEvent {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
         Self::iter().choose(&mut rng).unwrap().clone()
+    }
+
+    /// Generate a terrain-appropriate random event with weighted probabilities
+    pub fn random_for_terrain(terrain: &BaseTerrain) -> AreaEvent {
+        use BaseTerrain::*;
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+
+        // Define weights for each terrain (percentages out of 100)
+        let weights: Vec<(AreaEvent, u32)> = match terrain {
+            Desert => vec![
+                (AreaEvent::Sandstorm, 40),
+                (AreaEvent::Heatwave, 30),
+                (AreaEvent::Drought, 20),
+                (AreaEvent::Wildfire, 5),
+                (AreaEvent::Earthquake, 5),
+            ],
+            Mountains => vec![
+                (AreaEvent::Avalanche, 35),
+                (AreaEvent::Rockslide, 30),
+                (AreaEvent::Earthquake, 20),
+                (AreaEvent::Blizzard, 15),
+            ],
+            Wetlands => vec![
+                (AreaEvent::Flood, 50),
+                (AreaEvent::Wildfire, 20),
+                (AreaEvent::Drought, 15),
+                (AreaEvent::Landslide, 10),
+                (AreaEvent::Earthquake, 5),
+            ],
+            Tundra => vec![
+                (AreaEvent::Blizzard, 45),
+                (AreaEvent::Avalanche, 25),
+                (AreaEvent::Earthquake, 15),
+                (AreaEvent::Heatwave, 10),
+                (AreaEvent::Rockslide, 5),
+            ],
+            Forest => vec![
+                (AreaEvent::Wildfire, 40),
+                (AreaEvent::Flood, 25),
+                (AreaEvent::Landslide, 20),
+                (AreaEvent::Earthquake, 10),
+                (AreaEvent::Blizzard, 5),
+            ],
+            Grasslands => vec![
+                (AreaEvent::Wildfire, 35),
+                (AreaEvent::Drought, 25),
+                (AreaEvent::Flood, 20),
+                (AreaEvent::Heatwave, 15),
+                (AreaEvent::Sandstorm, 5),
+            ],
+            Clearing => vec![
+                (AreaEvent::Wildfire, 30),
+                (AreaEvent::Flood, 25),
+                (AreaEvent::Heatwave, 20),
+                (AreaEvent::Drought, 15),
+                (AreaEvent::Earthquake, 10),
+            ],
+            Badlands => vec![
+                (AreaEvent::Sandstorm, 35),
+                (AreaEvent::Rockslide, 25),
+                (AreaEvent::Drought, 20),
+                (AreaEvent::Heatwave, 15),
+                (AreaEvent::Earthquake, 5),
+            ],
+            Highlands => vec![
+                (AreaEvent::Rockslide, 30),
+                (AreaEvent::Landslide, 25),
+                (AreaEvent::Blizzard, 20),
+                (AreaEvent::Earthquake, 15),
+                (AreaEvent::Avalanche, 10),
+            ],
+            Jungle => vec![
+                (AreaEvent::Wildfire, 35),
+                (AreaEvent::Flood, 30),
+                (AreaEvent::Landslide, 20),
+                (AreaEvent::Heatwave, 10),
+                (AreaEvent::Earthquake, 5),
+            ],
+            UrbanRuins => vec![
+                (AreaEvent::Earthquake, 35),
+                (AreaEvent::Wildfire, 25),
+                (AreaEvent::Rockslide, 20),
+                (AreaEvent::Flood, 15),
+                (AreaEvent::Landslide, 5),
+            ],
+            Geothermal => vec![
+                (AreaEvent::Heatwave, 40),
+                (AreaEvent::Earthquake, 30),
+                (AreaEvent::Rockslide, 20),
+                (AreaEvent::Wildfire, 10),
+            ],
+        };
+
+        // Calculate total weight
+        let total: u32 = weights.iter().map(|(_, w)| w).sum();
+        let roll = rng.random_range(0..total);
+
+        // Select event based on weighted random
+        let mut cumulative = 0;
+        for (event, weight) in &weights {
+            cumulative += weight;
+            if roll < cumulative {
+                return event.clone();
+            }
+        }
+
+        // Fallback (should never reach here if weights are correct)
+        weights[0].0.clone()
     }
 
     /// Calculate event severity based on terrain type
@@ -317,5 +425,180 @@ mod tests {
     fn area_event_from_str_invalid() {
         let area_event = AreaEvent::from_str("alien invasion");
         assert!(area_event.is_err());
+    }
+
+    #[test]
+    fn test_desert_generates_terrain_appropriate_events() {
+        use std::collections::HashMap;
+        let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        for _ in 0..100 {
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Desert);
+            *counts.entry(event).or_insert(0) += 1;
+        }
+        // Desert should have high sandstorm/heatwave, no blizzard
+        assert!(counts.get(&AreaEvent::Sandstorm).unwrap_or(&0) >= &30);
+        assert!(counts.get(&AreaEvent::Heatwave).unwrap_or(&0) >= &20);
+        assert_eq!(counts.get(&AreaEvent::Blizzard).unwrap_or(&0), &0);
+    }
+
+    #[test]
+    fn test_mountains_generates_terrain_appropriate_events() {
+        use std::collections::HashMap;
+        let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        for _ in 0..100 {
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Mountains);
+            *counts.entry(event).or_insert(0) += 1;
+        }
+        // Mountains should have high avalanche/rockslide, no floods
+        assert!(counts.get(&AreaEvent::Avalanche).unwrap_or(&0) >= &25);
+        assert!(counts.get(&AreaEvent::Rockslide).unwrap_or(&0) >= &20);
+        assert_eq!(counts.get(&AreaEvent::Flood).unwrap_or(&0), &0);
+    }
+
+    #[test]
+    fn test_wetlands_generates_terrain_appropriate_events() {
+        use std::collections::HashMap;
+        let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        for _ in 0..100 {
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Wetlands);
+            *counts.entry(event).or_insert(0) += 1;
+        }
+        // Wetlands should have high flood, no avalanche
+        assert!(counts.get(&AreaEvent::Flood).unwrap_or(&0) >= &40);
+        assert_eq!(counts.get(&AreaEvent::Avalanche).unwrap_or(&0), &0);
+        assert_eq!(counts.get(&AreaEvent::Blizzard).unwrap_or(&0), &0);
+    }
+
+    #[test]
+    fn test_tundra_generates_terrain_appropriate_events() {
+        use std::collections::HashMap;
+        let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        for _ in 0..100 {
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Tundra);
+            *counts.entry(event).or_insert(0) += 1;
+        }
+        // Tundra should have high blizzard/avalanche, no sandstorm
+        assert!(counts.get(&AreaEvent::Blizzard).unwrap_or(&0) >= &35);
+        assert!(counts.get(&AreaEvent::Avalanche).unwrap_or(&0) >= &15);
+        assert_eq!(counts.get(&AreaEvent::Sandstorm).unwrap_or(&0), &0);
+        assert_eq!(counts.get(&AreaEvent::Flood).unwrap_or(&0), &0);
+    }
+
+    #[test]
+    fn test_forest_generates_terrain_appropriate_events() {
+        use std::collections::HashMap;
+        let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        for _ in 0..100 {
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Forest);
+            *counts.entry(event).or_insert(0) += 1;
+        }
+        // Forest should have high wildfire, no sandstorm
+        assert!(counts.get(&AreaEvent::Wildfire).unwrap_or(&0) >= &30);
+        assert_eq!(counts.get(&AreaEvent::Sandstorm).unwrap_or(&0), &0);
+        assert_eq!(counts.get(&AreaEvent::Drought).unwrap_or(&0), &0);
+    }
+
+    #[test]
+    fn test_grasslands_generates_terrain_appropriate_events() {
+        use std::collections::HashMap;
+        let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        for _ in 0..100 {
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Grasslands);
+            *counts.entry(event).or_insert(0) += 1;
+        }
+        // Grasslands should have high wildfire/drought, no avalanche
+        assert!(counts.get(&AreaEvent::Wildfire).unwrap_or(&0) >= &25);
+        assert!(counts.get(&AreaEvent::Drought).unwrap_or(&0) >= &15);
+        assert_eq!(counts.get(&AreaEvent::Avalanche).unwrap_or(&0), &0);
+        assert_eq!(counts.get(&AreaEvent::Blizzard).unwrap_or(&0), &0);
+    }
+
+    #[test]
+    fn test_clearing_generates_terrain_appropriate_events() {
+        use std::collections::HashMap;
+        let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        for _ in 0..100 {
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Clearing);
+            *counts.entry(event).or_insert(0) += 1;
+        }
+        // Clearing should have balanced events, no avalanche
+        assert!(counts.get(&AreaEvent::Wildfire).unwrap_or(&0) >= &20);
+        assert_eq!(counts.get(&AreaEvent::Avalanche).unwrap_or(&0), &0);
+        assert_eq!(counts.get(&AreaEvent::Blizzard).unwrap_or(&0), &0);
+    }
+
+    #[test]
+    fn test_badlands_generates_terrain_appropriate_events() {
+        use std::collections::HashMap;
+        let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        for _ in 0..100 {
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Badlands);
+            *counts.entry(event).or_insert(0) += 1;
+        }
+        // Badlands should have high sandstorm/rockslide, no flood/avalanche
+        assert!(counts.get(&AreaEvent::Sandstorm).unwrap_or(&0) >= &25);
+        assert!(counts.get(&AreaEvent::Rockslide).unwrap_or(&0) >= &15);
+        assert_eq!(counts.get(&AreaEvent::Flood).unwrap_or(&0), &0);
+        assert_eq!(counts.get(&AreaEvent::Avalanche).unwrap_or(&0), &0);
+    }
+
+    #[test]
+    fn test_highlands_generates_terrain_appropriate_events() {
+        use std::collections::HashMap;
+        let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        for _ in 0..100 {
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Highlands);
+            *counts.entry(event).or_insert(0) += 1;
+        }
+        // Highlands should have high rockslide/landslide, no flood/wildfire
+        assert!(counts.get(&AreaEvent::Rockslide).unwrap_or(&0) >= &20);
+        assert!(counts.get(&AreaEvent::Landslide).unwrap_or(&0) >= &15);
+        assert_eq!(counts.get(&AreaEvent::Flood).unwrap_or(&0), &0);
+        assert_eq!(counts.get(&AreaEvent::Wildfire).unwrap_or(&0), &0);
+    }
+
+    #[test]
+    fn test_jungle_generates_terrain_appropriate_events() {
+        use std::collections::HashMap;
+        let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        for _ in 0..100 {
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Jungle);
+            *counts.entry(event).or_insert(0) += 1;
+        }
+        // Jungle should have high wildfire/flood, no sandstorm/blizzard
+        assert!(counts.get(&AreaEvent::Wildfire).unwrap_or(&0) >= &25);
+        assert!(counts.get(&AreaEvent::Flood).unwrap_or(&0) >= &20);
+        assert_eq!(counts.get(&AreaEvent::Sandstorm).unwrap_or(&0), &0);
+        assert_eq!(counts.get(&AreaEvent::Blizzard).unwrap_or(&0), &0);
+    }
+
+    #[test]
+    fn test_urbanruins_generates_terrain_appropriate_events() {
+        use std::collections::HashMap;
+        let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        for _ in 0..100 {
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::UrbanRuins);
+            *counts.entry(event).or_insert(0) += 1;
+        }
+        // UrbanRuins should have high earthquake/wildfire, no avalanche/drought
+        assert!(counts.get(&AreaEvent::Earthquake).unwrap_or(&0) >= &25);
+        assert!(counts.get(&AreaEvent::Wildfire).unwrap_or(&0) >= &15);
+        assert_eq!(counts.get(&AreaEvent::Avalanche).unwrap_or(&0), &0);
+        assert_eq!(counts.get(&AreaEvent::Drought).unwrap_or(&0), &0);
+    }
+
+    #[test]
+    fn test_geothermal_generates_terrain_appropriate_events() {
+        use std::collections::HashMap;
+        let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
+        for _ in 0..100 {
+            let event = AreaEvent::random_for_terrain(&BaseTerrain::Geothermal);
+            *counts.entry(event).or_insert(0) += 1;
+        }
+        // Geothermal should have high heatwave/earthquake, no blizzard/flood
+        assert!(counts.get(&AreaEvent::Heatwave).unwrap_or(&0) >= &30);
+        assert!(counts.get(&AreaEvent::Earthquake).unwrap_or(&0) >= &20);
+        assert_eq!(counts.get(&AreaEvent::Blizzard).unwrap_or(&0), &0);
+        assert_eq!(counts.get(&AreaEvent::Flood).unwrap_or(&0), &0);
     }
 }

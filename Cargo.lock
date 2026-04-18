@@ -7085,6 +7085,7 @@ dependencies = [
  "dotenvy",
  "game",
  "getrandom 0.3.3",
+ "gloo-net",
  "gloo-storage",
  "jwt-rustcrypto",
  "reqwest",

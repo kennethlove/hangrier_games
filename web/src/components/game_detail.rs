@@ -7,6 +7,7 @@ use crate::components::game_edit::GameEdit;
 use crate::components::game_tributes::GameTributes;
 use crate::components::info_detail::InfoDetail;
 use crate::env::APP_API_HOST;
+use crate::hooks::{ConnectionState, use_game_websocket};
 use crate::routes::Routes;
 use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
@@ -16,7 +17,7 @@ use dioxus_query::prelude::{
 };
 use game::games::Game;
 use reqwest::StatusCode;
-use shared::{DisplayGame, GameStatus};
+use shared::{DisplayGame, GameEvent, GameStatus};
 use std::ops::Deref;
 
 async fn fetch_display_game(
@@ -165,6 +166,9 @@ async fn handle_next_step(
 
 #[component]
 pub fn GamePage(identifier: String) -> Element {
+    // WebSocket for real-time updates
+    let (ws_events, ws_connection) = use_game_websocket(identifier.clone());
+
     rsx! {
         div {
             class: r#"
@@ -173,10 +177,70 @@ pub fn GamePage(identifier: String) -> Element {
             flex-col
             gap-4
             "#,
+
+            // Connection status indicator
+            {match ws_connection() {
+                ConnectionState::Connected => rsx! {
+                    div { class: "text-sm text-green-600", "Live updates connected" }
+                },
+                ConnectionState::Connecting => rsx! {
+                    div { class: "text-sm text-yellow-600", "Connecting to live updates..." }
+                },
+                ConnectionState::Disconnected => rsx! {
+                    div { class: "text-sm text-gray-600", "Live updates disconnected" }
+                },
+                ConnectionState::Error(ref msg) => rsx! {
+                    div { class: "text-sm text-red-600", "Connection error: {msg}" }
+                },
+            }}
+
+            // Real-time event feed
+            if !ws_events.read().is_empty() {
+                div {
+                    class: "bg-gray-100 p-4 rounded-lg max-h-64 overflow-y-auto",
+                    h3 { class: "font-bold mb-2", "Live Events" }
+                    for event in ws_events.read().iter().rev().take(10) {
+                        div { class: "text-sm py-1 border-b border-gray-200",
+                            {format_game_event(event)}
+                        }
+                    }
+                }
+            }
+
             GameState { identifier: identifier.clone() }
             GameStats { identifier: identifier.clone() }
             GameDetails { identifier: identifier.clone() }
         }
+    }
+}
+
+/// Format a GameEvent for display
+fn format_game_event(event: &GameEvent) -> String {
+    match event {
+        GameEvent::GameStarted { day } => format!("Game started - Day {}", day),
+        GameEvent::GameFinished { winner } => {
+            if let Some(winner_name) = winner {
+                format!("Game finished! Winner: {}", winner_name)
+            } else {
+                "Game finished!".to_string()
+            }
+        }
+        GameEvent::DayStarted { day } => format!("Day {} started", day),
+        GameEvent::NightStarted { day } => format!("Night {} started", day),
+        GameEvent::TributeDied { name, cause, .. } => {
+            format!("{} died: {}", name, cause)
+        }
+        GameEvent::AreaEvent { area, event } => {
+            format!("{} in {}", event, area)
+        }
+        GameEvent::Combat {
+            attacker,
+            defender,
+            outcome,
+        } => {
+            format!("{} vs {}: {}", attacker, defender, outcome)
+        }
+        GameEvent::Message { content, .. } => content.clone(),
     }
 }
 

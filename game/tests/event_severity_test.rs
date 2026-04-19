@@ -149,10 +149,10 @@ fn test_survival_check_with_affinity() {
     let mut rng = SmallRng::seed_from_u64(42);
 
     // With affinity, survival should be easier
-    let result_with_affinity = event.survival_check(&terrain, true, false, false, 100, &mut rng);
+    let result_with_affinity = event.survival_check(&terrain, true, false, false, 100, true, 1.0, &mut rng);
     let mut rng2 = SmallRng::seed_from_u64(42);
     let result_without_affinity =
-        event.survival_check(&terrain, false, false, false, 100, &mut rng2);
+        event.survival_check(&terrain, false, false, false, 100, true, 1.0, &mut rng2);
 
     // Both should succeed or fail, but we can't deterministically test randomness
     // Just verify the function runs without panic
@@ -168,9 +168,9 @@ fn test_survival_check_with_item_bonus() {
     let mut rng = SmallRng::seed_from_u64(42);
 
     // With item bonus, survival should be easier
-    let result_with_item = event.survival_check(&terrain, false, true, false, 100, &mut rng);
+    let result_with_item = event.survival_check(&terrain, false, true, false, 100, true, 1.0, &mut rng);
     let mut rng2 = SmallRng::seed_from_u64(42);
-    let result_without_item = event.survival_check(&terrain, false, false, false, 100, &mut rng2);
+    let result_without_item = event.survival_check(&terrain, false, false, false, 100, true, 1.0, &mut rng2);
 
     // Just verify the function runs
     assert!(result_with_item.survived || !result_with_item.survived);
@@ -185,9 +185,9 @@ fn test_survival_check_with_desperation() {
     let mut rng = SmallRng::seed_from_u64(42);
 
     // With desperation, survival should be easier
-    let result_desperate = event.survival_check(&terrain, false, false, true, 10, &mut rng);
+    let result_desperate = event.survival_check(&terrain, false, false, true, 10, true, 1.0, &mut rng);
     let mut rng2 = SmallRng::seed_from_u64(42);
-    let result_normal = event.survival_check(&terrain, false, false, false, 100, &mut rng2);
+    let result_normal = event.survival_check(&terrain, false, false, false, 100, true, 1.0, &mut rng2);
 
     // Just verify the function runs
     assert!(result_desperate.survived || !result_desperate.survived);
@@ -201,7 +201,7 @@ fn test_survival_result_structure() {
     let terrain = BaseTerrain::Forest;
     let mut rng = SmallRng::seed_from_u64(42);
 
-    let result = event.survival_check(&terrain, false, false, false, 100, &mut rng);
+    let result = event.survival_check(&terrain, false, false, false, 100, true, 1.0, &mut rng);
 
     // Verify result has expected fields
     if result.survived {
@@ -229,7 +229,7 @@ fn test_catastrophic_instant_death_probability() {
 
     for i in 0..trials {
         let mut rng = SmallRng::seed_from_u64(i);
-        let result = event.survival_check(&terrain, false, false, false, 100, &mut rng);
+        let result = event.survival_check(&terrain, false, false, false, 100, true, 1.0, &mut rng);
         if !result.survived && result.instant_death {
             instant_deaths += 1;
         }
@@ -259,7 +259,7 @@ fn test_desperation_rewards_distribution() {
 
     for i in 0..trials {
         let mut rng = SmallRng::seed_from_u64(i);
-        let result = event.survival_check(&terrain, false, false, true, 10, &mut rng);
+        let result = event.survival_check(&terrain, false, false, true, 10, true, 1.0, &mut rng);
         if result.survived {
             if result.stamina_restored > 0 {
                 stamina_rewards += 1;

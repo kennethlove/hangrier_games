@@ -202,18 +202,13 @@ fn test_all_terrains_produce_valid_items() {
             assert!(!item.name.is_empty(), "Item should have name");
             assert!(item.quantity > 0, "Item should have positive quantity");
 
-            // Effect should be reasonable
-            if item.is_weapon() || item.is_defensive() {
-                assert!(
-                    item.effect > 0 && item.effect <= 7,
-                    "Combat gear should have 1-7 effect"
-                );
-            } else {
-                assert!(
-                    item.effect > 0 && item.effect <= 10,
-                    "Consumables should have 1-10 effect"
-                );
-            }
+            // Effect should be within the rarity tier ranges (max Legendary = 12).
+            assert!(
+                item.effect > 0 && item.effect <= 12,
+                "Item effect {} out of range 1-12 (rarity {:?})",
+                item.effect,
+                item.rarity
+            );
         }
     }
 }

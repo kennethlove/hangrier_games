@@ -228,7 +228,7 @@ fn test_stamina_threshold_differences() {
     assert_ne!(low, critical);
 
     // Critical should be most severe
-    assert!(critical.len() > 0);
+    assert!(!critical.is_empty());
 }
 
 /// Test that harsh terrain stamina narratives are more severe.
@@ -240,8 +240,8 @@ fn test_harsh_terrain_more_severe_stamina() {
     let mild = stamina_narrative(BaseTerrain::Clearing, stamina);
 
     // Both should be non-empty
-    assert!(harsh.len() > 0);
-    assert!(mild.len() > 0);
+    assert!(!harsh.is_empty());
+    assert!(!mild.is_empty());
 
     // Harsh should mention difficulty more prominently
     assert!(harsh.contains("harsh") || harsh.contains("brutal") || harsh.contains("demanding"));

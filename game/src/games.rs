@@ -561,7 +561,7 @@ impl Game {
                 if let Some(area_details) = self.random_open_area() {
                     let event = AreaEvent::random(rng);
                     let area_name = area_details.area.unwrap().to_string();
-                    if area_events.get(&area_name.clone()).is_some() {
+                    if area_events.contains_key(&area_name) {
                         let mut events = area_events[&area_name].1.clone();
                         events.push(event.clone());
                         area_events.insert(area_name, (area_details.clone(), events));
@@ -912,7 +912,7 @@ mod tests {
         assert_eq!(game.living_tributes().len(), 1);
         assert_eq!(game.winner(), Some(winner_tribute.clone()));
 
-        game.check_for_winner();
+        let _ = game.check_for_winner();
 
         // Game should be finished
         assert_eq!(game.status, GameStatus::Finished);
@@ -929,7 +929,7 @@ mod tests {
         assert!(game.living_tributes().is_empty());
         assert!(game.winner().is_none());
 
-        game.check_for_winner();
+        let _ = game.check_for_winner();
 
         // Game should be finished
         assert_eq!(game.status, GameStatus::Finished);
@@ -947,7 +947,7 @@ mod tests {
         assert_eq!(game.living_tributes().len(), 2);
         assert!(game.winner().is_none());
 
-        game.check_for_winner();
+        let _ = game.check_for_winner();
 
         // Game should be finished
         assert_eq!(game.status, starting_state);
@@ -962,12 +962,12 @@ mod tests {
         game.day = Some(1);
         game.areas.push(area);
         game.areas[0].events.push(event.clone());
-        game.prepare_cycle(true);
+        let _ = game.prepare_cycle(true);
         assert_eq!(game.day, Some(2));
         assert_eq!(game.areas[0].events.len(), 0);
 
         game.areas[0].events.push(event.clone());
-        game.prepare_cycle(false);
+        let _ = game.prepare_cycle(false);
         // Night cycle shouldn't advance the game day.
         assert_eq!(game.day, Some(2));
         assert_eq!(game.areas[0].events.len(), 0);
@@ -1012,7 +1012,7 @@ mod tests {
         game.areas.push(area);
 
         assert!(!game.areas[0].is_open());
-        game.announce_area_events();
+        let _ = game.announce_area_events();
         // announce_area_events does not yet emit messages; this test is a placeholder
         // until area-event narration is restored (see hangrier_games-33r).
         assert_eq!(game.messages.len(), 0);
@@ -1059,7 +1059,7 @@ mod tests {
         // Constrain areas
         // Use a fixed seed so the area-selection branch is deterministic.
         let mut rng = SmallRng::seed_from_u64(0);
-        game.constrain_areas(&mut rng);
+        let _ = game.constrain_areas(&mut rng);
 
         // Check if at least one area is closed
         assert!(game.random_open_area().is_some());
@@ -1085,7 +1085,7 @@ mod tests {
 
         // Run the tribute cycle
         let mut rng = SmallRng::from_rng(&mut rand::rng());
-        game.run_tribute_cycle(
+        let _ = game.run_tribute_cycle(
             true,
             &mut rng,
             closed_areas,

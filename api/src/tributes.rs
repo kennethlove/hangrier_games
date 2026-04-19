@@ -47,14 +47,14 @@ struct TributeGameEdge {
 
 pub async fn create_tribute(
     tribute: Option<Tribute>,
-    game_identifier: &String,
+    game_identifier: &str,
     db: &Surreal<Any>,
     district: u32,
 ) -> Result<Tribute, AppError> {
-    let game_id = RecordId::from(("game", game_identifier.clone()));
+    let game_id = RecordId::from(("game", game_identifier.to_owned()));
     let tribute_count = db
         .query("RETURN count(SELECT id FROM playing_in WHERE out.identifier=$game)")
-        .bind(("game", game_identifier.clone()))
+        .bind(("game", game_identifier.to_owned()))
         .await;
     let tribute_count: Option<u32> = tribute_count.unwrap().take(0).unwrap();
     if tribute_count >= Some(24) {
@@ -63,7 +63,7 @@ pub async fn create_tribute(
 
     let mut tribute = tribute.unwrap_or_else(Tribute::random);
     tribute.district = district + 1;
-    tribute.statistics.game = game_identifier.clone();
+    tribute.statistics.game = game_identifier.to_owned();
 
     let id = RecordId::from(("tribute", &tribute.identifier));
 

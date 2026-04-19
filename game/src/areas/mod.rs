@@ -127,8 +127,6 @@ impl OwnsItems for AreaDetails {
 
         if used_item.quantity > 0 {
             Ok(())
-        } else if used_item.quantity == 0 {
-            Err(ItemError::ItemNotFound)
         } else {
             Err(ItemError::ItemNotFound)
         }

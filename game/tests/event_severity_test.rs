@@ -156,9 +156,9 @@ fn test_survival_check_with_affinity() {
         event.survival_check(&terrain, false, false, false, 100, true, 1.0, &mut rng2);
 
     // Both should succeed or fail, but we can't deterministically test randomness
-    // Just verify the function runs without panic
-    assert!(result_with_affinity.survived || !result_with_affinity.survived);
-    assert!(result_without_affinity.survived || !result_without_affinity.survived);
+    // Just verify the function runs without panic and returns accessible fields
+    let _ = result_with_affinity.survived;
+    let _ = result_without_affinity.survived;
 }
 
 // Survival check tests - item bonus
@@ -176,8 +176,8 @@ fn test_survival_check_with_item_bonus() {
         event.survival_check(&terrain, false, false, false, 100, true, 1.0, &mut rng2);
 
     // Just verify the function runs
-    assert!(result_with_item.survived || !result_with_item.survived);
-    assert!(result_without_item.survived || !result_without_item.survived);
+    let _ = result_with_item.survived;
+    let _ = result_without_item.survived;
 }
 
 // Survival check tests - desperation bonus
@@ -195,8 +195,8 @@ fn test_survival_check_with_desperation() {
         event.survival_check(&terrain, false, false, false, 100, true, 1.0, &mut rng2);
 
     // Just verify the function runs
-    assert!(result_desperate.survived || !result_desperate.survived);
-    assert!(result_normal.survived || !result_normal.survived);
+    let _ = result_desperate.survived;
+    let _ = result_normal.survived;
 }
 
 // Test survival result structure
@@ -244,7 +244,7 @@ fn test_catastrophic_instant_death_probability() {
 
     // Should be around 5% (allow 2-10% range for randomness)
     assert!(
-        death_rate >= 0.02 && death_rate <= 0.10,
+        (0.02..=0.10).contains(&death_rate),
         "Instant death rate {} outside expected range",
         death_rate
     );
@@ -288,9 +288,9 @@ fn test_desperation_rewards_distribution() {
         let none_pct = no_rewards as f32 / total;
 
         // Rough validation (allow 25-60% for stamina/sanity, 0-25% for item, 0-15% for none)
-        assert!(stamina_pct >= 0.25 && stamina_pct <= 0.60);
-        assert!(sanity_pct >= 0.25 && sanity_pct <= 0.60);
-        assert!(item_pct >= 0.0 && item_pct <= 0.25);
-        assert!(none_pct >= 0.0 && none_pct <= 0.20);
+        assert!((0.25..=0.60).contains(&stamina_pct));
+        assert!((0.25..=0.60).contains(&sanity_pct));
+        assert!((0.0..=0.25).contains(&item_pct));
+        assert!((0.0..=0.20).contains(&none_pct));
     }
 }

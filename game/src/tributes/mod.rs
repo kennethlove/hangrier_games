@@ -30,20 +30,6 @@ use uuid::Uuid;
 const SANITY_BREAK_LEVEL: u32 = 9;
 const LOYALTY_BREAK_LEVEL: f64 = 0.25;
 
-/// Attribute maximums
-const MAX_HEALTH: u32 = 100;
-const MAX_SANITY: u32 = 100;
-const MAX_MOVEMENT: u32 = 100;
-const MAX_STRENGTH: u32 = 50;
-const MAX_DEFENSE: u32 = 50;
-const MAX_BRAVERY: u32 = 100;
-const MAX_LOYALTY: u32 = 100;
-const MAX_SPEED: u32 = 100;
-const MAX_DEXTERITY: u32 = 100;
-const MAX_INTELLIGENCE: u32 = 100;
-const MAX_PERSUASION: u32 = 100;
-const MAX_LUCK: u32 = 100;
-
 #[derive(Clone, Debug)]
 pub struct ActionSuggestion {
     pub action: Action,
@@ -365,8 +351,8 @@ impl Tribute {
     /// 2. If there are no enemies and the tribute is feeling suicidal, target self.
     /// 3. If there are no enemies nearby, but they exist elsewhere, target no one.
     /// 4. If there are no enemies nearby and no enemies left in the game:
-    /// 4a. If loyalty is low, target ally.
-    /// 4b. Otherwise, target no one.
+    ///    a. If loyalty is low, target ally.
+    ///    b. Otherwise, target no one.
     fn pick_target(
         &self,
         mut targets: Vec<Tribute>,

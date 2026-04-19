@@ -102,22 +102,21 @@ impl Tribute {
     /// Use consumable item from inventory
     pub(crate) fn try_use_consumable(&mut self, chosen_item: &Item) -> Result<(), ItemError> {
         let items = self.consumables();
-        let item: Item;
 
         // If the tribute has the item...
-        match items
+        let item = match items
             .iter()
             .find(|i| i.identifier == chosen_item.identifier)
         {
             Some(selected_item) => {
                 // select it
-                item = selected_item.clone();
+                selected_item.clone()
             }
             None => {
                 // otherwise, quit because you can't use an item you don't have
                 return Err(ItemError::ItemNotFound);
             }
-        }
+        };
 
         if self.use_item(&item).is_err() {
             return Err(ItemError::ItemNotUsable);

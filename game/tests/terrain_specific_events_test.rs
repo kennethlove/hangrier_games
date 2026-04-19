@@ -9,7 +9,7 @@ use std::collections::HashMap;
 #[test]
 fn test_game_loop_generates_terrain_appropriate_events() {
     let mut game = Game::new("test-terrain-events");
-    game.start();
+    let _ = game.start();
     game.day = Some(2); // Day 2 to avoid special day behavior
 
     // Create areas with different terrains

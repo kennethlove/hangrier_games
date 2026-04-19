@@ -641,7 +641,12 @@ mod tests {
         let tribute = Tribute::new("Katniss".to_string(), Some(12), None);
         assert_eq!(tribute.name, "Katniss");
         assert_eq!(tribute.district, 12);
-        assert_eq!(tribute.attributes.health, 100);
+        // Attributes::new() randomizes health in 50..=max_health.
+        assert!(
+            (50..=100).contains(&tribute.attributes.health),
+            "health {} out of range",
+            tribute.attributes.health
+        );
     }
 
     #[rstest]

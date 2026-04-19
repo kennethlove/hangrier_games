@@ -386,6 +386,8 @@ impl AreaEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::SeedableRng;
+    use rand::rngs::SmallRng;
     use rstest::rstest;
 
     #[test]
@@ -436,7 +438,7 @@ mod tests {
     fn test_desert_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::seed_from_u64(0);
         for _ in 0..100 {
             let event = AreaEvent::random_for_terrain(&BaseTerrain::Desert, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
@@ -451,7 +453,7 @@ mod tests {
     fn test_mountains_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::seed_from_u64(0);
         for _ in 0..100 {
             let event = AreaEvent::random_for_terrain(&BaseTerrain::Mountains, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
@@ -466,7 +468,7 @@ mod tests {
     fn test_wetlands_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::seed_from_u64(0);
         for _ in 0..100 {
             let event = AreaEvent::random_for_terrain(&BaseTerrain::Wetlands, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
@@ -481,7 +483,7 @@ mod tests {
     fn test_tundra_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::seed_from_u64(0);
         for _ in 0..100 {
             let event = AreaEvent::random_for_terrain(&BaseTerrain::Tundra, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
@@ -497,7 +499,9 @@ mod tests {
     fn test_forest_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
-        let mut rng = rand::thread_rng();
+        // Use a fixed seed so the distribution check is deterministic and
+        // not subject to ~0.5% tail-probability flakes from thread_rng.
+        let mut rng = SmallRng::seed_from_u64(0);
         for _ in 0..100 {
             let event = AreaEvent::random_for_terrain(&BaseTerrain::Forest, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
@@ -512,7 +516,7 @@ mod tests {
     fn test_grasslands_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::seed_from_u64(0);
         for _ in 0..100 {
             let event = AreaEvent::random_for_terrain(&BaseTerrain::Grasslands, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
@@ -528,7 +532,7 @@ mod tests {
     fn test_clearing_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::seed_from_u64(0);
         for _ in 0..100 {
             let event = AreaEvent::random_for_terrain(&BaseTerrain::Clearing, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
@@ -543,7 +547,7 @@ mod tests {
     fn test_badlands_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::seed_from_u64(0);
         for _ in 0..100 {
             let event = AreaEvent::random_for_terrain(&BaseTerrain::Badlands, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
@@ -559,7 +563,7 @@ mod tests {
     fn test_highlands_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::seed_from_u64(0);
         for _ in 0..100 {
             let event = AreaEvent::random_for_terrain(&BaseTerrain::Highlands, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
@@ -575,7 +579,7 @@ mod tests {
     fn test_jungle_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::seed_from_u64(0);
         for _ in 0..100 {
             let event = AreaEvent::random_for_terrain(&BaseTerrain::Jungle, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
@@ -591,7 +595,7 @@ mod tests {
     fn test_urbanruins_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::seed_from_u64(0);
         for _ in 0..100 {
             let event = AreaEvent::random_for_terrain(&BaseTerrain::UrbanRuins, &mut rng);
             *counts.entry(event).or_insert(0) += 1;
@@ -607,7 +611,7 @@ mod tests {
     fn test_geothermal_generates_terrain_appropriate_events() {
         use std::collections::HashMap;
         let mut counts: HashMap<AreaEvent, u32> = HashMap::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::seed_from_u64(0);
         for _ in 0..100 {
             let event = AreaEvent::random_for_terrain(&BaseTerrain::Geothermal, &mut rng);
             *counts.entry(event).or_insert(0) += 1;

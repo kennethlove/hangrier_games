@@ -690,7 +690,16 @@ mod tests {
 
     #[fixture]
     fn tribute() -> Tribute {
-        Tribute::new("Katniss".to_string(), None, None)
+        // Build a fully-deterministic Tribute for AI tests:
+        //   - Brain::default() = Balanced personality with seed=0 thresholds
+        //     (low_health=18, mid_health=38, low_sanity=16, mid_sanity=34,
+        //     low_movement=8, high_intelligence=40, low_intelligence=91)
+        //   - Attributes::default() = maxed-out attributes
+        // Tribute::new() randomizes both, so override after construction.
+        let mut tribute = Tribute::new("Katniss".to_string(), None, None);
+        tribute.brain = Brain::default();
+        tribute.attributes = crate::tributes::Attributes::default();
+        tribute
     }
 
     #[fixture]
@@ -877,8 +886,10 @@ mod tests {
         mut tribute: Tribute,
         mut small_rng: SmallRng,
     ) {
-        tribute.attributes.intelligence = 10;
-        tribute.attributes.sanity = 10;
+        // recklessness = 100 - intelligence - sanity must reach low_intelligence
+        // threshold (~91 for Balanced after variance) for the Attack branch.
+        tribute.attributes.intelligence = 5;
+        tribute.attributes.sanity = 0;
         let action = tribute.brain.act(&tribute.clone(), 6, &[], &mut small_rng);
         assert_eq!(action, Action::Attack);
     }
@@ -947,8 +958,16 @@ mod tests {
     fn test_defensive_retreats_earlier(mut small_rng: SmallRng) {
         let mut tribute = Tribute::default();
         tribute.brain.personality = BrainPersonality::Defensive;
-        tribute.attributes.health = 25; // Above balanced limit but below defensive
-        tribute.attributes.sanity = 40;
+        // Regenerate thresholds for the new personality (otherwise stale
+        // thresholds from random construction are used). Seed=0 gives
+        // Defensive low_health ~28-32, mid_health ~45-55.
+        tribute.brain.thresholds =
+            BrainPersonality::Defensive.generate_thresholds(&mut SmallRng::seed_from_u64(0));
+        tribute.attributes.health = 25; // Below defensive low_health
+        // Sanity must be safely above Defensive mid_sanity (base 45, +20%
+        // variance ceiling = 54) so the visible/ok-sanity arm of
+        // decide_action_few_enemies_low_health returns Move, not Attack.
+        tribute.attributes.sanity = 60;
 
         let action = tribute.brain.decide_action_few_enemies(&tribute);
         // Defensive should prefer moving/hiding at this health
@@ -1009,6 +1028,9 @@ mod tests {
     #[rstest]
     fn test_psychotic_break_recovery(mut small_rng: SmallRng) {
         let mut tribute = Tribute::default();
+        // Use deterministic Brain so psychotic_break_threshold is fixed
+        // (Balanced base = 7) and the +20 recovery margin is predictable.
+        tribute.brain = Brain::default();
         tribute.attributes.sanity = 3;
 
         // Trigger break
@@ -1027,6 +1049,9 @@ mod tests {
     #[rstest]
     fn test_psychotic_break_no_recovery_insufficient_sanity(mut small_rng: SmallRng) {
         let mut tribute = Tribute::default();
+        // Deterministic Brain: Balanced psychotic_break_threshold = 7,
+        // recovery requires sanity >= 27. sanity = 15 is below that.
+        tribute.brain = Brain::default();
         tribute.attributes.sanity = 3;
 
         // Trigger break

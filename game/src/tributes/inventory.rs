@@ -213,7 +213,9 @@ mod tests {
         item.quantity = 2;
         tribute.add_item(item.clone());
         assert!(tribute.use_item(&item).is_ok());
-        assert!(tribute.has_item(&item));
+        // After use, stored item has quantity=1, so equality with the
+        // original `item` (quantity=2) no longer holds. Verify directly.
+        assert_eq!(tribute.items.len(), 1);
         assert_eq!(tribute.items[0].quantity, 1);
     }
 }

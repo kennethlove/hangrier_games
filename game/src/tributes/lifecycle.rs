@@ -287,23 +287,6 @@ impl Tribute {
             self.status = TributeStatus::RecentlyDead;
         }
     }
-
-    /// Helper to attempt to add a tribute message, logging a warning on failure.
-    /// The success of this function does not affect the outcome of the calling method.
-    pub(crate) fn try_log_action(
-        &self,
-        _game_event_output: impl std::fmt::Display,
-        action_description: &str,
-    ) {
-        // Message logging removed - now handled at API level
-        // The game engine is now pure (no I/O side effects)
-        tracing::debug!(
-            target: "game::tribute",
-            "Tribute {} action: {}",
-            self.name,
-            action_description
-        );
-    }
 }
 
 #[cfg(test)]

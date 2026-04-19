@@ -280,6 +280,11 @@ impl Tribute {
             self.misses_home();
         }
 
+        // Check for psychotic breaks or recovery (sanity-based mental state changes)
+        self.brain
+            .check_psychotic_break(self.attributes.sanity, rng);
+        self.brain.check_recovery(self.attributes.sanity);
+
         // Set a preferred action if one is suggested
         if let Some(suggestion) = action_suggestion {
             self.brain.set_preferred_action(

@@ -10,8 +10,9 @@ fn test_desert_favors_consumables() {
     let mut weapon_count = 0;
     let mut shield_count = 0;
 
-    // Generate 100 items and count distribution
-    for _ in 0..100 {
+    // Generate 1000 items so the distribution assertions below are
+    // stable across RNG tails (n=100 was tail-flaky).
+    for _ in 0..1000 {
         let item = Item::new_random_with_terrain(terrain, None);
         if item.is_weapon() {
             weapon_count += 1;
@@ -22,10 +23,10 @@ fn test_desert_favors_consumables() {
         }
     }
 
-    // Consumables should be the majority (expect ~60% = 60 items)
-    // Allow variance but should be clearly dominant
+    // Consumables should be the majority (expect ~60% = 600 items).
+    // Allow variance but should be clearly dominant.
     assert!(
-        consumable_count > 40,
+        consumable_count > 400,
         "Desert should favor consumables: got {} consumables, {} weapons, {} shields",
         consumable_count,
         weapon_count,
@@ -46,7 +47,7 @@ fn test_urban_ruins_favors_weapons() {
     let mut shield_count = 0;
     let mut consumable_count = 0;
 
-    for _ in 0..100 {
+    for _ in 0..1000 {
         let item = Item::new_random_with_terrain(terrain, None);
         if item.is_weapon() {
             weapon_count += 1;
@@ -57,9 +58,9 @@ fn test_urban_ruins_favors_weapons() {
         }
     }
 
-    // Weapons should be the plurality (expect ~50% = 50 items)
+    // Weapons should be the plurality (expect ~50% = 500 items).
     assert!(
-        weapon_count > 30,
+        weapon_count > 300,
         "UrbanRuins should favor weapons: got {} weapons, {} shields, {} consumables",
         weapon_count,
         shield_count,
@@ -119,7 +120,7 @@ fn test_mountains_favors_combat_gear() {
     let mut shield_count = 0;
     let mut consumable_count = 0;
 
-    for _ in 0..100 {
+    for _ in 0..1000 {
         let item = Item::new_random_with_terrain(terrain, None);
         if item.is_weapon() {
             weapon_count += 1;
@@ -130,10 +131,10 @@ fn test_mountains_favors_combat_gear() {
         }
     }
 
-    // Combat gear (weapons + shields) should dominate
+    // Combat gear (weapons + shields) should dominate.
     let combat_gear = weapon_count + shield_count;
     assert!(
-        combat_gear > 60,
+        combat_gear > 600,
         "Mountains should favor combat gear: got {} weapons + {} shields = {} total",
         weapon_count,
         shield_count,
@@ -154,7 +155,9 @@ fn test_tundra_distribution() {
     let mut shield_count = 0;
     let mut consumable_count = 0;
 
-    for _ in 0..100 {
+    // Use a larger sample so the 0.3/0.4/0.3 distribution stabilises
+    // (n=100 regularly produced ties given the narrow shield margin).
+    for _ in 0..1000 {
         let item = Item::new_random_with_terrain(terrain, None);
         if item.is_weapon() {
             weapon_count += 1;

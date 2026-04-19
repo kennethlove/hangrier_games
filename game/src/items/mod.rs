@@ -160,8 +160,8 @@ impl Item {
     ///
     /// # Example
     /// ```
-    /// use hangrier_games::items::Item;
-    /// use hangrier_games::terrain::BaseTerrain;
+    /// use game::items::Item;
+    /// use game::terrain::BaseTerrain;
     ///
     /// // Desert terrain favors consumables (0.6 weight)
     /// let item = Item::new_random_with_terrain(BaseTerrain::Desert, None);

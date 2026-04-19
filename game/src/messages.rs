@@ -45,8 +45,8 @@ impl GameMessage {
 ///
 /// # Examples
 /// ```
-/// use hangrier_games::messages::movement_narrative;
-/// use hangrier_games::terrain::BaseTerrain;
+/// use game::messages::movement_narrative;
+/// use game::terrain::BaseTerrain;
 ///
 /// let desc = movement_narrative(BaseTerrain::Desert, "Alice");
 /// // Returns: "Alice struggles through the scorching desert sands"
@@ -133,8 +133,8 @@ pub fn movement_narrative(terrain: BaseTerrain, tribute_name: &str) -> String {
 ///
 /// # Examples
 /// ```
-/// use hangrier_games::messages::hiding_spot_narrative;
-/// use hangrier_games::terrain::BaseTerrain;
+/// use game::messages::hiding_spot_narrative;
+/// use game::terrain::BaseTerrain;
 ///
 /// let desc = hiding_spot_narrative(BaseTerrain::Forest, "Bob");
 /// // Returns: "Bob conceals themselves behind dense foliage, nearly invisible"
@@ -236,8 +236,8 @@ pub fn hiding_spot_narrative(terrain: BaseTerrain, tribute_name: &str) -> String
 ///
 /// # Examples
 /// ```
-/// use hangrier_games::messages::stamina_narrative;
-/// use hangrier_games::terrain::BaseTerrain;
+/// use game::messages::stamina_narrative;
+/// use game::terrain::BaseTerrain;
 ///
 /// let desc = stamina_narrative(BaseTerrain::Mountains, 30);
 /// // Returns: "The harsh mountain terrain is taking a severe toll..."

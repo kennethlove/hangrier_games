@@ -187,10 +187,7 @@ impl Tribute {
 
         // Any generous patrons this round?
         if let Some(gift) = self.receive_patron_gift(&mut *rng) {
-            self.try_log_action(
-                GameOutput::SponsorGift(self.name.as_str(), &gift),
-                "received gift",
-            );
+            events.push(GameOutput::SponsorGift(self.name.as_str(), &gift).to_string());
             self.add_item(gift);
         }
 
@@ -227,8 +224,8 @@ impl Tribute {
         match &action {
             Action::Move(area) => {
                 let travel_result = match area {
-                    Some(specific_area) => self.travels(closed_areas, Some(*specific_area)),
-                    None => self.travels(closed_areas, None),
+                    Some(specific_area) => self.travels(closed_areas, Some(*specific_area), events),
+                    None => self.travels(closed_areas, None, events),
                 };
 
                 match travel_result {
@@ -249,12 +246,12 @@ impl Tribute {
                                 } else {
                                     // Insufficient stamina - exhausted
                                     self.short_rests();
-                                    self.try_log_action(
+                                    events.push(
                                         GameOutput::TributeTravelExhausted(
                                             self.name.as_str(),
                                             &self.area.to_string(),
-                                        ),
-                                        "too exhausted to move",
+                                        )
+                                        .to_string(),
                                     );
                                 }
                             }
@@ -270,28 +267,23 @@ impl Tribute {
                 }
             }
             Action::Rest => {
-                self.try_log_action(GameOutput::TributeRest(self.name.as_str()), "resting");
+                events.push(GameOutput::TributeRest(self.name.as_str()).to_string());
                 self.long_rests();
             }
             Action::Hide => {
                 let hidden = self.hides();
                 if hidden {
-                    self.try_log_action(
-                        GameOutput::TributeHide(self.name.as_str()),
-                        "hid successfully",
-                    );
+                    events.push(GameOutput::TributeHide(self.name.as_str()).to_string());
                 } else {
                     // Just log as regular hide, game doesn't distinguish failure in output
-                    self.try_log_action(
-                        GameOutput::TributeHide(self.name.as_str()),
-                        "failed to hide",
-                    );
+                    events.push(GameOutput::TributeHide(self.name.as_str()).to_string());
                 }
             }
             Action::Attack => {
                 let target = self.pick_target(
                     encounter_context.potential_targets,
                     encounter_context.total_living_tributes,
+                    events,
                 );
                 if let Some(mut target) = target {
                     let outcome = self.attacks(&mut target, rng, events);
@@ -308,9 +300,8 @@ impl Tribute {
             }
             Action::TakeItem => {
                 if let Some(item) = self.take_nearby_item(area_details) {
-                    self.try_log_action(
-                        GameOutput::TributeTakeItem(self.name.as_str(), &item.name),
-                        "took item",
+                    events.push(
+                        GameOutput::TributeTakeItem(self.name.as_str(), &item.name).to_string(),
                     );
                 }
                 // If no items available, no output
@@ -318,18 +309,16 @@ impl Tribute {
             Action::UseItem(maybe_item) => {
                 if let Some(item) = maybe_item {
                     if let Err(error) = self.try_use_consumable(item) {
-                        self.try_log_action(
+                        events.push(
                             GameOutput::TributeCannotUseItem(
                                 self.name.as_str(),
                                 &error.to_string(),
-                            ),
-                            "item error",
+                            )
+                            .to_string(),
                         );
                     } else {
-                        self.try_log_action(
-                            GameOutput::TributeUseItem(self.name.as_str(), item),
-                            "used item",
-                        );
+                        events
+                            .push(GameOutput::TributeUseItem(self.name.as_str(), item).to_string());
                     }
                 }
             }
@@ -352,13 +341,14 @@ impl Tribute {
         &self,
         mut targets: Vec<Tribute>,
         living_tributes_count: u32,
+        events: &mut Vec<String>,
     ) -> Option<Tribute> {
         // If there are no targets, check if the tribute is feeling suicidal.
         if targets.is_empty() {
             match self.attributes.sanity {
                 0..=SANITY_BREAK_LEVEL => {
                     // attempt suicide
-                    self.try_log_action(GameOutput::TributeSuicide(self.name.as_str()), "suicide");
+                    events.push(GameOutput::TributeSuicide(self.name.as_str()).to_string());
                     Some(self.clone())
                 }
                 _ => None, // Attack no one

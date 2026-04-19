@@ -27,6 +27,7 @@ impl Tribute {
         &self,
         closed_areas: &[Area],
         suggested_area: Option<Area>,
+        events: &mut Vec<String>,
     ) -> TravelResult {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
         // Where is the tribute?
@@ -35,9 +36,9 @@ impl Tribute {
         // 1. Can the tribute move at all?
         if self.attributes.movement == 0 {
             let current_area = self.area.to_string();
-            self.try_log_action(
-                GameOutput::TributeTravelTooTired(self.name.as_str(), current_area.as_str()),
-                "too tired",
+            events.push(
+                GameOutput::TributeTravelTooTired(self.name.as_str(), current_area.as_str())
+                    .to_string(),
             );
             return TravelResult::Failure;
         }
@@ -49,9 +50,9 @@ impl Tribute {
         {
             if suggestion == current_area {
                 let suggestion = suggestion.to_string();
-                self.try_log_action(
-                    GameOutput::TributeTravelAlreadyThere(self.name.as_str(), suggestion.as_str()),
-                    "already there",
+                events.push(
+                    GameOutput::TributeTravelAlreadyThere(self.name.as_str(), suggestion.as_str())
+                        .to_string(),
                 );
                 return TravelResult::Failure;
             }
@@ -65,23 +66,23 @@ impl Tribute {
                 if let Some(new_area) = target_area {
                     let current_area = current_area.to_string();
                     let new_area_name = new_area.to_string();
-                    self.try_log_action(
+                    events.push(
                         GameOutput::TributeTravel(
                             self.name.as_str(),
                             current_area.as_str(),
                             new_area_name.as_str(),
-                        ),
-                        "travel",
+                        )
+                        .to_string(),
                     );
                     TravelResult::Success(new_area)
                 } else {
                     let current_area = current_area.to_string();
-                    self.try_log_action(
+                    events.push(
                         GameOutput::TributeTravelTooTired(
                             self.name.as_str(),
                             current_area.as_str(),
-                        ),
-                        "too tired",
+                        )
+                        .to_string(),
                     );
                     TravelResult::Failure
                 }
@@ -91,13 +92,13 @@ impl Tribute {
                 if let Some(new_area) = target_area {
                     let current_area = current_area.to_string();
                     let new_area_name = new_area.to_string();
-                    self.try_log_action(
+                    events.push(
                         GameOutput::TributeTravel(
                             self.name.as_str(),
                             current_area.as_str(),
                             new_area_name.as_str(),
-                        ),
-                        "travel",
+                        )
+                        .to_string(),
                     );
                     return TravelResult::Success(new_area);
                 }
@@ -110,12 +111,12 @@ impl Tribute {
 
                 if available_neighbors.is_empty() {
                     let current_area_name = current_area.to_string();
-                    self.try_log_action(
+                    events.push(
                         GameOutput::TributeTravelNoOptions(
                             self.name.as_str(),
                             current_area_name.as_str(),
-                        ),
-                        "no options",
+                        )
+                        .to_string(),
                     );
                     return TravelResult::Success(current_area);
                 }
@@ -125,13 +126,13 @@ impl Tribute {
                 let chosen_neighbor = available_neighbors.choose(&mut rng).unwrap();
                 let current_area_name = current_area.to_string();
                 let chosen_area_name = chosen_neighbor.to_string();
-                self.try_log_action(
+                events.push(
                     GameOutput::TributeTravel(
                         self.name.as_str(),
                         current_area_name.as_str(),
                         chosen_area_name.as_str(),
-                    ),
-                    "travel",
+                    )
+                    .to_string(),
                 );
                 TravelResult::Success(*chosen_neighbor)
             }
@@ -156,7 +157,7 @@ mod tests {
     #[tokio::test]
     async fn travels_success(tribute: Tribute) {
         let open_area = AreaDetails::new(Some("Forest".to_string()), Cornucopia);
-        let result = tribute.travels(&[East, South, North, West], None);
+        let result = tribute.travels(&[East, South, North, West], None, &mut Vec::new());
         assert_eq!(result, TravelResult::Success(open_area.area.unwrap()));
     }
 
@@ -164,7 +165,7 @@ mod tests {
     #[tokio::test]
     async fn travels_fail_no_movement(mut tribute: Tribute) {
         tribute.attributes.movement = 0;
-        let result = tribute.travels(&[], None);
+        let result = tribute.travels(&[], None, &mut Vec::new());
         assert_eq!(result, TravelResult::Failure);
     }
 
@@ -172,7 +173,11 @@ mod tests {
     #[tokio::test]
     async fn travels_fail_already_there(mut tribute: Tribute) {
         tribute.area = North;
-        let result = tribute.travels(&[Cornucopia, East, West, South], Some(North));
+        let result = tribute.travels(
+            &[Cornucopia, East, West, South],
+            Some(North),
+            &mut Vec::new(),
+        );
         assert_eq!(result, TravelResult::Failure);
     }
 
@@ -180,7 +185,7 @@ mod tests {
     #[tokio::test]
     async fn travels_fail_low_movement_no_suggestion(mut tribute: Tribute) {
         tribute.attributes.movement = 5;
-        let result = tribute.travels(&[Cornucopia, East, West, North], None);
+        let result = tribute.travels(&[Cornucopia, East, West, North], None, &mut Vec::new());
         assert_eq!(result, TravelResult::Failure);
     }
 
@@ -188,7 +193,11 @@ mod tests {
     #[tokio::test]
     async fn travels_fail_low_movement_suggestion(mut tribute: Tribute) {
         tribute.attributes.movement = 5;
-        let result = tribute.travels(&[Cornucopia, East, West, North], Some(North));
+        let result = tribute.travels(
+            &[Cornucopia, East, West, North],
+            Some(North),
+            &mut Vec::new(),
+        );
         assert_eq!(result, TravelResult::Failure);
     }
 
@@ -198,7 +207,7 @@ mod tests {
         tribute.area = North;
         tribute.attributes.movement = 5;
         let open_area = AreaDetails::new(Some("Forest".to_string()), Cornucopia);
-        let result = tribute.travels(&[East, South], Some(Cornucopia));
+        let result = tribute.travels(&[East, South], Some(Cornucopia), &mut Vec::new());
         assert_eq!(result, TravelResult::Success(open_area.area.unwrap()));
     }
 }

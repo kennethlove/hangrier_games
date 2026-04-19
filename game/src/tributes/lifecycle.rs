@@ -9,7 +9,6 @@
 
 use crate::areas::AreaDetails;
 use crate::areas::events::AreaEvent;
-use crate::messages::add_tribute_message;
 use crate::output::GameOutput;
 use crate::tributes::Tribute;
 use crate::tributes::statuses::TributeStatus;
@@ -304,20 +303,14 @@ impl Tribute {
         game_event_output: impl std::fmt::Display,
         action_description: &str,
     ) {
-        let content = format!("{}", game_event_output);
-
-        if let Err(e) = add_tribute_message(
-            self.identifier.as_str(),
-            self.statistics.game.as_str(),
-            content,
-        ) {
-            tracing::warn!(
-                target: "game::tribute",
-                "Failed to log action: {}. Error: {}",
-                action_description,
-                e
-            );
-        }
+        // Message logging removed - now handled at API level
+        // The game engine is now pure (no I/O side effects)
+        tracing::debug!(
+            target: "game::tribute",
+            "Tribute {} action: {}",
+            self.name,
+            action_description
+        );
     }
 }
 

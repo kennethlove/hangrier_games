@@ -354,6 +354,21 @@ pub fn update_stats(attacker: &mut Tribute, defender: &mut Tribute, result: Atta
             attacker.statistics.defeats += 1;
             defender.statistics.wins += 1;
         }
+        AttackResult::CriticalHit => {
+            // Critical hit is a special attacker win (triple damage)
+            defender.statistics.defeats += 1;
+            attacker.statistics.wins += 1;
+        }
+        AttackResult::PerfectBlock => {
+            // Perfect block is a special defender win (counter-attack)
+            attacker.statistics.defeats += 1;
+            defender.statistics.wins += 1;
+        }
+        AttackResult::CriticalFumble => {
+            // Critical fumble: attacker hurts themselves, counts as draw
+            attacker.statistics.draws += 1;
+            defender.statistics.draws += 1;
+        }
         AttackResult::Miss => {
             attacker.statistics.draws += 1;
             defender.statistics.draws += 1;

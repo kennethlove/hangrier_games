@@ -164,54 +164,6 @@ impl Tribute {
         format!("assets/{}", self.avatar.clone().unwrap())
     }
 
-    /// Applies the effects of a tribute event on a tribute.
-    // TODO: Use it or lose it
-    pub async fn handle_event(&mut self, tribute_event: TributeEvent) {
-        match tribute_event {
-            TributeEvent::AnimalAttack(ref animal) => {
-                self.status = TributeStatus::Mauled(animal.clone());
-            }
-            TributeEvent::Dysentery => {
-                self.status = TributeStatus::Sick;
-            }
-            TributeEvent::LightningStrike => {
-                self.status = TributeStatus::Electrocuted;
-            }
-            TributeEvent::Hypothermia => {
-                self.status = TributeStatus::Frozen;
-            }
-            TributeEvent::HeatStroke => {
-                self.status = TributeStatus::Overheated;
-            }
-            TributeEvent::Dehydration => {
-                self.status = TributeStatus::Dehydrated;
-            }
-            TributeEvent::Starvation => {
-                self.status = TributeStatus::Starving;
-            }
-            TributeEvent::Poisoning => {
-                self.status = TributeStatus::Poisoned;
-            }
-            TributeEvent::BrokenBone => {
-                self.status = TributeStatus::Broken;
-            }
-            TributeEvent::Infection => {
-                self.status = TributeStatus::Infected;
-            }
-            TributeEvent::Drowning => {
-                self.status = TributeStatus::Drowned;
-            }
-            TributeEvent::Burn => {
-                self.status = TributeStatus::Burned;
-            }
-        }
-        if self.attributes.health == 0 {
-            // Message logging removed - now handled at API level
-            self.statistics.killed_by = Some(self.status.to_string());
-            self.status = TributeStatus::RecentlyDead;
-        }
-    }
-
     /// Send a tribute through a game cycle.
     /// This is the main function that runs the tribute's actions.
     /// 1. Ignore dead tributes.
@@ -547,10 +499,6 @@ pub struct Attributes {
     pub bravery: u32,
     /// Are they a backstabber?
     pub loyalty: u32,
-    /// How far can they move each turn?
-    pub speed: u32,
-    /// How well do they avoid attacks?
-    pub dexterity: u32,
     /// How well do they avoid traps?
     pub intelligence: u32,
     /// Can they talk their way out of, or into, things?
@@ -572,8 +520,6 @@ impl Default for Attributes {
             defense: 50,
             bravery: 100,
             loyalty: 100,
-            speed: 100,
-            dexterity: 100,
             intelligence: 100,
             persuasion: 100,
             luck: 100,
@@ -596,8 +542,6 @@ impl Attributes {
             defense: rng.random_range(1..=config.max_defense),
             bravery: rng.random_range(1..=config.max_bravery),
             loyalty: rng.random_range(1..=config.max_loyalty),
-            speed: rng.random_range(1..=config.max_speed),
-            dexterity: rng.random_range(1..=config.max_dexterity),
             intelligence: rng.random_range(1..=config.max_intelligence),
             persuasion: rng.random_range(1..=config.max_persuasion),
             luck: rng.random_range(1..=config.max_luck),

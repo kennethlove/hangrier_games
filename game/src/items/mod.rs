@@ -46,6 +46,37 @@ impl ItemRarity {
             ItemRarity::Legendary => (8, 12),
         }
     }
+
+    /// Get durability range for weapons of this rarity tier.
+    pub fn weapon_durability_range(&self) -> (u32, u32) {
+        match self {
+            ItemRarity::Common => (2, 4),
+            ItemRarity::Uncommon => (3, 6),
+            ItemRarity::Rare => (5, 8),
+            ItemRarity::Legendary => (7, 12),
+        }
+    }
+
+    /// Get durability range for shields of this rarity tier.
+    pub fn shield_durability_range(&self) -> (u32, u32) {
+        match self {
+            ItemRarity::Common => (3, 5),
+            ItemRarity::Uncommon => (4, 7),
+            ItemRarity::Rare => (6, 10),
+            ItemRarity::Legendary => (9, 15),
+        }
+    }
+}
+
+/// Outcome of applying wear to an item.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum WearOutcome {
+    /// Item still has more than 50% durability remaining.
+    Pristine,
+    /// Item has crossed below 50% durability after this wear.
+    Worn,
+    /// Item durability has reached 0.
+    Broken,
 }
 
 impl Display for ItemRarity {
@@ -82,7 +113,8 @@ pub struct Item {
     pub name: String,
     pub item_type: ItemType,
     pub rarity: ItemRarity,
-    pub quantity: u32,
+    pub current_durability: u32,
+    pub max_durability: u32,
     pub attribute: Attribute,
     pub effect: i32,
 }
@@ -101,7 +133,8 @@ impl Default for Item {
             name: String::from("Useless health potion"),
             item_type: ItemType::Consumable,
             rarity: ItemRarity::Common,
-            quantity: 1,
+            current_durability: 1,
+            max_durability: 1,
             attribute: Attribute::Health,
             effect: 0,
         }
@@ -113,7 +146,7 @@ impl Item {
         name: &str,
         item_type: ItemType,
         rarity: ItemRarity,
-        quantity: u32,
+        max_durability: u32,
         attribute: Attribute,
         effect: i32,
     ) -> Item {
@@ -123,9 +156,31 @@ impl Item {
             name: name.to_string(),
             item_type,
             rarity,
-            quantity,
+            current_durability: max_durability,
+            max_durability,
             attribute,
             effect,
+        }
+    }
+
+    /// Apply wear to this item, reducing durability.
+    ///
+    /// Returns a [`WearOutcome`] describing the new state:
+    /// - `Broken` if durability reached 0
+    /// - `Worn` if this wear caused the item to cross below 50% durability
+    /// - `Pristine` otherwise
+    ///
+    /// Uses saturating subtraction so durability cannot underflow.
+    pub fn wear(&mut self, wear_amount: u32) -> WearOutcome {
+        let was_above_half = self.current_durability * 2 > self.max_durability;
+        self.current_durability = self.current_durability.saturating_sub(wear_amount);
+
+        if self.current_durability == 0 {
+            WearOutcome::Broken
+        } else if was_above_half && self.current_durability * 2 <= self.max_durability {
+            WearOutcome::Worn
+        } else {
+            WearOutcome::Pristine
         }
     }
 
@@ -201,12 +256,20 @@ impl Item {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
 
         let rarity = ItemRarity::random();
-        let quantity = 1;
         let attribute = Attribute::Strength;
         let (min, max) = rarity.effect_range();
         let effect = rng.random_range(min..=max);
+        let (dur_min, dur_max) = rarity.weapon_durability_range();
+        let durability = rng.random_range(dur_min..=dur_max);
 
-        Item::new(name, ItemType::Weapon, rarity, quantity, attribute, effect)
+        Item::new(
+            name,
+            ItemType::Weapon,
+            rarity,
+            durability,
+            attribute,
+            effect,
+        )
     }
 
     pub fn new_random_weapon() -> Item {
@@ -218,19 +281,11 @@ impl Item {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
 
         let rarity = ItemRarity::random();
-        let quantity = 1;
         let attribute = Attribute::random();
         let (min, max) = rarity.effect_range();
         let effect = rng.random_range(min..=max);
 
-        Item::new(
-            name,
-            ItemType::Consumable,
-            rarity,
-            quantity,
-            attribute,
-            effect,
-        )
+        Item::new(name, ItemType::Consumable, rarity, 1, attribute, effect)
     }
 
     pub fn new_random_consumable() -> Item {
@@ -238,18 +293,10 @@ impl Item {
         let rarity = ItemRarity::random();
         let attribute = Attribute::random();
         let name = attribute.consumable_name();
-        let quantity = 1;
         let (min, max) = rarity.effect_range();
         let effect = rng.random_range(min..=max);
 
-        Item::new(
-            &name,
-            ItemType::Consumable,
-            rarity,
-            quantity,
-            attribute,
-            effect,
-        )
+        Item::new(&name, ItemType::Consumable, rarity, 1, attribute, effect)
     }
 
     pub fn new_shield(name: &str) -> Item {
@@ -257,12 +304,13 @@ impl Item {
 
         let rarity = ItemRarity::random();
         let item_type = ItemType::Weapon;
-        let quantity = 1;
         let attribute = Attribute::Defense;
         let (min, max) = rarity.effect_range();
         let effect = rng.random_range(min..=max);
+        let (dur_min, dur_max) = rarity.shield_durability_range();
+        let durability = rng.random_range(dur_min..=dur_max);
 
-        Item::new(name, item_type, rarity, quantity, attribute, effect)
+        Item::new(name, item_type, rarity, durability, attribute, effect)
     }
 
     pub fn new_random_shield() -> Item {
@@ -427,7 +475,8 @@ mod tests {
         assert_eq!(item.name, "Test item");
         assert_eq!(item.item_type, ItemType::Weapon);
         assert_eq!(item.rarity, ItemRarity::Rare);
-        assert_eq!(item.quantity, 1);
+        assert_eq!(item.current_durability, 1);
+        assert_eq!(item.max_durability, 1);
         assert_eq!(item.attribute, Attribute::Defense);
         assert_eq!(item.effect, 10);
     }
@@ -436,14 +485,16 @@ mod tests {
     fn new_random_item() {
         let item = Item::new_random(Some("Test item"));
         assert_eq!(item.name, "Test item");
-        assert!((1..=3).contains(&item.quantity));
+        assert!(item.current_durability >= 1);
+        assert_eq!(item.current_durability, item.max_durability);
     }
 
     #[test]
     fn new_random_item_no_name() {
         let item = Item::new_random(None);
         assert!(!item.name.is_empty());
-        assert!((1..=3).contains(&item.quantity));
+        assert!(item.current_durability >= 1);
+        assert_eq!(item.current_durability, item.max_durability);
     }
 
     #[test]
@@ -658,5 +709,137 @@ mod tests {
                 max
             );
         }
+    }
+
+    #[rstest]
+    #[case(ItemRarity::Common, (2, 4))]
+    #[case(ItemRarity::Uncommon, (3, 6))]
+    #[case(ItemRarity::Rare, (5, 8))]
+    #[case(ItemRarity::Legendary, (7, 12))]
+    fn weapon_durability_ranges(#[case] rarity: ItemRarity, #[case] expected: (u32, u32)) {
+        assert_eq!(rarity.weapon_durability_range(), expected);
+    }
+
+    #[rstest]
+    #[case(ItemRarity::Common, (3, 5))]
+    #[case(ItemRarity::Uncommon, (4, 7))]
+    #[case(ItemRarity::Rare, (6, 10))]
+    #[case(ItemRarity::Legendary, (9, 15))]
+    fn shield_durability_ranges(#[case] rarity: ItemRarity, #[case] expected: (u32, u32)) {
+        assert_eq!(rarity.shield_durability_range(), expected);
+    }
+
+    #[test]
+    fn weapon_durability_within_rarity_range() {
+        for _ in 0..100 {
+            let weapon = Item::new_random_weapon();
+            let (min, max) = weapon.rarity.weapon_durability_range();
+            assert!(
+                weapon.max_durability >= min && weapon.max_durability <= max,
+                "Durability {} not in range {}..={}",
+                weapon.max_durability,
+                min,
+                max
+            );
+            assert_eq!(weapon.current_durability, weapon.max_durability);
+        }
+    }
+
+    #[test]
+    fn shield_durability_within_rarity_range() {
+        for _ in 0..100 {
+            let shield = Item::new_random_shield();
+            let (min, max) = shield.rarity.shield_durability_range();
+            assert!(
+                shield.max_durability >= min && shield.max_durability <= max,
+                "Durability {} not in range {}..={}",
+                shield.max_durability,
+                min,
+                max
+            );
+            assert_eq!(shield.current_durability, shield.max_durability);
+        }
+    }
+
+    #[test]
+    fn consumable_has_one_use() {
+        let consumable = Item::new_random_consumable();
+        assert_eq!(consumable.max_durability, 1);
+        assert_eq!(consumable.current_durability, 1);
+    }
+
+    #[test]
+    fn wear_pristine_when_above_half() {
+        let mut item = Item::new(
+            "Test",
+            ItemType::Weapon,
+            ItemRarity::Rare,
+            10,
+            Attribute::Strength,
+            5,
+        );
+        let outcome = item.wear(1);
+        assert_eq!(outcome, WearOutcome::Pristine);
+        assert_eq!(item.current_durability, 9);
+    }
+
+    #[test]
+    fn wear_worn_when_crossing_half() {
+        let mut item = Item::new(
+            "Test",
+            ItemType::Weapon,
+            ItemRarity::Rare,
+            10,
+            Attribute::Strength,
+            5,
+        );
+        // 10 -> 6 (still > 5, pristine)
+        assert_eq!(item.wear(4), WearOutcome::Pristine);
+        // 6 -> 5 (now <= half, worn)
+        assert_eq!(item.wear(1), WearOutcome::Worn);
+    }
+
+    #[test]
+    fn wear_worn_only_on_first_crossing() {
+        let mut item = Item::new(
+            "Test",
+            ItemType::Weapon,
+            ItemRarity::Rare,
+            10,
+            Attribute::Strength,
+            5,
+        );
+        assert_eq!(item.wear(5), WearOutcome::Worn); // 10 -> 5
+        assert_eq!(item.wear(1), WearOutcome::Pristine); // 5 -> 4, already worn
+    }
+
+    #[test]
+    fn wear_broken_at_zero() {
+        let mut item = Item::new(
+            "Test",
+            ItemType::Weapon,
+            ItemRarity::Common,
+            2,
+            Attribute::Strength,
+            5,
+        );
+        assert_eq!(item.wear(1), WearOutcome::Worn); // 2 -> 1
+        assert_eq!(item.wear(1), WearOutcome::Broken); // 1 -> 0
+        assert_eq!(item.current_durability, 0);
+    }
+
+    #[test]
+    fn wear_saturating_subtraction() {
+        let mut item = Item::new(
+            "Test",
+            ItemType::Weapon,
+            ItemRarity::Common,
+            3,
+            Attribute::Strength,
+            5,
+        );
+        let outcome = item.wear(100);
+        assert_eq!(outcome, WearOutcome::Broken);
+        assert_eq!(item.current_durability, 0);
     }
 }

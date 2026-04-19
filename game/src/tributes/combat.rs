@@ -256,15 +256,30 @@ pub fn attack_contest(
     attack_roll += attacker.attributes.strength as i32; // Add strength
 
     // If the attacker has a weapon, use it
-    if let Some(weapon) = attacker.weapons().iter_mut().last() {
+    let weapon_outcome = if let Some(weapon) = attacker.equipped_weapon_mut() {
         attack_roll += weapon.effect; // Add weapon damage
-        weapon.quantity = weapon.quantity.saturating_sub(1);
-        if weapon.quantity == 0 {
-            events.push(
-                GameOutput::WeaponBreak(attacker.name.as_str(), weapon.name.as_str()).to_string(),
-            );
-            if let Err(err) = attacker.remove_item(weapon) {
-                eprintln!("Failed to remove weapon: {}", err);
+        let outcome = weapon.wear(1);
+        Some((weapon.clone(), outcome))
+    } else {
+        None
+    };
+    if let Some((weapon, outcome)) = weapon_outcome {
+        match outcome {
+            crate::items::WearOutcome::Pristine => {}
+            crate::items::WearOutcome::Worn => {
+                events.push(
+                    GameOutput::WeaponWear(attacker.name.as_str(), weapon.name.as_str())
+                        .to_string(),
+                );
+            }
+            crate::items::WearOutcome::Broken => {
+                events.push(
+                    GameOutput::WeaponBreak(attacker.name.as_str(), weapon.name.as_str())
+                        .to_string(),
+                );
+                if let Err(err) = attacker.remove_item(&weapon) {
+                    eprintln!("Failed to remove weapon: {}", err);
+                }
             }
         }
     }
@@ -275,16 +290,29 @@ pub fn attack_contest(
     defense_roll += target.attributes.defense as i32; // Add defense
 
     // If the defender has a shield, use it
-    if let Some(shield) = target.shields().iter_mut().last() {
+    let shield_outcome = if let Some(shield) = target.equipped_shield_mut() {
         defense_roll += shield.effect; // Add shield defense
-        shield.quantity = shield.quantity.saturating_sub(1);
-        if shield.quantity == 0 {
-            events.push(
-                GameOutput::ShieldBreak(target.name.as_str(), shield.name.as_str()).to_string(),
-            );
-            if let Err(err) = target.remove_item(shield) {
-                eprintln!("Failed to remove shield: {}", err);
-            };
+        let outcome = shield.wear(1);
+        Some((shield.clone(), outcome))
+    } else {
+        None
+    };
+    if let Some((shield, outcome)) = shield_outcome {
+        match outcome {
+            crate::items::WearOutcome::Pristine => {}
+            crate::items::WearOutcome::Worn => {
+                events.push(
+                    GameOutput::ShieldWear(target.name.as_str(), shield.name.as_str()).to_string(),
+                );
+            }
+            crate::items::WearOutcome::Broken => {
+                events.push(
+                    GameOutput::ShieldBreak(target.name.as_str(), shield.name.as_str()).to_string(),
+                );
+                if let Err(err) = target.remove_item(&shield) {
+                    eprintln!("Failed to remove shield: {}", err);
+                }
+            }
         }
     }
 
@@ -644,5 +672,43 @@ mod tests {
         attacker.takes_physical_damage(5);
 
         assert_eq!(attacker.attributes.health, initial_health - 5);
+    }
+
+    /// Regression test for the clone-mutation bug where weapon wear was
+    /// applied to a cloned item from `weapons()` and silently lost.
+    /// A weapon with durability 5 must survive 3 attack contests with
+    /// reduced durability and remain in the attacker's inventory.
+    #[rstest]
+    fn weapon_survives_multiple_combats(mut small_rng: SmallRng) {
+        use crate::items::{Attribute, Item, ItemRarity, ItemType};
+
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut target = Tribute::new("Peeta".to_string(), None, None);
+
+        let weapon = Item::new(
+            "Test Bow",
+            ItemType::Weapon,
+            ItemRarity::Rare,
+            5,
+            Attribute::Strength,
+            3,
+        );
+        let weapon_id = weapon.identifier.clone();
+        attacker.items.push(weapon);
+
+        for _ in 0..3 {
+            attack_contest(&mut attacker, &mut target, &mut small_rng, &mut Vec::new());
+        }
+
+        let stored = attacker
+            .items
+            .iter()
+            .find(|i| i.identifier == weapon_id)
+            .expect("weapon should still be in inventory after 3 combats");
+        assert_eq!(stored.max_durability, 5);
+        assert_eq!(
+            stored.current_durability, 2,
+            "weapon should have been worn 3 times (5 - 3 = 2)"
+        );
     }
 }

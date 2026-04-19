@@ -67,7 +67,9 @@ pub enum GameOutput<'a> {
     TributeAlreadyDead(&'a str),
     TributeDead(&'a str),
     WeaponBreak(&'a str, &'a str),
+    WeaponWear(&'a str, &'a str),
     ShieldBreak(&'a str, &'a str),
+    ShieldWear(&'a str, &'a str),
     SponsorGift(&'a str, &'a Item),
     AreaEvent(&'a str, &'a str),
     AreaClose(&'a str),
@@ -320,15 +322,26 @@ impl<'a> Display for GameOutput<'a> {
             GameOutput::WeaponBreak(tribute, weapon) => {
                 write!(f, "🗡️ {} breaks their {}", tribute, weapon)
             }
+            GameOutput::WeaponWear(tribute, weapon) => {
+                write!(f, "🗡️ {}'s {} is showing signs of wear", tribute, weapon)
+            }
             GameOutput::ShieldBreak(tribute, shield) => {
                 write!(f, "🛡️ {} breaks their {}", tribute, shield)
+            }
+            GameOutput::ShieldWear(tribute, shield) => {
+                write!(f, "🛡️ {}'s {} is showing signs of wear", tribute, shield)
             }
             GameOutput::SponsorGift(tribute, item) => {
                 let object = indefinite(&item.name);
                 write!(
                     f,
-                    "🎁 {} receives {} ({}x {} +{})",
-                    tribute, object, item.quantity, item.attribute, item.effect
+                    "🎁 {} receives {} (durability {}/{} {} +{})",
+                    tribute,
+                    object,
+                    item.current_durability,
+                    item.max_durability,
+                    item.attribute,
+                    item.effect
                 )
             }
             GameOutput::AreaEvent(area_event, area) => {

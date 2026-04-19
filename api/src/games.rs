@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use game::areas::{Area, AreaDetails};
 use game::games::Game;
 use game::items::Item;
-use game::messages::{GameMessage, MessageSource, get_all_messages};
+use game::messages::{GameMessage, MessageSource};
 use game::terrain::BaseTerrain;
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
@@ -68,9 +68,6 @@ static GAME_CACHE: LazyLock<RwLock<HashMap<String, CacheEntry>>> =
 
 /// Cache TTL duration (5 minutes)
 const CACHE_TTL_SECS: u64 = 300;
-
-/// Maximum number of messages to retain per game to prevent OOM
-const MAX_MESSAGES: usize = 10000;
 
 pub static GAMES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
     Router::new()
@@ -209,6 +206,7 @@ pub async fn create_game(
         tributes: vec![],
         areas: vec![],
         private: true, // Default to private
+        config: Default::default(),
     };
 
     let created_game: Option<Game> = state
@@ -781,107 +779,16 @@ async fn save_game(
         AppError::InternalServerError(format!("Failed to start transaction: {}", e))
     })?;
 
-    if let Ok(logs) = get_all_messages() {
-        let game_day = game.day.unwrap_or_default();
-
-        // Broadcast messages to WebSocket clients
-        for log in &logs {
-            let source_str = match &log.source {
-                MessageSource::Game(id) => format!("game:{}", id),
-                MessageSource::Area(area) => format!("area:{}", area),
-                MessageSource::Tribute(trib) => format!("tribute:{}", trib),
-            };
-
-            crate::websocket::broadcast_game_message(
-                broadcaster,
-                &game.identifier,
-                &source_str,
-                &log.content,
-                game_day,
-            );
-        }
-
-        let game_logs: Vec<GameLog> = logs
-            .iter()
-            .map(|log| {
-                let log = log.clone();
-                let game_log = GameLog {
-                    id: RecordId::from(("message", &log.identifier)),
-                    identifier: log.identifier,
-                    source: log.source,
-                    game_day,
-                    subject: log.subject,
-                    timestamp: log.timestamp,
-                    content: log.content,
-                };
-                game_log
-            })
-            .collect();
-
-        // Check current message count for this game
-        let current_count: u32 = db
-            .query(
-                "RETURN count(SELECT id FROM message WHERE string::starts_with(subject, $game_id))",
-            )
-            .bind(("game_id", game.identifier.clone()))
-            .await
-            .ok()
-            .and_then(|mut r| r.take(0).ok().flatten())
-            .unwrap_or(0);
-
-        let new_messages_count = game_logs.len();
-        let total_after_insert = current_count as usize + new_messages_count;
-
-        // Log warning if approaching limit
-        if current_count >= 9000 && current_count < MAX_MESSAGES as u32 {
-            tracing::warn!(
-                game_id = %game.identifier,
-                current_count = %current_count,
-                "Game message count approaching limit (9000+)"
-            );
-        }
-
-        // Rotate messages if total would exceed MAX_MESSAGES
-        if total_after_insert > MAX_MESSAGES {
-            let messages_to_delete = total_after_insert - MAX_MESSAGES;
-            tracing::info!(
-                game_id = %game.identifier,
-                current_count = %current_count,
-                new_count = %new_messages_count,
-                deleting = %messages_to_delete,
-                "Rotating old messages to maintain {} message limit", MAX_MESSAGES
-            );
-
-            // Delete oldest messages for this game
-            if let Err(e) = db
-                .query(
-                    r#"
-                    DELETE message
-                    WHERE string::starts_with(subject, $game_id)
-                    ORDER BY timestamp ASC
-                    LIMIT $delete_count
-                    "#,
-                )
-                .bind(("game_id", game.identifier.clone()))
-                .bind(("delete_count", messages_to_delete))
-                .await
-            {
-                tracing::error!(
-                    game_id = %game.identifier,
-                    error = %e,
-                    "Failed to rotate old messages"
-                );
-                // Continue anyway - this is not critical enough to fail the save
-            }
-        }
-
-        if let Err(e) = db.insert::<Vec<GameMessage>>(()).content(game_logs).await {
-            let _ = db.query("ROLLBACK").await;
-            return Err(AppError::InternalServerError(format!(
-                "Failed to save game logs: {}",
-                e
-            )));
-        }
+    // TODO(hangrier_games-jyt): Restore message persistence + WebSocket broadcast.
+    // The GLOBAL_MESSAGES queue / get_all_messages() were removed from game crate
+    // during the event-system refactor (hangrier_games-33r). Until a replacement
+    // event collection mechanism is in place, no per-turn messages are persisted
+    // and no real-time broadcasts are sent. Existing historical logs in the
+    // database remain queryable; only newly generated events are dropped.
+    let _ = broadcaster; // suppress unused-variable warning until restored
+    let _ = MAX_MESSAGES; // suppress dead_code warning until restored
+    {
+        // Intentional empty block: no-op message persistence stub.
     }
 
     let area_results = futures::future::join_all(game.areas.iter().map(|area| async {

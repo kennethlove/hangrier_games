@@ -8,7 +8,7 @@ chrono = "0.4.41"
 dioxus = { version = "0.6.3", features = ["web", "router"] }
 dioxus-logger = "0.6.2"
 dioxus-query = "0.7.0"
-futures-util = "0.3"
+futures-util = { version = "0.3", features = ["sink"] }
 game = { path = "../game" }
 gloo-net = "0.6"
 gloo-storage = "0.3.0"

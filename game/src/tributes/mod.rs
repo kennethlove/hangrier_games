@@ -166,27 +166,22 @@ impl Tribute {
         environment_details: &mut EnvironmentContext<'_>,
         encounter_context: EncounterContext,
         rng: &mut impl Rng,
+        events: &mut Vec<String>,
     ) {
         // Tribute is already dead, do nothing.
         if !self.is_alive() {
-            self.try_log_action(
-                GameOutput::TributeAlreadyDead(self.name.as_str()),
-                "already dead",
-            );
+            events.push(GameOutput::TributeAlreadyDead(self.name.as_str()).to_string());
             return;
         }
 
         let area_details = &mut environment_details.area_details;
 
         // Update the tribute based on the period's events.
-        self.process_status(area_details, rng);
+        self.process_status(area_details, rng, events);
 
         // Tribute died to the period's events.
         if self.status == TributeStatus::RecentlyDead || self.attributes.health == 0 {
-            self.try_log_action(
-                GameOutput::TributeDead(self.name.as_str()),
-                "died to events",
-            );
+            events.push(GameOutput::TributeDead(self.name.as_str()).to_string());
             return;
         }
 
@@ -299,7 +294,7 @@ impl Tribute {
                     encounter_context.total_living_tributes,
                 );
                 if let Some(mut target) = target {
-                    let outcome = self.attacks(&mut target, rng);
+                    let outcome = self.attacks(&mut target, rng, events);
                     match outcome {
                         AttackOutcome::Kill(_, mut target) => {
                             self.statistics.kills += 1;

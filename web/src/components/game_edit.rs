@@ -41,11 +41,11 @@ pub fn GameEdit(identifier: String, name: String, icon_class: String, private: b
 
     let onclick = move |_| {
         let name = name.clone();
-        let private = private.clone();
+        let private = private;
         edit_game_signal.set(Some(EditGame {
             identifier: identifier.clone(),
             name: name.clone(),
-            private: private.clone(),
+            private,
         }));
     };
 
@@ -109,15 +109,12 @@ pub fn EditGameForm() -> Element {
 
         let data = e.data().values();
         let name = data.get("name").expect("No name value").0[0].clone();
-        let private = {
-            match data.get("private").expect("No private value").0[0]
+        let private = matches!(
+            data.get("private").expect("No private value").0[0]
                 .clone()
-                .as_str()
-            {
-                "on" => true,
-                _ => false,
-            }
-        };
+                .as_str(),
+            "on"
+        );
 
         if !name.is_empty() {
             let edit_game = EditGame {

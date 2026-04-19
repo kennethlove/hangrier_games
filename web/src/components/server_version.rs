@@ -7,7 +7,7 @@ async fn fetch_server_version(keys: Vec<QueryKey>) -> QueryResult<QueryValue, Qu
     if let Some(QueryKey::ServerVersion) = keys.first() {
         let client = reqwest::Client::new();
 
-        let request = client.request(reqwest::Method::GET, format!("{}", APP_API_HOST));
+        let request = client.request(reqwest::Method::GET, APP_API_HOST.to_string());
 
         match request.send().await {
             Ok(response) => match response.json::<String>().await {

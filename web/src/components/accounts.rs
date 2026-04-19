@@ -175,13 +175,12 @@ fn LoginForm() -> Element {
                                         let navigator = use_navigator();
                                         navigator.replace(Routes::GamesList {});
                                 }
-                            } else if let MutationState::Settled(Err(err)) = mutate.result().deref() {
-                                if let MutationError::UnableToAuthenticateUser = err {
+                            } else if let MutationState::Settled(Err(err)) = mutate.result().deref()
+                                && let MutationError::UnableToAuthenticateUser = err {
                                         username_error_signal.set("Unable to authenticate user".to_string());
                                         disabled_signal.set(false);
 
                                 }
-                            }
                         });
                     }
                 },
@@ -298,24 +297,22 @@ fn RegisterForm() -> Element {
                             };
                             mutate.mutate_async(user).await;
                             match mutate.result().deref() {
-                                MutationState::Settled(Ok(result)) => {
-                                    if let MutationValue::User(user) = result {
-                                        client.invalidate_queries(&[QueryKey::User]);
-                                        disabled_signal.set(false);
-                                        username_signal.set(String::default());
-                                        password_signal.set(String::default());
-                                        password2_signal.set(String::default());
-                                        password_error_signal.set(String::default());
-                                        username_error_signal.set(String::default());
+                                MutationState::Settled(Ok(MutationValue::User(user))) => {
+                                    client.invalidate_queries(&[QueryKey::User]);
+                                    disabled_signal.set(false);
+                                    username_signal.set(String::default());
+                                    password_signal.set(String::default());
+                                    password2_signal.set(String::default());
+                                    password_error_signal.set(String::default());
+                                    username_error_signal.set(String::default());
 
-                                        let mut state = storage.get();
-                                        state.jwt = Some(user.jwt.clone());
-                                        state.username = Some(username.clone());
-                                        storage.set(state);
+                                    let mut state = storage.get();
+                                    state.jwt = Some(user.jwt.clone());
+                                    state.username = Some(username.clone());
+                                    storage.set(state);
 
-                                        let navigator = use_navigator();
-                                        navigator.replace(Routes::GamesList {});
-                                    }
+                                    let navigator = use_navigator();
+                                    navigator.replace(Routes::GamesList {});
                                 },
                                 MutationState::Settled(Err(err)) => {
                                     if let MutationError::UnableToRegisterUser = err {
@@ -376,7 +373,7 @@ fn RegisterForm() -> Element {
                 }
                 div {
                     ThemedButton {
-                        disabled: Some(disabled_signal.read().clone()),
+                        disabled: Some(*disabled_signal.read()),
                         r#type: "submit",
                         "Register"
                     }

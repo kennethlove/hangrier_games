@@ -12,7 +12,7 @@ pub struct InputProperties {
 
 #[component]
 pub fn Input(props: InputProperties) -> Element {
-    let classes = props.class.clone().unwrap_or(String::new());
+    let classes = props.class.clone().unwrap_or_default();
 
     rsx! {
         input {

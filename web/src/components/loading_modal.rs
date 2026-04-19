@@ -7,10 +7,7 @@ use dioxus::prelude::*;
 pub fn LoadingModal() -> Element {
     let loading_signal = use_context::<Signal<LoadingState>>();
 
-    let open = match *loading_signal.read() {
-        LoadingState::Loading => true,
-        _ => false,
-    };
+    let open = matches!(*loading_signal.read(), LoadingState::Loading);
 
     let props = ModalProps {
         title: "Loading...".to_string(),

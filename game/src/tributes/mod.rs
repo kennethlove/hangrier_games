@@ -12,11 +12,10 @@ pub use combat::{attack_contest, update_stats};
 pub use movement::TravelResult;
 
 use crate::areas::{Area, AreaDetails};
-use crate::items::{Attribute, Item, ItemError, OwnsItems};
-use crate::messages::add_tribute_message;
+use crate::items::{Item, OwnsItems};
 use crate::output::GameOutput;
 use crate::tributes::events::TributeEvent;
-use actions::{Action, AttackOutcome, AttackResult};
+use actions::{Action, AttackOutcome};
 use brains::Brain;
 use fake::Fake;
 use fake::faker::name::raw::*;
@@ -207,19 +206,7 @@ impl Tribute {
             }
         }
         if self.attributes.health == 0 {
-            add_tribute_message(
-                self.identifier.as_str(),
-                self.statistics.game.as_str(),
-                format!(
-                    "{}",
-                    GameOutput::TributeDiesFromTributeEvent(
-                        self.name.as_str(),
-                        &*tribute_event.to_string()
-                    )
-                ),
-            )
-            .expect("");
-
+            // Message logging removed - now handled at API level
             self.statistics.killed_by = Some(self.status.to_string());
             self.status = TributeStatus::RecentlyDead;
         }

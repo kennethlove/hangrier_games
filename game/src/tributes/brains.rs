@@ -40,7 +40,7 @@ pub struct PersonalityThresholds {
 
 impl BrainPersonality {
     pub fn random(rng: &mut impl Rng) -> Self {
-        match rng.gen_range(0..5) {
+        match rng.random_range(0..5) {
             0 => BrainPersonality::Aggressive,
             1 => BrainPersonality::Defensive,
             2 => BrainPersonality::Balanced,
@@ -52,7 +52,7 @@ impl BrainPersonality {
     /// Generate thresholds with ±20% variance for individual differences
     pub fn generate_thresholds(&self, rng: &mut impl Rng) -> PersonalityThresholds {
         fn apply_variance(base: u32, rng: &mut impl Rng) -> u32 {
-            let variance = rng.gen_range(-0.2..=0.2);
+            let variance = rng.random_range(-0.2..=0.2);
             ((base as f32) * (1.0 + variance)).max(1.0) as u32
         }
 
@@ -245,7 +245,7 @@ impl Brain {
         // Check if sanity dropped below threshold
         if current_sanity <= self.thresholds.psychotic_break_threshold {
             // Randomly select break type (equal probability)
-            let break_type = match rng.gen_range(0..4) {
+            let break_type = match rng.random_range(0..4) {
                 0 => PsychoticBreakType::Berserk,
                 1 => PsychoticBreakType::Paranoid,
                 2 => PsychoticBreakType::Catatonic,

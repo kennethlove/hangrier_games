@@ -55,6 +55,7 @@ pub(crate) enum QueryValue {
 }
 
 #[allow(dead_code)]
+#[allow(clippy::large_enum_variant)]
 #[derive(PartialEq, Debug)]
 pub(crate) enum MutationValue {
     NewGame(Game),

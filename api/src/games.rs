@@ -124,7 +124,7 @@ async fn create_game_area_edge(
     let game_id = RecordId::from(("game", &game_identifier_str));
 
     // Does the `area` exist for the game?
-    let existing_area: Option<Area> = db
+    let mut resp = db
         .query(
             r#"
         SELECT identifier
@@ -135,7 +135,9 @@ async fn create_game_area_edge(
         .bind(("name", area))
         .bind(("game_id", game_identifier_str.clone()))
         .await
-        .and_then(|mut resp| resp.take(0))
+        .map_err(|e| AppError::InternalServerError(format!("Failed to find area: {}", e)))?;
+    let existing_area: Option<Area> = resp
+        .take(0)
         .map_err(|e| AppError::InternalServerError(format!("Failed to find area: {}", e)))?;
 
     let area_uuid = if let Some(identifier) = existing_area {

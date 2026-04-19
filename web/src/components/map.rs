@@ -9,11 +9,7 @@ pub fn Map(areas: Vec<AreaDetails>) -> Element {
         .into_iter()
         .map(|area| {
             (
-                area.clone()
-                    .area
-                    .unwrap()
-                    .to_string()
-                    .to_lowercase(),
+                area.clone().area.unwrap().to_string().to_lowercase(),
                 area.is_open(),
             )
         })

@@ -149,18 +149,9 @@ impl WPGen {
         let words_intensifiers = self
             .words_intensifiers
             .iter()
-            .map(|x| x)
             .collect::<Vec<&&'static str>>();
-        let words_adjectives = self
-            .words_adjectives
-            .iter()
-            .map(|x| x)
-            .collect::<Vec<&&'static str>>();
-        let words_nouns = self
-            .words_nouns
-            .iter()
-            .map(|x| x)
-            .collect::<Vec<&&'static str>>();
+        let words_adjectives = self.words_adjectives.iter().collect::<Vec<&&'static str>>();
+        let words_nouns = self.words_nouns.iter().collect::<Vec<&&'static str>>();
 
         // dictionary that we can recurse over
         let mut dict = [
@@ -177,7 +168,7 @@ impl WPGen {
             }
             list.retain(|s| s.len() <= word_len_max); // filter out words that are already longer than len_max; TODO: too restrictive sometimes
             list.shuffle(&mut *self.rng.borrow_mut()); // shuffle all the available words
-            list.sort_by(|a, b: &&&str| a.len().cmp(&b.len())); // sort by length (stable sort, so still shuffled) for easier length matching
+            list.sort_by_key(|a| a.len()); // sort by length (stable sort, so still shuffled) for easier length matching
         }
 
         let mut ret = vec![vec![""; words]; count];

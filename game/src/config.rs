@@ -135,7 +135,7 @@ mod tests {
         let config = GameConfig::default();
         assert_eq!(config.day_event_frequency, 0.25);
         assert_eq!(config.night_event_frequency, 0.125);
-        assert_eq!(config.instant_death_enabled, true);
+        assert!(config.instant_death_enabled);
         assert_eq!(config.catastrophic_severity_multiplier, 1.0);
     }
 
@@ -145,7 +145,7 @@ mod tests {
         config.instant_death_enabled = false;
         config.catastrophic_severity_multiplier = 0.5;
 
-        assert_eq!(config.instant_death_enabled, false);
+        assert!(!config.instant_death_enabled);
         assert_eq!(config.catastrophic_severity_multiplier, 0.5);
     }
 

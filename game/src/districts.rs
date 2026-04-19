@@ -170,7 +170,7 @@ mod tests {
 
         for district in 1..=12 {
             let affinities = assign_terrain_affinity(district, &mut rng);
-            assert!(affinities.len() >= 1 && affinities.len() <= 2);
+            assert!(!affinities.is_empty() && affinities.len() <= 2);
         }
     }
 
@@ -191,7 +191,7 @@ mod tests {
         // With 1000 iterations, expect roughly 350-450 bonuses (40% ± 5%)
         let percentage = (bonus_count as f64 / iterations as f64) * 100.0;
         assert!(
-            percentage >= 35.0 && percentage <= 45.0,
+            (35.0..=45.0).contains(&percentage),
             "Expected ~40% bonus rate, got {:.1}%",
             percentage
         );

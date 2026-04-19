@@ -23,7 +23,7 @@ fn test_game_loop_generates_terrain_appropriate_events() {
     for (area, terrain, name) in terrains {
         let area_details = AreaDetails::new_with_terrain(
             Some(name.to_string()),
-            area.clone(),
+            area,
             TerrainType::new(terrain, vec![]).unwrap(),
         );
         game.areas.push(area_details);

@@ -2,7 +2,6 @@ use crate::areas::events::AreaEvent;
 use crate::areas::{Area, AreaDetails};
 use crate::items::Item;
 use crate::items::OwnsItems;
-use crate::output::GameOutput;
 use crate::tributes::actions::Action;
 use crate::tributes::events::TributeEvent;
 use crate::tributes::statuses::TributeStatus;
@@ -306,10 +305,7 @@ impl Game {
                 .position(|a| a.area.as_ref() == Some(area));
 
             match area_idx {
-                Some(idx) => (
-                    self.areas[idx].terrain.base.clone(),
-                    self.areas[idx].events.clone(),
-                ),
+                Some(idx) => (self.areas[idx].terrain.base, self.areas[idx].events.clone()),
                 None => return Ok(()), // Area not found
             }
         };
@@ -319,7 +315,7 @@ impl Game {
             .tributes
             .iter()
             .enumerate()
-            .filter(|(_, t)| t.is_alive() && &t.area == area)
+            .filter(|(_, t)| t.is_alive() && t.area == area)
             .map(|(idx, _)| idx)
             .collect();
 
@@ -372,7 +368,7 @@ impl Game {
             if !result.survived {
                 tribute.attributes.health = 0;
 
-                let message = if result.instant_death {
+                let _message = if result.instant_death {
                     format!(
                         "{} is instantly killed by the catastrophic {}!",
                         tribute.name, most_severe_event
@@ -384,7 +380,7 @@ impl Game {
                 // Survivor - apply rewards if any
                 if result.stamina_restored > 0 {
                     tribute.stamina = tribute.stamina.saturating_add(result.stamina_restored);
-                    let message = format!(
+                    let _message = format!(
                         "{} survives the {}, recovering {} stamina",
                         tribute.name, most_severe_event, result.stamina_restored
                     );
@@ -395,7 +391,7 @@ impl Game {
                         .attributes
                         .sanity
                         .saturating_add(result.sanity_restored);
-                    let message = format!(
+                    let _message = format!(
                         "{} survives the {}, recovering {} sanity",
                         tribute.name, most_severe_event, result.sanity_restored
                     );
@@ -405,7 +401,7 @@ impl Game {
                     let item = Item::new_random_consumable();
                     let item_name = item.name.clone();
                     tribute.items.push(item);
-                    let message = format!(
+                    let _message = format!(
                         "{} survives the {} and finds a {}",
                         tribute.name, most_severe_event, item_name
                     );
@@ -441,10 +437,10 @@ impl Game {
     /// Announce events in closed areas.
     fn announce_area_events(&self) -> Result<(), GameError> {
         for area_details in &self.areas {
-            let area_name = area_details.area.clone().unwrap().to_string();
+            let _area_name = area_details.area.unwrap().to_string();
             if !area_details.is_open() {
                 for event in &area_details.events {
-                    let event_name = event.to_string();
+                    let _event_name = event.to_string();
                 }
             }
         }
@@ -453,10 +449,10 @@ impl Game {
 
     /// Ensures at least one area is open. If not, opens a random area by clearing its events.
     fn ensure_open_area(&mut self) {
-        if self.random_open_area().is_none() {
-            if let Some(area) = self.random_area() {
-                area.events.clear();
-            }
+        if self.random_open_area().is_none()
+            && let Some(area) = self.random_area()
+        {
+            area.events.clear();
         }
     }
 
@@ -478,14 +474,14 @@ impl Game {
                 if rng.random_bool(frequency) {
                     // Generate terrain-appropriate event
                     let area_event = AreaEvent::random_for_terrain(&area_details.terrain.base, rng);
-                    let area = area_details.area.clone().unwrap();
+                    let area = area_details.area.unwrap();
 
                     // Add event to area
                     area_details.events.push(area_event.clone());
 
                     // Announce event
-                    let event_name = area_event.to_string();
-                    let area_name = area.to_string();
+                    let _event_name = area_event.to_string();
+                    let _area_name = area.to_string();
 
                     // Collect for processing
                     events_to_process.push((area, area_event));
@@ -499,21 +495,21 @@ impl Game {
         }
 
         // Day 3 is Feast Day, refill the Cornucopia with a random assortment of items
-        if day && self.day == Some(3) {
-            if let Some(area_details) = self
+        if day
+            && self.day == Some(3)
+            && let Some(area_details) = self
                 .areas
                 .iter_mut()
                 .find(|ad| ad.area == Some(Area::Cornucopia))
-            {
-                for _ in 0..rng.random_range(1..=FEAST_WEAPON_COUNT) {
-                    area_details.add_item(Item::new_random_weapon());
-                }
-                for _ in 0..rng.random_range(1..=FEAST_SHIELD_COUNT) {
-                    area_details.add_item(Item::new_random_shield());
-                }
-                for _ in 0..rng.random_range(1..=FEAST_CONSUMABLE_COUNT) {
-                    area_details.add_item(Item::new_random_consumable());
-                }
+        {
+            for _ in 0..rng.random_range(1..=FEAST_WEAPON_COUNT) {
+                area_details.add_item(Item::new_random_weapon());
+            }
+            for _ in 0..rng.random_range(1..=FEAST_SHIELD_COUNT) {
+                area_details.add_item(Item::new_random_shield());
+            }
+            for _ in 0..rng.random_range(1..=FEAST_CONSUMABLE_COUNT) {
+                area_details.add_item(Item::new_random_consumable());
             }
         }
         Ok(())
@@ -530,7 +526,7 @@ impl Game {
             // If there is an open area, close it.
             if let Some(area_details) = self.random_open_area() {
                 let event = AreaEvent::random(rng);
-                let area_name = area_details.area.clone().unwrap().to_string();
+                let area_name = area_details.area.unwrap().to_string();
                 area_events.insert(area_name, (area_details.clone(), vec![event.clone()]));
             }
 
@@ -538,7 +534,7 @@ impl Game {
                 // Assuming there's still an open area.
                 if let Some(area_details) = self.random_open_area() {
                     let event = AreaEvent::random(rng);
-                    let area_name = area_details.area.clone().unwrap().to_string();
+                    let area_name = area_details.area.unwrap().to_string();
                     if area_events.get(&area_name.clone()).is_some() {
                         let mut events = area_events[&area_name].1.clone();
                         events.push(event.clone());
@@ -553,13 +549,13 @@ impl Game {
             for (area_name, (mut area_details, events)) in area_events.drain() {
                 for event in events {
                     area_details.events.push(event.clone());
-                    let event_name = event.to_string();
+                    let _event_name = event.to_string();
                     // let area_name = area_details.area.clone().unwrap().to_string();
                 }
 
                 // Update the corresponding area with the new events
                 for area in self.areas.iter_mut() {
-                    let key = area.area.clone().unwrap().to_string();
+                    let key = area.area.unwrap().to_string();
                     if key == area_name {
                         area.events = area_details.events;
                         break;
@@ -596,7 +592,7 @@ impl Game {
         let mut area_details_map = HashMap::with_capacity(self.areas.len());
         for (i, area_detail) in self.areas.iter_mut().enumerate() {
             if let Some(area) = &area_detail.area {
-                area_details_map.insert(area.clone(), i);
+                area_details_map.insert(*area, i);
             }
         }
 
@@ -604,8 +600,8 @@ impl Game {
         let mut tributes_by_area: HashMap<Area, Vec<&Tribute>> = HashMap::new();
         for tribute in &living_tributes {
             tributes_by_area
-                .entry(tribute.area.clone())
-                .or_insert_with(Vec::new)
+                .entry(tribute.area)
+                .or_default()
                 .push(tribute);
         }
 
@@ -634,12 +630,12 @@ impl Game {
                     // Find the AreaDetails for this neighbor
                     self.areas
                         .iter()
-                        .find(|ad| ad.area == Some(neighbor_area.clone()))
+                        .find(|ad| ad.area == Some(neighbor_area))
                         .map(|ad| {
                             // Calculate stamina cost to move to this area
-                            let move_action = Action::Move(Some(neighbor_area.clone()));
+                            let move_action = Action::Move(Some(neighbor_area));
                             let stamina_cost =
-                                calculate_stamina_cost(&move_action, &ad.terrain, &tribute);
+                                calculate_stamina_cost(&move_action, &ad.terrain, tribute);
 
                             crate::areas::DestinationInfo {
                                 area: neighbor_area,
@@ -719,8 +715,7 @@ impl Game {
         let closed_areas: Vec<Area> = self
             .closed_areas()
             .iter()
-            .filter(|ad| ad.area.is_some())
-            .map(|ad| ad.area.clone().unwrap())
+            .filter_map(|ad| ad.area)
             .clone()
             .collect();
         let living_tributes = self.living_tributes();
@@ -750,7 +745,7 @@ impl Game {
 
             if self.tributes[i].status == TributeStatus::RecentlyDead {
                 self.tributes[i].statistics.day_killed = self.day;
-                let tribute_area = self.tributes[i].area.clone();
+                let tribute_area = self.tributes[i].area;
 
                 if let Some(area) = self.get_area_details_mut(tribute_area) {
                     for item in tribute_items {
@@ -765,9 +760,7 @@ impl Game {
 
     /// Get a mutable reference to the area details for a given area.
     fn get_area_details_mut(&mut self, area: Area) -> Option<&mut AreaDetails> {
-        self.areas
-            .iter_mut()
-            .find(|ad| ad.area == Some(area.clone()))
+        self.areas.iter_mut().find(|ad| ad.area == Some(area))
     }
 }
 
@@ -1060,8 +1053,8 @@ mod tests {
         let closed_areas = game
             .areas
             .iter()
-            .filter(|ad| ad.area.is_some() & &!ad.is_open())
-            .map(|ad| ad.area.clone().unwrap())
+            .filter(|ad| ad.area.is_some() & !ad.is_open())
+            .map(|ad| ad.area.unwrap())
             .collect::<Vec<Area>>();
 
         // Run the tribute cycle

@@ -68,7 +68,7 @@ fn test_affinity_count() {
 
         let affinity_count = tribute.terrain_affinity.len();
         assert!(
-            affinity_count >= 1 && affinity_count <= 2,
+            (1..=2).contains(&affinity_count),
             "District {} should have 1-2 terrain affinities, got {}",
             district,
             affinity_count
@@ -96,7 +96,7 @@ fn test_bonus_affinity_probability() {
 
     // With 100 iterations, expect roughly 30-50 bonuses (40% ± 10%)
     assert!(
-        bonus_count >= 30 && bonus_count <= 50,
+        (30..=50).contains(&bonus_count),
         "Expected ~40 bonuses in 100 iterations, got {}",
         bonus_count
     );

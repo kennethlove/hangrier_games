@@ -394,7 +394,7 @@ mod tests {
     fn random_area_event() {
         let mut rng = rand::thread_rng();
         let random_event = AreaEvent::random(&mut rng);
-        assert!(AreaEvent::iter().position(|a| a == random_event).is_some());
+        assert!(AreaEvent::iter().any(|a| a == random_event));
     }
 
     #[rstest]

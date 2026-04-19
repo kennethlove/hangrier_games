@@ -6,7 +6,7 @@ fn test_movement_costs_within_range() {
     for terrain in BaseTerrain::iter() {
         let cost = terrain.movement_cost();
         assert!(
-            cost >= 0.5 && cost <= 3.0,
+            (0.5..=3.0).contains(&cost),
             "Movement cost out of range for {:?}",
             terrain
         );
@@ -52,7 +52,7 @@ fn test_item_spawn_modifiers_reasonable() {
     for terrain in BaseTerrain::iter() {
         let modifier = terrain.item_spawn_modifier();
         assert!(
-            modifier >= 0.5 && modifier <= 1.5,
+            (0.5..=1.5).contains(&modifier),
             "Item modifier out of range for {:?}",
             terrain
         );

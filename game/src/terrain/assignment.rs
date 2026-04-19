@@ -31,7 +31,7 @@ impl TerrainType {
 
     /// Generate random Moderate harshness terrain
     pub fn random_moderate(rng: &mut impl Rng) -> Self {
-        let moderate_terrains = vec![
+        let moderate_terrains = [
             BaseTerrain::Forest,
             BaseTerrain::Jungle,
             BaseTerrain::UrbanRuins,

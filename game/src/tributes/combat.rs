@@ -614,7 +614,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_critical_hit_triple_damage(mut small_rng: SmallRng) {
+    fn test_critical_hit_triple_damage(_small_rng: SmallRng) {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         let mut target = Tribute::new("Peeta".to_string(), None, None);
 
@@ -637,7 +637,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_fumble_self_damage(mut small_rng: SmallRng) {
+    fn test_fumble_self_damage(_small_rng: SmallRng) {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         attacker.attributes.health = 100;
         let initial_health = attacker.attributes.health;

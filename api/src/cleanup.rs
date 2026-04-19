@@ -67,9 +67,6 @@ pub async fn start_cleanup_scheduler(state: AppState) -> Result<JobScheduler, Ap
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Arc;
-    use surrealdb::Surreal;
-    use surrealdb::engine::any::Any;
 
     #[tokio::test]
     async fn test_cleanup_scheduler_creation() {

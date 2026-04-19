@@ -30,16 +30,13 @@ async fn test_create_game() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "game_creator1").await;
 
     let response = server
         .post("/api/games")
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "max_tributes": 24,
             "tribute_pool": 24,
@@ -63,7 +60,7 @@ async fn test_list_games() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "game_lister").await;
 
@@ -71,10 +68,7 @@ async fn test_list_games() {
     for _ in 0..3 {
         server
             .post("/api/games")
-            .add_header(
-                "Authorization".parse().unwrap(),
-                user.auth_header().parse().unwrap(),
-            )
+            .add_header("Authorization", user.auth_header())
             .json(&json!({
                 "max_tributes": 24,
                 "tribute_pool": 24,
@@ -87,10 +81,7 @@ async fn test_list_games() {
     // List games
     let response = server
         .get("/api/games")
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     response.assert_status_ok();
@@ -111,17 +102,14 @@ async fn test_get_game() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "game_getter").await;
 
     // Create a game
     let create_response = server
         .post("/api/games")
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "max_tributes": 24,
             "tribute_pool": 24,
@@ -135,10 +123,7 @@ async fn test_get_game() {
     // Get the game
     let get_response = server
         .get(&format!("/api/games/{}", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     get_response.assert_status_ok();
@@ -155,17 +140,14 @@ async fn test_update_game() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "game_updater").await;
 
     // Create a game
     let create_response = server
         .post("/api/games")
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "max_tributes": 24,
             "tribute_pool": 24,
@@ -179,10 +161,7 @@ async fn test_update_game() {
     // Update the game
     let update_response = server
         .put(&format!("/api/games/{}", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "max_tributes": 12,
         }))
@@ -202,17 +181,14 @@ async fn test_delete_game() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "game_deleter").await;
 
     // Create a game
     let create_response = server
         .post("/api/games")
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "max_tributes": 24,
             "tribute_pool": 24,
@@ -226,10 +202,7 @@ async fn test_delete_game() {
     // Delete the game
     let delete_response = server
         .delete(&format!("/api/games/{}", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     delete_response.assert_status(axum::http::StatusCode::NO_CONTENT);
@@ -237,10 +210,7 @@ async fn test_delete_game() {
     // Try to get the deleted game - should return 404
     let get_response = server
         .get(&format!("/api/games/{}", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     get_response.assert_status(axum::http::StatusCode::NOT_FOUND);
@@ -254,17 +224,14 @@ async fn test_game_display() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "game_displayer").await;
 
     // Create a game
     let create_response = server
         .post("/api/games")
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "max_tributes": 24,
             "tribute_pool": 24,
@@ -278,10 +245,7 @@ async fn test_game_display() {
     // Get the game display
     let display_response = server
         .get(&format!("/api/games/{}/display", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     display_response.assert_status_ok();
@@ -299,17 +263,14 @@ async fn test_game_areas() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "area_viewer").await;
 
     // Create a game
     let create_response = server
         .post("/api/games")
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "max_tributes": 24,
             "tribute_pool": 24,
@@ -323,10 +284,7 @@ async fn test_game_areas() {
     // Get game areas
     let areas_response = server
         .get(&format!("/api/games/{}/areas", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     areas_response.assert_status_ok();
@@ -346,17 +304,14 @@ async fn test_publish_game() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "game_publisher").await;
 
     // Create a game
     let create_response = server
         .post("/api/games")
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "max_tributes": 24,
             "tribute_pool": 24,
@@ -370,10 +325,7 @@ async fn test_publish_game() {
     // Publish the game
     let publish_response = server
         .put(&format!("/api/games/{}/publish", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     publish_response.assert_status_ok();
@@ -390,17 +342,14 @@ async fn test_unpublish_game() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "game_unpublisher").await;
 
     // Create and publish a game
     let create_response = server
         .post("/api/games")
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "max_tributes": 24,
             "tribute_pool": 24,
@@ -413,20 +362,14 @@ async fn test_unpublish_game() {
 
     server
         .put(&format!("/api/games/{}/publish", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await
         .assert_status_ok();
 
     // Unpublish the game
     let unpublish_response = server
         .put(&format!("/api/games/{}/unpublish", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     unpublish_response.assert_status_ok();
@@ -443,7 +386,7 @@ async fn test_unauthorized_game_access() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     // Try to create a game without authentication
     let response = server

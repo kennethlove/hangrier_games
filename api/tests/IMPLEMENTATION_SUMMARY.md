@@ -86,7 +86,7 @@ async fn test_feature() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
     
     // Test code here
     

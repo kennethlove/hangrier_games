@@ -144,6 +144,31 @@ jj rebase -d main@origin     # Rebase onto remote main
 - Use `jj new` to start fresh change (like `git commit && git checkout -b`)
 - Conflicts tracked explicitly; can defer resolution
 
+## Pull Request Workflow
+
+**All changes land on `main` via GitHub Pull Requests.** Never merge to `main` locally and never push directly to `main`.
+
+**Standard flow**:
+```bash
+# 1. Make commits on a descriptive bookmark (not main)
+jj bookmark create my-feature -r @-
+
+# 2. Push the bookmark to origin
+jj git push --bookmark my-feature
+
+# 3. Open a PR with gh
+gh pr create --base main --head my-feature \
+  --title "type(scope): summary" \
+  --body "..."
+```
+
+**Rules**:
+- One bookmark per logical change; name it after the work (e.g. `fix-ws-hook`, `feat-sponsorship`)
+- Use conventional commit style for both commit messages and PR titles
+- PR body should include a Summary, Changes, Verification (commands run), and Follow-ups (beads IDs) section
+- Do not use `jj git push` to push directly to `main` — only push feature bookmarks
+- Do not run `jj bookmark set main` to advance main locally; let the GitHub merge do it, then `jj git fetch` to sync
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker
 
@@ -166,28 +191,32 @@ bd close <id>         # Complete work
 
 ## Session Completion
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until a PR exists on GitHub for every code change.
 
 **MANDATORY WORKFLOW:**
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
+1. **File issues for remaining work** - Create beads issues for anything that needs follow-up
+2. **Run quality gates** (if code changed) - Tests, linters, builds (`just quality`)
 3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
+4. **OPEN A PULL REQUEST** - This is MANDATORY for any code change:
    ```bash
-   jj git fetch                # Sync with remote
-   jj rebase -d main@origin    # Rebase if needed
-   bd dolt push                # Push beads data
-   jj git push                 # Push commits to GitHub
-   jj log -r 'remote_bookmarks()'  # Verify push succeeded
+   jj git fetch                                    # Sync with remote
+   jj rebase -d main@origin                        # Rebase if needed
+   bd dolt push                                    # Push beads data
+   jj bookmark create <branch-name> -r @-          # Create feature bookmark
+   jj git push --bookmark <branch-name>            # Push the bookmark (NOT main)
+   gh pr create --base main --head <branch-name> \
+     --title "type(scope): summary" --body "..."   # Open the PR
    ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
+5. **Clean up** - Clear stashes, prune stale local bookmarks
+6. **Verify** - All changes committed AND a PR URL is in hand
+7. **Hand off** - Provide the PR URL plus context for next session
 
 **CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
+- Work is NOT complete until a PR is open on GitHub
+- NEVER push directly to `main`; always go through a feature bookmark + PR
+- NEVER merge PRs locally; let the GitHub UI (or maintainer) do the merge
+- NEVER stop before opening the PR - that leaves work stranded on a local bookmark
+- NEVER say "ready to push when you are" - YOU must push the bookmark and open the PR
+- If push or `gh pr create` fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->

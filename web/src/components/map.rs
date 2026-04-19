@@ -11,7 +11,6 @@ pub fn Map(areas: Vec<AreaDetails>) -> Element {
             (
                 area.clone()
                     .area
-                    .clone()
                     .unwrap()
                     .to_string()
                     .to_lowercase(),

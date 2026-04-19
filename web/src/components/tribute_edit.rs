@@ -116,7 +116,7 @@ pub fn EditTributeForm() -> Element {
     let identifier = tribute_details.identifier.clone();
 
     let mut avatar_preview = use_signal(|| avatar.clone());
-    let mut upload_status = use_signal(|| String::new());
+    let mut upload_status = use_signal(String::new);
 
     let mutate = use_mutation(edit_tribute);
 
@@ -177,9 +177,9 @@ pub fn EditTributeForm() -> Element {
         spawn(async move {
             let files = e.files();
 
-            if let Some(file_engine) = files {
-                if let Some(file_name) = file_engine.files().into_iter().next() {
-                    if let Some(file_data) = file_engine.read_file(&file_name).await {
+            if let Some(file_engine) = files
+                && let Some(file_name) = file_engine.files().into_iter().next()
+                    && let Some(file_data) = file_engine.read_file(&file_name).await {
                         // Upload file using multipart/form-data
                         let client = reqwest::Client::new();
                         let url = format!(
@@ -201,12 +201,11 @@ pub fn EditTributeForm() -> Element {
 
                         match response {
                             Ok(resp) if resp.status().is_success() => {
-                                if let Ok(json) = resp.json::<serde_json::Value>().await {
-                                    if let Some(url) = json.get("url").and_then(|v| v.as_str()) {
+                                if let Ok(json) = resp.json::<serde_json::Value>().await
+                                    && let Some(url) = json.get("url").and_then(|v| v.as_str()) {
                                         avatar_preview.set(url.to_string());
                                         upload_status.set("Upload successful!".to_string());
                                     }
-                                }
                             }
                             Ok(resp) => {
                                 upload_status.set(format!("Upload failed: {}", resp.status()));
@@ -216,8 +215,6 @@ pub fn EditTributeForm() -> Element {
                             }
                         }
                     }
-                }
-            }
         });
     };
 
@@ -272,7 +269,7 @@ pub fn EditTributeForm() -> Element {
                 form {
                     class: "mb-2",
                     onchange: upload_avatar,
-                    prevent_default: "onsubmit",
+                    onsubmit: |e| e.prevent_default(),
 
                     input {
                         r#type: "file",

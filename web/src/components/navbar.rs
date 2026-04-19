@@ -14,7 +14,7 @@ pub fn Navbar() -> Element {
         let jwt_string = storage.get().jwt.clone().unwrap_or_default();
         dioxus_logger::tracing::debug!("JWT String: {}", &jwt_string);
         let decoded = jwt_rustcrypto::decode_only(&jwt_string).expect("Failed to decode JWT");
-        let is_expired = decoded.payload.get("exp").map_or(false, |exp| {
+        let is_expired = decoded.payload.get("exp").is_some_and(|exp| {
             let exp_time = exp.as_i64().unwrap_or(0);
             let current_time = chrono::Utc::now().timestamp();
             dioxus_logger::tracing::debug!("difference: {}", current_time - exp_time);

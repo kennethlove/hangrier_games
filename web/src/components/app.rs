@@ -18,7 +18,7 @@ pub fn App() -> Element {
 
     let storage = use_persistent("hangry-games", AppState::default);
 
-    let loading_signal: Signal<LoadingState> = use_signal(|| LoadingState::default());
+    let loading_signal: Signal<LoadingState> = use_signal(LoadingState::default);
     use_context_provider(|| loading_signal);
 
     let theme_signal: Signal<Colorscheme> = use_signal(|| storage.get().colorscheme);

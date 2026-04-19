@@ -180,7 +180,7 @@ pub fn GameTributeListMember(
     game_status: GameStatus,
 ) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.expect("No JWT found");
+    let _token = storage.get().jwt.expect("No JWT found");
 
     let fist_item = Item::new_weapon("basic fist");
 

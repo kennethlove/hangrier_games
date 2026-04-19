@@ -144,7 +144,7 @@ async fn handle_next_step(
                 | MutationValue::GameFinished(game_identifier)
                 | MutationValue::GameAdvanced(game_identifier) => {
                     client.invalidate_queries(&[
-                        QueryKey::DisplayGame(game_identifier.clone().into()),
+                        QueryKey::DisplayGame(game_identifier.clone()),
                         QueryKey::Games,
                     ]);
                     loading_signal.set(LoadingState::Loaded);
@@ -284,9 +284,9 @@ fn GameState(identifier: String) -> Element {
             let next_step_handler = move |_| {
                 let game_id_clone = game_id.clone();
                 let token_clone = token_clone.clone();
-                let mutate_clone = mutate.clone();
-                let client_clone = client.clone();
-                let loading_signal_clone = loading_signal.clone();
+                let mutate_clone = mutate;
+                let client_clone = client;
+                let loading_signal_clone = loading_signal;
 
                 spawn(async move {
                     handle_next_step(

@@ -9,7 +9,7 @@ use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
 use dioxus_query::prelude::{QueryResult, QueryState, use_get_query, use_query_client};
 use serde::{Deserialize, Serialize};
-use shared::{DisplayGame, GameStatus, ListDisplayGame, PaginationMetadata};
+use shared::{GameStatus, ListDisplayGame, PaginationMetadata};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct PaginatedGamesResponse {
@@ -213,7 +213,7 @@ pub fn GameListMember(game: ListDisplayGame) -> Element {
                         GameEdit {
                             identifier: game.identifier.clone(),
                             name: game.name.clone(),
-                            private: game.private.clone(),
+                            private: game.private,
                             icon_class: r#"
                             size-4
                             theme1:fill-amber-600
@@ -303,10 +303,10 @@ pub fn GameListMember(game: ListDisplayGame) -> Element {
 #[component]
 fn LoadMoreButton(current_offset: u32, limit: u32) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.expect("No JWT found");
+    let _token = storage.get().jwt.expect("No JWT found");
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
-    let next_offset = current_offset + limit;
+    let _next_offset = current_offset + limit;
 
     let onclick = move |_| {
         // TODO: Implement actual loading - for now just refresh to get next page

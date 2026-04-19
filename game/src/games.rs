@@ -386,13 +386,15 @@ impl Game {
             let is_desperate = tribute.attributes.health < 30;
             let current_health = tribute.attributes.health;
 
-            // Run survival check
+            // Run survival check with config parameters
             let result = most_severe_event.survival_check(
                 &terrain,
                 has_affinity,
                 has_item_bonus,
                 is_desperate,
                 current_health,
+                self.config.instant_death_enabled,
+                self.config.catastrophic_severity_multiplier,
                 rng,
             );
 

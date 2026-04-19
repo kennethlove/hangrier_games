@@ -17,6 +17,10 @@ pub struct GameConfig {
     pub day_event_frequency: f64,
     /// Probability of night events occurring (1.0 = 100%, 0.125 = 12.5%)
     pub night_event_frequency: f64,
+    /// Enable instant death outcomes for catastrophic events
+    pub instant_death_enabled: bool,
+    /// Global multiplier for event severity (1.0 = normal, 2.0 = double damage)
+    pub catastrophic_severity_multiplier: f64,
 
     // Tribute AI decision thresholds (from tributes/brains.rs)
     /// Enemy count threshold for "few enemies" AI decisions
@@ -70,6 +74,8 @@ impl Default for GameConfig {
             feast_consumable_count: 4,
             day_event_frequency: 1.0 / 4.0,
             night_event_frequency: 1.0 / 8.0,
+            instant_death_enabled: true,
+            catastrophic_severity_multiplier: 1.0,
 
             // Tribute AI
             low_enemy_limit: 6,
@@ -122,5 +128,35 @@ mod tests {
         let json = serde_json::to_string(&config).unwrap();
         let deserialized: GameConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(config, deserialized);
+    }
+
+    #[test]
+    fn test_event_config_defaults() {
+        let config = GameConfig::default();
+        assert_eq!(config.day_event_frequency, 0.25);
+        assert_eq!(config.night_event_frequency, 0.125);
+        assert_eq!(config.instant_death_enabled, true);
+        assert_eq!(config.catastrophic_severity_multiplier, 1.0);
+    }
+
+    #[test]
+    fn test_easy_mode_config() {
+        let mut config = GameConfig::default();
+        config.instant_death_enabled = false;
+        config.catastrophic_severity_multiplier = 0.5;
+
+        assert_eq!(config.instant_death_enabled, false);
+        assert_eq!(config.catastrophic_severity_multiplier, 0.5);
+    }
+
+    #[test]
+    fn test_hard_mode_config() {
+        let mut config = GameConfig::default();
+        config.instant_death_enabled = true;
+        config.catastrophic_severity_multiplier = 2.0;
+        config.day_event_frequency = 0.5; // More frequent events
+
+        assert_eq!(config.catastrophic_severity_multiplier, 2.0);
+        assert_eq!(config.day_event_frequency, 0.5);
     }
 }

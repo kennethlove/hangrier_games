@@ -277,6 +277,8 @@ impl AreaEvent {
     /// * `has_item_bonus` - Whether tribute has relevant protective item (+2 bonus)
     /// * `is_desperate` - Whether tribute is in desperate state (health < 30%, +5 bonus)
     /// * `current_health` - Tribute's current health for desperation rewards
+    /// * `instant_death_enabled` - Whether instant death outcomes are enabled
+    /// * `severity_multiplier` - Multiplier for severity effects (default 1.0)
     /// * `rng` - Random number generator for deterministic simulation
     ///
     /// # Returns
@@ -288,17 +290,20 @@ impl AreaEvent {
         has_item_bonus: bool,
         is_desperate: bool,
         current_health: u32,
+        instant_death_enabled: bool,
+        severity_multiplier: f64,
         rng: &mut impl Rng,
     ) -> SurvivalResult {
         let severity = self.severity_in_terrain(terrain);
 
-        // Base survival DC by severity
-        let base_dc = match severity {
+        // Base survival DC by severity (apply multiplier)
+        let base_dc_raw = match severity {
             EventSeverity::Minor => 5,
             EventSeverity::Moderate => 10,
             EventSeverity::Major => 15,
             EventSeverity::Catastrophic => 20,
         };
+        let base_dc = (base_dc_raw as f64 * severity_multiplier) as i32;
 
         // Calculate modifiers
         let mut modifier = 0;
@@ -316,8 +321,8 @@ impl AreaEvent {
         let roll = rng.random_range(1..=20);
         let total = roll + modifier;
 
-        // Check for catastrophic instant death (5% chance)
-        let instant_death = if severity == EventSeverity::Catastrophic {
+        // Check for catastrophic instant death (5% chance, only if enabled)
+        let instant_death = if instant_death_enabled && severity == EventSeverity::Catastrophic {
             rng.random_range(0..100) < 5 // 5% instant death
         } else {
             false

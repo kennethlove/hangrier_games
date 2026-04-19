@@ -521,18 +521,19 @@ mod tests {
 
     #[rstest]
     fn test_critical_hit() {
-        // Use a custom RNG that returns 20 for the attack roll
+        // Use a custom RNG that always returns the high bits needed for
+        // `random_range(1..=20)` to produce 20 under rand 0.9's algorithm.
         struct CritRng;
         impl RngCore for CritRng {
             fn next_u32(&mut self) -> u32 {
-                20
+                0xF333_3334
             }
             fn next_u64(&mut self) -> u64 {
-                20
+                ((self.next_u32() as u64) << 32) | self.next_u32() as u64
             }
             fn fill_bytes(&mut self, dest: &mut [u8]) {
                 for byte in dest.iter_mut() {
-                    *byte = 20;
+                    *byte = 0xFF;
                 }
             }
         }
@@ -550,18 +551,18 @@ mod tests {
 
     #[rstest]
     fn test_critical_fumble() {
-        // Use a custom RNG that returns 1 for the attack roll
+        // Use a custom RNG that returns 0 so `random_range(1..=20)` yields 1.
         struct FumbleRng;
         impl RngCore for FumbleRng {
             fn next_u32(&mut self) -> u32 {
-                1
+                0
             }
             fn next_u64(&mut self) -> u64 {
-                1
+                0
             }
             fn fill_bytes(&mut self, dest: &mut [u8]) {
                 for byte in dest.iter_mut() {
-                    *byte = 1;
+                    *byte = 0;
                 }
             }
         }
@@ -576,7 +577,8 @@ mod tests {
 
     #[rstest]
     fn test_perfect_block() {
-        // Use a custom RNG that returns 10 for attack, 20 for defense
+        // First call (attacker roll): 0x7333_3334 → random_range(1..=20) == 10
+        // Second call (defender roll): 0xF333_3334 → random_range(1..=20) == 20
         struct BlockRng {
             call_count: std::cell::Cell<usize>,
         }
@@ -591,7 +593,7 @@ mod tests {
             fn next_u32(&mut self) -> u32 {
                 let count = self.call_count.get();
                 self.call_count.set(count + 1);
-                if count == 0 { 10 } else { 20 } // First call: 10, second: 20
+                if count == 0 { 0x7333_3334 } else { 0xF333_3334 }
             }
             fn next_u64(&mut self) -> u64 {
                 self.next_u32() as u64

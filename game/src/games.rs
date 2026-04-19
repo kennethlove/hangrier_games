@@ -1038,7 +1038,8 @@ mod tests {
         game.tributes.push(tribute2.clone());
 
         // Constrain areas
-        let mut rng = SmallRng::from_rng(&mut rand::rng());
+        // Use a fixed seed so the area-selection branch is deterministic.
+        let mut rng = SmallRng::seed_from_u64(0);
         game.constrain_areas(&mut rng);
 
         // Check if at least one area is closed

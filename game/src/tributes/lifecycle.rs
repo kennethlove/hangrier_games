@@ -20,7 +20,6 @@ const MAX_HEALTH: u32 = 100;
 const MAX_SANITY: u32 = 100;
 const MAX_MOVEMENT: u32 = 100;
 const MAX_STRENGTH: u32 = 50;
-const MAX_SPEED: u32 = 100;
 const MAX_BRAVERY: u32 = 100;
 
 /// Default healing amounts
@@ -30,23 +29,23 @@ const DEFAULT_MENTAL_HEAL: u32 = 5;
 /// Status effect damage constants
 const WOUNDED_DAMAGE: u32 = 1;
 const SICK_STRENGTH_REDUCTION: u32 = 1;
-const SICK_SPEED_REDUCTION: u32 = 1;
+const SICK_MOVEMENT_REDUCTION: u32 = 1;
 const ELECTROCUTED_DAMAGE: u32 = 20;
-const FROZEN_SPEED_REDUCTION: u32 = 1;
-const OVERHEATED_SPEED_REDUCTION: u32 = 1;
+const FROZEN_MOVEMENT_REDUCTION: u32 = 1;
+const OVERHEATED_MOVEMENT_REDUCTION: u32 = 1;
 const DEHYDRATED_STRENGTH_REDUCTION: u32 = 1;
 const STARVING_STRENGTH_REDUCTION: u32 = 1;
 const POISONED_MENTAL_DAMAGE: u32 = 5;
-const BROKEN_BONE_LEG_SPEED_REDUCTION: u32 = 10;
+const BROKEN_BONE_LEG_MOVEMENT_REDUCTION: u32 = 10;
 const BROKEN_BONE_ARM_STRENGTH_REDUCTION: u32 = 5;
 const BROKEN_BONE_SKULL_INTELLIGENCE_REDUCTION: u32 = 5;
-const BROKEN_BONE_RIB_DEXTERITY_REDUCTION: u32 = 5;
+const BROKEN_BONE_RIB_DAMAGE: u32 = 5;
 const INFECTED_DAMAGE: u32 = 2;
 const INFECTED_MENTAL_DAMAGE: u32 = 5;
 const DROWNED_DAMAGE: u32 = 2;
 const DROWNED_MENTAL_DAMAGE: u32 = 2;
 const BURNED_DAMAGE: u32 = 5;
-const BURIED_SPEED_REDUCTION: u32 = 5;
+const BURIED_DAMAGE: u32 = 5;
 
 impl Tribute {
     /// Marks the tribute as dead and reveals them.
@@ -113,14 +112,9 @@ impl Tribute {
             .min(MAX_STRENGTH);
     }
 
-    /// Reduces movement speed.
-    pub(crate) fn reduce_speed(&mut self, amount: u32) {
-        self.attributes.speed = self.attributes.speed.saturating_sub(amount).max(1);
-    }
-
-    /// Increases movement speed.
-    pub(crate) fn increase_speed(&mut self, amount: u32) {
-        self.attributes.speed = self.attributes.speed.saturating_add(amount).min(MAX_SPEED);
+    /// Reduces movement which limits travel and is used by AI for retreat decisions.
+    pub(crate) fn reduce_movement(&mut self, amount: u32) {
+        self.attributes.movement = self.attributes.movement.saturating_sub(amount).max(1);
     }
 
     /// Reduces intelligence which affects decision-making and hiding.
@@ -138,19 +132,12 @@ impl Tribute {
     }
 
     /// Increases movement which allows more travel
-    // TODO: Use movement more effectively.
     pub(crate) fn increase_movement(&mut self, amount: u32) {
         self.attributes.movement = self
             .attributes
             .movement
             .saturating_add(amount)
             .min(MAX_MOVEMENT);
-    }
-
-    /// Reduces dexterity which currently affects nothing.
-    // TODO: Use dexterity for something.
-    pub(crate) fn reduce_dexterity(&mut self, amount: u32) {
-        self.attributes.dexterity = self.attributes.dexterity.saturating_sub(amount).max(1);
     }
 
     /// Restores health.
@@ -227,16 +214,16 @@ impl Tribute {
             }
             TributeStatus::Sick => {
                 self.reduce_strength(SICK_STRENGTH_REDUCTION);
-                self.reduce_speed(SICK_SPEED_REDUCTION);
+                self.reduce_movement(SICK_MOVEMENT_REDUCTION);
             }
             TributeStatus::Electrocuted => {
                 self.takes_physical_damage(ELECTROCUTED_DAMAGE);
             }
             TributeStatus::Frozen => {
-                self.reduce_speed(FROZEN_SPEED_REDUCTION);
+                self.reduce_movement(FROZEN_MOVEMENT_REDUCTION);
             }
             TributeStatus::Overheated => {
-                self.reduce_speed(OVERHEATED_SPEED_REDUCTION);
+                self.reduce_movement(OVERHEATED_MOVEMENT_REDUCTION);
             }
             TributeStatus::Dehydrated => {
                 self.reduce_strength(DEHYDRATED_STRENGTH_REDUCTION);
@@ -252,13 +239,13 @@ impl Tribute {
                 let bone = rng.random_range(0..4);
                 match bone {
                     // Leg
-                    0 => self.reduce_speed(BROKEN_BONE_LEG_SPEED_REDUCTION),
+                    0 => self.reduce_movement(BROKEN_BONE_LEG_MOVEMENT_REDUCTION),
                     // Arm
                     1 => self.reduce_strength(BROKEN_BONE_ARM_STRENGTH_REDUCTION),
                     // Skull
                     2 => self.reduce_intelligence(BROKEN_BONE_SKULL_INTELLIGENCE_REDUCTION),
                     // Rib
-                    _ => self.reduce_dexterity(BROKEN_BONE_RIB_DEXTERITY_REDUCTION),
+                    _ => self.takes_physical_damage(BROKEN_BONE_RIB_DAMAGE),
                 }
             }
             TributeStatus::Infected => {
@@ -278,7 +265,7 @@ impl Tribute {
                 self.takes_physical_damage(BURNED_DAMAGE);
             }
             TributeStatus::Buried => {
-                self.reduce_speed(BURIED_SPEED_REDUCTION);
+                self.takes_physical_damage(BURIED_DAMAGE);
             }
             TributeStatus::Healthy | TributeStatus::RecentlyDead | TributeStatus::Dead => {}
         }

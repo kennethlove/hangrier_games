@@ -29,19 +29,20 @@ impl OwnsItems for Tribute {
             .position(|i| i.identifier == item.identifier)
             .ok_or(ItemError::ItemNotFound)?;
 
-        let current_quantity = self.items[index].quantity;
+        let current_durability = self.items[index].current_durability;
 
-        // If the item has 0 uses left, return an error.
-        // If the item has 1 use left, remove it from the inventory.
-        // If the item has more than 1 use left, decrement the quantity.
-        match current_quantity {
+        // If the item has 0 durability left, return an error.
+        // If the item has 1 durability left, remove it from the inventory.
+        // If the item has more than 1 durability left, decrement it.
+        match current_durability {
             0 => Err(ItemError::ItemNotFound),
             1 => {
                 self.items.remove(index);
                 Ok(())
             }
             _ => {
-                self.items[index].quantity = self.items[index].quantity.saturating_sub(1);
+                self.items[index].current_durability =
+                    self.items[index].current_durability.saturating_sub(1);
                 Ok(())
             }
         }
@@ -138,25 +139,7 @@ impl Tribute {
     pub(crate) fn available_items(&self) -> Vec<Item> {
         self.items
             .iter()
-            .filter(|i| i.quantity > 0)
-            .cloned()
-            .collect()
-    }
-
-    /// Which items are marked as weapons?
-    pub(crate) fn weapons(&self) -> Vec<Item> {
-        self.available_items()
-            .iter()
-            .filter(|i| i.is_weapon())
-            .cloned()
-            .collect()
-    }
-
-    /// Which items are marked as shields?
-    pub(crate) fn shields(&self) -> Vec<Item> {
-        self.available_items()
-            .iter()
-            .filter(|i| i.is_defensive())
+            .filter(|i| i.current_durability > 0)
             .cloned()
             .collect()
     }
@@ -168,6 +151,30 @@ impl Tribute {
             .filter(|i| i.is_consumable())
             .cloned()
             .collect()
+    }
+
+    /// Get a mutable reference to the tribute's currently equipped weapon.
+    ///
+    /// Returns the last weapon (matching `weapons()` selection semantics) with
+    /// `current_durability > 0`. Used by combat to apply wear directly to the
+    /// equipped item rather than to a clone.
+    pub(crate) fn equipped_weapon_mut(&mut self) -> Option<&mut Item> {
+        self.items
+            .iter_mut()
+            .filter(|i| i.is_weapon() && i.current_durability > 0)
+            .last()
+    }
+
+    /// Get a mutable reference to the tribute's currently equipped shield.
+    ///
+    /// Returns the last shield (matching `shields()` selection semantics) with
+    /// `current_durability > 0`. Used by combat to apply wear directly to the
+    /// equipped item rather than to a clone.
+    pub(crate) fn equipped_shield_mut(&mut self) -> Option<&mut Item> {
+        self.items
+            .iter_mut()
+            .filter(|i| i.is_defensive() && i.current_durability > 0)
+            .last()
     }
 }
 
@@ -199,7 +206,8 @@ mod tests {
     #[rstest]
     fn use_item(mut tribute: Tribute) {
         let mut item = Item::new_random_consumable();
-        item.quantity = 1;
+        item.current_durability = 1;
+        item.max_durability = 1;
         tribute.add_item(item.clone());
         assert!(tribute.use_item(&item).is_ok());
         assert!(!tribute.has_item(&item));
@@ -208,12 +216,51 @@ mod tests {
     #[rstest]
     fn use_item_reusable(mut tribute: Tribute) {
         let mut item = Item::new_random_weapon();
-        item.quantity = 2;
+        item.current_durability = 2;
+        item.max_durability = 2;
         tribute.add_item(item.clone());
         assert!(tribute.use_item(&item).is_ok());
-        // After use, stored item has quantity=1, so equality with the
-        // original `item` (quantity=2) no longer holds. Verify directly.
+        // After use, stored item has current_durability=1, so equality with the
+        // original `item` (current_durability=2) no longer holds. Verify directly.
         assert_eq!(tribute.items.len(), 1);
-        assert_eq!(tribute.items[0].quantity, 1);
+        assert_eq!(tribute.items[0].current_durability, 1);
+    }
+
+    #[rstest]
+    fn equipped_weapon_mut_returns_actual_item(mut tribute: Tribute) {
+        let mut weapon = Item::new_random_weapon();
+        weapon.current_durability = 5;
+        weapon.max_durability = 5;
+        tribute.add_item(weapon.clone());
+
+        // Mutate via equipped_weapon_mut and verify it persists in inventory.
+        {
+            let equipped = tribute.equipped_weapon_mut().expect("weapon equipped");
+            equipped.current_durability = 3;
+        }
+        assert_eq!(tribute.items[0].current_durability, 3);
+    }
+
+    #[rstest]
+    fn equipped_shield_mut_returns_actual_item(mut tribute: Tribute) {
+        let mut shield = Item::new_random_shield();
+        shield.current_durability = 5;
+        shield.max_durability = 5;
+        tribute.add_item(shield.clone());
+
+        {
+            let equipped = tribute.equipped_shield_mut().expect("shield equipped");
+            equipped.current_durability = 2;
+        }
+        assert_eq!(tribute.items[0].current_durability, 2);
+    }
+
+    #[rstest]
+    fn equipped_weapon_mut_skips_broken(mut tribute: Tribute) {
+        let mut broken = Item::new_random_weapon();
+        broken.current_durability = 0;
+        broken.max_durability = 5;
+        tribute.add_item(broken);
+        assert!(tribute.equipped_weapon_mut().is_none());
     }
 }

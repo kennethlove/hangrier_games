@@ -949,11 +949,11 @@ async fn save_area_items(
         new_map.insert(item.identifier.clone(), item.clone());
     }
 
-    // Find items to delete (in DB but not in new items or quantity is 0)
+    // Find items to delete (in DB but not in new items or durability is 0)
     let mut items_to_delete = Vec::new();
     for id in existing_map.keys() {
         if let Some(item) = new_map.get(id) {
-            if item.quantity == 0 {
+            if item.current_durability == 0 {
                 items_to_delete.push(id.clone());
             }
         } else {
@@ -964,7 +964,7 @@ async fn save_area_items(
     // Find items to update (in DB and in new items with different values)
     let mut items_to_update = Vec::new();
     for (id, item) in &new_map {
-        if item.quantity > 0 {
+        if item.current_durability > 0 {
             if let Some(existing) = existing_map.get(id) {
                 if existing != item {
                     items_to_update.push(item.clone());
@@ -1007,7 +1007,8 @@ async fn save_area_items(
                     name: '{}',
                     item_type: '{:?}',
                     effect: {},
-                    quantity: {},
+                    current_durability: {},
+                    max_durability: {},
                     attribute: '{:?}'
                 }}",
                 item.identifier,
@@ -1015,7 +1016,8 @@ async fn save_area_items(
                 item.name.replace("'", "\\'"),
                 item.item_type,
                 item.effect,
-                item.quantity,
+                item.current_durability,
+                item.max_durability,
                 item.attribute
             ));
         }
@@ -1065,11 +1067,11 @@ async fn save_tribute_items(
         new_map.insert(item.identifier.clone(), item.clone());
     }
 
-    // Find items to delete (in DB but not in new items or quantity is 0)
+    // Find items to delete (in DB but not in new items or durability is 0)
     let mut items_to_delete = Vec::new();
     for id in existing_map.keys() {
         if let Some(item) = new_map.get(id) {
-            if item.quantity == 0 {
+            if item.current_durability == 0 {
                 items_to_delete.push(id.clone());
             }
         } else {
@@ -1080,7 +1082,7 @@ async fn save_tribute_items(
     // Find items to update (in DB and in new items with different values)
     let mut items_to_update = Vec::new();
     for (id, item) in &new_map {
-        if item.quantity > 0 {
+        if item.current_durability > 0 {
             if let Some(existing) = existing_map.get(id) {
                 if existing != item {
                     items_to_update.push(item.clone());
@@ -1123,7 +1125,8 @@ async fn save_tribute_items(
                     name: '{}',
                     item_type: '{:?}',
                     effect: {},
-                    quantity: {},
+                    current_durability: {},
+                    max_durability: {},
                     attribute: '{:?}'
                 }}",
                 item.identifier,
@@ -1131,7 +1134,8 @@ async fn save_tribute_items(
                 item.name.replace("'", "\\'"),
                 item.item_type,
                 item.effect,
-                item.quantity,
+                item.current_durability,
+                item.max_durability,
                 item.attribute
             ));
         }

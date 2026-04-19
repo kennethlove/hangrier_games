@@ -125,7 +125,7 @@ impl OwnsItems for AreaDetails {
         let index = self.items.iter().position(|i| i == item);
         let used_item = self.items.swap_remove(index.unwrap());
 
-        if used_item.quantity > 0 {
+        if used_item.current_durability > 0 {
             Ok(())
         } else {
             Err(ItemError::ItemNotFound)

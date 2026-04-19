@@ -203,7 +203,10 @@ fn test_all_terrains_produce_valid_items() {
             // Item should have valid properties
             assert!(!item.identifier.is_empty(), "Item should have identifier");
             assert!(!item.name.is_empty(), "Item should have name");
-            assert!(item.quantity > 0, "Item should have positive quantity");
+            assert!(
+                item.current_durability > 0,
+                "Item should have positive durability"
+            );
 
             // Effect should be within the rarity tier ranges (max Legendary = 12).
             assert!(

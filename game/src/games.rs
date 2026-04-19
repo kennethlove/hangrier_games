@@ -197,6 +197,21 @@ impl Game {
         ));
     }
 
+    /// Log a structured game output by rendering its `Display` impl into a `GameMessage`.
+    ///
+    /// Use this when emitting events from inside the engine: build a `GameOutput<'_>` at
+    /// the call site and pass it here. Until `hangrier_games-mqi` lands and we have a
+    /// serializable structured event, this is the bridge between typed events and the
+    /// stringly-typed `GameMessage.content` field.
+    pub fn log_output<D: std::fmt::Display>(
+        &mut self,
+        source: crate::messages::MessageSource,
+        subject: String,
+        output: D,
+    ) {
+        self.log(source, subject, output.to_string());
+    }
+
     fn check_for_winner(&mut self) -> Result<(), GameError> {
         if let Some(winner) = self.winner() {
             self.log(
@@ -631,6 +646,10 @@ impl Game {
                 .push(tribute);
         }
 
+        // Collected (actor_identifier, line) pairs from all tributes this cycle.
+        // Drained into self.messages after the mutable borrow of self.tributes ends.
+        let mut collected_events: Vec<(String, String, String)> = Vec::new();
+
         // Process tributes
         for tribute in self.tributes.iter_mut() {
             if !tribute.is_alive() {
@@ -704,11 +723,25 @@ impl Game {
                 total_living_tributes: living_tributes_count as u32,
             };
 
+            let mut tribute_events: Vec<String> = Vec::new();
             tribute.process_turn_phase(
                 action_suggestion.clone(),
                 &mut environment_details,
                 encounter_context,
                 rng,
+                &mut tribute_events,
+            );
+            for line in tribute_events {
+                collected_events.push((tribute.identifier.clone(), tribute.name.clone(), line));
+            }
+        }
+
+        // Drain collected events into game messages now that the mutable borrow ends.
+        for (identifier, name, line) in collected_events {
+            self.log_output(
+                crate::messages::MessageSource::Tribute(identifier),
+                name,
+                line,
             );
         }
         Ok(())

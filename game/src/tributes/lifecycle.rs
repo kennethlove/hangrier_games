@@ -203,7 +203,12 @@ impl Tribute {
 
     /// Applies any effects from elsewhere in the game to the tribute.
     /// This may result in status or attribute changes.
-    pub(crate) fn process_status(&mut self, area_details: &AreaDetails, rng: &mut impl Rng) {
+    pub(crate) fn process_status(
+        &mut self,
+        area_details: &AreaDetails,
+        rng: &mut impl Rng,
+        events: &mut Vec<String>,
+    ) {
         // First, apply any area events for the current area
         self.apply_area_effects(area_details);
 
@@ -274,9 +279,9 @@ impl Tribute {
 
         if self.attributes.health == 0 {
             let killer = self.status.clone();
-            self.try_log_action(
-                GameOutput::TributeDiesFromStatus(self.name.as_str(), &killer.to_string()),
-                "dies from status",
+            events.push(
+                GameOutput::TributeDiesFromStatus(self.name.as_str(), &killer.to_string())
+                    .to_string(),
             );
             self.statistics.killed_by = Some(killer.to_string());
             self.status = TributeStatus::RecentlyDead;
@@ -437,7 +442,7 @@ mod tests {
         tribute.status = TributeStatus::Mauled(Animal::Bear);
         let area_details =
             AreaDetails::new(Some("Forest".to_string()), crate::areas::Area::Cornucopia);
-        tribute.process_status(&area_details, &mut small_rng);
+        tribute.process_status(&area_details, &mut small_rng, &mut Vec::new());
         assert!(tribute.attributes.health < health);
     }
 
@@ -463,7 +468,7 @@ mod tests {
         tribute.status = status.clone();
         let area_details =
             AreaDetails::new(Some("Forest".to_string()), crate::areas::Area::Cornucopia);
-        tribute.process_status(&area_details, &mut small_rng);
+        tribute.process_status(&area_details, &mut small_rng, &mut Vec::new());
         assert!(tribute.is_alive());
     }
 
@@ -473,7 +478,7 @@ mod tests {
         tribute.status = TributeStatus::Electrocuted;
         let area_details =
             AreaDetails::new(Some("Forest".to_string()), crate::areas::Area::Cornucopia);
-        tribute.process_status(&area_details, &mut small_rng);
+        tribute.process_status(&area_details, &mut small_rng, &mut Vec::new());
         assert_eq!(tribute.attributes.health, 0);
         assert_eq!(tribute.status, TributeStatus::RecentlyDead);
     }
@@ -491,7 +496,7 @@ mod tests {
         let mut area_details = AreaDetails::new(Some("Forest".to_string()), Area::Cornucopia);
         area_details.events.push(AreaEvent::Wildfire);
 
-        tribute.process_status(&area_details, &mut small_rng);
+        tribute.process_status(&area_details, &mut small_rng, &mut Vec::new());
         assert_eq!(tribute.status, TributeStatus::Burned);
     }
 }

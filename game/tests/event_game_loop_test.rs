@@ -10,7 +10,7 @@ use rand::rngs::SmallRng;
 #[test]
 fn test_event_survival_integration_with_game_loop() {
     let mut game = Game::new("test-game");
-    game.start();
+    let _ = game.start();
 
     // Create area with Forest terrain (catastrophic for wildfire)
     let mut area_details = AreaDetails::new_with_terrain(
@@ -77,7 +77,7 @@ fn test_event_survival_integration_with_game_loop() {
 #[test]
 fn test_trigger_cycle_events_calls_process_event() {
     let mut game = Game::new("test-game");
-    game.start();
+    let _ = game.start();
     game.day = Some(2); // Day 2 to avoid special day #1 behavior
 
     // Create multiple areas with different terrains
@@ -142,23 +142,28 @@ fn test_trigger_cycle_events_calls_process_event() {
 /// Test that tributes with terrain affinity have better survival
 #[test]
 fn test_terrain_affinity_improves_survival() {
-    // Run multiple trials to get statistical significance
+    // Use a Major-severity event (Flood in Forest = DC 15) so the +3 affinity
+    // bonus makes a measurable statistical difference. Catastrophic events
+    // (DC 20) are too lethal in this regime to show separation reliably.
+    //
+    // Each arm gets its own deterministic RNG so the comparison is independent.
+    let trials = 50;
     let mut with_affinity_deaths = 0;
     let mut without_affinity_deaths = 0;
-    let trials = 20;
-    let mut rng = SmallRng::seed_from_u64(2024);
+    let mut rng_with = SmallRng::seed_from_u64(2024);
+    let mut rng_without = SmallRng::seed_from_u64(4048);
 
     for _ in 0..trials {
         // Test WITH affinity
         let mut game_with = Game::new("test-affinity");
-        game_with.start();
+        let _ = game_with.start();
 
         let mut area = AreaDetails::new_with_terrain(
             Some("Forest".to_string()),
             Area::North,
             TerrainType::new(BaseTerrain::Forest, vec![]).unwrap(),
         );
-        area.events.push(AreaEvent::Wildfire);
+        area.events.push(AreaEvent::Flood);
         game_with.areas.push(area);
 
         let mut tribute = Tribute::new("Affinity Tribute".to_string(), Some(1), None);
@@ -169,7 +174,7 @@ fn test_terrain_affinity_improves_survival() {
         game_with.tributes.push(tribute);
 
         game_with
-            .process_event_for_area(&Area::North, &AreaEvent::Wildfire, &mut rng)
+            .process_event_for_area(&Area::North, &AreaEvent::Flood, &mut rng_with)
             .unwrap();
 
         if game_with.tributes[0].attributes.health == 0 {
@@ -178,14 +183,14 @@ fn test_terrain_affinity_improves_survival() {
 
         // Test WITHOUT affinity
         let mut game_without = Game::new("test-no-affinity");
-        game_without.start();
+        let _ = game_without.start();
 
         let mut area2 = AreaDetails::new_with_terrain(
             Some("Forest".to_string()),
             Area::North,
             TerrainType::new(BaseTerrain::Forest, vec![]).unwrap(),
         );
-        area2.events.push(AreaEvent::Wildfire);
+        area2.events.push(AreaEvent::Flood);
         game_without.areas.push(area2);
 
         let mut tribute2 = Tribute::new("No Affinity Tribute".to_string(), Some(1), None);
@@ -196,7 +201,7 @@ fn test_terrain_affinity_improves_survival() {
         game_without.tributes.push(tribute2);
 
         game_without
-            .process_event_for_area(&Area::North, &AreaEvent::Wildfire, &mut rng)
+            .process_event_for_area(&Area::North, &AreaEvent::Flood, &mut rng_without)
             .unwrap();
 
         if game_without.tributes[0].attributes.health == 0 {
@@ -204,10 +209,10 @@ fn test_terrain_affinity_improves_survival() {
         }
     }
 
-    // Tributes with affinity should die less often
-    // This is probabilistic, but over 20 trials should show a difference
+    // Tributes with affinity should die strictly less often than tributes
+    // without it. With these seeds and 50 trials this is deterministic.
     assert!(
-        with_affinity_deaths <= without_affinity_deaths,
+        with_affinity_deaths < without_affinity_deaths,
         "Expected tributes WITH affinity to die less often (with: {}, without: {})",
         with_affinity_deaths,
         without_affinity_deaths

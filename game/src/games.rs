@@ -336,76 +336,102 @@ impl Game {
 
         // Process each tribute's survival check
         for tribute_idx in tribute_indices {
-            let tribute = &mut self.tributes[tribute_idx];
+            // Outcome messages we'll log after the tribute borrow is released.
+            let mut pending_messages: Vec<(crate::messages::MessageSource, String, String)> =
+                Vec::new();
 
-            // Check modifiers
-            let has_affinity = tribute.terrain_affinity.contains(&terrain);
+            {
+                let tribute = &mut self.tributes[tribute_idx];
 
-            // Check for protective items (shields only for physical events)
-            let is_physical_event = matches!(
-                most_severe_event,
-                AreaEvent::Avalanche | AreaEvent::Rockslide | AreaEvent::Earthquake
-            );
-            let has_item_bonus =
-                is_physical_event && tribute.items.iter().any(|item| item.is_defensive());
+                // Check modifiers
+                let has_affinity = tribute.terrain_affinity.contains(&terrain);
 
-            let is_desperate = tribute.attributes.health < 30;
-            let current_health = tribute.attributes.health;
+                // Check for protective items (shields only for physical events)
+                let is_physical_event = matches!(
+                    most_severe_event,
+                    AreaEvent::Avalanche | AreaEvent::Rockslide | AreaEvent::Earthquake
+                );
+                let has_item_bonus =
+                    is_physical_event && tribute.items.iter().any(|item| item.is_defensive());
 
-            // Run survival check with config parameters
-            let result = most_severe_event.survival_check(
-                &terrain,
-                has_affinity,
-                has_item_bonus,
-                is_desperate,
-                current_health,
-                self.config.instant_death_enabled,
-                self.config.catastrophic_severity_multiplier,
-                rng,
-            );
+                let is_desperate = tribute.attributes.health < 30;
+                let current_health = tribute.attributes.health;
 
-            // Apply results
-            if !result.survived {
-                tribute.attributes.health = 0;
+                // Run survival check with config parameters
+                let result = most_severe_event.survival_check(
+                    &terrain,
+                    has_affinity,
+                    has_item_bonus,
+                    is_desperate,
+                    current_health,
+                    self.config.instant_death_enabled,
+                    self.config.catastrophic_severity_multiplier,
+                    rng,
+                );
 
-                let _message = if result.instant_death {
-                    format!(
-                        "{} is instantly killed by the catastrophic {}!",
-                        tribute.name, most_severe_event
-                    )
+                let source = crate::messages::MessageSource::Tribute(tribute.identifier.clone());
+                let subject = format!("tribute:{}", tribute.identifier);
+
+                // Apply results
+                if !result.survived {
+                    tribute.attributes.health = 0;
+
+                    let content = if result.instant_death {
+                        format!(
+                            "{} is instantly killed by the catastrophic {}!",
+                            tribute.name, most_severe_event
+                        )
+                    } else {
+                        format!("{} dies from the {}", tribute.name, most_severe_event)
+                    };
+                    pending_messages.push((source, subject, content));
                 } else {
-                    format!("{} dies from the {}", tribute.name, most_severe_event)
-                };
-            } else {
-                // Survivor - apply rewards if any
-                if result.stamina_restored > 0 {
-                    tribute.stamina = tribute.stamina.saturating_add(result.stamina_restored);
-                    let _message = format!(
-                        "{} survives the {}, recovering {} stamina",
-                        tribute.name, most_severe_event, result.stamina_restored
-                    );
-                }
+                    // Survivor - apply rewards if any
+                    if result.stamina_restored > 0 {
+                        tribute.stamina = tribute.stamina.saturating_add(result.stamina_restored);
+                        pending_messages.push((
+                            source.clone(),
+                            subject.clone(),
+                            format!(
+                                "{} survives the {}, recovering {} stamina",
+                                tribute.name, most_severe_event, result.stamina_restored
+                            ),
+                        ));
+                    }
 
-                if result.sanity_restored > 0 {
-                    tribute.attributes.sanity = tribute
-                        .attributes
-                        .sanity
-                        .saturating_add(result.sanity_restored);
-                    let _message = format!(
-                        "{} survives the {}, recovering {} sanity",
-                        tribute.name, most_severe_event, result.sanity_restored
-                    );
-                }
+                    if result.sanity_restored > 0 {
+                        tribute.attributes.sanity = tribute
+                            .attributes
+                            .sanity
+                            .saturating_add(result.sanity_restored);
+                        pending_messages.push((
+                            source.clone(),
+                            subject.clone(),
+                            format!(
+                                "{} survives the {}, recovering {} sanity",
+                                tribute.name, most_severe_event, result.sanity_restored
+                            ),
+                        ));
+                    }
 
-                if result.reward_item.is_some() {
-                    let item = Item::new_random_consumable();
-                    let item_name = item.name.clone();
-                    tribute.items.push(item);
-                    let _message = format!(
-                        "{} survives the {} and finds a {}",
-                        tribute.name, most_severe_event, item_name
-                    );
+                    if result.reward_item.is_some() {
+                        let item = Item::new_random_consumable();
+                        let item_name = item.name.clone();
+                        tribute.items.push(item);
+                        pending_messages.push((
+                            source,
+                            subject,
+                            format!(
+                                "{} survives the {} and finds a {}",
+                                tribute.name, most_severe_event, item_name
+                            ),
+                        ));
+                    }
                 }
+            }
+
+            for (source, subject, content) in pending_messages {
+                self.log(source, subject, content);
             }
         }
         Ok(())

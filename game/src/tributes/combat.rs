@@ -535,10 +535,6 @@ mod tests {
                     *byte = 20;
                 }
             }
-            fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
-                self.fill_bytes(dest);
-                Ok(())
-            }
         }
 
         let mut crit_rng = CritRng;
@@ -567,10 +563,6 @@ mod tests {
                 for byte in dest.iter_mut() {
                     *byte = 1;
                 }
-            }
-            fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
-                self.fill_bytes(dest);
-                Ok(())
             }
         }
 
@@ -609,10 +601,6 @@ mod tests {
                     *byte = self.next_u32() as u8;
                 }
             }
-            fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
-                self.fill_bytes(dest);
-                Ok(())
-            }
         }
 
         let mut block_rng = BlockRng::new();
@@ -631,21 +619,19 @@ mod tests {
         attacker.attributes.strength = 20;
         target.attributes.health = 100;
         let initial_health = target.attributes.health;
+        let damage = attacker.attributes.strength * 3;
 
         // Manually test the damage application for critical hit
         apply_combat_results(
             &mut attacker,
             &mut target,
-            attacker.attributes.strength * 3, // Triple damage
+            damage, // Triple damage
             GameOutput::TributeAttackWin("Katniss", "Peeta"),
             "critical hit test",
         );
 
         // Verify triple damage was applied
-        assert_eq!(
-            target.attributes.health,
-            initial_health - (attacker.attributes.strength * 3)
-        );
+        assert_eq!(target.attributes.health, initial_health - damage);
     }
 
     #[rstest]

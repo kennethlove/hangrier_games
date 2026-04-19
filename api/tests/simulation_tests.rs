@@ -33,10 +33,7 @@ async fn create_game_with_tributes(
     // Create game
     let game_response = server
         .post("/api/games")
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "max_tributes": 24,
             "tribute_pool": 24,
@@ -52,10 +49,7 @@ async fn create_game_with_tributes(
         let district = (i % 12) + 1;
         server
             .post(&format!("/api/games/{}/tributes", game_id))
-            .add_header(
-                "Authorization".parse().unwrap(),
-                user.auth_header().parse().unwrap(),
-            )
+            .add_header("Authorization", user.auth_header())
             .json(&json!({
                 "name": format!("Tribute {}", i + 1),
                 "district": district,
@@ -73,7 +67,7 @@ async fn test_advance_game() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "game_advancer").await;
     let game_id = create_game_with_tributes(&server, &user, 4).await;
@@ -81,10 +75,7 @@ async fn test_advance_game() {
     // Advance the game
     let response = server
         .put(&format!("/api/games/{}/next", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     response.assert_status_ok();
@@ -105,7 +96,7 @@ async fn test_game_status_transitions() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "status_tester").await;
     let game_id = create_game_with_tributes(&server, &user, 2).await;
@@ -113,10 +104,7 @@ async fn test_game_status_transitions() {
     // Check initial status
     let get_response = server
         .get(&format!("/api/games/{}", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     let get_body = get_response.json::<serde_json::Value>();
@@ -125,10 +113,7 @@ async fn test_game_status_transitions() {
     // Advance game - should transition to running
     let advance_response = server
         .put(&format!("/api/games/{}/next", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     let advance_body = advance_response.json::<serde_json::Value>();
@@ -144,7 +129,7 @@ async fn test_game_day_logs() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "log_viewer").await;
     let game_id = create_game_with_tributes(&server, &user, 4).await;
@@ -152,20 +137,14 @@ async fn test_game_day_logs() {
     // Advance game to generate logs
     server
         .put(&format!("/api/games/{}/next", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await
         .assert_status_ok();
 
     // Get logs for day 1
     let log_response = server
         .get(&format!("/api/games/{}/log/1", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     log_response.assert_status_ok();
@@ -182,7 +161,7 @@ async fn test_tribute_day_logs() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "tribute_log_viewer").await;
     let game_id = create_game_with_tributes(&server, &user, 4).await;
@@ -190,10 +169,7 @@ async fn test_tribute_day_logs() {
     // Get tribute ID
     let game_response = server
         .get(&format!("/api/games/{}", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     let game_body = game_response.json::<serde_json::Value>();
@@ -203,20 +179,14 @@ async fn test_tribute_day_logs() {
     // Advance game
     server
         .put(&format!("/api/games/{}/next", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await
         .assert_status_ok();
 
     // Get tribute logs for day 1
     let log_response = server
         .get(&format!("/api/games/{}/log/1/{}", game_id, tribute_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     log_response.assert_status_ok();
@@ -233,7 +203,7 @@ async fn test_multiple_game_cycles() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "cycle_tester").await;
     let game_id = create_game_with_tributes(&server, &user, 4).await;
@@ -242,10 +212,7 @@ async fn test_multiple_game_cycles() {
     for _ in 0..3 {
         let response = server
             .put(&format!("/api/games/{}/next", game_id))
-            .add_header(
-                "Authorization".parse().unwrap(),
-                user.auth_header().parse().unwrap(),
-            )
+            .add_header("Authorization", user.auth_header())
             .await;
 
         response.assert_status_ok();
@@ -258,10 +225,7 @@ async fn test_multiple_game_cycles() {
     // Verify final state
     let get_response = server
         .get(&format!("/api/games/{}", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     let get_body = get_response.json::<serde_json::Value>();
@@ -277,7 +241,7 @@ async fn test_game_finishes_with_winner() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "winner_tester").await;
     let game_id = create_game_with_tributes(&server, &user, 2).await;
@@ -289,10 +253,7 @@ async fn test_game_finishes_with_winner() {
     while status != "finished" && iterations < 50 {
         let response = server
             .put(&format!("/api/games/{}/next", game_id))
-            .add_header(
-                "Authorization".parse().unwrap(),
-                user.auth_header().parse().unwrap(),
-            )
+            .add_header("Authorization", user.auth_header())
             .await;
 
         if response.status_code() != axum::http::StatusCode::OK {
@@ -317,7 +278,7 @@ async fn test_advance_finished_game() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "finished_game_tester").await;
     let game_id = create_game_with_tributes(&server, &user, 2).await;
@@ -326,10 +287,7 @@ async fn test_advance_finished_game() {
     for _ in 0..50 {
         let response = server
             .put(&format!("/api/games/{}/next", game_id))
-            .add_header(
-                "Authorization".parse().unwrap(),
-                user.auth_header().parse().unwrap(),
-            )
+            .add_header("Authorization", user.auth_header())
             .await;
 
         if !response.status_code().is_success() {
@@ -345,10 +303,7 @@ async fn test_advance_finished_game() {
     // Try to advance the finished game
     let response = server
         .put(&format!("/api/games/{}/next", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     // Should either return error or return the same state
@@ -366,7 +321,7 @@ async fn test_game_state_persistence() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "persistence_tester").await;
     let game_id = create_game_with_tributes(&server, &user, 4).await;
@@ -374,20 +329,14 @@ async fn test_game_state_persistence() {
     // Advance game
     server
         .put(&format!("/api/games/{}/next", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await
         .assert_status_ok();
 
     // Get game state
     let get_response1 = server
         .get(&format!("/api/games/{}", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     let body1 = get_response1.json::<serde_json::Value>();
@@ -396,20 +345,14 @@ async fn test_game_state_persistence() {
     // Advance again
     server
         .put(&format!("/api/games/{}/next", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await
         .assert_status_ok();
 
     // Get game state again
     let get_response2 = server
         .get(&format!("/api/games/{}", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     let body2 = get_response2.json::<serde_json::Value>();

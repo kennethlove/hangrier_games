@@ -10,7 +10,7 @@ async fn test_user_registration() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let test_user = TestUser::new("testuser1");
 
@@ -38,7 +38,7 @@ async fn test_user_authentication() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let test_user = TestUser::new("testuser2");
 
@@ -77,7 +77,7 @@ async fn test_authentication_wrong_password() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let test_user = TestUser::new("testuser3");
 
@@ -112,7 +112,7 @@ async fn test_token_refresh() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let test_user = TestUser::new("testuser4");
 
@@ -157,7 +157,7 @@ async fn test_logout() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let test_user = TestUser::new("testuser5");
 
@@ -204,7 +204,7 @@ async fn test_duplicate_username() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let test_user = TestUser::new("duplicate_user");
 
@@ -244,7 +244,7 @@ async fn test_session_endpoint() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let test_user = TestUser::new("testuser6");
 
@@ -265,10 +265,7 @@ async fn test_session_endpoint() {
     // Call session endpoint with token
     let session_response = server
         .get("/api/users")
-        .add_header(
-            "Authorization".parse().unwrap(),
-            format!("Bearer {}", access_token).parse().unwrap(),
-        )
+        .add_header("Authorization", format!("Bearer {}", access_token))
         .await;
 
     session_response.assert_status_ok();

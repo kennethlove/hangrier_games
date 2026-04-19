@@ -28,10 +28,7 @@ async fn create_authenticated_user(server: &TestServer, username: &str) -> TestU
 async fn create_test_game(server: &TestServer, user: &TestUser) -> String {
     let response = server
         .post("/api/games")
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "max_tributes": 24,
             "tribute_pool": 24,
@@ -49,17 +46,14 @@ async fn test_create_tribute() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "tribute_creator1").await;
     let game_id = create_test_game(&server, &user).await;
 
     let response = server
         .post(&format!("/api/games/{}/tributes", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "name": "Katniss Everdeen",
             "district": 12,
@@ -84,7 +78,7 @@ async fn test_get_tribute() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "tribute_getter").await;
     let game_id = create_test_game(&server, &user).await;
@@ -92,10 +86,7 @@ async fn test_get_tribute() {
     // Create a tribute
     let create_response = server
         .post(&format!("/api/games/{}/tributes", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "name": "Peeta Mellark",
             "district": 12,
@@ -108,10 +99,7 @@ async fn test_get_tribute() {
     // Get the tribute
     let get_response = server
         .get(&format!("/api/games/{}/tributes/{}", game_id, tribute_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     get_response.assert_status_ok();
@@ -129,7 +117,7 @@ async fn test_update_tribute() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "tribute_updater").await;
     let game_id = create_test_game(&server, &user).await;
@@ -137,10 +125,7 @@ async fn test_update_tribute() {
     // Create a tribute
     let create_response = server
         .post(&format!("/api/games/{}/tributes", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "name": "Rue",
             "district": 11,
@@ -153,10 +138,7 @@ async fn test_update_tribute() {
     // Update the tribute
     let update_response = server
         .put(&format!("/api/games/{}/tributes/{}", game_id, tribute_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "name": "Rue (Updated)",
         }))
@@ -176,7 +158,7 @@ async fn test_delete_tribute() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "tribute_deleter").await;
     let game_id = create_test_game(&server, &user).await;
@@ -184,10 +166,7 @@ async fn test_delete_tribute() {
     // Create a tribute
     let create_response = server
         .post(&format!("/api/games/{}/tributes", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "name": "Cato",
             "district": 2,
@@ -200,10 +179,7 @@ async fn test_delete_tribute() {
     // Delete the tribute
     let delete_response = server
         .delete(&format!("/api/games/{}/tributes/{}", game_id, tribute_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     delete_response.assert_status(axum::http::StatusCode::NO_CONTENT);
@@ -211,10 +187,7 @@ async fn test_delete_tribute() {
     // Try to get the deleted tribute - should return 404
     let get_response = server
         .get(&format!("/api/games/{}/tributes/{}", game_id, tribute_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     get_response.assert_status(axum::http::StatusCode::NOT_FOUND);
@@ -228,7 +201,7 @@ async fn test_create_multiple_tributes() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "multi_tribute_creator").await;
     let game_id = create_test_game(&server, &user).await;
@@ -239,10 +212,7 @@ async fn test_create_multiple_tributes() {
     for (name, district) in tributes {
         let response = server
             .post(&format!("/api/games/{}/tributes", game_id))
-            .add_header(
-                "Authorization".parse().unwrap(),
-                user.auth_header().parse().unwrap(),
-            )
+            .add_header("Authorization", user.auth_header())
             .json(&json!({
                 "name": name,
                 "district": district,
@@ -261,7 +231,7 @@ async fn test_tribute_log() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "tribute_logger").await;
     let game_id = create_test_game(&server, &user).await;
@@ -269,10 +239,7 @@ async fn test_tribute_log() {
     // Create a tribute
     let create_response = server
         .post(&format!("/api/games/{}/tributes", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "name": "Finnick Odair",
             "district": 4,
@@ -288,10 +255,7 @@ async fn test_tribute_log() {
             "/api/games/{}/tributes/{}/log",
             game_id, tribute_id
         ))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     log_response.assert_status_ok();
@@ -308,7 +272,7 @@ async fn test_tribute_items() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "tribute_item_tester").await;
     let game_id = create_test_game(&server, &user).await;
@@ -316,10 +280,7 @@ async fn test_tribute_items() {
     // Create a tribute
     let create_response = server
         .post(&format!("/api/games/{}/tributes", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "name": "Johanna Mason",
             "district": 7,
@@ -332,10 +293,7 @@ async fn test_tribute_items() {
     // Get tribute details (should include items)
     let get_response = server
         .get(&format!("/api/games/{}/tributes/{}", game_id, tribute_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .await;
 
     get_response.assert_status_ok();
@@ -352,7 +310,7 @@ async fn test_create_tribute_validation() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "tribute_validator").await;
     let game_id = create_test_game(&server, &user).await;
@@ -360,10 +318,7 @@ async fn test_create_tribute_validation() {
     // Try to create tribute without name
     let response = server
         .post(&format!("/api/games/{}/tributes", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "district": 1,
         }))
@@ -384,7 +339,7 @@ async fn test_tribute_district_validation() {
     let test_db = TestDb::new().await;
     let app_state = test_db.app_state();
     let router = create_test_router(app_state);
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let user = create_authenticated_user(&server, "district_validator").await;
     let game_id = create_test_game(&server, &user).await;
@@ -392,10 +347,7 @@ async fn test_tribute_district_validation() {
     // Try to create tribute with invalid district
     let response = server
         .post(&format!("/api/games/{}/tributes", game_id))
-        .add_header(
-            "Authorization".parse().unwrap(),
-            user.auth_header().parse().unwrap(),
-        )
+        .add_header("Authorization", user.auth_header())
         .json(&json!({
             "name": "Invalid District",
             "district": 99,

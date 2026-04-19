@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use api::AppState;
 use axum::Router;
 use std::sync::Arc;
@@ -64,7 +66,7 @@ impl TestDb {
     pub async fn cleanup(&self) {
         // Note: In a real test setup, you might want to drop the entire database
         // For now, we'll just clear the tables
-        let _: Result<Vec<serde_json::Value>, _> = self.db.query("REMOVE DATABASE $this").await;
+        let _ = self.db.query("REMOVE DATABASE $this").await;
     }
 }
 

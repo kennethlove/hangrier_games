@@ -2,7 +2,7 @@ use game::areas::AreaDetails;
 use game::games::Game;
 use game::messages::GameMessage;
 use game::tributes::Tribute;
-use shared::{AuthenticatedUser, DisplayGame, TributeKey};
+use shared::{AuthenticatedUser, DisplayGame};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum QueryKey {
@@ -46,7 +46,6 @@ pub(crate) enum QueryValue {
     Games(Vec<Game>),
     Tribute(Box<Tribute>),
     Tributes(Vec<Tribute>),
-    GameTributes(Vec<TributeKey>),
     Logs(Vec<GameMessage>),
     Summary(String),
     ServerVersion(String),

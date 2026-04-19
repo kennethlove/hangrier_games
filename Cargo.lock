@@ -7123,6 +7123,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shared",
+ "tracing",
  "web-sys",
 ]
 

@@ -50,7 +50,7 @@ pub fn SpriteSheetLoader() -> Element {
     "#;
 
     rsx! {
-        script { dangerous: js_code }
+        script { dangerous_inner_html: js_code }
     }
 }
 

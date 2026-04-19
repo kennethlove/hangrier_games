@@ -10,7 +10,7 @@ use shared::EditGame;
 use std::ops::Deref;
 
 async fn edit_game(args: (EditGame, String)) -> MutationResult<MutationValue, MutationError> {
-    let identifier = args.0.0.clone();
+    let identifier = args.0.identifier.clone();
     let token = args.1.clone();
 
     let client = reqwest::Client::new();
@@ -42,11 +42,11 @@ pub fn GameEdit(identifier: String, name: String, icon_class: String, private: b
     let onclick = move |_| {
         let name = name.clone();
         let private = private.clone();
-        edit_game_signal.set(Some(EditGame(
-            identifier.clone(),
-            name.clone(),
-            private.clone(),
-        )));
+        edit_game_signal.set(Some(EditGame {
+            identifier: identifier.clone(),
+            name: name.clone(),
+            private: private.clone(),
+        }));
     };
 
     rsx! {
@@ -91,9 +91,9 @@ pub fn EditGameForm() -> Element {
 
     let mut edit_game_signal: Signal<Option<EditGame>> = use_context();
     let game_details = edit_game_signal.read().clone().unwrap_or_default();
-    let name = game_details.1.clone();
-    let identifier = game_details.0.clone();
-    let private = game_details.2.clone();
+    let name = game_details.name.clone();
+    let identifier = game_details.identifier.clone();
+    let private = game_details.private;
 
     let mutate = use_mutation(edit_game);
 
@@ -120,7 +120,11 @@ pub fn EditGameForm() -> Element {
         };
 
         if !name.is_empty() {
-            let edit_game = EditGame(identifier.clone(), name.clone(), private.clone());
+            let edit_game = EditGame {
+                identifier: identifier.clone(),
+                name: name.clone(),
+                private,
+            };
             spawn(async move {
                 mutate.mutate_async((edit_game.clone(), token)).await;
                 edit_game_signal.set(Some(edit_game.clone()));

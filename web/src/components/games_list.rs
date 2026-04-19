@@ -8,9 +8,10 @@ use crate::routes::Routes;
 use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
 use dioxus_query::prelude::{QueryResult, QueryState, use_get_query, use_query_client};
+use serde::{Deserialize, Serialize};
 use shared::{DisplayGame, GameStatus, ListDisplayGame, PaginationMetadata};
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct PaginatedGamesResponse {
     pub games: Vec<ListDisplayGame>,
     pub pagination: PaginationMetadata,

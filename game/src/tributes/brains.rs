@@ -681,6 +681,7 @@ impl Brain {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::items::Item;
     use crate::tributes::Tribute;
     use crate::tributes::actions::Action;

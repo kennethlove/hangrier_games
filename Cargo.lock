@@ -2354,6 +2354,7 @@ dependencies = [
  "rand 0.9.1",
  "rstest",
  "serde",
+ "serde_json",
  "shared",
  "strum 0.27.1",
  "strum_macros 0.27.1",

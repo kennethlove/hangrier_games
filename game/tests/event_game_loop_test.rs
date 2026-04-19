@@ -1,15 +1,14 @@
 use game::areas::events::AreaEvent;
 use game::areas::{Area, AreaDetails};
 use game::games::Game;
-use game::messages::{clear_messages, get_all_messages};
 use game::terrain::{BaseTerrain, TerrainType};
 use game::tributes::Tribute;
+use rand::SeedableRng;
+use rand::rngs::SmallRng;
 
 /// Test that events triggered in game loop actually process tribute survival checks
 #[test]
 fn test_event_survival_integration_with_game_loop() {
-    clear_messages().unwrap();
-
     let mut game = Game::new("test-game");
     game.start();
 
@@ -37,8 +36,13 @@ fn test_event_survival_integration_with_game_loop() {
     let initial_alive = game.living_tributes().len();
     assert_eq!(initial_alive, 5);
 
+    // Drain any setup messages so we only inspect event-driven output below
+    game.messages.clear();
+
     // Process event survival checks
-    game.process_event_for_area(&Area::North, &AreaEvent::Wildfire);
+    let mut rng = SmallRng::seed_from_u64(123);
+    game.process_event_for_area(&Area::North, &AreaEvent::Wildfire, &mut rng)
+        .unwrap();
 
     // Check that some tributes died (probabilistic, but should happen)
     let final_alive = game.living_tributes().len();
@@ -52,16 +56,13 @@ fn test_event_survival_integration_with_game_loop() {
     );
 
     // Verify messages were generated
-    let messages = get_all_messages().unwrap();
-
-    // Should have death/survival messages
     assert!(
-        !messages.is_empty(),
+        !game.messages.is_empty(),
         "Expected survival outcome messages but found none"
     );
 
     // Check for specific outcome messages (death or survival)
-    let has_outcome_message = messages.iter().any(|m| {
+    let has_outcome_message = game.messages.iter().any(|m| {
         m.content.contains("dies from")
             || m.content.contains("killed by")
             || m.content.contains("survives")
@@ -75,8 +76,6 @@ fn test_event_survival_integration_with_game_loop() {
 /// Test that trigger_cycle_events integrates with process_event_for_area
 #[test]
 fn test_trigger_cycle_events_calls_process_event() {
-    clear_messages().unwrap();
-
     let mut game = Game::new("test-game");
     game.start();
     game.day = Some(2); // Day 2 to avoid special day #1 behavior
@@ -116,9 +115,15 @@ fn test_trigger_cycle_events_calls_process_event() {
 
     let initial_alive = game.living_tributes().len();
 
+    // Drain setup messages so the assertion below only sees event output
+    game.messages.clear();
+
     // Process events (what trigger_cycle_events now does internally)
-    game.process_event_for_area(&Area::North, &AreaEvent::Wildfire);
-    game.process_event_for_area(&Area::South, &AreaEvent::Sandstorm);
+    let mut rng = SmallRng::seed_from_u64(99);
+    game.process_event_for_area(&Area::North, &AreaEvent::Wildfire, &mut rng)
+        .unwrap();
+    game.process_event_for_area(&Area::South, &AreaEvent::Sandstorm, &mut rng)
+        .unwrap();
 
     let final_alive = game.living_tributes().len();
 
@@ -131,20 +136,17 @@ fn test_trigger_cycle_events_calls_process_event() {
     );
 
     // Verify messages exist
-    let messages = get_all_messages().unwrap();
-
-    assert!(!messages.is_empty(), "Expected event outcome messages");
+    assert!(!game.messages.is_empty(), "Expected event outcome messages");
 }
 
 /// Test that tributes with terrain affinity have better survival
 #[test]
 fn test_terrain_affinity_improves_survival() {
-    clear_messages().unwrap();
-
     // Run multiple trials to get statistical significance
     let mut with_affinity_deaths = 0;
     let mut without_affinity_deaths = 0;
     let trials = 20;
+    let mut rng = SmallRng::seed_from_u64(2024);
 
     for _ in 0..trials {
         // Test WITH affinity
@@ -166,7 +168,9 @@ fn test_terrain_affinity_improves_survival() {
         tribute.statistics.game = game_with.identifier.clone();
         game_with.tributes.push(tribute);
 
-        game_with.process_event_for_area(&Area::North, &AreaEvent::Wildfire);
+        game_with
+            .process_event_for_area(&Area::North, &AreaEvent::Wildfire, &mut rng)
+            .unwrap();
 
         if game_with.tributes[0].attributes.health == 0 {
             with_affinity_deaths += 1;
@@ -191,7 +195,9 @@ fn test_terrain_affinity_improves_survival() {
         tribute2.statistics.game = game_without.identifier.clone();
         game_without.tributes.push(tribute2);
 
-        game_without.process_event_for_area(&Area::North, &AreaEvent::Wildfire);
+        game_without
+            .process_event_for_area(&Area::North, &AreaEvent::Wildfire, &mut rng)
+            .unwrap();
 
         if game_without.tributes[0].attributes.health == 0 {
             without_affinity_deaths += 1;

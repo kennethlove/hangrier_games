@@ -3,6 +3,8 @@ use game::areas::{Area, AreaDetails};
 use game::games::Game;
 use game::terrain::{BaseTerrain, TerrainType};
 use game::tributes::Tribute;
+use rand::SeedableRng;
+use rand::rngs::SmallRng;
 
 #[test]
 fn test_wildfire_in_forest_kills_tributes() {
@@ -31,9 +33,12 @@ fn test_wildfire_in_forest_kills_tributes() {
 
     // Run 10 times, expect at least some deaths
     let mut death_count = 0;
+    let mut rng = SmallRng::seed_from_u64(42);
     for _ in 0..10 {
         let mut test_game = game.clone();
-        test_game.process_event_for_area(&area_name, &event);
+        test_game
+            .process_event_for_area(&area_name, &event, &mut rng)
+            .unwrap();
         if test_game.tributes[0].attributes.health == 0 {
             death_count += 1;
         }
@@ -72,9 +77,12 @@ fn test_wildfire_in_desert_minor_impact() {
 
     // Run 10 times, expect low death rate
     let mut death_count = 0;
+    let mut rng = SmallRng::seed_from_u64(7);
     for _ in 0..10 {
         let mut test_game = game.clone();
-        test_game.process_event_for_area(&area_name, &event);
+        test_game
+            .process_event_for_area(&area_name, &event, &mut rng)
+            .unwrap();
         if test_game.tributes[0].attributes.health == 0 {
             death_count += 1;
         }

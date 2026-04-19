@@ -1,4 +1,4 @@
-use crate::tributes::{TRIBUTES_ROUTER, TributeItemEdge, create_tribute};
+use crate::tributes::{TRIBUTES_ROUTER, create_tribute};
 use crate::{AppError, AppState};
 use axum::Json;
 use axum::Router;
@@ -146,7 +146,7 @@ async fn create_game_area_edge(
         WHERE original_name = '$name'
         AND <-areas<-game.identifier = '$game_id'"#,
         )
-        .bind(("name", area.clone()))
+        .bind(("name", area))
         .bind(("game_id", game_identifier_str.clone()))
         .await
         .and_then(|mut resp| resp.take(0))
@@ -156,8 +156,8 @@ async fn create_game_area_edge(
         Uuid::from_str(&identifier.to_string())
             .map_err(|e| AppError::BadRequest(format!("Invalid area UUID: {}", e)))?
     } else {
-        match create_game_area(area, &db).await {
-            Ok(game_area) => Uuid::from_str(&game_area.identifier.as_str())
+        match create_game_area(area, db).await {
+            Ok(game_area) => Uuid::from_str(game_area.identifier.as_str())
                 .map_err(|e| AppError::BadRequest(format!("Invalid game area UUID: {}", e)))?,
             Err(_) => {
                 return Err(AppError::InternalServerError(
@@ -237,14 +237,8 @@ pub async fn create_game(
     let base_item_count = payload.item_quantity.base_item_count();
 
     // Create areas concurrently with customized item count
-    let area_futures = Area::iter().map(|area| {
-        create_area(
-            game_identifier.as_str(),
-            area.clone(),
-            base_item_count,
-            &state.db,
-        )
-    });
+    let area_futures = Area::iter()
+        .map(|area| create_area(game_identifier.as_str(), area, base_item_count, &state.db));
     let area_results = futures::future::join_all(area_futures).await;
 
     if let Some(err) = area_results.into_iter().find_map(Result::err) {
@@ -265,9 +259,9 @@ pub async fn create_area(
 ) -> Result<(), AppError> {
     let game_uuid = Uuid::from_str(game_identifier)
         .map_err(|e| AppError::BadRequest(format!("Invalid game UUID: {}", e)))?;
-    if let Ok(game_area) = create_game_area_edge(area.clone(), game_uuid, &db).await {
+    if let Ok(game_area) = create_game_area_edge(area, game_uuid, db).await {
         // Create initial items for the area (terrain will be assigned by game engine)
-        let item_futures = (0..num_items).map(|_| add_item_to_area(&game_area, None, &db));
+        let item_futures = (0..num_items).map(|_| add_item_to_area(&game_area, None, db));
         let item_results = futures::future::join_all(item_futures).await;
         if let Some(err) = item_results.into_iter().find_map(Result::err) {
             return Err(AppError::InternalServerError(format!(
@@ -498,7 +492,7 @@ pub async fn game_update(
             })?;
             if let Some(game) = game {
                 Ok(Json::<Game>(game))
-            } else if let None = game {
+            } else if game.is_none() {
                 Err(AppError::NotFound("Failed to find game".into()))
             } else {
                 unreachable!()
@@ -705,7 +699,7 @@ pub async fn next_step(
             Ok(Json(Some(game)))
         }
         GameStatus::InProgress => {
-            let dead_tribute_count = get_dead_tribute_count(&state.db, &id_str).await?;
+            let dead_tribute_count = get_dead_tribute_count(&state.db, id_str).await?;
 
             if dead_tribute_count >= 24 {
                 update_game_status(&state.db, &record_id, GameStatus::Finished).await?;
@@ -1056,11 +1050,7 @@ async fn save_area_items(
         // Batch insert relations
         let mut relation_parts = Vec::new();
         for item in &items_to_update {
-            relation_parts.push(format!(
-                "RELATE {}->items->item:{}",
-                owner.to_string(),
-                item.identifier
-            ));
+            relation_parts.push(format!("RELATE {}->items->item:{}", owner, item.identifier));
         }
 
         let bulk_relations = relation_parts.join(";\n");
@@ -1176,11 +1166,7 @@ async fn save_tribute_items(
         // Batch insert relations
         let mut relation_parts = Vec::new();
         for item in &items_to_update {
-            relation_parts.push(format!(
-                "RELATE {}->owns->item:{}",
-                owner.to_string(),
-                item.identifier
-            ));
+            relation_parts.push(format!("RELATE {}->owns->item:{}", owner, item.identifier));
         }
 
         let bulk_relations = relation_parts.join(";\n");

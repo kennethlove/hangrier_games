@@ -59,7 +59,6 @@ impl Display for ItemRarity {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Error)]
 pub enum ItemError {
     #[error("Item not found")]
@@ -224,7 +223,14 @@ impl Item {
         let (min, max) = rarity.effect_range();
         let effect = rng.random_range(min..=max);
 
-        Item::new(name, ItemType::Consumable, rarity, quantity, attribute, effect)
+        Item::new(
+            name,
+            ItemType::Consumable,
+            rarity,
+            quantity,
+            attribute,
+            effect,
+        )
     }
 
     pub fn new_random_consumable() -> Item {
@@ -236,7 +242,14 @@ impl Item {
         let (min, max) = rarity.effect_range();
         let effect = rng.random_range(min..=max);
 
-        Item::new(&name, ItemType::Consumable, rarity, quantity, attribute, effect)
+        Item::new(
+            &name,
+            ItemType::Consumable,
+            rarity,
+            quantity,
+            attribute,
+            effect,
+        )
     }
 
     pub fn new_shield(name: &str) -> Item {
@@ -395,12 +408,22 @@ mod tests {
     #[test]
     fn item_to_string() {
         let item = Item::default();
-        assert_eq!(item.to_string(), "Useless health potion (Common)".to_string());
+        assert_eq!(
+            item.to_string(),
+            "Useless health potion (Common)".to_string()
+        );
     }
 
     #[test]
     fn new_item() {
-        let item = Item::new("Test item", ItemType::Weapon, ItemRarity::Rare, 1, Attribute::Defense, 10);
+        let item = Item::new(
+            "Test item",
+            ItemType::Weapon,
+            ItemRarity::Rare,
+            1,
+            Attribute::Defense,
+            10,
+        );
         assert_eq!(item.name, "Test item");
         assert_eq!(item.item_type, ItemType::Weapon);
         assert_eq!(item.rarity, ItemRarity::Rare);
@@ -498,11 +521,7 @@ mod tests {
     #[test]
     fn random_attribute() {
         let attribute = Attribute::random();
-        assert!(
-            Attribute::iter()
-                .find(|a| *a == attribute.clone())
-                .is_some()
-        );
+        assert!(Attribute::iter().any(|a| a == attribute.clone()));
     }
 
     #[rstest]
@@ -551,13 +570,15 @@ mod tests {
         // Test that random() returns valid rarities
         for _ in 0..100 {
             let rarity = ItemRarity::random();
-            assert!([
-                ItemRarity::Common,
-                ItemRarity::Uncommon,
-                ItemRarity::Rare,
-                ItemRarity::Legendary
-            ]
-            .contains(&rarity));
+            assert!(
+                [
+                    ItemRarity::Common,
+                    ItemRarity::Uncommon,
+                    ItemRarity::Rare,
+                    ItemRarity::Legendary
+                ]
+                .contains(&rarity)
+            );
         }
     }
 
@@ -583,13 +604,15 @@ mod tests {
     fn weapon_has_rarity() {
         let weapon = Item::new_weapon("Test weapon");
         // Verify rarity is set
-        assert!([
-            ItemRarity::Common,
-            ItemRarity::Uncommon,
-            ItemRarity::Rare,
-            ItemRarity::Legendary
-        ]
-        .contains(&weapon.rarity));
+        assert!(
+            [
+                ItemRarity::Common,
+                ItemRarity::Uncommon,
+                ItemRarity::Rare,
+                ItemRarity::Legendary
+            ]
+            .contains(&weapon.rarity)
+        );
     }
 
     #[test]

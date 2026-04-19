@@ -326,10 +326,10 @@ impl Brain {
         }
 
         // If there is a preferred action, we should take it, assuming a positive roll
-        if let Some(ref preferred_action) = self.preferred_action {
-            if rng.random_bool(self.preferred_action_percentage) {
-                return preferred_action.clone();
-            }
+        if let Some(ref preferred_action) = self.preferred_action
+            && rng.random_bool(self.preferred_action_percentage)
+        {
+            return preferred_action.clone();
         }
 
         // Does the tribute have items?
@@ -360,7 +360,7 @@ impl Brain {
                     .iter()
                     .map(|dest| {
                         let mut ad = AreaDetails::default();
-                        ad.area = Some(dest.area.clone());
+                        ad.area = Some(dest.area);
                         ad.terrain = dest.terrain.clone();
                         ad.events = dest.active_events.clone();
                         ad
@@ -372,10 +372,9 @@ impl Brain {
                     // Also check if tribute has enough stamina
                     if let Some(dest_info) =
                         available_destinations.iter().find(|d| d.area == best_area)
+                        && tribute.stamina >= dest_info.stamina_cost
                     {
-                        if tribute.stamina >= dest_info.stamina_cost {
-                            return Action::Move(Some(best_area));
-                        }
+                        return Action::Move(Some(best_area));
                     }
                 }
                 // Fall back to rest if no good destination or insufficient stamina
@@ -443,7 +442,7 @@ impl Brain {
 
             if score > best_score {
                 best_score = score;
-                best_area = area_details.area.clone();
+                best_area = area_details.area;
             }
         }
 
@@ -467,10 +466,10 @@ impl Brain {
         }
 
         // Check for preferred action first
-        if let Some(ref preferred_action) = self.preferred_action {
-            if rng.random_bool(self.preferred_action_percentage) {
-                return preferred_action.clone();
-            }
+        if let Some(ref preferred_action) = self.preferred_action
+            && rng.random_bool(self.preferred_action_percentage)
+        {
+            return preferred_action.clone();
         }
 
         // Check if we have consumables
@@ -955,7 +954,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_defensive_retreats_earlier(mut small_rng: SmallRng) {
+    fn test_defensive_retreats_earlier(_small_rng: SmallRng) {
         let mut tribute = Tribute::default();
         tribute.brain.personality = BrainPersonality::Defensive;
         // Regenerate thresholds for the new personality (otherwise stale

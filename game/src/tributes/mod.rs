@@ -124,7 +124,7 @@ impl Tribute {
         // Assign terrain affinity and personality based on district
         let mut rng = SmallRng::from_rng(&mut rand::rng());
         let brain = Brain::new_with_random_personality(&mut rng);
-        let terrain_affinity = if district >= 1 && district <= 12 {
+        let terrain_affinity = if (1..=12).contains(&district) {
             crate::districts::assign_terrain_affinity(district as u8, &mut rng)
         } else {
             vec![]
@@ -241,7 +241,7 @@ impl Tribute {
         let area_details = &mut environment_details.area_details;
 
         // Update the tribute based on the period's events.
-        self.process_status(&area_details, rng);
+        self.process_status(area_details, rng);
 
         // Tribute died to the period's events.
         if self.status == TributeStatus::RecentlyDead || self.attributes.health == 0 {
@@ -283,7 +283,7 @@ impl Tribute {
         // Get tribute action
         let number_of_nearby_tributes = encounter_context.nearby_tributes_count;
         let action = self.brain.act(
-            &self,
+            self,
             number_of_nearby_tributes,
             &environment_details.available_destinations,
             rng,
@@ -294,7 +294,7 @@ impl Tribute {
         match &action {
             Action::Move(area) => {
                 let travel_result = match area {
-                    Some(specific_area) => self.travels(closed_areas, Some(specific_area.clone())),
+                    Some(specific_area) => self.travels(closed_areas, Some(*specific_area)),
                     None => self.travels(closed_areas, None),
                 };
 
@@ -608,8 +608,7 @@ impl Attributes {
 
 #[cfg(test)]
 mod tests {
-    use crate::areas::Area::{Cornucopia, East, North, South, West};
-    use crate::areas::AreaDetails;
+
     use crate::tributes::Tribute;
     use rand::SeedableRng;
     use rand::rngs::SmallRng;

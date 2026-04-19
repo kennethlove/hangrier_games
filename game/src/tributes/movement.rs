@@ -30,7 +30,7 @@ impl Tribute {
     ) -> TravelResult {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
         // Where is the tribute?
-        let current_area = self.area.clone();
+        let current_area = self.area;
 
         // 1. Can the tribute move at all?
         if self.attributes.movement == 0 {
@@ -44,21 +44,18 @@ impl Tribute {
 
         // 2. Determine the target area based on suggestion and validity.
         let mut target_area: Option<Area> = None;
-        if let Some(suggestion) = suggested_area {
-            if !closed_areas.contains(&suggestion) {
-                if suggestion == current_area {
-                    let suggestion = suggestion.to_string();
-                    self.try_log_action(
-                        GameOutput::TributeTravelAlreadyThere(
-                            self.name.as_str(),
-                            suggestion.as_str(),
-                        ),
-                        "already there",
-                    );
-                    return TravelResult::Failure;
-                }
-                target_area = Some(suggestion);
+        if let Some(suggestion) = suggested_area
+            && !closed_areas.contains(&suggestion)
+        {
+            if suggestion == current_area {
+                let suggestion = suggestion.to_string();
+                self.try_log_action(
+                    GameOutput::TributeTravelAlreadyThere(self.name.as_str(), suggestion.as_str()),
+                    "already there",
+                );
+                return TravelResult::Failure;
             }
+            target_area = Some(suggestion);
         }
 
         // 3. Handle movement based on tribute's movement attribute.
@@ -120,7 +117,7 @@ impl Tribute {
                         ),
                         "no options",
                     );
-                    return TravelResult::Success(current_area.clone());
+                    return TravelResult::Success(current_area);
                 }
 
                 // TODO: Loyalty bit goes here
@@ -136,7 +133,7 @@ impl Tribute {
                     ),
                     "travel",
                 );
-                TravelResult::Success(chosen_neighbor.clone())
+                TravelResult::Success(*chosen_neighbor)
             }
         }
     }

@@ -135,11 +135,11 @@ impl<'a> Display for GameOutput<'a> {
                 write!(f, "🚶 {} moves from {} to {}", tribute, area_a, area_b)
             }
             GameOutput::TributeTakeItem(tribute, item) => {
-                let object = indefinite(&item);
+                let object = indefinite(item);
                 write!(f, "🔨 {} takes {}", tribute, object)
             }
             GameOutput::TributeCannotUseItem(tribute, item) => {
-                let object = indefinite(&item);
+                let object = indefinite(item);
                 write!(f, "❌ {} cannot use {}", tribute, object)
             }
             GameOutput::TributeUseItem(tribute, item) => {
@@ -333,7 +333,7 @@ impl<'a> Display for GameOutput<'a> {
             }
             GameOutput::AreaEvent(area_event, area) => {
                 let area_name = area.replace("The ", "");
-                let event = indefinite_capitalized(&area_event);
+                let event = indefinite_capitalized(area_event);
                 write!(f, "=== ⚠️ {} has occurred in the {} ===", event, area_name)
             }
             GameOutput::AreaClose(area) => {

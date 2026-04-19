@@ -149,7 +149,8 @@ fn test_survival_check_with_affinity() {
     let mut rng = SmallRng::seed_from_u64(42);
 
     // With affinity, survival should be easier
-    let result_with_affinity = event.survival_check(&terrain, true, false, false, 100, true, 1.0, &mut rng);
+    let result_with_affinity =
+        event.survival_check(&terrain, true, false, false, 100, true, 1.0, &mut rng);
     let mut rng2 = SmallRng::seed_from_u64(42);
     let result_without_affinity =
         event.survival_check(&terrain, false, false, false, 100, true, 1.0, &mut rng2);
@@ -168,9 +169,11 @@ fn test_survival_check_with_item_bonus() {
     let mut rng = SmallRng::seed_from_u64(42);
 
     // With item bonus, survival should be easier
-    let result_with_item = event.survival_check(&terrain, false, true, false, 100, true, 1.0, &mut rng);
+    let result_with_item =
+        event.survival_check(&terrain, false, true, false, 100, true, 1.0, &mut rng);
     let mut rng2 = SmallRng::seed_from_u64(42);
-    let result_without_item = event.survival_check(&terrain, false, false, false, 100, true, 1.0, &mut rng2);
+    let result_without_item =
+        event.survival_check(&terrain, false, false, false, 100, true, 1.0, &mut rng2);
 
     // Just verify the function runs
     assert!(result_with_item.survived || !result_with_item.survived);
@@ -185,9 +188,11 @@ fn test_survival_check_with_desperation() {
     let mut rng = SmallRng::seed_from_u64(42);
 
     // With desperation, survival should be easier
-    let result_desperate = event.survival_check(&terrain, false, false, true, 10, true, 1.0, &mut rng);
+    let result_desperate =
+        event.survival_check(&terrain, false, false, true, 10, true, 1.0, &mut rng);
     let mut rng2 = SmallRng::seed_from_u64(42);
-    let result_normal = event.survival_check(&terrain, false, false, false, 100, true, 1.0, &mut rng2);
+    let result_normal =
+        event.survival_check(&terrain, false, false, false, 100, true, 1.0, &mut rng2);
 
     // Just verify the function runs
     assert!(result_desperate.survived || !result_desperate.survived);

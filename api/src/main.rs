@@ -194,7 +194,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Initialize storage backend
-    use api::storage::{LocalStorage, StorageBackend};
+    use api::storage::LocalStorage;
     let storage_path = env::var("STORAGE_PATH").unwrap_or_else(|_| "uploads".to_string());
     let storage = Arc::new(LocalStorage::new(&storage_path, "/uploads"));
     storage.init().await?;

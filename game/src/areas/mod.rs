@@ -11,9 +11,21 @@ use strum_macros::EnumIter;
 use uuid::Uuid;
 
 #[derive(
-    Copy, Clone, Debug, Eq, PartialEq, EnumIter, Hash, Deserialize, Serialize, Ord, PartialOrd,
+    Copy,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    EnumIter,
+    Hash,
+    Deserialize,
+    Serialize,
+    Ord,
+    PartialOrd,
+    Default,
 )]
 pub enum Area {
+    #[default]
     Cornucopia,
     North,
     East,
@@ -36,12 +48,6 @@ impl Display for Area {
 impl PartialEq<&Area> for Area {
     fn eq(&self, other: &&Area) -> bool {
         *self == **other
-    }
-}
-
-impl Default for Area {
-    fn default() -> Self {
-        Area::Cornucopia
     }
 }
 

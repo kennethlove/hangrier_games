@@ -288,7 +288,7 @@ impl Tribute {
         if self.attributes.health == 0 {
             let killer = self.status.clone();
             self.try_log_action(
-                GameOutput::TributeDiesFromStatus(self.name.as_str(), &*killer.to_string()),
+                GameOutput::TributeDiesFromStatus(self.name.as_str(), &killer.to_string()),
                 "dies from status",
             );
             self.statistics.killed_by = Some(killer.to_string());
@@ -300,7 +300,7 @@ impl Tribute {
     /// The success of this function does not affect the outcome of the calling method.
     pub(crate) fn try_log_action(
         &self,
-        game_event_output: impl std::fmt::Display,
+        _game_event_output: impl std::fmt::Display,
         action_description: &str,
     ) {
         // Message logging removed - now handled at API level
@@ -400,7 +400,7 @@ mod tests {
         tribute.dies();
         assert_eq!(tribute.attributes.health, 0);
         assert_eq!(tribute.status, TributeStatus::Dead);
-        assert_eq!(tribute.attributes.is_hidden, false);
+        assert!(!tribute.attributes.is_hidden);
         assert_eq!(tribute.items.len(), 0);
     }
 

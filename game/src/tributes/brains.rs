@@ -358,12 +358,11 @@ impl Brain {
                 // Convert DestinationInfo to AreaDetails for choose_destination
                 let area_details: Vec<AreaDetails> = available_destinations
                     .iter()
-                    .map(|dest| {
-                        let mut ad = AreaDetails::default();
-                        ad.area = Some(dest.area);
-                        ad.terrain = dest.terrain.clone();
-                        ad.events = dest.active_events.clone();
-                        ad
+                    .map(|dest| AreaDetails {
+                        area: Some(dest.area),
+                        terrain: dest.terrain.clone(),
+                        events: dest.active_events.clone(),
+                        ..AreaDetails::default()
                     })
                     .collect();
 
@@ -1026,10 +1025,12 @@ mod tests {
 
     #[rstest]
     fn test_psychotic_break_recovery(mut small_rng: SmallRng) {
-        let mut tribute = Tribute::default();
         // Use deterministic Brain so psychotic_break_threshold is fixed
         // (Balanced base = 7) and the +20 recovery margin is predictable.
-        tribute.brain = Brain::default();
+        let mut tribute = Tribute {
+            brain: Brain::default(),
+            ..Tribute::default()
+        };
         tribute.attributes.sanity = 3;
 
         // Trigger break
@@ -1047,10 +1048,12 @@ mod tests {
 
     #[rstest]
     fn test_psychotic_break_no_recovery_insufficient_sanity(mut small_rng: SmallRng) {
-        let mut tribute = Tribute::default();
         // Deterministic Brain: Balanced psychotic_break_threshold = 7,
         // recovery requires sanity >= 27. sanity = 15 is below that.
-        tribute.brain = Brain::default();
+        let mut tribute = Tribute {
+            brain: Brain::default(),
+            ..Tribute::default()
+        };
         tribute.attributes.sanity = 3;
 
         // Trigger break

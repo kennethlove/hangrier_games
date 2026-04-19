@@ -18,11 +18,6 @@ pub static USERS_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
 });
 
 #[derive(Serialize, Deserialize, Debug)]
-struct JwtResponse {
-    jwt: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 struct JwtClaims {
     id: String,
     #[serde(rename = "sub")]

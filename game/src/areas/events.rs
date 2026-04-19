@@ -283,6 +283,7 @@ impl AreaEvent {
     ///
     /// # Returns
     /// SurvivalResult containing survival status and any rewards
+    #[allow(clippy::too_many_arguments)]
     pub fn survival_check(
         &self,
         terrain: &BaseTerrain,
@@ -392,7 +393,7 @@ mod tests {
 
     #[test]
     fn random_area_event() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let random_event = AreaEvent::random(&mut rng);
         assert!(AreaEvent::iter().any(|a| a == random_event));
     }

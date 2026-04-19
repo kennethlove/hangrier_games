@@ -173,12 +173,12 @@ impl WPGen {
 
         let mut ret = vec![vec![""; words]; count];
 
-        for i in 0..count {
+        for slot in ret.iter_mut().take(count) {
             if let Some(mut vec) =
                 self.generate_backtracking(len_min, len_max, 1, &dict, &WPGen::create_format(words))
             {
                 vec.reverse();
-                ret[i] = vec;
+                *slot = vec;
             } else {
                 return None;
             }

@@ -18,11 +18,11 @@ fn test_wildfire_in_forest_kills_tributes() {
     );
     game.areas.push(area_details);
 
-    let area_name = game.areas[0].area.clone().unwrap();
+    let area_name = game.areas[0].area.unwrap();
 
     // Create tribute in forest area with low health
     let mut tribute = Tribute::random();
-    tribute.area = area_name.clone();
+    tribute.area = area_name;
     tribute.attributes.health = 50; // Not desperate but vulnerable
     tribute.terrain_affinity = vec![]; // No affinity bonus
     tribute.statistics.game = game.identifier.clone(); // Set game identifier
@@ -62,7 +62,7 @@ fn test_wildfire_in_desert_minor_impact() {
     );
     game.areas.push(area_details);
 
-    let area_name = game.areas[0].area.clone().unwrap();
+    let area_name = game.areas[0].area.unwrap();
 
     // Create tribute
     let mut tribute = Tribute::random();

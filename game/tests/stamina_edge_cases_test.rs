@@ -169,8 +169,10 @@ fn test_stamina_restoration() {
 #[test]
 fn test_zero_stamina_calculation() {
     let terrain = TerrainType::new(BaseTerrain::Clearing, vec![]).unwrap();
-    let mut tribute = Tribute::default();
-    tribute.stamina = 0; // Depleted stamina
+    let mut tribute = Tribute {
+        stamina: 0, // Depleted stamina
+        ..Tribute::default()
+    };
     tribute.attributes.health = 100;
 
     let action = Action::Rest; // Base cost 0

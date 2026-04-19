@@ -137,9 +137,11 @@ mod tests {
 
     #[test]
     fn test_easy_mode_config() {
-        let mut config = GameConfig::default();
-        config.instant_death_enabled = false;
-        config.catastrophic_severity_multiplier = 0.5;
+        let config = GameConfig {
+            instant_death_enabled: false,
+            catastrophic_severity_multiplier: 0.5,
+            ..GameConfig::default()
+        };
 
         assert!(!config.instant_death_enabled);
         assert_eq!(config.catastrophic_severity_multiplier, 0.5);
@@ -147,10 +149,12 @@ mod tests {
 
     #[test]
     fn test_hard_mode_config() {
-        let mut config = GameConfig::default();
-        config.instant_death_enabled = true;
-        config.catastrophic_severity_multiplier = 2.0;
-        config.day_event_frequency = 0.5; // More frequent events
+        let config = GameConfig {
+            instant_death_enabled: true,
+            catastrophic_severity_multiplier: 2.0,
+            day_event_frequency: 0.5,
+            ..GameConfig::default()
+        };
 
         assert_eq!(config.catastrophic_severity_multiplier, 2.0);
         assert_eq!(config.day_event_frequency, 0.5);

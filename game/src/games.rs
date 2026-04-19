@@ -349,6 +349,16 @@ impl Game {
             event.clone()
         };
 
+        // Announce the event itself in the area channel so the broader narrative
+        // captures *what happened* even when no tributes are present to react.
+        let area_name = area.to_string();
+        let area_subject = format!("area:{}", area_name);
+        self.log_output(
+            crate::messages::MessageSource::Area(area_name.clone()),
+            area_subject.clone(),
+            crate::output::GameOutput::AreaEvent(&most_severe_event.to_string(), &area_name),
+        );
+
         // Process each tribute's survival check
         for tribute_idx in tribute_indices {
             // Outcome messages we'll log after the tribute borrow is released.
@@ -386,6 +396,18 @@ impl Game {
 
                 let source = crate::messages::MessageSource::Tribute(tribute.identifier.clone());
                 let subject = format!("tribute:{}", tribute.identifier);
+                let roll_detail = format!(
+                    "[{:?} severity, rolled {}{}]",
+                    result.severity,
+                    result.roll,
+                    if result.modifier == 0 {
+                        String::new()
+                    } else if result.modifier > 0 {
+                        format!(" +{}", result.modifier)
+                    } else {
+                        format!(" {}", result.modifier)
+                    }
+                );
 
                 // Apply results
                 if !result.survived {
@@ -393,14 +415,28 @@ impl Game {
 
                     let content = if result.instant_death {
                         format!(
-                            "{} is instantly killed by the catastrophic {}!",
-                            tribute.name, most_severe_event
+                            "{} is instantly killed by the catastrophic {}! {}",
+                            tribute.name, most_severe_event, roll_detail
                         )
                     } else {
-                        format!("{} dies from the {}", tribute.name, most_severe_event)
+                        format!(
+                            "{} dies from the {} {}",
+                            tribute.name, most_severe_event, roll_detail
+                        )
                     };
                     pending_messages.push((source, subject, content));
                 } else {
+                    // Always announce the survival itself so the narrative captures
+                    // who weathered the event, even when no rewards land.
+                    pending_messages.push((
+                        source.clone(),
+                        subject.clone(),
+                        format!(
+                            "{} survives the {} {}",
+                            tribute.name, most_severe_event, roll_detail
+                        ),
+                    ));
+
                     // Survivor - apply rewards if any
                     if result.stamina_restored > 0 {
                         tribute.stamina = tribute.stamina.saturating_add(result.stamina_restored);
@@ -408,8 +444,8 @@ impl Game {
                             source.clone(),
                             subject.clone(),
                             format!(
-                                "{} survives the {}, recovering {} stamina",
-                                tribute.name, most_severe_event, result.stamina_restored
+                                "{} recovers {} stamina from the {}",
+                                tribute.name, result.stamina_restored, most_severe_event
                             ),
                         ));
                     }
@@ -423,8 +459,8 @@ impl Game {
                             source.clone(),
                             subject.clone(),
                             format!(
-                                "{} survives the {}, recovering {} sanity",
-                                tribute.name, most_severe_event, result.sanity_restored
+                                "{} recovers {} sanity from the {}",
+                                tribute.name, result.sanity_restored, most_severe_event
                             ),
                         ));
                     }
@@ -437,8 +473,8 @@ impl Game {
                             source,
                             subject,
                             format!(
-                                "{} survives the {} and finds a {}",
-                                tribute.name, most_severe_event, item_name
+                                "{} finds a {} after surviving the {}",
+                                tribute.name, item_name, most_severe_event
                             ),
                         ));
                     }
@@ -476,14 +512,40 @@ impl Game {
     }
 
     /// Announce events in closed areas.
-    fn announce_area_events(&self) -> Result<(), GameError> {
-        for area_details in &self.areas {
-            let _area_name = area_details.area.unwrap().to_string();
-            if !area_details.is_open() {
-                for event in &area_details.events {
-                    let _event_name = event.to_string();
-                }
+    ///
+    /// Emits one `MessageSource::Area` line per active event (using
+    /// `GameOutput::AreaEvent`) plus a closing `GameOutput::AreaClose`
+    /// summary so consumers know the area is currently uninhabitable.
+    fn announce_area_events(&mut self) -> Result<(), GameError> {
+        // Snapshot to avoid borrow conflicts with self.log_output below.
+        let snapshots: Vec<(String, Vec<String>)> = self
+            .areas
+            .iter()
+            .filter(|a| !a.is_open())
+            .filter_map(|a| {
+                a.area.map(|area| {
+                    (
+                        area.to_string(),
+                        a.events.iter().map(|e| e.to_string()).collect(),
+                    )
+                })
+            })
+            .collect();
+
+        for (area_name, event_names) in snapshots {
+            let subject = format!("area:{}", area_name);
+            for event_name in &event_names {
+                self.log_output(
+                    crate::messages::MessageSource::Area(area_name.clone()),
+                    subject.clone(),
+                    crate::output::GameOutput::AreaEvent(event_name, &area_name),
+                );
             }
+            self.log_output(
+                crate::messages::MessageSource::Area(area_name.clone()),
+                subject,
+                crate::output::GameOutput::AreaClose(&area_name),
+            );
         }
         Ok(())
     }
@@ -1035,8 +1097,6 @@ mod tests {
 
     #[test]
     fn test_announce_area_events() {
-        // Clear any messages from other tests running in parallel
-
         let mut game = Game::new("Test Game");
         let mut area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
         let mut rng = rand::rng();
@@ -1046,9 +1106,18 @@ mod tests {
 
         assert!(!game.areas[0].is_open());
         let _ = game.announce_area_events();
-        // announce_area_events does not yet emit messages; this test is a placeholder
-        // until area-event narration is restored (see hangrier_games-33r).
-        assert_eq!(game.messages.len(), 0);
+
+        // 2 AreaEvent lines + 1 AreaClose summary
+        assert_eq!(game.messages.len(), 3);
+        // All emitted under the Area channel for the affected area.
+        let area_name = Area::Cornucopia.to_string();
+        for msg in &game.messages {
+            assert_eq!(
+                msg.source,
+                crate::messages::MessageSource::Area(area_name.clone())
+            );
+            assert_eq!(msg.subject, format!("area:{}", area_name));
+        }
     }
 
     #[test]

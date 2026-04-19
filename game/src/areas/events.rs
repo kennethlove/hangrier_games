@@ -34,6 +34,12 @@ pub struct SurvivalResult {
     pub stamina_restored: u32,
     pub sanity_restored: u32,
     pub reward_item: Option<String>,
+    /// d20 roll value (1..=20) used for the survival check.
+    pub roll: i32,
+    /// Total modifier applied to the roll (affinity + items + desperation).
+    pub modifier: i32,
+    /// Severity of the event in this terrain at check time.
+    pub severity: EventSeverity,
 }
 
 impl FromStr for AreaEvent {
@@ -336,6 +342,9 @@ impl AreaEvent {
                 stamina_restored: 0,
                 sanity_restored: 0,
                 reward_item: None,
+                roll,
+                modifier,
+                severity: severity.clone(),
             };
         }
 
@@ -349,6 +358,9 @@ impl AreaEvent {
                 stamina_restored: 0,
                 sanity_restored: 0,
                 reward_item: None,
+                roll,
+                modifier,
+                severity: severity.clone(),
             };
         }
 
@@ -380,6 +392,9 @@ impl AreaEvent {
             stamina_restored,
             sanity_restored,
             reward_item,
+            roll,
+            modifier,
+            severity,
         }
     }
 }

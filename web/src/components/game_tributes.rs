@@ -12,9 +12,10 @@ use dioxus_query::prelude::{QueryResult, QueryState, use_get_query};
 use game::items::Item;
 use game::messages::GameMessage;
 use game::tributes::Tribute;
+use serde::{Deserialize, Serialize};
 use shared::{DisplayGame, GameStatus, PaginationMetadata};
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct PaginatedTributesResponse {
     pub tributes: Vec<Tribute>,
     pub pagination: PaginationMetadata,

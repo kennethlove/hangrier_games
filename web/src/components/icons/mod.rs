@@ -10,4 +10,5 @@ pub mod map_pin;
 pub mod mockingjay;
 pub mod mockingjay_arrow;
 pub mod mockingjay_flight;
+pub mod svg_icon;
 pub mod uturn;

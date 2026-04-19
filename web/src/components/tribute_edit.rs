@@ -13,7 +13,7 @@ async fn edit_tribute(
     args: (EditTribute, String, String),
 ) -> MutationResult<MutationValue, MutationError> {
     let tribute = args.clone().0;
-    let identifier = args.clone().0.0;
+    let identifier = args.clone().0.identifier.clone();
     let game_identifier = args.clone().1;
     let token = args.clone().2;
 
@@ -51,12 +51,12 @@ pub fn TributeEdit(
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
 
     let onclick = move |_| {
-        edit_tribute_signal.set(Some(EditTribute(
-            identifier.clone(),
-            name.clone(),
-            avatar.clone(),
-            game_identifier.clone(),
-        )));
+        edit_tribute_signal.set(Some(EditTribute {
+            identifier: identifier.clone(),
+            name: name.clone(),
+            avatar: avatar.clone(),
+            game_identifier: game_identifier.clone(),
+        }));
     };
 
     rsx! {
@@ -110,10 +110,10 @@ pub fn EditTributeForm() -> Element {
 
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
     let tribute_details = edit_tribute_signal.read().clone().unwrap_or_default();
-    let name = tribute_details.1.clone();
-    let avatar = tribute_details.2.clone();
-    let game_identifier = tribute_details.3.clone();
-    let identifier = tribute_details.0.clone();
+    let name = tribute_details.name.clone();
+    let avatar = tribute_details.avatar.clone();
+    let game_identifier = tribute_details.game_identifier.clone();
+    let identifier = tribute_details.identifier.clone();
 
     let mut avatar_preview = use_signal(|| avatar.clone());
     let mut upload_status = use_signal(|| String::new());
@@ -126,6 +126,8 @@ pub fn EditTributeForm() -> Element {
 
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
+    let game_identifier_for_upload = game_identifier.clone();
+
     let save = move |e: Event<FormData>| {
         let token = storage.get().jwt.expect("No JWT found");
         let game_identifier = game_identifier.clone();
@@ -133,19 +135,19 @@ pub fn EditTributeForm() -> Element {
             .read()
             .clone()
             .expect("No details provided");
-        let identifier = tribute_details.0.clone();
+        let identifier = tribute_details.identifier.clone();
         let current_avatar = avatar_preview.read().clone();
 
         let data = e.data().values();
         let name = data.get("name").expect("No name value").0[0].clone();
 
         if !name.is_empty() {
-            let edit_tribute = EditTribute(
-                identifier.clone(),
-                name.clone(),
-                current_avatar,
-                game_identifier.clone(),
-            );
+            let edit_tribute = EditTribute {
+                identifier: identifier.clone(),
+                name: name.clone(),
+                avatar: current_avatar,
+                game_identifier: game_identifier.clone(),
+            };
             spawn(async move {
                 mutate
                     .mutate_async((edit_tribute.clone(), game_identifier.clone(), token))
@@ -167,7 +169,7 @@ pub fn EditTributeForm() -> Element {
 
     let upload_avatar = move |e: Event<FormData>| {
         let token = storage.get().jwt.expect("No JWT found");
-        let game_id = game_identifier.clone();
+        let game_id = game_identifier_for_upload.clone();
         let tribute_id = identifier.clone();
 
         upload_status.set("Uploading...".to_string());

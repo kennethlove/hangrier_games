@@ -1,8 +1,8 @@
+use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use futures_util::{SinkExt, StreamExt};
 use gloo_net::websocket::{Message, futures::WebSocket};
 use shared::{GameEvent, WebSocketMessage};
-use std::rc::Rc;
 
 /// WebSocket connection state
 #[derive(Clone, Debug, PartialEq)]
@@ -13,109 +13,106 @@ pub enum ConnectionState {
     Error(String),
 }
 
-/// Hook to manage WebSocket connection for real-time game updates
-pub fn use_game_websocket(game_id: String) -> (Signal<Vec<GameEvent>>, Signal<ConnectionState>) {
-    let mut events = use_signal(|| vec![]);
-    let mut connection_state = use_signal(|| ConnectionState::Connecting);
+/// Maximum number of events retained in the in-memory ring buffer.
+/// Prevents unbounded growth on long-running games.
+const MAX_EVENTS: usize = 200;
 
-    let game_id_clone = game_id.clone();
+/// Hook to manage WebSocket connection for real-time game updates.
+///
+/// Connects to `{API_HOST}/ws`, sends a `Subscribe { game_id }` frame,
+/// then streams `GameEvent`s into the returned signal. The connection state
+/// signal reflects the current lifecycle phase. The hook does not retry on
+/// disconnect; callers can observe `ConnectionState::Disconnected` and
+/// re-mount if needed.
+pub fn use_game_websocket(game_id: String) -> (Signal<Vec<GameEvent>>, Signal<ConnectionState>) {
+    let events = use_signal(Vec::<GameEvent>::new);
+    let connection_state = use_signal(|| ConnectionState::Connecting);
 
     use_effect(move || {
-        let game_id = game_id_clone.clone();
+        let game_id = game_id.clone();
+        let mut events = events;
+        let mut connection_state = connection_state;
 
         spawn(async move {
-            // Get WebSocket URL from environment
-            let ws_url = if let Ok(api_host) = std::env::var("APP_API_HOST") {
-                api_host
-                    .replace("http://", "ws://")
-                    .replace("https://", "wss://")
-                    + "/ws"
-            } else {
-                "ws://localhost:3000/ws".to_string()
-            };
+            // Convert http(s):// → ws(s):// for the WebSocket endpoint.
+            let ws_url = build_ws_url(APP_API_HOST, &game_id);
 
-            web_sys::console::log_1(&format!("Connecting to WebSocket: {}", ws_url).into());
-
-            // Connect to WebSocket
             let ws = match WebSocket::open(&ws_url) {
-                Ok(ws) => {
-                    connection_state.set(ConnectionState::Connected);
-                    ws
-                }
+                Ok(ws) => ws,
                 Err(e) => {
-                    let err_msg = format!("Failed to connect to WebSocket: {:?}", e);
-                    web_sys::console::error_1(&err_msg.clone().into());
-                    connection_state.set(ConnectionState::Error(err_msg));
+                    tracing::error!("Failed to open WebSocket {}: {}", ws_url, e);
+                    connection_state.set(ConnectionState::Error(e.to_string()));
                     return;
                 }
             };
 
-            let (mut write, mut read) = ws.split();
+            // Split so we can hold the writer briefly to send the subscribe
+            // frame and then poll the reader for the lifetime of the effect.
+            let (mut writer, mut reader) = ws.split();
 
-            // Subscribe to game
-            let subscribe_msg = WebSocketMessage::Subscribe {
+            // Send subscription frame.
+            let subscribe = WebSocketMessage::Subscribe {
                 game_id: game_id.clone(),
             };
-
-            if let Ok(json) = serde_json::to_string(&subscribe_msg) {
-                if let Err(e) = write.send(Message::Text(json)).await {
-                    web_sys::console::error_1(
-                        &format!("Failed to send subscribe message: {:?}", e).into(),
-                    );
-                    connection_state
-                        .set(ConnectionState::Error(format!("Subscribe failed: {:?}", e)));
+            match serde_json::to_string(&subscribe) {
+                Ok(payload) => {
+                    if let Err(e) = writer.send(Message::Text(payload)).await {
+                        tracing::error!("WebSocket subscribe send failed: {}", e);
+                        connection_state.set(ConnectionState::Error(e.to_string()));
+                        return;
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to serialize Subscribe: {}", e);
+                    connection_state.set(ConnectionState::Error(e.to_string()));
                     return;
                 }
-                web_sys::console::log_1(&format!("Subscribed to game {}", game_id).into());
             }
 
-            // Listen for messages
-            while let Some(msg) = read.next().await {
+            connection_state.set(ConnectionState::Connected);
+
+            // Read loop.
+            while let Some(msg) = reader.next().await {
                 match msg {
                     Ok(Message::Text(text)) => {
                         match serde_json::from_str::<WebSocketMessage>(&text) {
                             Ok(WebSocketMessage::GameEvent {
-                                game_id: received_game_id,
+                                game_id: gid,
                                 event,
-                            }) => {
-                                if received_game_id == game_id {
-                                    web_sys::console::log_1(
-                                        &format!("Received game event: {:?}", event).into(),
-                                    );
-                                    events.write().push(event);
-                                }
+                            }) if gid == game_id => {
+                                events.with_mut(|list| {
+                                    list.push(event);
+                                    if list.len() > MAX_EVENTS {
+                                        let drop_count = list.len() - MAX_EVENTS;
+                                        list.drain(0..drop_count);
+                                    }
+                                });
                             }
                             Ok(WebSocketMessage::Error { message }) => {
-                                web_sys::console::error_1(
-                                    &format!("WebSocket error: {}", message).into(),
-                                );
-                                connection_state.set(ConnectionState::Error(message));
+                                tracing::warn!("WebSocket server error: {}", message);
                             }
-                            Ok(_) => {
-                                web_sys::console::warn_1(&"Unexpected WebSocket message".into());
+                            Ok(_) => { /* ignore Subscribe/Unsubscribe echoes and other game IDs */
                             }
                             Err(e) => {
-                                web_sys::console::error_1(
-                                    &format!("Failed to parse WebSocket message: {:?}", e).into(),
+                                tracing::warn!(
+                                    "Failed to decode WebSocket message: {} ({})",
+                                    text,
+                                    e
                                 );
                             }
                         }
                     }
                     Ok(Message::Bytes(_)) => {
-                        web_sys::console::warn_1(
-                            &"Received binary WebSocket message (unexpected)".into(),
-                        );
+                        // Server only emits text frames; ignore binary.
                     }
                     Err(e) => {
-                        web_sys::console::error_1(&format!("WebSocket error: {:?}", e).into());
-                        connection_state.set(ConnectionState::Error(format!("{:?}", e)));
-                        break;
+                        tracing::error!("WebSocket read error: {}", e);
+                        connection_state.set(ConnectionState::Error(e.to_string()));
+                        return;
                     }
                 }
             }
 
-            // Connection closed
-            web_sys::console::log_1(&"WebSocket disconnected".into());
             connection_state.set(ConnectionState::Disconnected);
         });
     });
@@ -123,102 +120,16 @@ pub fn use_game_websocket(game_id: String) -> (Signal<Vec<GameEvent>>, Signal<Co
     (events, connection_state)
 }
 
-/// Hook to manage WebSocket connection for real-time game updates
-pub fn use_game_websocket(game_id: String) -> (Signal<Vec<GameEvent>>, Signal<ConnectionState>) {
-    let mut events = use_signal(|| vec![]);
-    let mut connection_state = use_signal(|| ConnectionState::Connecting);
-
-    let game_id_clone = game_id.clone();
-
-    use_effect(move || {
-        let game_id = game_id_clone.clone();
-
-        spawn(async move {
-            // Get WebSocket URL from environment
-            let ws_url = if let Ok(api_host) = std::env::var("APP_API_HOST") {
-                api_host
-                    .replace("http://", "ws://")
-                    .replace("https://", "wss://")
-                    + "/ws"
-            } else {
-                "ws://localhost:3000/ws".to_string()
-            };
-
-            tracing::info!("Connecting to WebSocket: {}", ws_url);
-
-            // Connect to WebSocket
-            let ws = match WebSocket::open(&ws_url) {
-                Ok(ws) => {
-                    connection_state.set(ConnectionState::Connected);
-                    ws
-                }
-                Err(e) => {
-                    let err_msg = format!("Failed to connect to WebSocket: {:?}", e);
-                    tracing::error!("{}", err_msg);
-                    connection_state.set(ConnectionState::Error(err_msg));
-                    return;
-                }
-            };
-
-            let (mut write, mut read) = ws.split();
-
-            // Subscribe to game
-            let subscribe_msg = WebSocketMessage::Subscribe {
-                game_id: game_id.clone(),
-            };
-
-            if let Ok(json) = serde_json::to_string(&subscribe_msg) {
-                if let Err(e) = write.send(Message::Text(json)).await {
-                    tracing::error!("Failed to send subscribe message: {:?}", e);
-                    connection_state
-                        .set(ConnectionState::Error(format!("Subscribe failed: {:?}", e)));
-                    return;
-                }
-                tracing::info!("Subscribed to game {}", game_id);
-            }
-
-            // Listen for messages
-            while let Some(msg) = read.next().await {
-                match msg {
-                    Ok(Message::Text(text)) => {
-                        match serde_json::from_str::<WebSocketMessage>(&text) {
-                            Ok(WebSocketMessage::GameEvent {
-                                game_id: received_game_id,
-                                event,
-                            }) => {
-                                if received_game_id == game_id {
-                                    tracing::debug!("Received game event: {:?}", event);
-                                    events.write().push(event);
-                                }
-                            }
-                            Ok(WebSocketMessage::Error { message }) => {
-                                tracing::error!("WebSocket error: {}", message);
-                                connection_state.set(ConnectionState::Error(message));
-                            }
-                            Ok(_) => {
-                                tracing::warn!("Unexpected WebSocket message");
-                            }
-                            Err(e) => {
-                                tracing::error!("Failed to parse WebSocket message: {:?}", e);
-                            }
-                        }
-                    }
-                    Ok(Message::Bytes(_)) => {
-                        tracing::warn!("Received binary WebSocket message (unexpected)");
-                    }
-                    Err(e) => {
-                        tracing::error!("WebSocket error: {:?}", e);
-                        connection_state.set(ConnectionState::Error(format!("{:?}", e)));
-                        break;
-                    }
-                }
-            }
-
-            // Connection closed
-            tracing::info!("WebSocket disconnected");
-            connection_state.set(ConnectionState::Disconnected);
-        });
-    });
-
-    (events, connection_state)
+/// Convert an `http(s)://host[/path]` API host into a `ws(s)://host/ws` URL.
+fn build_ws_url(api_host: &str, _game_id: &str) -> String {
+    let base = api_host.trim_end_matches('/');
+    let ws_base = if let Some(rest) = base.strip_prefix("https://") {
+        format!("wss://{}", rest)
+    } else if let Some(rest) = base.strip_prefix("http://") {
+        format!("ws://{}", rest)
+    } else {
+        // Assume the caller already supplied a ws scheme.
+        base.to_string()
+    };
+    format!("{}/ws", ws_base)
 }

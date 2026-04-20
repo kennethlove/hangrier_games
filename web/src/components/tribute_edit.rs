@@ -179,42 +179,43 @@ pub fn EditTributeForm() -> Element {
 
             if let Some(file_engine) = files
                 && let Some(file_name) = file_engine.files().into_iter().next()
-                    && let Some(file_data) = file_engine.read_file(&file_name).await {
-                        // Upload file using multipart/form-data
-                        let client = reqwest::Client::new();
-                        let url = format!(
-                            "{}/api/games/{}/tributes/{}/avatar",
-                            APP_API_HOST, game_id, tribute_id
-                        );
+                && let Some(file_data) = file_engine.read_file(&file_name).await
+            {
+                // Upload file using multipart/form-data
+                let client = reqwest::Client::new();
+                let url = format!(
+                    "{}/api/games/{}/tributes/{}/avatar",
+                    APP_API_HOST, game_id, tribute_id
+                );
 
-                        let part =
-                            reqwest::multipart::Part::bytes(file_data).file_name(file_name.clone());
+                let part = reqwest::multipart::Part::bytes(file_data).file_name(file_name.clone());
 
-                        let form = reqwest::multipart::Form::new().part("avatar", part);
+                let form = reqwest::multipart::Form::new().part("avatar", part);
 
-                        let response = client
-                            .post(&url)
-                            .bearer_auth(token)
-                            .multipart(form)
-                            .send()
-                            .await;
+                let response = client
+                    .post(&url)
+                    .bearer_auth(token)
+                    .multipart(form)
+                    .send()
+                    .await;
 
-                        match response {
-                            Ok(resp) if resp.status().is_success() => {
-                                if let Ok(json) = resp.json::<serde_json::Value>().await
-                                    && let Some(url) = json.get("url").and_then(|v| v.as_str()) {
-                                        avatar_preview.set(url.to_string());
-                                        upload_status.set("Upload successful!".to_string());
-                                    }
-                            }
-                            Ok(resp) => {
-                                upload_status.set(format!("Upload failed: {}", resp.status()));
-                            }
-                            Err(e) => {
-                                upload_status.set(format!("Upload error: {}", e));
-                            }
+                match response {
+                    Ok(resp) if resp.status().is_success() => {
+                        if let Ok(json) = resp.json::<serde_json::Value>().await
+                            && let Some(url) = json.get("url").and_then(|v| v.as_str())
+                        {
+                            avatar_preview.set(url.to_string());
+                            upload_status.set("Upload successful!".to_string());
                         }
                     }
+                    Ok(resp) => {
+                        upload_status.set(format!("Upload failed: {}", resp.status()));
+                    }
+                    Err(e) => {
+                        upload_status.set(format!("Upload error: {}", e));
+                    }
+                }
+            }
         });
     };
 

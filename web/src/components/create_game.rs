@@ -59,10 +59,11 @@ pub fn CreateGameButton() -> Element {
         spawn(async move {
             mutate.mutate_async((None, token)).await;
             if let MutationState::Settled(Ok(result)) = mutate.result().deref()
-                && let MutationValue::NewGame(_game) = result {
-                    client.invalidate_queries(&[QueryKey::Games]);
-                    loading_signal.set(LoadingState::Loaded);
-                };
+                && let MutationValue::NewGame(_game) = result
+            {
+                client.invalidate_queries(&[QueryKey::Games]);
+                loading_signal.set(LoadingState::Loaded);
+            };
         });
     };
 
@@ -94,11 +95,12 @@ pub fn CreateGameForm() -> Element {
         spawn(async move {
             mutate.mutate_async((Some(name), token)).await;
             if let MutationState::Settled(Ok(result)) = mutate.result().deref()
-                && let MutationValue::NewGame(_game) = result {
-                    client.invalidate_queries(&[QueryKey::Games]);
-                    loading_signal.set(LoadingState::Loaded);
-                    game_name_signal.set(String::default());
-                }
+                && let MutationValue::NewGame(_game) = result
+            {
+                client.invalidate_queries(&[QueryKey::Games]);
+                loading_signal.set(LoadingState::Loaded);
+                game_name_signal.set(String::default());
+            }
         });
     };
 

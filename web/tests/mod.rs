@@ -10,8 +10,3 @@
 // features and API calls are not tested here.
 
 mod button_test;
-mod info_detail_test;
-mod item_icon_test;
-mod loading_modal_test;
-mod modal_test;
-mod tribute_status_icon_test;

@@ -230,6 +230,7 @@ async fn test_duplicate_username() {
         .await;
 
     // Should return error (400 or 409)
+
     assert!(
         response.status_code() == axum::http::StatusCode::BAD_REQUEST
             || response.status_code() == axum::http::StatusCode::CONFLICT

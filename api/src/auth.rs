@@ -2,10 +2,11 @@ use crate::{AppError, AppState};
 use axum::extract::State;
 use axum::routing::post;
 use axum::{Json, Router};
+use chrono::Utc;
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
-use surrealdb::sql::Thing;
+use surrealdb::sql::{Datetime, Thing};
 use time::OffsetDateTime;
 use uuid::Uuid;
 use validator::Validate;
@@ -25,11 +26,9 @@ pub struct RefreshToken {
     pub token: String,
     pub user_id: Thing,
     pub username: String,
-    #[serde(with = "time::serde::rfc3339")]
-    pub expires_at: OffsetDateTime,
+    pub expires_at: Datetime,
     pub revoked: bool,
-    #[serde(with = "time::serde::rfc3339")]
-    pub created_at: OffsetDateTime,
+    pub created_at: Datetime,
 }
 
 #[derive(Serialize, Deserialize, Debug, Validate)]
@@ -48,16 +47,16 @@ impl RefreshToken {
     /// Generate a new refresh token for a user
     pub fn new(user_id: Thing, username: String) -> Self {
         let token = Uuid::new_v4().to_string();
-        let now = OffsetDateTime::now_utc();
-        let expires_at = now + time::Duration::days(7);
+        let now = Utc::now();
+        let expires_at = now + chrono::Duration::days(7);
 
         RefreshToken {
             token,
             user_id,
             username,
-            expires_at,
+            expires_at: Datetime::from(expires_at),
             revoked: false,
-            created_at: now,
+            created_at: Datetime::from(now),
         }
     }
 
@@ -67,8 +66,7 @@ impl RefreshToken {
             return false;
         }
 
-        let now = OffsetDateTime::now_utc();
-        self.expires_at > now
+        self.expires_at.0 > Utc::now()
     }
 }
 
@@ -91,8 +89,8 @@ pub async fn get_refresh_token(state: &AppState, token: &str) -> Result<RefreshT
     let token_owned = token.to_string();
     let mut result = state
         .db
-        .query("SELECT * FROM refresh_token WHERE token = $token LIMIT 1")
-        .bind(("token", token_owned))
+        .query("SELECT * FROM refresh_token WHERE token = $tk LIMIT 1")
+        .bind(("tk", token_owned))
         .await
         .map_err(|e| AppError::DbError(format!("Failed to query refresh token: {}", e)))?;
 
@@ -111,8 +109,8 @@ pub async fn revoke_refresh_token(state: &AppState, token: &str) -> Result<(), A
     let token_owned = token.to_string();
     let _: Option<RefreshToken> = state
         .db
-        .query("UPDATE refresh_token SET revoked = true WHERE token = $token")
-        .bind(("token", token_owned))
+        .query("UPDATE refresh_token SET revoked = true WHERE token = $tk")
+        .bind(("tk", token_owned))
         .await
         .map_err(|e| AppError::DbError(format!("Failed to revoke refresh token: {}", e)))?
         .take(0)
@@ -228,7 +226,7 @@ mod tests {
         assert_eq!(token.username, username);
         assert_eq!(token.token.len(), 36); // UUID v4 length
         assert!(!token.revoked);
-        assert!(token.expires_at > OffsetDateTime::now_utc());
+        assert!(token.expires_at.0 > Utc::now());
     }
 
     #[test]
@@ -238,16 +236,16 @@ mod tests {
         let token_str = Uuid::new_v4().to_string();
 
         // Create a token that expired 1 day ago
-        let now = OffsetDateTime::now_utc();
-        let expired = now - time::Duration::days(1);
+        let now = Utc::now();
+        let expired = now - chrono::Duration::days(1);
 
         let token = RefreshToken {
             token: token_str,
             user_id,
             username,
-            expires_at: expired,
+            expires_at: Datetime::from(expired),
             revoked: false,
-            created_at: now - time::Duration::days(8),
+            created_at: Datetime::from(now - chrono::Duration::days(8)),
         };
 
         assert!(!token.is_valid());
@@ -260,16 +258,16 @@ mod tests {
         let token_str = Uuid::new_v4().to_string();
 
         // Create a token that's not expired but is revoked
-        let now = OffsetDateTime::now_utc();
-        let expires_at = now + time::Duration::days(7);
+        let now = Utc::now();
+        let expires_at = now + chrono::Duration::days(7);
 
         let token = RefreshToken {
             token: token_str,
             user_id,
             username,
-            expires_at,
+            expires_at: Datetime::from(expires_at),
             revoked: true,
-            created_at: now,
+            created_at: Datetime::from(now),
         };
 
         assert!(!token.is_valid());

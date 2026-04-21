@@ -122,7 +122,21 @@ async fn user_create(
             let token_pair = create_token_pair(&state, jwt, user_id, username).await?;
             Ok(Json(token_pair))
         }
-        Err(_) => Err(AppError::DbError("Failed to create user".to_string())),
+        Err(e) => {
+            // SurrealDB returns a generic "record access signup query failed" error
+            // for any signup-block failure; in this code path the only realistic
+            // failure mode is the unique_username index, so map to 409 Conflict.
+            let combined = format!("{e} {e:?}").to_lowercase();
+            if combined.contains("unique_username")
+                || combined.contains("already")
+                || combined.contains("duplicate")
+                || combined.contains("signup query failed")
+            {
+                Err(AppError::Conflict("Username already taken".to_string()))
+            } else {
+                Err(AppError::DbError(format!("Failed to create user: {e}")))
+            }
+        }
     }
 }
 

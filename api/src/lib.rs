@@ -39,6 +39,8 @@ pub enum AppError {
     GameFull(String),
     #[error("Database error")]
     DbError(String),
+    #[error("Conflict")]
+    Conflict(String),
     #[error("Invalid status")]
     InvalidStatus(String),
     #[error("Validation error")]
@@ -54,6 +56,7 @@ impl IntoResponse for AppError {
             AppError::Unauthorized(message) => (StatusCode::UNAUTHORIZED, message),
             AppError::GameFull(message) => (StatusCode::BAD_REQUEST, message),
             AppError::DbError(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
+            AppError::Conflict(message) => (StatusCode::CONFLICT, message),
             AppError::InvalidStatus(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
             AppError::ValidationError(message) => (StatusCode::BAD_REQUEST, message),
         };

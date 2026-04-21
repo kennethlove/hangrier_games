@@ -93,11 +93,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .map_err(|e| format!("Failed to authenticate to database: {}", e))?;
     tracing::debug!("authenticated to SurrealDB");
 
-    db.use_ns("hangry-games")
-        .use_db("games")
+    let surreal_namespace =
+        env::var("APP_SURREAL_NAMESPACE").unwrap_or_else(|_| "hangry-games".to_string());
+    let surreal_database = env::var("APP_SURREAL_DATABASE").unwrap_or_else(|_| "games".to_string());
+
+    db.use_ns(&surreal_namespace)
+        .use_db(&surreal_database)
         .await
         .map_err(|e| format!("Failed to use database: {}", e))?;
-    tracing::debug!("Using 'hangry-games' namespace and 'games' database");
+    tracing::debug!(
+        "Using '{}' namespace and '{}' database",
+        surreal_namespace,
+        surreal_database
+    );
 
     MigrationRunner::new(&db)
         .up()
@@ -209,6 +217,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         db: db.clone(),
         storage,
         broadcaster,
+        namespace: surreal_namespace,
+        database: surreal_database,
     };
 
     // Start cleanup scheduler for refresh tokens

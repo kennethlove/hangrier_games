@@ -12,6 +12,8 @@ use surrealdb_migrations::MigrationRunner;
 /// Test configuration for SurrealDB
 pub struct TestDb {
     pub db: Arc<Surreal<Any>>,
+    pub namespace: String,
+    pub database: String,
 }
 
 impl TestDb {
@@ -44,7 +46,8 @@ impl TestDb {
             "test_{}",
             uuid::Uuid::new_v4().to_string().replace('-', "_")
         );
-        db.use_ns("hangry-games-test")
+        let test_ns = "hangry-games-test".to_string();
+        db.use_ns(&test_ns)
             .use_db(&test_db_name)
             .await
             .expect("Failed to use test database");
@@ -66,7 +69,11 @@ impl TestDb {
             .await
             .expect("Failed to apply migrations");
 
-        TestDb { db }
+        TestDb {
+            db,
+            namespace: test_ns,
+            database: test_db_name,
+        }
     }
 
     /// Get the AppState for testing
@@ -78,6 +85,8 @@ impl TestDb {
             db: self.db.clone(),
             storage: Arc::new(LocalStorage::new("test_uploads", "/uploads")),
             broadcaster: Arc::new(GameBroadcaster::default()),
+            namespace: self.namespace.clone(),
+            database: self.database.clone(),
         }
     }
 

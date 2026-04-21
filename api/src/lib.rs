@@ -21,6 +21,8 @@ pub struct AppState {
     pub db: Arc<Surreal<Any>>,
     pub storage: Arc<dyn storage::StorageBackend>,
     pub broadcaster: Arc<websocket::GameBroadcaster>,
+    pub namespace: String,
+    pub database: String,
 }
 
 #[derive(Debug, Error)]

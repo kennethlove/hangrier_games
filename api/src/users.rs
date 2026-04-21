@@ -91,8 +91,8 @@ async fn user_create(
         .db
         .signup(Record {
             access: "user",
-            namespace: "hangry-games",
-            database: "games",
+            namespace: &state.namespace,
+            database: &state.database,
             params: RegistrationUser {
                 username: username.clone(),
                 password: password.clone(),
@@ -129,8 +129,8 @@ async fn user_authenticate(
         .db
         .signin(Record {
             access: "user",
-            namespace: "hangry-games",
-            database: "games",
+            namespace: &state.namespace,
+            database: &state.database,
             params: RegistrationUser {
                 username: username.clone(),
                 password: password.clone(),

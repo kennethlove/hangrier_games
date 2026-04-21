@@ -121,7 +121,12 @@ pub async fn revoke_refresh_token(state: &AppState, token: &str) -> Result<(), A
 }
 
 /// Generate a new access token for a user
-fn generate_access_token(user_id: &Thing, username: &str) -> Result<String, AppError> {
+fn generate_access_token(
+    user_id: &Thing,
+    username: &str,
+    namespace: &str,
+    database: &str,
+) -> Result<String, AppError> {
     // Create JWT claims matching SurrealDB's format
     let now = OffsetDateTime::now_utc().unix_timestamp();
     let exp = now + 3600; // 1 hour expiration
@@ -131,8 +136,8 @@ fn generate_access_token(user_id: &Thing, username: &str) -> Result<String, AppE
         "iat": now,
         "nbf": now,
         "exp": exp,
-        "ns": "hangry-games",
-        "db": "games",
+        "ns": namespace,
+        "db": database,
         "ac": "user",
         "id": user_id.to_string(),
         "sub": username,
@@ -178,7 +183,12 @@ async fn refresh_token(
     store_refresh_token(&state, &new_refresh_token).await?;
 
     // Generate new access token
-    let access_token = generate_access_token(&token.user_id, &token.username)?;
+    let access_token = generate_access_token(
+        &token.user_id,
+        &token.username,
+        &state.namespace,
+        &state.database,
+    )?;
 
     Ok(Json(TokenResponse {
         access_token,

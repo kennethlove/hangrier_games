@@ -156,17 +156,19 @@ async fn create_game_area_edge(
     };
 
     let gar = db
-        .insert::<Option<Vec<GameAreaEdge>>>(RecordId::from(("areas", area_uuid.to_string())))
+        .insert::<Option<GameAreaEdge>>(RecordId::from(("areas", area_uuid.to_string())))
         .relation(GameAreaEdge {
             game: game_id.clone(),
             area: RecordId::from(("area", &area_uuid.to_string())),
         })
         .await
-        .map_err(|_| AppError::InternalServerError("Failed to link game and area".into()))?;
+        .map_err(|e| {
+            AppError::InternalServerError(format!("Failed to link game and area: {}", e))
+        })?;
 
     match gar {
-        Some(edges) if !edges.is_empty() => Ok(edges[0].clone()),
-        _ => Err(AppError::InternalServerError(
+        Some(edge) => Ok(edge),
+        None => Err(AppError::InternalServerError(
             "Failed to create game area record".into(),
         )),
     }
@@ -230,9 +232,15 @@ pub async fn create_game(
     let area_results = futures::future::join_all(area_futures).await;
 
     if let Some(err) = area_results.into_iter().find_map(Result::err) {
+        let detail = match &err {
+            AppError::InternalServerError(s) | AppError::BadRequest(s) | AppError::DbError(s) => {
+                s.clone()
+            }
+            other => other.to_string(),
+        };
         return Err(AppError::InternalServerError(format!(
             "Failed to create areas: {}",
-            err
+            detail
         )));
     }
 
@@ -247,20 +255,30 @@ pub async fn create_area(
 ) -> Result<(), AppError> {
     let game_uuid = Uuid::from_str(game_identifier)
         .map_err(|e| AppError::BadRequest(format!("Invalid game UUID: {}", e)))?;
-    if let Ok(game_area) = create_game_area_edge(area, game_uuid, db).await {
-        // Create initial items for the area (terrain will be assigned by game engine)
-        let item_futures = (0..num_items).map(|_| add_item_to_area(&game_area, None, db));
-        let item_results = futures::future::join_all(item_futures).await;
-        if let Some(err) = item_results.into_iter().find_map(Result::err) {
-            return Err(AppError::InternalServerError(format!(
-                "Failed to create items: {}",
-                err
-            )));
-        }
-    } else {
-        return Err(AppError::InternalServerError(
-            "Failed to create game area".into(),
-        ));
+    let game_area = create_game_area_edge(area, game_uuid, db)
+        .await
+        .map_err(|e| {
+            let detail = match &e {
+                AppError::InternalServerError(s)
+                | AppError::BadRequest(s)
+                | AppError::DbError(s) => s.clone(),
+                other => other.to_string(),
+            };
+            AppError::InternalServerError(format!("Failed to create game area: {}", detail))
+        })?;
+    let item_futures = (0..num_items).map(|_| add_item_to_area(&game_area, None, db));
+    let item_results = futures::future::join_all(item_futures).await;
+    if let Some(err) = item_results.into_iter().find_map(Result::err) {
+        let detail = match &err {
+            AppError::InternalServerError(s) | AppError::BadRequest(s) | AppError::DbError(s) => {
+                s.clone()
+            }
+            other => other.to_string(),
+        };
+        return Err(AppError::InternalServerError(format!(
+            "Failed to create items: {}",
+            detail
+        )));
     }
 
     Ok(())
@@ -1224,7 +1242,7 @@ async fn tribute_logs(
 async fn publish_game(
     Path(game_identifier): Path<Uuid>,
     state: State<AppState>,
-) -> Result<StatusCode, AppError> {
+) -> Result<Json<serde_json::Value>, AppError> {
     let game_identifier = game_identifier.to_string();
     let response = state
         .db
@@ -1233,7 +1251,7 @@ async fn publish_game(
         .await;
 
     match response {
-        Ok(_) => Ok(StatusCode::OK),
+        Ok(_) => Ok(Json(serde_json::json!({ "published": true }))),
         Err(e) => Err(AppError::InternalServerError(format!(
             "Failed to publish game: {e:?}"
         ))),
@@ -1243,7 +1261,7 @@ async fn publish_game(
 async fn unpublish_game(
     Path(game_identifier): Path<Uuid>,
     state: State<AppState>,
-) -> Result<StatusCode, AppError> {
+) -> Result<Json<serde_json::Value>, AppError> {
     let game_identifier = game_identifier.to_string();
     let response = state
         .db
@@ -1252,7 +1270,7 @@ async fn unpublish_game(
         .await;
 
     match response {
-        Ok(_) => Ok(StatusCode::OK),
+        Ok(_) => Ok(Json(serde_json::json!({ "published": false }))),
         Err(e) => Err(AppError::InternalServerError(format!(
             "Failed to unpublish game: {e:?}"
         ))),

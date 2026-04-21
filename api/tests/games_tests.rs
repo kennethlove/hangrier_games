@@ -38,18 +38,16 @@ async fn test_create_game() {
         .post("/api/games")
         .add_header("Authorization", user.auth_header())
         .json(&json!({
-            "max_tributes": 24,
-            "tribute_pool": 24,
-            "tribute_list": [],
+            "name": "Test Game",
         }))
         .await;
 
     response.assert_status_ok();
 
     let body = response.json::<serde_json::Value>();
-    assert!(body.get("id").is_some());
-    assert_eq!(body["max_tributes"], 24);
-    assert_eq!(body["status"], "setup");
+    assert!(body.get("identifier").is_some());
+    assert_eq!(body["name"], "Test Game");
+    assert_eq!(body["status"], "NotStarted");
 
     test_db.cleanup().await;
 }
@@ -118,7 +116,7 @@ async fn test_get_game() {
         .await;
 
     let create_body = create_response.json::<serde_json::Value>();
-    let game_id = create_body["id"].as_str().unwrap();
+    let game_id = create_body["identifier"].as_str().unwrap();
 
     // Get the game
     let get_response = server
@@ -129,7 +127,7 @@ async fn test_get_game() {
     get_response.assert_status_ok();
 
     let get_body = get_response.json::<serde_json::Value>();
-    assert_eq!(get_body["id"].as_str().unwrap(), game_id);
+    assert_eq!(get_body["identifier"].as_str().unwrap(), game_id);
 
     test_db.cleanup().await;
 }
@@ -156,21 +154,24 @@ async fn test_update_game() {
         .await;
 
     let create_body = create_response.json::<serde_json::Value>();
-    let game_id = create_body["id"].as_str().unwrap();
+    let game_id = create_body["identifier"].as_str().unwrap();
 
     // Update the game
     let update_response = server
         .put(&format!("/api/games/{}", game_id))
         .add_header("Authorization", user.auth_header())
         .json(&json!({
-            "max_tributes": 12,
+            "identifier": game_id,
+            "name": "Renamed Game",
+            "private": false,
         }))
         .await;
 
     update_response.assert_status_ok();
 
     let update_body = update_response.json::<serde_json::Value>();
-    assert_eq!(update_body["max_tributes"], 12);
+    assert_eq!(update_body["name"], "Renamed Game");
+    assert_eq!(update_body["private"], false);
 
     test_db.cleanup().await;
 }
@@ -197,7 +198,7 @@ async fn test_delete_game() {
         .await;
 
     let create_body = create_response.json::<serde_json::Value>();
-    let game_id = create_body["id"].as_str().unwrap();
+    let game_id = create_body["identifier"].as_str().unwrap();
 
     // Delete the game
     let delete_response = server
@@ -240,7 +241,7 @@ async fn test_game_display() {
         .await;
 
     let create_body = create_response.json::<serde_json::Value>();
-    let game_id = create_body["id"].as_str().unwrap();
+    let game_id = create_body["identifier"].as_str().unwrap();
 
     // Get the game display
     let display_response = server
@@ -251,7 +252,7 @@ async fn test_game_display() {
     display_response.assert_status_ok();
 
     let display_body = display_response.json::<serde_json::Value>();
-    assert!(display_body.get("id").is_some());
+    assert!(display_body.get("identifier").is_some());
     assert!(display_body.get("status").is_some());
 
     test_db.cleanup().await;
@@ -279,7 +280,7 @@ async fn test_game_areas() {
         .await;
 
     let create_body = create_response.json::<serde_json::Value>();
-    let game_id = create_body["id"].as_str().unwrap();
+    let game_id = create_body["identifier"].as_str().unwrap();
 
     // Get game areas
     let areas_response = server
@@ -320,7 +321,7 @@ async fn test_publish_game() {
         .await;
 
     let create_body = create_response.json::<serde_json::Value>();
-    let game_id = create_body["id"].as_str().unwrap();
+    let game_id = create_body["identifier"].as_str().unwrap();
 
     // Publish the game
     let publish_response = server
@@ -358,7 +359,7 @@ async fn test_unpublish_game() {
         .await;
 
     let create_body = create_response.json::<serde_json::Value>();
-    let game_id = create_body["id"].as_str().unwrap();
+    let game_id = create_body["identifier"].as_str().unwrap();
 
     server
         .put(&format!("/api/games/{}/publish", game_id))

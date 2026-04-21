@@ -5,6 +5,7 @@ use axum::Router;
 use std::sync::Arc;
 use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
+use surrealdb::opt::Config;
 use surrealdb::opt::auth::Root;
 use surrealdb_migrations::MigrationRunner;
 
@@ -16,9 +17,16 @@ pub struct TestDb {
 impl TestDb {
     /// Create a new test database connection (in-memory)
     pub async fn new() -> Self {
-        // Use in-memory database for tests (no external dependencies)
+        // Use in-memory database for tests (no external dependencies).
+        // Provision root credentials at engine init so the subsequent signin
+        // (and downstream JWT-based authenticate calls) succeed against a
+        // fresh `mem://` instance.
+        let config = Config::new().user(Root {
+            username: "root",
+            password: "root",
+        });
         let db = Arc::new(
-            surrealdb::engine::any::connect("mem://")
+            surrealdb::engine::any::connect(("mem://", config))
                 .await
                 .expect("Failed to create in-memory database"),
         );
@@ -41,7 +49,18 @@ impl TestDb {
             .await
             .expect("Failed to use test database");
 
-        // Run migrations
+        // Run migrations. The runner reads `schemas/` and `migrations/` relative
+        // to its working dir; tests run with CWD=api/, but those folders live at
+        // the workspace root. Point the runner there via SURREAL_MIG_PATH (the
+        // env var honored by surrealdb-migrations when no .surrealdb config is
+        // present).
+        let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("api crate must have a parent (workspace root)");
+        // SAFETY: tests run with --test-threads=1, so this process-global mutation is safe.
+        unsafe {
+            std::env::set_var("SURREAL_MIG_PATH", workspace_root);
+        }
         MigrationRunner::new(&db)
             .up()
             .await

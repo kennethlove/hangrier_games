@@ -96,7 +96,12 @@ pub struct AreaDetails {
     pub items: Vec<Item>,
     #[serde(default)]
     pub events: Vec<AreaEvent>,
+    #[serde(default = "default_terrain")]
     pub terrain: TerrainType,
+}
+
+fn default_terrain() -> TerrainType {
+    TerrainType::new(BaseTerrain::Clearing, vec![]).unwrap()
 }
 
 impl Default for AreaDetails {

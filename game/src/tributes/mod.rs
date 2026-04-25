@@ -6,6 +6,7 @@ pub mod inventory;
 pub mod lifecycle;
 pub mod movement;
 pub mod statuses;
+pub mod traits;
 
 // Re-export key items from sub-modules
 pub use combat::{attack_contest, update_stats};

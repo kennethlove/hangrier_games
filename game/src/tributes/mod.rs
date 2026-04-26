@@ -57,6 +57,10 @@ pub struct EncounterContext {
 pub struct Tribute {
     /// Identifier
     pub identifier: String,
+    /// Stable typed UUID. Mirrors `identifier` for callers that want a
+    /// non-stringly-typed key (alliance graph, betrayal events).
+    #[serde(default = "Uuid::new_v4")]
+    pub id: Uuid,
     /// Where are they?
     pub area: Area,
     /// What is their current status?
@@ -92,6 +96,17 @@ pub struct Tribute {
     pub stamina: u32,
     /// Maximum stamina capacity
     pub max_stamina: u32,
+    /// Personality/behavior trait set. Replaces `BrainPersonality`.
+    /// A tribute with zero traits behaves as the old `Balanced` baseline.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub traits: Vec<traits::Trait>,
+    /// Pair-wise alliance graph. Symmetric: when A allies with B, both
+    /// `allies` lists gain the other. Capped at `MAX_ALLIES`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allies: Vec<Uuid>,
+    /// Turn counter for the Treacherous betrayal cadence. Reset on betrayal.
+    #[serde(default)]
+    pub turns_since_last_betrayal: u8,
 }
 
 impl Default for Tribute {
@@ -107,7 +122,8 @@ impl Tribute {
         let attributes = Attributes::new();
         let statistics = Statistics::default();
 
-        let id: String = Uuid::new_v4().to_string();
+        let id_uuid: Uuid = Uuid::new_v4();
+        let id: String = id_uuid.to_string();
 
         // Assign terrain affinity and personality based on district
         let mut rng = SmallRng::from_rng(&mut rand::rng());
@@ -120,6 +136,7 @@ impl Tribute {
 
         Self {
             identifier: id,
+            id: id_uuid,
             area: Area::Cornucopia,
             name: name.clone(),
             district,
@@ -135,6 +152,9 @@ impl Tribute {
             terrain_affinity,
             stamina: 100,
             max_stamina: 100,
+            traits: Vec::new(),
+            allies: Vec::new(),
+            turns_since_last_betrayal: 0,
         }
     }
 
@@ -570,5 +590,14 @@ mod tests {
         let tribute = Tribute::random();
         assert!(!tribute.name.is_empty());
         assert!(tribute.district >= 1 && tribute.district <= 12);
+    }
+
+    #[rstest]
+    fn new_tribute_has_empty_alliance_state() {
+        let tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        assert!(tribute.allies.is_empty());
+        assert_eq!(tribute.turns_since_last_betrayal, 0);
+        // `id` mirrors `identifier`.
+        assert_eq!(tribute.id.to_string(), tribute.identifier);
     }
 }

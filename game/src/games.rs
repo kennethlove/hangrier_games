@@ -73,6 +73,11 @@ pub struct Game {
     /// Skipped during serialization since events live in their own table.
     #[serde(default, skip_serializing)]
     pub messages: Vec<crate::messages::GameMessage>,
+    /// Transient queue of alliance lifecycle events drained between tribute
+    /// turns inside `run_day_night_cycle`. Lives only for the duration of a
+    /// single cycle; never persisted. See spec §7.5.
+    #[serde(default, skip)]
+    pub alliance_events: Vec<crate::tributes::alliances::AllianceEvent>,
 }
 
 impl Default for Game {
@@ -94,6 +99,7 @@ impl Default for Game {
             private: true,
             config: Default::default(),
             messages: vec![],
+            alliance_events: vec![],
         }
     }
 }
@@ -712,9 +718,123 @@ impl Game {
         // Drained into self.messages after the mutable borrow of self.tributes ends.
         let mut collected_events: Vec<(String, String, String)> = Vec::new();
 
+        // Alliance formation rolls (spec §6). For every pair of living
+        // tributes sharing an area where neither already lists the other as
+        // an ally and neither is at the alliance cap, run try_form_alliance.
+        // Collect successful pairs as (id_a, id_b, factor) and apply after
+        // the immutable borrow ends. This runs *before* the per-tribute
+        // turn so newly-formed alliances are visible to pick_target this
+        // cycle.
+        let mut new_alliances: Vec<(uuid::Uuid, uuid::Uuid, String, String)> = Vec::new();
+        for tributes in tributes_by_area.values() {
+            for i in 0..tributes.len() {
+                for j in (i + 1)..tributes.len() {
+                    let a = tributes[i];
+                    let b = tributes[j];
+                    if a.allies.contains(&b.id) || b.allies.contains(&a.id) {
+                        continue;
+                    }
+                    if a.allies.len() >= crate::tributes::alliances::MAX_ALLIES
+                        || b.allies.len() >= crate::tributes::alliances::MAX_ALLIES
+                    {
+                        continue;
+                    }
+                    let same_district = a.district == b.district;
+                    let formed = crate::tributes::alliances::try_form_alliance(
+                        &a.traits,
+                        &b.traits,
+                        same_district,
+                        a.allies.len(),
+                        b.allies.len(),
+                        rng,
+                    );
+                    if formed {
+                        let factor = crate::tributes::alliances::deciding_factor(
+                            &a.traits,
+                            &b.traits,
+                            same_district,
+                        );
+                        let factor_label = factor
+                            .as_ref()
+                            .map(|f| f.label())
+                            .unwrap_or("mutual circumstance");
+                        new_alliances.push((
+                            a.id,
+                            b.id,
+                            a.name.clone(),
+                            format!(
+                                "{} and {} form an alliance ({}).",
+                                a.name, b.name, factor_label
+                            ),
+                        ));
+                    }
+                }
+            }
+        }
+
+        // Alliance events drained from each tribute's local buffer this cycle.
+        // Appended to self.alliance_events after the mutable borrow ends, then
+        // processed via process_alliance_events so cascades resolve before the
+        // next cycle.
+        let mut drained_alliance_events: Vec<crate::tributes::alliances::AllianceEvent> =
+            Vec::new();
+
+        // Apply alliance formations symmetrically. Both sides get each
+        // other's id pushed onto `allies` so the graph stays consistent.
+        // Skip duplicates defensively in case the same pair appears twice.
+        for (id_a, id_b, name_a, message) in &new_alliances {
+            // Find indices to satisfy the borrow checker for two-side mutation.
+            let mut idx_a: Option<usize> = None;
+            let mut idx_b: Option<usize> = None;
+            for (i, t) in self.tributes.iter().enumerate() {
+                if t.id == *id_a {
+                    idx_a = Some(i);
+                }
+                if t.id == *id_b {
+                    idx_b = Some(i);
+                }
+            }
+            let (Some(ia), Some(ib)) = (idx_a, idx_b) else {
+                continue;
+            };
+            // Re-check caps and existing membership at apply time in case
+            // multiple formations targeting the same tribute pushed the
+            // count over MAX_ALLIES.
+            if self.tributes[ia].allies.len() >= crate::tributes::alliances::MAX_ALLIES
+                || self.tributes[ib].allies.len() >= crate::tributes::alliances::MAX_ALLIES
+            {
+                continue;
+            }
+            if !self.tributes[ia].allies.contains(id_b) {
+                self.tributes[ia].allies.push(*id_b);
+            }
+            if !self.tributes[ib].allies.contains(id_a) {
+                self.tributes[ib].allies.push(*id_a);
+            }
+            collected_events.push((
+                self.tributes[ia].identifier.clone(),
+                name_a.clone(),
+                message.clone(),
+            ));
+        }
+
         // Process tributes
         for tribute in self.tributes.iter_mut() {
             if !tribute.is_alive() {
+                // Newly-dead tributes (status=RecentlyDead going into this
+                // cycle) trigger a DeathRecorded event so allies process the
+                // ally-death cascade. Killer attribution is deferred — combat
+                // sites that record kills should enqueue with `killer = Some`
+                // directly. Promote to Dead after enqueueing so the same
+                // tribute does not re-emit on subsequent cycles.
+                if tribute.status == TributeStatus::RecentlyDead {
+                    drained_alliance_events.push(
+                        crate::tributes::alliances::AllianceEvent::DeathRecorded {
+                            deceased: tribute.id,
+                            killer: None,
+                        },
+                    );
+                }
                 tribute.status = TributeStatus::Dead;
                 continue;
             }
@@ -796,6 +916,7 @@ impl Game {
             for line in tribute_events {
                 collected_events.push((tribute.identifier.clone(), tribute.name.clone(), line));
             }
+            drained_alliance_events.append(&mut tribute.drain_alliance_events());
         }
 
         // Drain collected events into game messages now that the mutable borrow ends.
@@ -805,6 +926,13 @@ impl Game {
                 name,
                 line,
             );
+        }
+
+        // Promote drained alliance events into the game queue and process them
+        // so betrayal/death cascades take effect before the next cycle.
+        if !drained_alliance_events.is_empty() {
+            self.alliance_events.append(&mut drained_alliance_events);
+            self.process_alliance_events(rng);
         }
         Ok(())
     }
@@ -883,6 +1011,76 @@ impl Game {
     fn get_area_details_mut(&mut self, area: Area) -> Option<&mut AreaDetails> {
         self.areas.iter_mut().find(|ad| ad.area == Some(area))
     }
+
+    /// Drain the alliance event queue accumulated during the current cycle.
+    /// Called between tribute turns inside `run_tribute_cycle` so cascades
+    /// resolve before the next tribute acts. Per spec §7.5:
+    /// - `BetrayalRecorded`: remove the symmetric pair on the victim's side
+    ///   (betrayer's side was already cleaned at trigger time) and flag the
+    ///   victim for a trust-shock roll on their next turn. The betrayer is
+    ///   never flagged.
+    /// - `DeathRecorded`: roll a sanity-break per direct ally of the deceased
+    ///   (consistent with §7.3a thresholds) and emit a break message on
+    ///   success. After the cascade, unconditionally scrub the deceased's
+    ///   id from every surviving tribute's `allies` list.
+    pub fn process_alliance_events(&mut self, rng: &mut impl Rng) {
+        use crate::tributes::alliances::{AllianceEvent, sanity_break_roll};
+
+        // Collect drained events into a local Vec so we can release the
+        // borrow on `self.alliance_events` before mutating `self.tributes`.
+        let drained: Vec<AllianceEvent> = self.alliance_events.drain(..).collect();
+
+        for ev in drained {
+            match ev {
+                AllianceEvent::BetrayalRecorded { betrayer, victim } => {
+                    if let Some(v) = self.tributes.iter_mut().find(|t| t.id == victim) {
+                        v.allies.retain(|x| *x != betrayer);
+                        v.pending_trust_shock = true;
+                    }
+                    // Spec §7.5: betrayer is never enqueued for trust-shock.
+                }
+                AllianceEvent::DeathRecorded {
+                    deceased,
+                    killer: _,
+                } => {
+                    // Snapshot the deceased's allies before mutation so we
+                    // can roll the cascade per direct ally.
+                    let allies_of_deceased: Vec<Uuid> = self
+                        .tributes
+                        .iter()
+                        .find(|t| t.id == deceased)
+                        .map(|d| d.allies.clone())
+                        .unwrap_or_default();
+
+                    for ally_id in allies_of_deceased {
+                        if let Some(ally) = self.tributes.iter_mut().find(|t| t.id == ally_id) {
+                            // `extreme_low_sanity` is the §7.3a low-limit
+                            // mapping (see PersonalityThresholds doc).
+                            let limit = ally.brain.thresholds.extreme_low_sanity;
+                            let sanity = ally.attributes.sanity;
+                            if sanity_break_roll(sanity, limit, rng) {
+                                ally.allies.retain(|x| *x != deceased);
+                                let line = format!(
+                                    "{} is shaken by their ally's death and breaks the bond.",
+                                    ally.name
+                                );
+                                let aid = ally.identifier.clone();
+                                let aname = ally.name.clone();
+                                self.log(crate::messages::MessageSource::Tribute(aid), aname, line);
+                            }
+                        }
+                    }
+
+                    // Unconditional cleanup: ensure the deceased's id is
+                    // removed from every surviving tribute's allies list,
+                    // even if their cascade roll failed.
+                    for t in self.tributes.iter_mut() {
+                        t.allies.retain(|x| *x != deceased);
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -900,6 +1098,7 @@ mod tests {
             private: true,
             config: Default::default(),
             messages: vec![],
+            alliance_events: vec![],
         }
     }
 
@@ -922,6 +1121,12 @@ mod tests {
         assert_eq!(game.status, GameStatus::NotStarted);
         assert_eq!(game.day, None);
         assert_eq!(game.tributes.len(), 0);
+    }
+
+    #[test]
+    fn game_has_empty_alliance_event_queue_on_new() {
+        let g = Game::default();
+        assert!(g.alliance_events.is_empty());
     }
 
     #[test]
@@ -1219,5 +1424,433 @@ mod tests {
 
         assert_eq!(game.open_areas().len(), 1);
         assert_eq!(game.closed_areas().len(), 1);
+    }
+
+    // ---- Phase 4: alliance event drain -----------------------------------
+
+    #[test]
+    fn process_alliance_events_betrayal_removes_pair_on_victim_side() {
+        // Victim still lists betrayer in allies (betrayer's own list was
+        // already cleaned by the betrayal trigger that enqueued the event).
+        let mut betrayer = Tribute::new("Betrayer".to_string(), Some(1), None);
+        let mut victim = Tribute::new("Victim".to_string(), Some(2), None);
+        victim.allies.push(betrayer.id);
+        // Sanity force victim to a state where the drain path runs cleanly.
+        victim.attributes.health = 100;
+        betrayer.attributes.health = 100;
+        let bid = betrayer.id;
+        let vid = victim.id;
+
+        let mut game = create_test_game_with_tributes(vec![betrayer, victim]);
+        game.alliance_events.push(
+            crate::tributes::alliances::AllianceEvent::BetrayalRecorded {
+                betrayer: bid,
+                victim: vid,
+            },
+        );
+
+        let mut rng = SmallRng::seed_from_u64(53);
+        game.process_alliance_events(&mut rng);
+
+        let v = game.tributes.iter().find(|t| t.id == vid).unwrap();
+        assert!(!v.allies.contains(&bid));
+        assert!(v.pending_trust_shock);
+        assert!(game.alliance_events.is_empty());
+    }
+
+    #[test]
+    fn process_alliance_events_betrayer_not_marked_for_trust_shock() {
+        let betrayer = Tribute::new("Betrayer".to_string(), Some(1), None);
+        let victim = Tribute::new("Victim".to_string(), Some(2), None);
+        let bid = betrayer.id;
+        let vid = victim.id;
+
+        let mut game = create_test_game_with_tributes(vec![betrayer, victim]);
+        game.alliance_events.push(
+            crate::tributes::alliances::AllianceEvent::BetrayalRecorded {
+                betrayer: bid,
+                victim: vid,
+            },
+        );
+
+        let mut rng = SmallRng::seed_from_u64(53);
+        game.process_alliance_events(&mut rng);
+
+        let b = game.tributes.iter().find(|t| t.id == bid).unwrap();
+        assert!(!b.pending_trust_shock, "betrayer must not roll trust-shock");
+    }
+
+    #[test]
+    fn process_alliance_events_death_removes_deceased_from_all_ally_lists() {
+        // Three tributes; the deceased was in two allies' lists.
+        let deceased = Tribute::new("Deceased".to_string(), Some(1), None);
+        let mut a = Tribute::new("A".to_string(), Some(2), None);
+        let mut b = Tribute::new("B".to_string(), Some(3), None);
+        a.allies.push(deceased.id);
+        b.allies.push(deceased.id);
+        // Force ally sanity well above any threshold so the cascade roll
+        // never fires; we want to verify the unconditional cleanup path.
+        a.attributes.sanity = 100;
+        b.attributes.sanity = 100;
+
+        let did = deceased.id;
+        let mut game = create_test_game_with_tributes(vec![deceased, a, b]);
+        game.alliance_events
+            .push(crate::tributes::alliances::AllianceEvent::DeathRecorded {
+                deceased: did,
+                killer: None,
+            });
+
+        let mut rng = SmallRng::seed_from_u64(89);
+        game.process_alliance_events(&mut rng);
+
+        for t in game.tributes.iter().filter(|t| t.id != did) {
+            assert!(
+                !t.allies.contains(&did),
+                "tribute {} still lists deceased",
+                t.name
+            );
+        }
+        assert!(game.alliance_events.is_empty());
+    }
+
+    #[test]
+    fn run_tribute_cycle_drains_tribute_alliance_events_into_game_queue() {
+        // Pre-load tribute1's alliance_events buffer; after run_tribute_cycle
+        // it must be drained into the game queue and processed (BetrayalRecorded
+        // cleans the victim's allies and flags pending_trust_shock).
+        let mut tribute1 = create_tribute("Tribute1", true);
+        let mut tribute2 = create_tribute("Tribute2", true);
+        // Make tribute2 list tribute1 as ally; betrayal has tribute1 as betrayer,
+        // tribute2 as victim. Plumbing only — we just need the side effects we
+        // can observe on the victim.
+        tribute2.allies.push(tribute1.id);
+        let bid = tribute1.id;
+        let vid = tribute2.id;
+        tribute1.alliance_events.push(
+            crate::tributes::alliances::AllianceEvent::BetrayalRecorded {
+                betrayer: bid,
+                victim: vid,
+            },
+        );
+
+        let mut game = create_test_game_with_tributes(vec![tribute1.clone(), tribute2.clone()]);
+        let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
+        game.areas.push(area);
+        let closed_areas = game
+            .areas
+            .iter()
+            .filter(|ad| ad.area.is_some() & !ad.is_open())
+            .map(|ad| ad.area.unwrap())
+            .collect::<Vec<Area>>();
+
+        let mut rng = SmallRng::seed_from_u64(211);
+        let _ = game.run_tribute_cycle(
+            true,
+            &mut rng,
+            closed_areas,
+            vec![tribute1.clone(), tribute2.clone()],
+            2,
+        );
+
+        // After cycle: queue empty (drained + processed), each tribute's local
+        // buffer empty, victim's allies cleaned, victim flagged for trust shock.
+        assert!(game.alliance_events.is_empty(), "game queue must drain");
+        for t in &game.tributes {
+            assert!(
+                t.alliance_events.is_empty(),
+                "tribute {} buffer must drain",
+                t.name
+            );
+        }
+        let v = game.tributes.iter().find(|t| t.id == vid).unwrap();
+        assert!(!v.allies.contains(&bid), "victim allies cleaned");
+        assert!(v.pending_trust_shock, "victim flagged for trust shock");
+    }
+
+    #[test]
+    fn run_tribute_cycle_forms_alliance_between_compatible_same_area_tributes() {
+        // Two Friendly tributes from the same district sharing an area
+        // should be able to form an alliance during a cycle. With both
+        // sides starting at 0 allies, district bonus, and Friendly affinity
+        // 1.5 each, roll_chance ≈ 0.675; with a fixed seed and many trials
+        // we deterministically observe at least one cycle that forms.
+        use crate::tributes::traits::Trait;
+        let mut t1 = create_tribute("Cinna", true);
+        let mut t2 = create_tribute("Portia", true);
+        // Force compatibility: same district + Friendly traits.
+        t1.district = 1;
+        t2.district = 1;
+        t1.traits = vec![Trait::Friendly];
+        t2.traits = vec![Trait::Friendly];
+        // Place both in Cornucopia (default `Tribute::new` already does this,
+        // but be explicit for the test's intent).
+        t1.area = Area::Cornucopia;
+        t2.area = Area::Cornucopia;
+
+        let id1 = t1.id;
+        let id2 = t2.id;
+
+        let mut game = create_test_game_with_tributes(vec![t1.clone(), t2.clone()]);
+        let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
+        game.areas.push(area);
+        let closed_areas = game
+            .areas
+            .iter()
+            .filter(|ad| ad.area.is_some() & !ad.is_open())
+            .map(|ad| ad.area.unwrap())
+            .collect::<Vec<Area>>();
+
+        // Loop a few seeded cycles until at least one forms; if production
+        // wiring is correct this should hit within a handful of trials.
+        let mut formed = false;
+        for seed in [313u64, 419, 547, 23, 89, 211] {
+            let mut g = game.clone();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let _ = g.run_tribute_cycle(
+                true,
+                &mut rng,
+                closed_areas.clone(),
+                vec![t1.clone(), t2.clone()],
+                2,
+            );
+            let a1 = g.tributes.iter().find(|t| t.id == id1).unwrap();
+            let a2 = g.tributes.iter().find(|t| t.id == id2).unwrap();
+            if a1.allies.contains(&id2) && a2.allies.contains(&id1) {
+                formed = true;
+                break;
+            }
+        }
+        assert!(
+            formed,
+            "Friendly same-district pair must form an alliance within a few cycles"
+        );
+    }
+
+    #[test]
+    fn run_tribute_cycle_treacherous_tribute_betrays_same_area_ally_when_timer_elapses() {
+        // Treacherous tribute with an ally in the same area, timer at the
+        // betrayal interval, must enqueue BetrayalRecorded during the cycle.
+        // After process_alliance_events, the victim must have:
+        //   - pending_trust_shock set
+        //   - betrayer removed from allies
+        // and the betrayer must have:
+        //   - victim removed from allies
+        //   - timer reset to 0
+        use crate::tributes::alliances::TREACHEROUS_BETRAYAL_INTERVAL;
+        use crate::tributes::traits::Trait;
+
+        let mut betrayer = create_tribute("Cato", true);
+        let mut victim = create_tribute("Glimmer", true);
+        betrayer.traits = vec![Trait::Treacherous];
+        // Strip any auto-generated traits from victim that might accidentally
+        // form an alliance back during the cycle (we want a pre-existing ally).
+        victim.traits = vec![Trait::Tough];
+        // Pre-existing alliance set up manually.
+        betrayer.allies.push(victim.id);
+        victim.allies.push(betrayer.id);
+        // Timer at threshold so betrayal fires this turn.
+        betrayer.turns_since_last_betrayal = TREACHEROUS_BETRAYAL_INTERVAL;
+        // Same area.
+        betrayer.area = Area::Cornucopia;
+        victim.area = Area::Cornucopia;
+        // Different districts so we don't accidentally re-form alliances
+        // during the formation pass.
+        betrayer.district = 1;
+        victim.district = 2;
+
+        let bid = betrayer.id;
+        let vid = victim.id;
+
+        let mut game = create_test_game_with_tributes(vec![betrayer.clone(), victim.clone()]);
+        let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
+        game.areas.push(area);
+        let closed_areas = game
+            .areas
+            .iter()
+            .filter(|ad| ad.area.is_some() & !ad.is_open())
+            .map(|ad| ad.area.unwrap())
+            .collect::<Vec<Area>>();
+
+        let mut rng = SmallRng::seed_from_u64(313);
+        let _ = game.run_tribute_cycle(
+            true,
+            &mut rng,
+            closed_areas,
+            vec![betrayer.clone(), victim.clone()],
+            2,
+        );
+
+        let v = game.tributes.iter().find(|t| t.id == vid).unwrap();
+        let b = game.tributes.iter().find(|t| t.id == bid).unwrap();
+        assert!(!v.allies.contains(&bid), "victim allies cleaned by event");
+        assert!(v.pending_trust_shock, "victim flagged for trust shock");
+        assert!(!b.allies.contains(&vid), "betrayer dropped victim locally");
+        // tick_alliance_timers ran and incremented to TREACHEROUS_BETRAYAL_INTERVAL+1
+        // before betrayal fired? No: betrayal logic must reset to 0. After reset,
+        // the rest of process_turn_phase doesn't tick again, so we expect 0.
+        assert_eq!(
+            b.turns_since_last_betrayal, 0,
+            "betrayal resets the cooldown timer"
+        );
+    }
+
+    #[test]
+    fn run_tribute_cycle_treacherous_no_betrayal_without_same_area_ally_resets_timer() {
+        // Treacherous tribute alone in its area: no betrayal possible, but
+        // the timer should still reset (one missed opportunity per cycle).
+        use crate::tributes::alliances::TREACHEROUS_BETRAYAL_INTERVAL;
+        use crate::tributes::traits::Trait;
+
+        let mut loner = create_tribute("Foxface", true);
+        let mut other = create_tribute("Marvel", true);
+        loner.traits = vec![Trait::Treacherous];
+        other.traits = vec![Trait::Tough];
+        loner.turns_since_last_betrayal = TREACHEROUS_BETRAYAL_INTERVAL;
+        // Different areas so other is not a same-area ally.
+        loner.area = Area::North;
+        other.area = Area::South;
+        loner.district = 5;
+        other.district = 6;
+        let lid = loner.id;
+
+        let mut game = create_test_game_with_tributes(vec![loner.clone(), other.clone()]);
+        game.areas
+            .push(AreaDetails::new(Some("Hill".to_string()), Area::North));
+        game.areas
+            .push(AreaDetails::new(Some("Lake".to_string()), Area::South));
+        let closed_areas = game
+            .areas
+            .iter()
+            .filter(|ad| ad.area.is_some() & !ad.is_open())
+            .map(|ad| ad.area.unwrap())
+            .collect::<Vec<Area>>();
+
+        let mut rng = SmallRng::seed_from_u64(419);
+        let _ = game.run_tribute_cycle(
+            true,
+            &mut rng,
+            closed_areas,
+            vec![loner.clone(), other.clone()],
+            2,
+        );
+
+        let l = game.tributes.iter().find(|t| t.id == lid).unwrap();
+        assert_eq!(
+            l.turns_since_last_betrayal, 0,
+            "missed opportunity also resets the timer per spec §7.4(b)"
+        );
+    }
+
+    #[test]
+    fn run_tribute_cycle_enqueues_death_recorded_for_recently_dead_ally() {
+        // A tribute who died last cycle (status=RecentlyDead) must trigger
+        // a DeathRecorded event so allies process the ally-death cascade.
+        // After the cycle, the deceased's allies should have:
+        //   - the deceased removed from their `allies` lists (via cascade);
+        //   - process_alliance_events drained the queue.
+        use crate::tributes::traits::Trait;
+
+        let mut deceased = create_tribute("Rue", true);
+        let mut survivor = create_tribute("Katniss", true);
+        // Make survivor highly likely to break on cascade: low sanity, high
+        // threshold makes deficit_ratio close to 1.0 → near-certain break.
+        survivor.attributes.sanity = 0;
+        survivor.brain.thresholds.extreme_low_sanity = 50;
+        survivor.traits = vec![Trait::Tough];
+        deceased.traits = vec![Trait::Tough];
+        // Pre-existing alliance (survivor lists deceased as ally).
+        survivor.allies.push(deceased.id);
+        deceased.allies.push(survivor.id);
+        // Mark deceased as RecentlyDead going into the cycle.
+        deceased.attributes.health = 0;
+        deceased.status = TributeStatus::RecentlyDead;
+        // Same area so deceased is "in the cycle" but the early skip applies.
+        deceased.area = Area::Cornucopia;
+        survivor.area = Area::Cornucopia;
+        deceased.district = 11;
+        survivor.district = 12;
+
+        let did = deceased.id;
+        let sid = survivor.id;
+
+        let mut game = create_test_game_with_tributes(vec![deceased.clone(), survivor.clone()]);
+        game.areas
+            .push(AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia));
+        // Living tributes snapshot: deceased is RecentlyDead so excluded.
+        let living = game.living_tributes();
+        let closed_areas: Vec<Area> = vec![];
+
+        let mut rng = SmallRng::seed_from_u64(547);
+        let _ = game.run_tribute_cycle(true, &mut rng, closed_areas, living, 1);
+
+        // Cycle drained the queue (no leftovers).
+        assert!(
+            game.alliance_events.is_empty(),
+            "queue must drain after cycle"
+        );
+        // Deceased promoted to Dead.
+        let d = game.tributes.iter().find(|t| t.id == did).unwrap();
+        assert_eq!(d.status, TributeStatus::Dead);
+        // Survivor's ally list cleaned of deceased (cascade fired with high
+        // probability given sanity=0 vs threshold=50; even on the rare miss
+        // the alliance edge is still broken because process_alliance_events
+        // does symmetric removal of dead from all surviving allies' lists).
+        let s = game.tributes.iter().find(|t| t.id == sid).unwrap();
+        assert!(
+            !s.allies.contains(&did),
+            "survivor must not retain a dead ally edge"
+        );
+    }
+
+    #[test]
+    fn run_tribute_cycle_three_way_preserves_existing_alliance() {
+        // Three-way scenario: A and B are pre-allied; C is a LoneWolf in
+        // the same area (refuser → cannot form an alliance with either).
+        // After a cycle, A and B's bond must remain intact and C must
+        // remain unallied. This pins that:
+        //   1. The formation pass does not silently rebreak existing
+        //      same-area alliances.
+        //   2. The presence of a third unalliable tribute does not
+        //      perturb the pair's bond.
+        use crate::tributes::traits::Trait;
+
+        let mut a = create_tribute("Katniss", true);
+        let mut b = create_tribute("Peeta", true);
+        let mut c = create_tribute("Cato", true);
+        a.traits = vec![Trait::Friendly];
+        b.traits = vec![Trait::Loyal];
+        c.traits = vec![Trait::LoneWolf];
+        // Pre-existing symmetric alliance between A and B.
+        a.allies.push(b.id);
+        b.allies.push(a.id);
+        a.area = Area::Cornucopia;
+        b.area = Area::Cornucopia;
+        c.area = Area::Cornucopia;
+        a.district = 1;
+        b.district = 2;
+        c.district = 3;
+
+        let aid = a.id;
+        let bid = b.id;
+        let cid = c.id;
+
+        let mut game = create_test_game_with_tributes(vec![a.clone(), b.clone(), c.clone()]);
+        game.areas
+            .push(AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia));
+        let living = game.living_tributes();
+        let closed_areas: Vec<Area> = vec![];
+
+        let mut rng = SmallRng::seed_from_u64(547);
+        let _ = game.run_tribute_cycle(true, &mut rng, closed_areas, living, 3);
+
+        let a2 = game.tributes.iter().find(|t| t.id == aid).unwrap();
+        let b2 = game.tributes.iter().find(|t| t.id == bid).unwrap();
+        let c2 = game.tributes.iter().find(|t| t.id == cid).unwrap();
+        assert!(a2.allies.contains(&bid), "A still allied with B");
+        assert!(b2.allies.contains(&aid), "B still allied with A");
+        assert!(!a2.allies.contains(&cid), "A did not bond with LoneWolf C");
+        assert!(!b2.allies.contains(&cid), "B did not bond with LoneWolf C");
+        assert!(c2.allies.is_empty(), "LoneWolf C remains unallied");
     }
 }

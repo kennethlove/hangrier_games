@@ -339,7 +339,7 @@ Brain::act()
 - `calculate_violence_stress()`: Stress from combat (lines 1079-1109)
 - `travels()`: Movement logic with area validation (lines 457-548)
 - `process_status()`: Apply status effect damage (lines 552-616)
-- `pick_target()`: Target selection with loyalty/betrayal (lines 949-1018)
+- `pick_target()`: Target selection with alliance filter (lines 416-450)
 - 26 damage/reduction constants (lines 24-57)
 - 12 max attribute values (lines 60-71)
 - 60+ test functions

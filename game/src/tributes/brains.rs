@@ -2,19 +2,11 @@ use crate::areas::{Area, AreaDetails};
 use crate::terrain::{BaseTerrain, Harshness, TerrainType, Visibility};
 use crate::tributes::Tribute;
 use crate::tributes::actions::Action;
+use crate::tributes::traits::{ThresholdDelta, Trait};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 const LOW_ENEMY_LIMIT: u32 = 6;
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum BrainPersonality {
-    Aggressive,
-    Defensive,
-    Balanced,
-    Cautious,
-    Reckless,
-}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum PsychoticBreakType {
@@ -38,166 +30,72 @@ pub struct PersonalityThresholds {
     pub psychotic_break_threshold: u32, // Sanity level that triggers break
 }
 
-impl BrainPersonality {
-    pub fn random(rng: &mut impl Rng) -> Self {
-        match rng.random_range(0..5) {
-            0 => BrainPersonality::Aggressive,
-            1 => BrainPersonality::Defensive,
-            2 => BrainPersonality::Balanced,
-            3 => BrainPersonality::Cautious,
-            _ => BrainPersonality::Reckless,
-        }
-    }
-
-    /// Generate thresholds with ±20% variance for individual differences
-    pub fn generate_thresholds(&self, rng: &mut impl Rng) -> PersonalityThresholds {
-        fn apply_variance(base: u32, rng: &mut impl Rng) -> u32 {
-            let variance = rng.random_range(-0.2..=0.2);
+impl PersonalityThresholds {
+    /// Derive thresholds from a tribute's traits. Sums each trait's
+    /// `ThresholdDelta`, applies it to baseline values, then applies ±20%
+    /// individual variance. Each field is clamped to at least 1.
+    ///
+    /// Field mapping from `ThresholdDelta` to `PersonalityThresholds`:
+    /// - `low_health_limit`        → `low_health`
+    /// - `mid_health_limit`        → `mid_health`
+    /// - `low_sanity_limit`        → `extreme_low_sanity`
+    /// - `mid_sanity_limit`        → `low_sanity`
+    /// - `high_sanity_limit`       → `mid_sanity`
+    /// - `movement_limit`          → `low_movement`
+    /// - `high_intelligence_limit` → `high_intelligence`
+    /// - `low_intelligence_limit`  → `low_intelligence`
+    /// - `psychotic_break_threshold` → `psychotic_break_threshold`
+    pub fn from_traits(traits: &[Trait], rng: &mut impl Rng) -> Self {
+        fn apply_variance(base: i32, rng: &mut impl Rng) -> u32 {
+            let variance = rng.random_range(-0.2_f32..=0.2_f32);
             ((base as f32) * (1.0 + variance)).max(1.0) as u32
         }
 
-        // Base values per personality
-        let (base_low_health, base_mid_health) = match self {
-            BrainPersonality::Aggressive => (15, 30),
-            BrainPersonality::Defensive => (30, 50),
-            BrainPersonality::Balanced => (20, 40),
-            BrainPersonality::Cautious => (35, 55),
-            BrainPersonality::Reckless => (10, 25),
-        };
+        fn apply_delta(base: i32, delta: i32) -> i32 {
+            (base + delta).max(1)
+        }
 
-        let (base_extreme_low_sanity, base_low_sanity, base_mid_sanity) = match self {
-            BrainPersonality::Aggressive => (8, 15, 25),
-            BrainPersonality::Defensive => (15, 25, 45),
-            BrainPersonality::Balanced => (10, 20, 35),
-            BrainPersonality::Cautious => (18, 30, 50),
-            BrainPersonality::Reckless => (5, 10, 20),
-        };
+        // Baseline values match the original `Balanced` personality.
+        let base_low_health: i32 = 20;
+        let base_mid_health: i32 = 40;
+        let base_extreme_low_sanity: i32 = 10;
+        let base_low_sanity: i32 = 20;
+        let base_mid_sanity: i32 = 35;
+        let base_low_movement: i32 = 10;
+        let base_high_intelligence: i32 = 35;
+        let base_low_intelligence: i32 = 80;
+        let base_break_threshold: i32 = 8;
 
-        let base_low_movement = match self {
-            BrainPersonality::Aggressive => 8,
-            BrainPersonality::Defensive => 15,
-            BrainPersonality::Balanced => 10,
-            BrainPersonality::Cautious => 18,
-            BrainPersonality::Reckless => 5,
-        };
-
-        let (base_high_intelligence, base_low_intelligence) = match self {
-            BrainPersonality::Aggressive => (30, 75),
-            BrainPersonality::Defensive => (40, 85),
-            BrainPersonality::Balanced => (35, 80),
-            BrainPersonality::Cautious => (45, 90),
-            BrainPersonality::Reckless => (25, 70),
-        };
-
-        // Psychotic break threshold varies by personality
-        // Reckless/Aggressive more prone (higher threshold = breaks sooner)
-        // Cautious/Defensive more resilient (lower threshold = breaks later)
-        let base_break_threshold = match self {
-            BrainPersonality::Reckless => 12, // Breaks easily
-            BrainPersonality::Aggressive => 10,
-            BrainPersonality::Balanced => 8,
-            BrainPersonality::Defensive => 6,
-            BrainPersonality::Cautious => 5, // Very resilient
-        };
+        let delta: ThresholdDelta = traits.iter().map(|t| t.threshold_modifiers()).sum();
 
         PersonalityThresholds {
-            low_health: apply_variance(base_low_health, rng),
-            mid_health: apply_variance(base_mid_health, rng),
-            extreme_low_sanity: apply_variance(base_extreme_low_sanity, rng),
-            low_sanity: apply_variance(base_low_sanity, rng),
-            mid_sanity: apply_variance(base_mid_sanity, rng),
-            low_movement: apply_variance(base_low_movement, rng),
-            high_intelligence: apply_variance(base_high_intelligence, rng),
-            low_intelligence: apply_variance(base_low_intelligence, rng),
-            psychotic_break_threshold: apply_variance(base_break_threshold, rng),
-        }
-    }
-
-    // Keep original methods for backward compatibility/reference
-    pub fn low_health_limit(&self) -> u32 {
-        match self {
-            BrainPersonality::Aggressive => 15,
-            BrainPersonality::Defensive => 30,
-            BrainPersonality::Balanced => 20,
-            BrainPersonality::Cautious => 35,
-            BrainPersonality::Reckless => 10,
-        }
-    }
-
-    pub fn mid_health_limit(&self) -> u32 {
-        match self {
-            BrainPersonality::Aggressive => 30,
-            BrainPersonality::Defensive => 50,
-            BrainPersonality::Balanced => 40,
-            BrainPersonality::Cautious => 55,
-            BrainPersonality::Reckless => 25,
-        }
-    }
-
-    pub fn extreme_low_sanity_limit(&self) -> u32 {
-        match self {
-            BrainPersonality::Aggressive => 8,
-            BrainPersonality::Defensive => 15,
-            BrainPersonality::Balanced => 10,
-            BrainPersonality::Cautious => 18,
-            BrainPersonality::Reckless => 5,
-        }
-    }
-
-    pub fn low_sanity_limit(&self) -> u32 {
-        match self {
-            BrainPersonality::Aggressive => 15,
-            BrainPersonality::Defensive => 25,
-            BrainPersonality::Balanced => 20,
-            BrainPersonality::Cautious => 30,
-            BrainPersonality::Reckless => 10,
-        }
-    }
-
-    pub fn mid_sanity_limit(&self) -> u32 {
-        match self {
-            BrainPersonality::Aggressive => 25,
-            BrainPersonality::Defensive => 45,
-            BrainPersonality::Balanced => 35,
-            BrainPersonality::Cautious => 50,
-            BrainPersonality::Reckless => 20,
-        }
-    }
-
-    pub fn low_movement_limit(&self) -> u32 {
-        match self {
-            BrainPersonality::Aggressive => 8,
-            BrainPersonality::Defensive => 15,
-            BrainPersonality::Balanced => 10,
-            BrainPersonality::Cautious => 18,
-            BrainPersonality::Reckless => 5,
-        }
-    }
-
-    pub fn high_intelligence_limit(&self) -> u32 {
-        match self {
-            BrainPersonality::Aggressive => 30,
-            BrainPersonality::Defensive => 40,
-            BrainPersonality::Balanced => 35,
-            BrainPersonality::Cautious => 45,
-            BrainPersonality::Reckless => 25,
-        }
-    }
-
-    pub fn low_intelligence_limit(&self) -> u32 {
-        match self {
-            BrainPersonality::Aggressive => 75,
-            BrainPersonality::Defensive => 85,
-            BrainPersonality::Balanced => 80,
-            BrainPersonality::Cautious => 90,
-            BrainPersonality::Reckless => 70,
+            low_health: apply_variance(apply_delta(base_low_health, delta.low_health_limit), rng),
+            mid_health: apply_variance(apply_delta(base_mid_health, delta.mid_health_limit), rng),
+            extreme_low_sanity: apply_variance(
+                apply_delta(base_extreme_low_sanity, delta.low_sanity_limit),
+                rng,
+            ),
+            low_sanity: apply_variance(apply_delta(base_low_sanity, delta.mid_sanity_limit), rng),
+            mid_sanity: apply_variance(apply_delta(base_mid_sanity, delta.high_sanity_limit), rng),
+            low_movement: apply_variance(apply_delta(base_low_movement, delta.movement_limit), rng),
+            high_intelligence: apply_variance(
+                apply_delta(base_high_intelligence, delta.high_intelligence_limit),
+                rng,
+            ),
+            low_intelligence: apply_variance(
+                apply_delta(base_low_intelligence, delta.low_intelligence_limit),
+                rng,
+            ),
+            psychotic_break_threshold: apply_variance(
+                apply_delta(base_break_threshold, delta.psychotic_break_threshold),
+                rng,
+            ),
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Brain {
-    pub personality: BrainPersonality,
     pub thresholds: PersonalityThresholds,
     pub psychotic_break: Option<PsychoticBreakType>,
     pub preferred_action: Option<Action>,
@@ -209,8 +107,7 @@ impl Default for Brain {
         use rand::SeedableRng;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(0); // Deterministic default
         Self {
-            personality: BrainPersonality::Balanced,
-            thresholds: BrainPersonality::Balanced.generate_thresholds(&mut rng),
+            thresholds: PersonalityThresholds::from_traits(&[], &mut rng),
             psychotic_break: None,
             preferred_action: None,
             preferred_action_percentage: 0.0,
@@ -219,12 +116,10 @@ impl Default for Brain {
 }
 
 impl Brain {
-    pub fn new_with_random_personality(rng: &mut impl Rng) -> Self {
-        let personality = BrainPersonality::random(rng);
-        let thresholds = personality.generate_thresholds(rng);
+    /// Build a brain whose thresholds are derived from a tribute's traits.
+    pub fn from_traits(traits: &[Trait], rng: &mut impl Rng) -> Self {
         Self {
-            personality,
-            thresholds,
+            thresholds: PersonalityThresholds::from_traits(traits, rng),
             psychotic_break: None,
             preferred_action: None,
             preferred_action_percentage: 0.0,
@@ -892,113 +787,6 @@ mod tests {
         assert_eq!(action, Action::Attack);
     }
 
-    #[test]
-    fn test_personality_thresholds_aggressive() {
-        let personality = BrainPersonality::Aggressive;
-        assert_eq!(personality.low_health_limit(), 15);
-        assert_eq!(personality.mid_health_limit(), 30);
-        assert!(personality.low_health_limit() < BrainPersonality::Balanced.low_health_limit());
-    }
-
-    #[test]
-    fn test_personality_thresholds_defensive() {
-        let personality = BrainPersonality::Defensive;
-        assert_eq!(personality.low_health_limit(), 30);
-        assert_eq!(personality.mid_health_limit(), 50);
-        assert!(personality.low_health_limit() > BrainPersonality::Balanced.low_health_limit());
-    }
-
-    #[test]
-    fn test_personality_thresholds_reckless() {
-        let personality = BrainPersonality::Reckless;
-        assert_eq!(personality.low_health_limit(), 10);
-        assert!(personality.low_health_limit() < BrainPersonality::Aggressive.low_health_limit());
-    }
-
-    #[test]
-    fn test_personality_thresholds_cautious() {
-        let personality = BrainPersonality::Cautious;
-        assert_eq!(personality.low_health_limit(), 35);
-        assert!(personality.low_health_limit() > BrainPersonality::Defensive.low_health_limit());
-    }
-
-    #[test]
-    fn test_personality_random_distribution() {
-        let mut rng = SmallRng::seed_from_u64(42);
-        let mut counts = std::collections::HashMap::new();
-
-        for _ in 0..100 {
-            let personality = BrainPersonality::random(&mut rng);
-            *counts.entry(format!("{:?}", personality)).or_insert(0) += 1;
-        }
-
-        // Should have all 5 personality types
-        assert_eq!(counts.len(), 5);
-        // Each should appear at least once (with high probability)
-        for count in counts.values() {
-            assert!(*count > 0);
-        }
-    }
-
-    #[rstest]
-    fn test_aggressive_fights_at_lower_health(mut small_rng: SmallRng) {
-        let mut tribute = Tribute::default();
-        tribute.brain.personality = BrainPersonality::Aggressive;
-        tribute.attributes.health = 18; // Between aggressive (15) and balanced (20)
-        tribute.attributes.sanity = 40;
-
-        let action = tribute.brain.act(&tribute.clone(), 1, &[], &mut small_rng);
-        // Aggressive should still attack/move at this health
-        assert!(matches!(action, Action::Attack | Action::Move(_)));
-    }
-
-    #[rstest]
-    fn test_defensive_retreats_earlier(_small_rng: SmallRng) {
-        let mut tribute = Tribute::default();
-        tribute.brain.personality = BrainPersonality::Defensive;
-        // Regenerate thresholds for the new personality (otherwise stale
-        // thresholds from random construction are used). Seed=0 gives
-        // Defensive low_health ~28-32, mid_health ~45-55.
-        tribute.brain.thresholds =
-            BrainPersonality::Defensive.generate_thresholds(&mut SmallRng::seed_from_u64(0));
-        tribute.attributes.health = 25; // Below defensive low_health
-        // Sanity must be safely above Defensive mid_sanity (base 45, +20%
-        // variance ceiling = 54) so the visible/ok-sanity arm of
-        // decide_action_few_enemies_low_health returns Move, not Attack.
-        tribute.attributes.sanity = 60;
-
-        let action = tribute.brain.decide_action_few_enemies(&tribute);
-        // Defensive should prefer moving/hiding at this health
-        assert!(matches!(action, Action::Move(_) | Action::Hide));
-    }
-
-    #[rstest]
-    fn test_threshold_variance_within_range(mut small_rng: SmallRng) {
-        let personality = BrainPersonality::Balanced;
-        let thresholds = personality.generate_thresholds(&mut small_rng);
-
-        // Base value for Balanced is 20, variance is ±20% = 16-24
-        assert!(thresholds.low_health >= 16 && thresholds.low_health <= 24);
-        // Base value for Balanced is 40, variance is ±20% = 32-48
-        assert!(thresholds.mid_health >= 32 && thresholds.mid_health <= 48);
-    }
-
-    #[rstest]
-    fn test_threshold_variance_differs_between_tributes(mut small_rng: SmallRng) {
-        let personality = BrainPersonality::Balanced;
-        let thresholds1 = personality.generate_thresholds(&mut small_rng);
-        let thresholds2 = personality.generate_thresholds(&mut small_rng);
-
-        // With high probability, at least one threshold should differ
-        // (not guaranteed due to randomness, but very likely)
-        let differs = thresholds1.low_health != thresholds2.low_health
-            || thresholds1.mid_health != thresholds2.mid_health
-            || thresholds1.low_sanity != thresholds2.low_sanity;
-
-        // This test may occasionally fail due to random chance, but is very unlikely
-        assert!(differs);
-    }
-
     #[rstest]
     fn test_psychotic_break_triggers_at_low_sanity(mut small_rng: SmallRng) {
         let mut tribute = Tribute::default();
@@ -1106,5 +894,57 @@ mod tests {
         let action = tribute.brain.act(&tribute.clone(), 2, &[], &mut small_rng);
         // Self-destructive ignores health and attacks
         assert_eq!(action, Action::Attack);
+    }
+
+    #[rstest]
+    fn from_traits_empty_uses_balanced_baseline() {
+        // With no traits and zero variance, thresholds collapse to the
+        // documented baseline values (the original `Balanced` numbers).
+        let mut rng = SmallRng::seed_from_u64(101);
+        let thresholds = PersonalityThresholds::from_traits(&[], &mut rng);
+        // Each base ±20% — assert each lies in the expected window.
+        assert!(
+            (16..=24).contains(&thresholds.low_health),
+            "low_health={}",
+            thresholds.low_health
+        );
+        assert!((32..=48).contains(&thresholds.mid_health));
+        assert!((8..=12).contains(&thresholds.extreme_low_sanity));
+        assert!((16..=24).contains(&thresholds.low_sanity));
+        assert!((28..=42).contains(&thresholds.mid_sanity));
+        assert!((8..=12).contains(&thresholds.low_movement));
+        assert!((28..=42).contains(&thresholds.high_intelligence));
+        assert!((64..=96).contains(&thresholds.low_intelligence));
+        assert!((6..=10).contains(&thresholds.psychotic_break_threshold));
+    }
+
+    #[rstest]
+    fn from_traits_aggressive_lowers_health_thresholds() {
+        // Aggressive: low_health -5 (→15), mid_health -10 (→30) before variance.
+        // Use many seeds and check the mean is shifted below baseline.
+        let aggressive = vec![Trait::Aggressive];
+        let mut total_low: u32 = 0;
+        let mut total_mid: u32 = 0;
+        for seed in 0..50 {
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let t = PersonalityThresholds::from_traits(&aggressive, &mut rng);
+            total_low += t.low_health;
+            total_mid += t.mid_health;
+        }
+        // Mean low_health ≈ 15, mean mid_health ≈ 30.
+        let mean_low = total_low / 50;
+        let mean_mid = total_mid / 50;
+        assert!((12..=18).contains(&mean_low), "mean_low={}", mean_low);
+        assert!((25..=35).contains(&mean_mid), "mean_mid={}", mean_mid);
+    }
+
+    #[rstest]
+    fn from_traits_clamps_to_minimum_one() {
+        // Stack many sanity-lowering traits to push past the clamp boundary.
+        let traits = vec![Trait::Reckless, Trait::Aggressive];
+        let mut rng = SmallRng::seed_from_u64(17);
+        let t = PersonalityThresholds::from_traits(&traits, &mut rng);
+        assert!(t.extreme_low_sanity >= 1);
+        assert!(t.low_health >= 1);
     }
 }

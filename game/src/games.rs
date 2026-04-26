@@ -823,15 +823,18 @@ impl Game {
             if !tribute.is_alive() {
                 // Newly-dead tributes (status=RecentlyDead going into this
                 // cycle) trigger a DeathRecorded event so allies process the
-                // ally-death cascade. Killer attribution is deferred — combat
-                // sites that record kills should enqueue with `killer = Some`
-                // directly. Promote to Dead after enqueueing so the same
-                // tribute does not re-emit on subsequent cycles.
+                // ally-death cascade. Killer attribution is read from the
+                // tribute's transient `recently_killed_by` field, which combat
+                // sites set when the death was caused by another tribute.
+                // Environmental/status deaths leave it `None`. Promote to Dead
+                // after enqueueing so the same tribute does not re-emit on
+                // subsequent cycles.
                 if tribute.status == TributeStatus::RecentlyDead {
+                    let killer = tribute.recently_killed_by.take();
                     drained_alliance_events.push(
                         crate::tributes::alliances::AllianceEvent::DeathRecorded {
                             deceased: tribute.id,
-                            killer: None,
+                            killer,
                         },
                     );
                 }
@@ -1852,5 +1855,112 @@ mod tests {
         assert!(!a2.allies.contains(&cid), "A did not bond with LoneWolf C");
         assert!(!b2.allies.contains(&cid), "B did not bond with LoneWolf C");
         assert!(c2.allies.is_empty(), "LoneWolf C remains unallied");
+    }
+
+    #[test]
+    fn run_tribute_cycle_consumes_recently_killed_by_for_combat_death() {
+        // A tribute who died at a combat site has `recently_killed_by` set
+        // by the combat code. The cycle must read it, emit DeathRecorded
+        // with that killer, and clear the field so it does not leak into
+        // subsequent cycles.
+        let mut deceased = create_tribute("Rue", true);
+        let mut killer = create_tribute("Cato", true);
+        let mut survivor = create_tribute("Katniss", true);
+
+        let did = deceased.id;
+        let kid = killer.id;
+        let sid = survivor.id;
+
+        // Pre-existing alliance so DeathRecorded has a cascade target.
+        survivor.allies.push(deceased.id);
+        deceased.allies.push(survivor.id);
+
+        // Simulate combat outcome going into the cycle.
+        deceased.attributes.health = 0;
+        deceased.status = TributeStatus::RecentlyDead;
+        deceased.recently_killed_by = Some(kid);
+
+        deceased.area = Area::Cornucopia;
+        killer.area = Area::Cornucopia;
+        survivor.area = Area::Cornucopia;
+        deceased.district = 11;
+        killer.district = 2;
+        survivor.district = 12;
+
+        let mut game = create_test_game_with_tributes(vec![
+            deceased.clone(),
+            killer.clone(),
+            survivor.clone(),
+        ]);
+        game.areas
+            .push(AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia));
+        let living = game.living_tributes();
+        let closed_areas: Vec<Area> = vec![];
+
+        let mut rng = SmallRng::seed_from_u64(547);
+        let _ = game.run_tribute_cycle(true, &mut rng, closed_areas, living, 1);
+
+        // Cycle drained the queue.
+        assert!(
+            game.alliance_events.is_empty(),
+            "queue must drain after cycle"
+        );
+        // Deceased promoted to Dead and field cleared.
+        let d = game.tributes.iter().find(|t| t.id == did).unwrap();
+        assert_eq!(d.status, TributeStatus::Dead);
+        assert!(
+            d.recently_killed_by.is_none(),
+            "cycle must take() the killer field after emitting DeathRecorded"
+        );
+        // Cascade fired (deceased removed from survivor's allies).
+        let s = game.tributes.iter().find(|t| t.id == sid).unwrap();
+        assert!(
+            !s.allies.contains(&did),
+            "survivor must not retain a dead ally edge"
+        );
+    }
+
+    #[test]
+    fn run_tribute_cycle_environmental_death_emits_killer_none() {
+        // A tribute who died from environmental/status damage has no
+        // `recently_killed_by` set. The cycle must still emit DeathRecorded
+        // but with killer: None. We assert the field stays None across the
+        // cycle and the cascade still fires (downstream behavior unchanged).
+        let mut deceased = create_tribute("Rue", true);
+        let mut survivor = create_tribute("Katniss", true);
+
+        let did = deceased.id;
+        let sid = survivor.id;
+
+        survivor.allies.push(deceased.id);
+        deceased.allies.push(survivor.id);
+
+        // Environmental death: health=0, RecentlyDead, killer field None.
+        deceased.attributes.health = 0;
+        deceased.status = TributeStatus::RecentlyDead;
+        assert!(deceased.recently_killed_by.is_none());
+
+        deceased.area = Area::Cornucopia;
+        survivor.area = Area::Cornucopia;
+        deceased.district = 11;
+        survivor.district = 12;
+
+        let mut game = create_test_game_with_tributes(vec![deceased.clone(), survivor.clone()]);
+        game.areas
+            .push(AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia));
+        let living = game.living_tributes();
+        let closed_areas: Vec<Area> = vec![];
+
+        let mut rng = SmallRng::seed_from_u64(547);
+        let _ = game.run_tribute_cycle(true, &mut rng, closed_areas, living, 1);
+
+        let d = game.tributes.iter().find(|t| t.id == did).unwrap();
+        assert_eq!(d.status, TributeStatus::Dead);
+        assert!(
+            d.recently_killed_by.is_none(),
+            "environmental death keeps killer field None"
+        );
+        let s = game.tributes.iter().find(|t| t.id == sid).unwrap();
+        assert!(!s.allies.contains(&did));
     }
 }

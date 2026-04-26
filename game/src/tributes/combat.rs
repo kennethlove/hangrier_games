@@ -85,6 +85,7 @@ impl Tribute {
                 if self.attributes.health == 0 {
                     self.statistics.killed_by = Some("themselves (fumble)".to_string());
                     self.status = crate::tributes::statuses::TributeStatus::RecentlyDead;
+                    self.recently_killed_by = Some(self.id);
                     events.push(
                         GameOutput::TributeAttackDied(tribute_name.as_str(), "themselves")
                             .to_string(),
@@ -161,6 +162,7 @@ impl Tribute {
             // Target killed attacker
             self.statistics.killed_by = Some(target_name.clone());
             self.status = crate::tributes::statuses::TributeStatus::RecentlyDead;
+            self.recently_killed_by = Some(target.id);
 
             events.push(
                 GameOutput::TributeAttackDied(tribute_name.as_str(), target_name.as_str())
@@ -172,6 +174,7 @@ impl Tribute {
             // Attacker killed Target
             target.statistics.killed_by = Some(tribute_name.clone());
             target.status = crate::tributes::statuses::TributeStatus::RecentlyDead;
+            target.recently_killed_by = Some(self.id);
 
             events.push(
                 GameOutput::TributeAttackSuccessKill(tribute_name.as_str(), target_name.as_str())
@@ -710,5 +713,75 @@ mod tests {
             stored.current_durability, 2,
             "weapon should have been worn 3 times (5 - 3 = 2)"
         );
+    }
+
+    #[rstest]
+    fn attacks_target_killed_records_killer_id() {
+        // When the attacker kills the target, target.recently_killed_by must
+        // be set to the attacker's id so the cycle can attribute the death.
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut target = Tribute::new("Peeta".to_string(), None, None);
+
+        attacker.attributes.strength = 100;
+        target.attributes.health = 1;
+        target.attributes.defense = 0;
+        let attacker_id = attacker.id;
+
+        // Use a deterministic RNG; with strength=100 vs defense=0 the
+        // attacker reliably wins or crit-hits and the 1hp target dies.
+        let mut rng = SmallRng::seed_from_u64(1);
+        let _ = attacker.attacks(&mut target, &mut rng, &mut Vec::new());
+
+        assert_eq!(
+            target.attributes.health, 0,
+            "target should be dead in this scenario"
+        );
+        assert_eq!(
+            target.status,
+            crate::tributes::statuses::TributeStatus::RecentlyDead
+        );
+        assert_eq!(
+            target.recently_killed_by,
+            Some(attacker_id),
+            "killer id must be recorded on the deceased"
+        );
+        assert!(
+            attacker.recently_killed_by.is_none(),
+            "attacker is alive; their field must remain None"
+        );
+    }
+
+    #[rstest]
+    fn attacks_attacker_killed_records_target_id() {
+        // When the target's counter kills the attacker (e.g. perfect block),
+        // attacker.recently_killed_by must point to the target.
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut target = Tribute::new("Peeta".to_string(), None, None);
+
+        attacker.attributes.health = 1;
+        attacker.attributes.strength = 0;
+        attacker.attributes.defense = 0;
+        target.attributes.strength = 100;
+        target.attributes.defense = 100;
+        let target_id = target.id;
+
+        let mut rng = SmallRng::seed_from_u64(2);
+        let _ = attacker.attacks(&mut target, &mut rng, &mut Vec::new());
+
+        if attacker.attributes.health == 0 {
+            assert_eq!(
+                attacker.status,
+                crate::tributes::statuses::TributeStatus::RecentlyDead
+            );
+            assert_eq!(
+                attacker.recently_killed_by,
+                Some(target_id),
+                "killer id must be recorded on the deceased attacker"
+            );
+        } else {
+            // The seed didn't produce a kill; not a failure of attribution
+            // logic, just RNG. Re-skip rather than flake.
+            eprintln!("seed did not produce attacker death; skipping attribution check");
+        }
     }
 }

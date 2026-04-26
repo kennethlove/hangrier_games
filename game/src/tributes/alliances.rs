@@ -7,7 +7,7 @@
 
 use uuid::Uuid;
 
-use crate::tributes::traits::{REFUSERS, Trait};
+use crate::tributes::traits::{REFUSERS, Trait, geometric_mean_affinity};
 
 /// Per-tribute hard cap on direct alliances.
 pub const MAX_ALLIES: usize = 5;
@@ -37,6 +37,32 @@ pub fn passes_gate(self_traits: &[Trait], target_traits: &[Trait]) -> bool {
     let has_refuser = |ts: &[Trait]| ts.iter().any(|x| REFUSERS.contains(x));
     (has_positive(self_traits) && has_positive(target_traits))
         || (!has_refuser(self_traits) && !has_refuser(target_traits))
+}
+
+/// Roll chance per spec §6.2. `self_allies_len` and `target_allies_len`
+/// are the current `Vec::len()` of each tribute's `allies` list. Returns
+/// 0.0 if either side is at the cap; clamped at 0.95.
+pub fn roll_chance(
+    self_traits: &[Trait],
+    target_traits: &[Trait],
+    same_district: bool,
+    self_allies_len: usize,
+    target_allies_len: usize,
+) -> f64 {
+    let trait_factor = geometric_mean_affinity(self_traits);
+    let target_factor = geometric_mean_affinity(target_traits);
+    let district_bonus = if same_district { 1.5 } else { 1.0 };
+    let self_cap_pen =
+        ((MAX_ALLIES as f64) - (self_allies_len as f64)) / (MAX_ALLIES as f64);
+    let target_cap_pen =
+        ((MAX_ALLIES as f64) - (target_allies_len as f64)) / (MAX_ALLIES as f64);
+    let raw = BASE_ALLIANCE_CHANCE
+        * trait_factor
+        * target_factor
+        * district_bonus
+        * self_cap_pen.max(0.0)
+        * target_cap_pen.max(0.0);
+    raw.clamp(0.0, 0.95)
 }
 
 #[cfg(test)]
@@ -116,5 +142,64 @@ mod tests {
     fn neutral_pair_passes_gate() {
         // Tough has affinity 1.0 and is not a refuser; both clauses hold.
         assert!(passes_gate(&[Trait::Tough], &[Trait::Tough]));
+    }
+
+    // ---- Task 2.3: roll_chance -------------------------------------------
+
+    #[test]
+    fn roll_chance_zero_when_self_at_cap() {
+        let chance = roll_chance(
+            &[Trait::Friendly],
+            &[Trait::Friendly],
+            true,
+            MAX_ALLIES,
+            0,
+        );
+        assert_eq!(chance, 0.0);
+    }
+
+    #[test]
+    fn roll_chance_zero_when_target_at_cap() {
+        let chance = roll_chance(
+            &[Trait::Friendly],
+            &[Trait::Friendly],
+            true,
+            0,
+            MAX_ALLIES,
+        );
+        assert_eq!(chance, 0.0);
+    }
+
+    #[test]
+    fn roll_chance_neutral_pair_at_base() {
+        // 0.20 * 1.0 * 1.0 * 1.0 * 1.0 * 1.0 = 0.20.
+        let chance = roll_chance(&[], &[], false, 0, 0);
+        assert!((chance - 0.20).abs() < 1e-9);
+    }
+
+    #[test]
+    fn roll_chance_friendly_same_district_higher_than_base() {
+        // 0.20 * 1.5 * 1.5 * 1.5 = 0.675.
+        let chance = roll_chance(&[Trait::Friendly], &[Trait::Friendly], true, 0, 0);
+        assert!(chance > 0.6 && chance <= 0.95);
+    }
+
+    #[test]
+    fn roll_chance_clamps_at_ceiling() {
+        let chance = roll_chance(
+            &[Trait::Friendly, Trait::Friendly, Trait::Friendly],
+            &[Trait::Friendly, Trait::Friendly, Trait::Friendly],
+            true,
+            0,
+            0,
+        );
+        assert!(chance <= 0.95 + 1e-9);
+    }
+
+    #[test]
+    fn roll_chance_symmetric_in_traits() {
+        let a = roll_chance(&[Trait::Friendly], &[Trait::Loyal], true, 0, 0);
+        let b = roll_chance(&[Trait::Loyal], &[Trait::Friendly], true, 0, 0);
+        assert!((a - b).abs() < 1e-9);
     }
 }

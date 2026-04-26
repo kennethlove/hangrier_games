@@ -258,10 +258,9 @@ impl Tribute {
                         betrayer: self.id,
                         victim: victim.id,
                     });
-                events.push(format!(
-                    "{} betrays {} — true to their treacherous nature.",
-                    self.name, victim.name
-                ));
+                // The human-readable betrayal line is emitted at the game
+                // level inside `process_alliance_events` so it can be tagged
+                // with `MessageKind::BetrayalTriggered`. See games.rs.
             }
             // Reset the timer whether or not an ally was available.
             self.turns_since_last_betrayal = 0;

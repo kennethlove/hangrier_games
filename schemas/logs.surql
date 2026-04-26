@@ -12,12 +12,16 @@ DEFINE FIELD OVERWRITE game_day ON message TYPE number;
 DEFINE FIELD OVERWRITE subject ON message TYPE string;
 DEFINE FIELD OVERWRITE timestamp ON message TYPE number;
 DEFINE FIELD OVERWRITE content ON message TYPE string;
+-- Optional typed category for engine-emitted events. See
+-- `game::messages::MessageKind`. Legacy rows leave this unset.
+DEFINE FIELD OVERWRITE kind ON message TYPE option<string>;
 
 -- Define indexes for querying
 DEFINE INDEX OVERWRITE message_timestamp ON message FIELDS timestamp;
 DEFINE INDEX OVERWRITE message_game_day ON message FIELDS game_day;
 DEFINE INDEX OVERWRITE message_source_type ON message FIELDS source.type;
 DEFINE INDEX OVERWRITE message_game_id ON message FIELDS source.value;
+DEFINE INDEX OVERWRITE message_kind ON message FIELDS kind;
 
 -- Helper functions for common queries
 DEFINE FUNCTION OVERWRITE fn::get_messages_by_day($day: number) {

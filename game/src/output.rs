@@ -82,6 +82,9 @@ pub enum GameOutput<'a> {
     TributeForcedBetrayal(&'a str, &'a str),
     NoOneToAttack(&'a str),
     AllAlone(&'a str),
+    AllianceFormed(&'a str, &'a str, &'a str), // tribute_a, tribute_b, deciding factor
+    BetrayalTriggered(&'a str, &'a str),       // betrayer, victim
+    TrustShockBreak(&'a str),                  // shaken tribute
 }
 
 impl<'a> Display for GameOutput<'a> {
@@ -380,6 +383,52 @@ impl<'a> Display for GameOutput<'a> {
             GameOutput::AllAlone(tribute) => {
                 write!(f, "😢 {} is all alone!", tribute)
             }
+            GameOutput::AllianceFormed(a, b, factor) => {
+                write!(f, "{} and {} form an alliance ({}).", a, b, factor)
+            }
+            GameOutput::BetrayalTriggered(betrayer, victim) => {
+                write!(
+                    f,
+                    "{} betrays {} — true to their treacherous nature.",
+                    betrayer, victim
+                )
+            }
+            GameOutput::TrustShockBreak(shaken) => {
+                write!(
+                    f,
+                    "{} is shaken by their ally's death and breaks the bond.",
+                    shaken
+                )
+            }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_alliance_formed_unchanged() {
+        let s = GameOutput::AllianceFormed("Alice", "Bob", "trust").to_string();
+        assert_eq!(s, "Alice and Bob form an alliance (trust).");
+    }
+
+    #[test]
+    fn display_betrayal_triggered_unchanged() {
+        let s = GameOutput::BetrayalTriggered("Cato", "Glimmer").to_string();
+        assert_eq!(
+            s,
+            "Cato betrays Glimmer — true to their treacherous nature."
+        );
+    }
+
+    #[test]
+    fn display_trust_shock_break_unchanged() {
+        let s = GameOutput::TrustShockBreak("Rue").to_string();
+        assert_eq!(
+            s,
+            "Rue is shaken by their ally's death and breaks the bond."
+        );
     }
 }

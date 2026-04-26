@@ -111,6 +111,11 @@ pub struct Tribute {
     /// next turn to drive the trust-shock cascade (spec §7.3c1).
     #[serde(default)]
     pub pending_trust_shock: bool,
+    /// Per-tribute alliance event buffer, populated during `process_turn_phase`
+    /// (e.g. on Treacherous betrayal) and drained by the game cycle into
+    /// `Game.alliance_events` between turns. Transient; never persisted.
+    #[serde(default, skip)]
+    pub alliance_events: Vec<alliances::AllianceEvent>,
 }
 
 impl Default for Tribute {
@@ -161,6 +166,7 @@ impl Tribute {
             allies: Vec::new(),
             turns_since_last_betrayal: 0,
             pending_trust_shock: false,
+            alliance_events: Vec::new(),
         }
     }
 
@@ -403,6 +409,14 @@ impl Tribute {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
         Some(enemies.choose(&mut rng).unwrap().clone())
     }
+
+    /// Drain this tribute's per-turn alliance event buffer. Called by
+    /// `Game::run_tribute_cycle` after each tribute's turn so the events
+    /// are appended to the game's queue and processed before the next
+    /// tribute acts. See spec §7.5.
+    pub fn drain_alliance_events(&mut self) -> Vec<alliances::AllianceEvent> {
+        std::mem::take(&mut self.alliance_events)
+    }
 }
 
 /// Calculates the stamina cost for a tribute action based on:
@@ -594,6 +608,21 @@ mod tests {
     fn new_tribute_has_no_pending_trust_shock() {
         let tribute = Tribute::new("Cinna".to_string(), Some(1), None);
         assert!(!tribute.pending_trust_shock);
+    }
+
+    #[rstest]
+    fn tribute_drain_alliance_events_returns_and_clears_buffer() {
+        use crate::tributes::alliances::AllianceEvent;
+        use uuid::Uuid;
+        let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        let other = Uuid::new_v4();
+        tribute.alliance_events.push(AllianceEvent::BetrayalRecorded {
+            betrayer: tribute.id,
+            victim: other,
+        });
+        let drained = tribute.drain_alliance_events();
+        assert_eq!(drained.len(), 1);
+        assert!(tribute.alliance_events.is_empty());
     }
 
     #[rstest]

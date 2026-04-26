@@ -45,8 +45,6 @@ pub struct GameConfig {
     // Tribute lifecycle constants (from tributes/mod.rs)
     /// Sanity level at which tributes may attempt suicide
     pub sanity_break_level: u32,
-    /// Loyalty percentage below which tributes may betray allies
-    pub loyalty_break_level: f64,
 
     // Attribute maximums (from tributes/mod.rs)
     pub max_health: u32,
@@ -55,7 +53,6 @@ pub struct GameConfig {
     pub max_strength: u32,
     pub max_defense: u32,
     pub max_bravery: u32,
-    pub max_loyalty: u32,
     pub max_intelligence: u32,
     pub max_persuasion: u32,
     pub max_luck: u32,
@@ -88,7 +85,6 @@ impl Default for GameConfig {
 
             // Tribute lifecycle
             sanity_break_level: 9,
-            loyalty_break_level: 0.25,
 
             // Attribute maximums
             max_health: 100,
@@ -97,7 +93,6 @@ impl Default for GameConfig {
             max_strength: 50,
             max_defense: 50,
             max_bravery: 100,
-            max_loyalty: 100,
             max_intelligence: 100,
             max_persuasion: 100,
             max_luck: 100,

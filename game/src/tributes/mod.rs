@@ -116,6 +116,13 @@ pub struct Tribute {
     /// `Game.alliance_events` between turns. Transient; never persisted.
     #[serde(default, skip)]
     pub alliance_events: Vec<alliances::AllianceEvent>,
+    /// Set by combat sites when this tribute is killed by another tribute
+    /// (or by themselves on a fumble). Read and cleared by the game cycle
+    /// when emitting `AllianceEvent::DeathRecorded` so allies receive the
+    /// correct killer attribution. `None` for environmental/status deaths.
+    /// Transient; never persisted.
+    #[serde(default, skip)]
+    pub recently_killed_by: Option<Uuid>,
 }
 
 impl Default for Tribute {
@@ -167,6 +174,7 @@ impl Tribute {
             turns_since_last_betrayal: 0,
             pending_trust_shock: false,
             alliance_events: Vec::new(),
+            recently_killed_by: None,
         }
     }
 

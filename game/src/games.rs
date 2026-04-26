@@ -821,6 +821,20 @@ impl Game {
         // Process tributes
         for tribute in self.tributes.iter_mut() {
             if !tribute.is_alive() {
+                // Newly-dead tributes (status=RecentlyDead going into this
+                // cycle) trigger a DeathRecorded event so allies process the
+                // ally-death cascade. Killer attribution is deferred — combat
+                // sites that record kills should enqueue with `killer = Some`
+                // directly. Promote to Dead after enqueueing so the same
+                // tribute does not re-emit on subsequent cycles.
+                if tribute.status == TributeStatus::RecentlyDead {
+                    drained_alliance_events.push(
+                        crate::tributes::alliances::AllianceEvent::DeathRecorded {
+                            deceased: tribute.id,
+                            killer: None,
+                        },
+                    );
+                }
                 tribute.status = TributeStatus::Dead;
                 continue;
             }
@@ -1726,6 +1740,67 @@ mod tests {
         assert_eq!(
             l.turns_since_last_betrayal, 0,
             "missed opportunity also resets the timer per spec §7.4(b)"
+        );
+    }
+
+    #[test]
+    fn run_tribute_cycle_enqueues_death_recorded_for_recently_dead_ally() {
+        // A tribute who died last cycle (status=RecentlyDead) must trigger
+        // a DeathRecorded event so allies process the ally-death cascade.
+        // After the cycle, the deceased's allies should have:
+        //   - the deceased removed from their `allies` lists (via cascade);
+        //   - process_alliance_events drained the queue.
+        use crate::tributes::traits::Trait;
+
+        let mut deceased = create_tribute("Rue", true);
+        let mut survivor = create_tribute("Katniss", true);
+        // Make survivor highly likely to break on cascade: low sanity, high
+        // threshold makes deficit_ratio close to 1.0 → near-certain break.
+        survivor.attributes.sanity = 0;
+        survivor.brain.thresholds.extreme_low_sanity = 50;
+        survivor.traits = vec![Trait::Tough];
+        deceased.traits = vec![Trait::Tough];
+        // Pre-existing alliance (survivor lists deceased as ally).
+        survivor.allies.push(deceased.id);
+        deceased.allies.push(survivor.id);
+        // Mark deceased as RecentlyDead going into the cycle.
+        deceased.attributes.health = 0;
+        deceased.status = TributeStatus::RecentlyDead;
+        // Same area so deceased is "in the cycle" but the early skip applies.
+        deceased.area = Area::Cornucopia;
+        survivor.area = Area::Cornucopia;
+        deceased.district = 11;
+        survivor.district = 12;
+
+        let did = deceased.id;
+        let sid = survivor.id;
+
+        let mut game = create_test_game_with_tributes(vec![deceased.clone(), survivor.clone()]);
+        game.areas
+            .push(AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia));
+        // Living tributes snapshot: deceased is RecentlyDead so excluded.
+        let living = game.living_tributes();
+        let closed_areas: Vec<Area> = vec![];
+
+        let mut rng = SmallRng::seed_from_u64(547);
+        let _ = game.run_tribute_cycle(true, &mut rng, closed_areas, living, 1);
+
+        // Cycle drained the queue (no leftovers).
+        assert!(
+            game.alliance_events.is_empty(),
+            "queue must drain after cycle"
+        );
+        // Deceased promoted to Dead.
+        let d = game.tributes.iter().find(|t| t.id == did).unwrap();
+        assert_eq!(d.status, TributeStatus::Dead);
+        // Survivor's ally list cleaned of deceased (cascade fired with high
+        // probability given sanity=0 vs threshold=50; even on the rare miss
+        // the alliance edge is still broken because process_alliance_events
+        // does symmetric removal of dead from all surviving allies' lists).
+        let s = game.tributes.iter().find(|t| t.id == sid).unwrap();
+        assert!(
+            !s.allies.contains(&did),
+            "survivor must not retain a dead ally edge"
         );
     }
 }

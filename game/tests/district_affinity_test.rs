@@ -1,5 +1,8 @@
+use game::districts::assign_terrain_affinity;
 use game::terrain::BaseTerrain;
 use game::tributes::Tribute;
+use rand::SeedableRng;
+use rand::rngs::SmallRng;
 use rstest::rstest;
 
 #[rstest]
@@ -78,27 +81,25 @@ fn test_affinity_count() {
 
 #[test]
 fn test_bonus_affinity_probability() {
-    // Run 100 iterations to test the ~40% probability
-    let iterations = 100;
+    // Use seeded RNG for determinism (mirrors unit test in districts.rs).
+    // 1000 iterations gives tighter ±5% bound vs flaky 100-iter ±10%.
+    let iterations = 1000;
     let mut bonus_count = 0;
 
-    for _i in 0..iterations {
-        let tribute = Tribute::new(
-            "Test Tribute".to_string(),
-            Some(1), // District 1
-            None,
-        );
+    for i in 0..iterations {
+        let mut rng = SmallRng::seed_from_u64(i);
+        let affinities = assign_terrain_affinity(1, &mut rng);
 
-        if tribute.terrain_affinity.len() == 2 {
+        if affinities.len() == 2 {
             bonus_count += 1;
         }
     }
 
-    // With 100 iterations, expect roughly 30-50 bonuses (40% ± 10%)
+    let percentage = (bonus_count as f64 / iterations as f64) * 100.0;
     assert!(
-        (30..=50).contains(&bonus_count),
-        "Expected ~40 bonuses in 100 iterations, got {}",
-        bonus_count
+        (35.0..=45.0).contains(&percentage),
+        "Expected ~40% bonus rate, got {:.1}%",
+        percentage
     );
 }
 

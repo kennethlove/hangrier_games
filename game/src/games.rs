@@ -238,6 +238,48 @@ impl Game {
         ));
     }
 
+    /// Log a structured [`GameEvent`] by rendering its `Display` impl into a
+    /// [`GameMessage`] (mqi.2 plumbing).
+    ///
+    /// This is the structured counterpart to [`Self::log_output`]. The event
+    /// itself is currently dropped after rendering — only the rendered
+    /// `content` string flows into `GameMessage`. mqi.3 will persist the
+    /// structured event alongside the message; until then this helper exists
+    /// so emission sites can construct typed `GameEvent` values today and the
+    /// migration to a structured event log is a one-line swap later.
+    pub fn log_event(
+        &mut self,
+        source: crate::messages::MessageSource,
+        subject: String,
+        event: crate::events::GameEvent,
+    ) {
+        let content = event.to_string();
+        // Drop `event` here. mqi.3 will store it instead.
+        let _ = event;
+        self.log(source, subject, content);
+    }
+
+    /// Log a structured [`GameEvent`] and tag the resulting `GameMessage`
+    /// with a typed [`crate::messages::MessageKind`] (mqi.2 plumbing).
+    ///
+    /// See [`Self::log_event`] for the rationale; this variant adds a typed
+    /// category for downstream consumers (UI filters, announcers).
+    pub fn log_event_kind(
+        &mut self,
+        source: crate::messages::MessageSource,
+        subject: String,
+        event: crate::events::GameEvent,
+        kind: crate::messages::MessageKind,
+    ) {
+        let game_day = self.day.unwrap_or(0);
+        let content = event.to_string();
+        // Drop `event` here. mqi.3 will store it instead.
+        let _ = event;
+        self.messages.push(crate::messages::GameMessage::with_kind(
+            source, game_day, subject, content, kind,
+        ));
+    }
+
     fn check_for_winner(&mut self) -> Result<(), GameError> {
         if let Some(winner) = self.winner() {
             self.log(
@@ -379,10 +421,13 @@ impl Game {
         // captures *what happened* even when no tributes are present to react.
         let area_name = area.to_string();
         let area_subject = format!("area:{}", area_name);
-        self.log_output(
+        self.log_event(
             crate::messages::MessageSource::Area(area_name.clone()),
             area_subject.clone(),
-            crate::output::GameOutput::AreaEvent(&most_severe_event.to_string(), &area_name),
+            crate::events::GameEvent::AreaEvent {
+                area_event: most_severe_event.to_string(),
+                area_name: area_name.clone(),
+            },
         );
 
         // Process each tribute's survival check
@@ -561,16 +606,21 @@ impl Game {
         for (area_name, event_names) in snapshots {
             let subject = format!("area:{}", area_name);
             for event_name in &event_names {
-                self.log_output(
+                self.log_event(
                     crate::messages::MessageSource::Area(area_name.clone()),
                     subject.clone(),
-                    crate::output::GameOutput::AreaEvent(event_name, &area_name),
+                    crate::events::GameEvent::AreaEvent {
+                        area_event: event_name.clone(),
+                        area_name: area_name.clone(),
+                    },
                 );
             }
-            self.log_output(
+            self.log_event(
                 crate::messages::MessageSource::Area(area_name.clone()),
                 subject,
-                crate::output::GameOutput::AreaClose(&area_name),
+                crate::events::GameEvent::AreaClose {
+                    area_name: area_name.clone(),
+                },
             );
         }
         Ok(())
@@ -734,23 +784,38 @@ impl Game {
                 .push(tribute);
         }
 
-        // Collected (actor_identifier, line) pairs from all tributes this cycle.
-        // Drained into self.messages after the mutable borrow of self.tributes ends.
-        let mut collected_events: Vec<(
+        // Collected (actor_identifier, actor_name, line, kind, structured_event) tuples
+        // from all tributes this cycle. Drained into self.messages after the mutable
+        // borrow of self.tributes ends.
+        //
+        // The optional `GameEvent` (mqi.2) is constructed at sites where the call
+        // site has access to the typed inputs (UUIDs, names) — currently only the
+        // alliance-formation path. Sites that flow through `Vec<String>` from
+        // `Tribute::process_turn_phase` carry `None` and will be migrated when the
+        // tribute action layer learns to emit `GameEvent` directly (tracked as a
+        // discovered-from bead under hangrier_games-mqi).
+        type CollectedEvent = (
             String,
             String,
             String,
             Option<crate::messages::MessageKind>,
-        )> = Vec::new();
+            Option<crate::events::GameEvent>,
+        );
+        let mut collected_events: Vec<CollectedEvent> = Vec::new();
 
         // Alliance formation rolls (spec §6). For every pair of living
         // tributes sharing an area where neither already lists the other as
         // an ally and neither is at the alliance cap, run try_form_alliance.
-        // Collect successful pairs as (id_a, id_b, factor) and apply after
-        // the immutable borrow ends. This runs *before* the per-tribute
-        // turn so newly-formed alliances are visible to pick_target this
-        // cycle.
-        let mut new_alliances: Vec<(uuid::Uuid, uuid::Uuid, String, String)> = Vec::new();
+        // Collect successful pairs as (id_a, id_b, name_a, structured event)
+        // Alliance formation rolls (spec §6). For every pair of living
+        // tributes sharing an area where neither already lists the other as
+        // an ally and neither is at the alliance cap, run try_form_alliance.
+        // Collect successful pairs as (id_a, id_b, name_a, structured event)
+        // and apply after the immutable borrow ends. This runs *before* the
+        // per-tribute turn so newly-formed alliances are visible to
+        // pick_target this cycle.
+        type NewAlliance = (uuid::Uuid, uuid::Uuid, String, crate::events::GameEvent);
+        let mut new_alliances: Vec<NewAlliance> = Vec::new();
         for tributes in tributes_by_area.values() {
             for i in 0..tributes.len() {
                 for j in (i + 1)..tributes.len() {
@@ -783,13 +848,14 @@ impl Game {
                             .as_ref()
                             .map(|f| f.label())
                             .unwrap_or("mutual circumstance");
-                        let message = crate::output::GameOutput::AllianceFormed(
-                            &a.name,
-                            &b.name,
-                            factor_label,
-                        )
-                        .to_string();
-                        new_alliances.push((a.id, b.id, a.name.clone(), message));
+                        let event = crate::events::GameEvent::AllianceFormed {
+                            tribute_a_id: a.id,
+                            tribute_a_name: a.name.clone(),
+                            tribute_b_id: b.id,
+                            tribute_b_name: b.name.clone(),
+                            factor: factor_label.to_string(),
+                        };
+                        new_alliances.push((a.id, b.id, a.name.clone(), event));
                     }
                 }
             }
@@ -805,7 +871,7 @@ impl Game {
         // Apply alliance formations symmetrically. Both sides get each
         // other's id pushed onto `allies` so the graph stays consistent.
         // Skip duplicates defensively in case the same pair appears twice.
-        for (id_a, id_b, name_a, message) in &new_alliances {
+        for (id_a, id_b, name_a, event) in &new_alliances {
             // Find indices to satisfy the borrow checker for two-side mutation.
             let mut idx_a: Option<usize> = None;
             let mut idx_b: Option<usize> = None;
@@ -837,8 +903,9 @@ impl Game {
             collected_events.push((
                 self.tributes[ia].identifier.clone(),
                 name_a.clone(),
-                message.clone(),
+                event.to_string(),
                 Some(crate::messages::MessageKind::AllianceFormed),
+                Some(event.clone()),
             ));
         }
 
@@ -946,21 +1013,38 @@ impl Game {
                     tribute.name.clone(),
                     line,
                     None,
+                    None,
                 ));
             }
             drained_alliance_events.append(&mut tribute.drain_alliance_events());
         }
 
         // Drain collected events into game messages now that the mutable borrow ends.
-        for (identifier, name, line, kind) in collected_events {
-            match kind {
-                Some(k) => self.log_output_kind(
+        // When a structured `GameEvent` is present (currently only the alliance
+        // formation path) we route through `log_event*`; otherwise we fall back
+        // to the legacy stringly-typed path. Both paths produce byte-identical
+        // `GameMessage.content` because `log_event*` simply renders the event's
+        // `Display` impl, which is parity-tested against `GameOutput`.
+        for (identifier, name, line, kind, event) in collected_events {
+            match (kind, event) {
+                (Some(k), Some(ev)) => self.log_event_kind(
+                    crate::messages::MessageSource::Tribute(identifier),
+                    name,
+                    ev,
+                    k,
+                ),
+                (Some(k), None) => self.log_output_kind(
                     crate::messages::MessageSource::Tribute(identifier),
                     name,
                     line,
                     k,
                 ),
-                None => self.log_output(
+                (None, Some(ev)) => self.log_event(
+                    crate::messages::MessageSource::Tribute(identifier),
+                    name,
+                    ev,
+                ),
+                (None, None) => self.log_output(
                     crate::messages::MessageSource::Tribute(identifier),
                     name,
                     line,
@@ -1091,12 +1175,16 @@ impl Game {
                     }
                     // Spec §7.5: betrayer is never enqueued for trust-shock.
                     if let (Some(b_name), Some((v_id, v_name))) = (betrayer_name, victim_info) {
-                        let line = crate::output::GameOutput::BetrayalTriggered(&b_name, &v_name)
-                            .to_string();
-                        self.log_output_kind(
+                        let event = crate::events::GameEvent::BetrayalTriggered {
+                            betrayer_id: betrayer,
+                            betrayer_name: b_name,
+                            victim_id: victim,
+                            victim_name: v_name.clone(),
+                        };
+                        self.log_event_kind(
                             crate::messages::MessageSource::Tribute(v_id),
                             v_name,
-                            line,
+                            event,
                             crate::messages::MessageKind::BetrayalTriggered,
                         );
                     }
@@ -1124,12 +1212,15 @@ impl Game {
                                 ally.allies.retain(|x| *x != deceased);
                                 let aid = ally.identifier.clone();
                                 let aname = ally.name.clone();
-                                let line =
-                                    crate::output::GameOutput::TrustShockBreak(&aname).to_string();
-                                self.log_output_kind(
+                                let ally_uuid = ally.id;
+                                let event = crate::events::GameEvent::TrustShockBreak {
+                                    tribute_id: ally_uuid,
+                                    tribute_name: aname.clone(),
+                                };
+                                self.log_event_kind(
                                     crate::messages::MessageSource::Tribute(aid),
                                     aname,
-                                    line,
+                                    event,
                                     crate::messages::MessageKind::TrustShockBreak,
                                 );
                             }
@@ -2120,6 +2211,153 @@ mod tests {
         assert_eq!(
             m.content,
             "Cato betrays Glimmer — true to their treacherous nature."
+        );
+    }
+
+    /// mqi.2 parity: at the alliance-formation emission site, the structured
+    /// `GameEvent::AllianceFormed` constructed inside `run_tribute_cycle`
+    /// renders to the exact same string that ends up as `GameMessage.content`.
+    /// Catches future drift between the typed event and the legacy renderer
+    /// at the actual call site (not just at the type level — that is covered
+    /// by the parity table in `events::tests`).
+    #[test]
+    fn alliance_formed_message_content_matches_game_event_display() {
+        use crate::messages::MessageKind;
+        use crate::tributes::traits::Trait;
+
+        let mut t1 = create_tribute("Cinna", true);
+        let mut t2 = create_tribute("Portia", true);
+        t1.district = 1;
+        t2.district = 1;
+        t1.traits = vec![Trait::Friendly];
+        t2.traits = vec![Trait::Friendly];
+        t1.area = Area::Cornucopia;
+        t2.area = Area::Cornucopia;
+
+        let base = create_test_game_with_tributes(vec![t1.clone(), t2.clone()]);
+        let mut game_with_area = base.clone();
+        game_with_area
+            .areas
+            .push(AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia));
+        let closed_areas: Vec<Area> = vec![];
+
+        let mut hit: Option<crate::messages::GameMessage> = None;
+        for seed in [313u64, 419, 547, 23, 89, 211, 7, 11] {
+            let mut g = game_with_area.clone();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let _ = g.run_tribute_cycle(
+                true,
+                &mut rng,
+                closed_areas.clone(),
+                vec![t1.clone(), t2.clone()],
+                2,
+            );
+            if let Some(m) = g
+                .messages
+                .iter()
+                .find(|m| m.kind == Some(MessageKind::AllianceFormed))
+            {
+                hit = Some(m.clone());
+                break;
+            }
+        }
+        let m = hit.expect("at least one cycle must emit AllianceFormed");
+
+        // Reconstruct the structured event with the same inputs the engine
+        // used. The factor label depends on trait-overlap math; rather than
+        // recompute it here (and re-couple the test to that algorithm) we
+        // parse it back out of the rendered message, which is exactly what
+        // mqi.4+ consumers will rely on. The point of this test is parity
+        // between `GameEvent::AllianceFormed::Display` and
+        // `GameMessage.content` at the call site, not validation of the
+        // factor-selection logic.
+        let factor = m
+            .content
+            .rsplit_once('(')
+            .and_then(|(_, rest)| rest.rsplit_once(')').map(|(f, _)| f.to_string()))
+            .expect("rendered alliance message must contain a parenthesised factor");
+        let candidates = [
+            crate::events::GameEvent::AllianceFormed {
+                tribute_a_id: t1.id,
+                tribute_a_name: t1.name.clone(),
+                tribute_b_id: t2.id,
+                tribute_b_name: t2.name.clone(),
+                factor: factor.clone(),
+            },
+            crate::events::GameEvent::AllianceFormed {
+                tribute_a_id: t2.id,
+                tribute_a_name: t2.name.clone(),
+                tribute_b_id: t1.id,
+                tribute_b_name: t1.name.clone(),
+                factor,
+            },
+        ];
+        assert!(
+            candidates.iter().any(|ev| ev.to_string() == m.content),
+            "GameMessage.content {:?} must match GameEvent::AllianceFormed Display \
+             for one of {:?}",
+            m.content,
+            candidates.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
+        );
+    }
+
+    /// mqi.2 parity: at the betrayal emission site, the structured
+    /// `GameEvent::BetrayalTriggered` constructed inside
+    /// `process_alliance_events` renders identically to `GameMessage.content`.
+    #[test]
+    fn betrayal_triggered_message_content_matches_game_event_display() {
+        use crate::events::GameEvent;
+        use crate::messages::MessageKind;
+        use crate::tributes::alliances::TREACHEROUS_BETRAYAL_INTERVAL;
+        use crate::tributes::traits::Trait;
+
+        let mut betrayer = create_tribute("Cato", true);
+        let mut victim = create_tribute("Glimmer", true);
+        betrayer.traits = vec![Trait::Treacherous];
+        victim.traits = vec![Trait::Tough];
+        betrayer.allies.push(victim.id);
+        victim.allies.push(betrayer.id);
+        betrayer.turns_since_last_betrayal = TREACHEROUS_BETRAYAL_INTERVAL;
+        betrayer.area = Area::Cornucopia;
+        victim.area = Area::Cornucopia;
+        betrayer.district = 1;
+        victim.district = 2;
+
+        let betrayer_id = betrayer.id;
+        let victim_id = victim.id;
+        let betrayer_name = betrayer.name.clone();
+        let victim_name = victim.name.clone();
+
+        let mut game = create_test_game_with_tributes(vec![betrayer.clone(), victim.clone()]);
+        game.areas
+            .push(AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia));
+        let closed_areas: Vec<Area> = vec![];
+
+        let mut rng = SmallRng::seed_from_u64(313);
+        let _ = game.run_tribute_cycle(
+            true,
+            &mut rng,
+            closed_areas,
+            vec![betrayer.clone(), victim.clone()],
+            2,
+        );
+
+        let m = game
+            .messages
+            .iter()
+            .find(|m| m.kind == Some(MessageKind::BetrayalTriggered))
+            .expect("betrayal cycle must emit BetrayalTriggered message");
+
+        let event = GameEvent::BetrayalTriggered {
+            betrayer_id,
+            betrayer_name,
+            victim_id,
+            victim_name,
+        };
+        assert_eq!(
+            m.content,
+            event.to_string(),
+            "GameMessage.content must equal GameEvent::BetrayalTriggered Display"
         );
     }
 }

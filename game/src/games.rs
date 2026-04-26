@@ -218,6 +218,26 @@ impl Game {
         self.log(source, subject, output.to_string());
     }
 
+    /// Log a structured game output and tag the resulting `GameMessage` with a typed
+    /// [`MessageKind`]. Used by the alliance event sites so consumers (UI, announcers)
+    /// can filter by category without parsing strings.
+    pub fn log_output_kind<D: std::fmt::Display>(
+        &mut self,
+        source: crate::messages::MessageSource,
+        subject: String,
+        output: D,
+        kind: crate::messages::MessageKind,
+    ) {
+        let game_day = self.day.unwrap_or(0);
+        self.messages.push(crate::messages::GameMessage::with_kind(
+            source,
+            game_day,
+            subject,
+            output.to_string(),
+            kind,
+        ));
+    }
+
     fn check_for_winner(&mut self) -> Result<(), GameError> {
         if let Some(winner) = self.winner() {
             self.log(
@@ -716,7 +736,12 @@ impl Game {
 
         // Collected (actor_identifier, line) pairs from all tributes this cycle.
         // Drained into self.messages after the mutable borrow of self.tributes ends.
-        let mut collected_events: Vec<(String, String, String)> = Vec::new();
+        let mut collected_events: Vec<(
+            String,
+            String,
+            String,
+            Option<crate::messages::MessageKind>,
+        )> = Vec::new();
 
         // Alliance formation rolls (spec §6). For every pair of living
         // tributes sharing an area where neither already lists the other as
@@ -758,15 +783,13 @@ impl Game {
                             .as_ref()
                             .map(|f| f.label())
                             .unwrap_or("mutual circumstance");
-                        new_alliances.push((
-                            a.id,
-                            b.id,
-                            a.name.clone(),
-                            format!(
-                                "{} and {} form an alliance ({}).",
-                                a.name, b.name, factor_label
-                            ),
-                        ));
+                        let message = crate::output::GameOutput::AllianceFormed(
+                            &a.name,
+                            &b.name,
+                            factor_label,
+                        )
+                        .to_string();
+                        new_alliances.push((a.id, b.id, a.name.clone(), message));
                     }
                 }
             }
@@ -815,6 +838,7 @@ impl Game {
                 self.tributes[ia].identifier.clone(),
                 name_a.clone(),
                 message.clone(),
+                Some(crate::messages::MessageKind::AllianceFormed),
             ));
         }
 
@@ -917,18 +941,31 @@ impl Game {
                 &mut tribute_events,
             );
             for line in tribute_events {
-                collected_events.push((tribute.identifier.clone(), tribute.name.clone(), line));
+                collected_events.push((
+                    tribute.identifier.clone(),
+                    tribute.name.clone(),
+                    line,
+                    None,
+                ));
             }
             drained_alliance_events.append(&mut tribute.drain_alliance_events());
         }
 
         // Drain collected events into game messages now that the mutable borrow ends.
-        for (identifier, name, line) in collected_events {
-            self.log_output(
-                crate::messages::MessageSource::Tribute(identifier),
-                name,
-                line,
-            );
+        for (identifier, name, line, kind) in collected_events {
+            match kind {
+                Some(k) => self.log_output_kind(
+                    crate::messages::MessageSource::Tribute(identifier),
+                    name,
+                    line,
+                    k,
+                ),
+                None => self.log_output(
+                    crate::messages::MessageSource::Tribute(identifier),
+                    name,
+                    line,
+                ),
+            }
         }
 
         // Promote drained alliance events into the game queue and process them
@@ -1036,11 +1073,33 @@ impl Game {
         for ev in drained {
             match ev {
                 AllianceEvent::BetrayalRecorded { betrayer, victim } => {
+                    // Snapshot names before the mutable borrow on `victim` so
+                    // we can emit the message after victim mutation completes.
+                    let betrayer_name = self
+                        .tributes
+                        .iter()
+                        .find(|t| t.id == betrayer)
+                        .map(|t| t.name.clone());
+                    let victim_info = self
+                        .tributes
+                        .iter()
+                        .find(|t| t.id == victim)
+                        .map(|t| (t.identifier.clone(), t.name.clone()));
                     if let Some(v) = self.tributes.iter_mut().find(|t| t.id == victim) {
                         v.allies.retain(|x| *x != betrayer);
                         v.pending_trust_shock = true;
                     }
                     // Spec §7.5: betrayer is never enqueued for trust-shock.
+                    if let (Some(b_name), Some((v_id, v_name))) = (betrayer_name, victim_info) {
+                        let line = crate::output::GameOutput::BetrayalTriggered(&b_name, &v_name)
+                            .to_string();
+                        self.log_output_kind(
+                            crate::messages::MessageSource::Tribute(v_id),
+                            v_name,
+                            line,
+                            crate::messages::MessageKind::BetrayalTriggered,
+                        );
+                    }
                 }
                 AllianceEvent::DeathRecorded {
                     deceased,
@@ -1063,13 +1122,16 @@ impl Game {
                             let sanity = ally.attributes.sanity;
                             if sanity_break_roll(sanity, limit, rng) {
                                 ally.allies.retain(|x| *x != deceased);
-                                let line = format!(
-                                    "{} is shaken by their ally's death and breaks the bond.",
-                                    ally.name
-                                );
                                 let aid = ally.identifier.clone();
                                 let aname = ally.name.clone();
-                                self.log(crate::messages::MessageSource::Tribute(aid), aname, line);
+                                let line =
+                                    crate::output::GameOutput::TrustShockBreak(&aname).to_string();
+                                self.log_output_kind(
+                                    crate::messages::MessageSource::Tribute(aid),
+                                    aname,
+                                    line,
+                                    crate::messages::MessageKind::TrustShockBreak,
+                                );
                             }
                         }
                     }
@@ -1962,5 +2024,102 @@ mod tests {
         );
         let s = game.tributes.iter().find(|t| t.id == sid).unwrap();
         assert!(!s.allies.contains(&did));
+    }
+
+    #[test]
+    fn alliance_formation_emits_message_with_alliance_formed_kind() {
+        // Friendly + same district guarantees a high formation chance; loop
+        // a few seeds until at least one cycle forms an alliance and assert
+        // the resulting message carries kind = AllianceFormed and the exact
+        // display string from `GameOutput::AllianceFormed`.
+        use crate::messages::MessageKind;
+        use crate::tributes::traits::Trait;
+
+        let mut t1 = create_tribute("Cinna", true);
+        let mut t2 = create_tribute("Portia", true);
+        t1.district = 1;
+        t2.district = 1;
+        t1.traits = vec![Trait::Friendly];
+        t2.traits = vec![Trait::Friendly];
+        t1.area = Area::Cornucopia;
+        t2.area = Area::Cornucopia;
+
+        let base = create_test_game_with_tributes(vec![t1.clone(), t2.clone()]);
+        let mut game_with_area = base.clone();
+        game_with_area
+            .areas
+            .push(AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia));
+        let closed_areas: Vec<Area> = vec![];
+
+        let mut hit: Option<crate::messages::GameMessage> = None;
+        for seed in [313u64, 419, 547, 23, 89, 211, 7, 11] {
+            let mut g = game_with_area.clone();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let _ = g.run_tribute_cycle(
+                true,
+                &mut rng,
+                closed_areas.clone(),
+                vec![t1.clone(), t2.clone()],
+                2,
+            );
+            if let Some(m) = g
+                .messages
+                .iter()
+                .find(|m| m.kind == Some(MessageKind::AllianceFormed))
+            {
+                hit = Some(m.clone());
+                break;
+            }
+        }
+        let m = hit.expect("at least one cycle must emit AllianceFormed");
+        assert_eq!(m.kind, Some(MessageKind::AllianceFormed));
+        assert!(
+            m.content.contains("form an alliance"),
+            "content should match GameOutput::AllianceFormed display, got: {}",
+            m.content
+        );
+    }
+
+    #[test]
+    fn betrayal_emits_message_with_betrayal_triggered_kind() {
+        use crate::messages::MessageKind;
+        use crate::tributes::alliances::TREACHEROUS_BETRAYAL_INTERVAL;
+        use crate::tributes::traits::Trait;
+
+        let mut betrayer = create_tribute("Cato", true);
+        let mut victim = create_tribute("Glimmer", true);
+        betrayer.traits = vec![Trait::Treacherous];
+        victim.traits = vec![Trait::Tough];
+        betrayer.allies.push(victim.id);
+        victim.allies.push(betrayer.id);
+        betrayer.turns_since_last_betrayal = TREACHEROUS_BETRAYAL_INTERVAL;
+        betrayer.area = Area::Cornucopia;
+        victim.area = Area::Cornucopia;
+        betrayer.district = 1;
+        victim.district = 2;
+
+        let mut game = create_test_game_with_tributes(vec![betrayer.clone(), victim.clone()]);
+        game.areas
+            .push(AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia));
+        let closed_areas: Vec<Area> = vec![];
+
+        let mut rng = SmallRng::seed_from_u64(313);
+        let _ = game.run_tribute_cycle(
+            true,
+            &mut rng,
+            closed_areas,
+            vec![betrayer.clone(), victim.clone()],
+            2,
+        );
+
+        let m = game
+            .messages
+            .iter()
+            .find(|m| m.kind == Some(MessageKind::BetrayalTriggered))
+            .expect("betrayal cycle must emit BetrayalTriggered message");
+        assert_eq!(
+            m.content,
+            "Cato betrays Glimmer — true to their treacherous nature."
+        );
     }
 }

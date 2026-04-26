@@ -106,6 +106,11 @@ pub struct Tribute {
     /// Turn counter for the Treacherous betrayal cadence. Reset on betrayal.
     #[serde(default)]
     pub turns_since_last_betrayal: u8,
+    /// Set to `true` by the cycle drain when this tribute is the victim of a
+    /// betrayal. Consumed at the top of `process_turn_phase` on the victim's
+    /// next turn to drive the trust-shock cascade (spec §7.3c1).
+    #[serde(default)]
+    pub pending_trust_shock: bool,
 }
 
 impl Default for Tribute {
@@ -155,6 +160,7 @@ impl Tribute {
             traits,
             allies: Vec::new(),
             turns_since_last_betrayal: 0,
+            pending_trust_shock: false,
         }
     }
 
@@ -582,6 +588,12 @@ mod tests {
         assert_eq!(tribute.turns_since_last_betrayal, 0);
         // `id` mirrors `identifier`.
         assert_eq!(tribute.id.to_string(), tribute.identifier);
+    }
+
+    #[rstest]
+    fn new_tribute_has_no_pending_trust_shock() {
+        let tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        assert!(!tribute.pending_trust_shock);
     }
 
     #[rstest]

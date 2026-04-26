@@ -64,8 +64,11 @@ pub struct Tribute {
     pub area: Area,
     /// What is their current status?
     pub status: TributeStatus,
-    /// This is their thinker
-    #[serde(skip)]
+    /// This is their thinker. Persisted across saves so runtime state
+    /// (psychotic break, preferred-action overrides, derived thresholds)
+    /// survives load. `#[serde(default)]` lets pre-fix rows that omit the
+    /// `brain` column hydrate via `Brain::default()`.
+    #[serde(default)]
     pub brain: Brain,
     /// How they present themselves to the real world
     pub avatar: Option<String>,
@@ -646,6 +649,7 @@ impl Attributes {
 mod tests {
 
     use crate::tributes::Tribute;
+    use crate::tributes::brains::Brain;
     use rand::SeedableRng;
     use rand::rngs::SmallRng;
     use rstest::*;
@@ -717,6 +721,54 @@ mod tests {
         assert!(restored.traits.is_empty());
         assert_eq!(restored.turns_since_last_betrayal, 0);
         assert!(!restored.pending_trust_shock);
+    }
+
+    #[rstest]
+    fn brain_roundtrips_psychotic_break_state() {
+        use crate::tributes::brains::PsychoticBreakType;
+
+        let mut tribute = Tribute::new("Cato".to_string(), None, None);
+        tribute.brain.psychotic_break = Some(PsychoticBreakType::Berserk);
+
+        let json = serde_json::to_string(&tribute).expect("serialize");
+        assert!(json.contains("\"brain\""));
+        assert!(json.contains("\"Berserk\""));
+
+        let restored: Tribute = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(
+            restored.brain.psychotic_break,
+            Some(PsychoticBreakType::Berserk),
+        );
+    }
+
+    #[rstest]
+    fn brain_roundtrips_preferred_action() {
+        use crate::tributes::actions::Action;
+
+        let mut tribute = Tribute::new("Foxface".to_string(), None, None);
+        tribute.brain.preferred_action = Some(Action::Hide);
+        tribute.brain.preferred_action_percentage = 0.75;
+
+        let json = serde_json::to_string(&tribute).expect("serialize");
+
+        let restored: Tribute = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(restored.brain.preferred_action, Some(Action::Hide));
+        assert!((restored.brain.preferred_action_percentage - 0.75).abs() < f64::EPSILON);
+    }
+
+    #[rstest]
+    fn brain_missing_field_defaults() {
+        // Pre-fix tribute rows persisted before #[serde(default)] was added
+        // omit the `brain` column entirely. They must still deserialize, with
+        // brain hydrated via `Brain::default()`.
+        let baseline = Tribute::new("Legacy".to_string(), None, None);
+        let mut value: serde_json::Value = serde_json::to_value(&baseline).expect("to_value");
+        value.as_object_mut().expect("object").remove("brain");
+
+        let restored: Tribute = serde_json::from_value(value).expect("legacy deserialize");
+        assert_eq!(restored.brain, Brain::default());
+        assert!(restored.brain.psychotic_break.is_none());
+        assert!(restored.brain.preferred_action.is_none());
     }
 
     #[rstest]

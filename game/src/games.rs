@@ -718,12 +718,105 @@ impl Game {
         // Drained into self.messages after the mutable borrow of self.tributes ends.
         let mut collected_events: Vec<(String, String, String)> = Vec::new();
 
+        // Alliance formation rolls (spec §6). For every pair of living
+        // tributes sharing an area where neither already lists the other as
+        // an ally and neither is at the alliance cap, run try_form_alliance.
+        // Collect successful pairs as (id_a, id_b, factor) and apply after
+        // the immutable borrow ends. This runs *before* the per-tribute
+        // turn so newly-formed alliances are visible to pick_target this
+        // cycle.
+        let mut new_alliances: Vec<(uuid::Uuid, uuid::Uuid, String, String)> = Vec::new();
+        for tributes in tributes_by_area.values() {
+            for i in 0..tributes.len() {
+                for j in (i + 1)..tributes.len() {
+                    let a = tributes[i];
+                    let b = tributes[j];
+                    if a.allies.contains(&b.id) || b.allies.contains(&a.id) {
+                        continue;
+                    }
+                    if a.allies.len() >= crate::tributes::alliances::MAX_ALLIES
+                        || b.allies.len() >= crate::tributes::alliances::MAX_ALLIES
+                    {
+                        continue;
+                    }
+                    let same_district = a.district == b.district;
+                    let formed = crate::tributes::alliances::try_form_alliance(
+                        &a.traits,
+                        &b.traits,
+                        same_district,
+                        a.allies.len(),
+                        b.allies.len(),
+                        rng,
+                    );
+                    if formed {
+                        let factor = crate::tributes::alliances::deciding_factor(
+                            &a.traits,
+                            &b.traits,
+                            same_district,
+                        );
+                        let factor_label = factor
+                            .as_ref()
+                            .map(|f| f.label())
+                            .unwrap_or("mutual circumstance");
+                        new_alliances.push((
+                            a.id,
+                            b.id,
+                            a.name.clone(),
+                            format!(
+                                "{} and {} form an alliance ({}).",
+                                a.name, b.name, factor_label
+                            ),
+                        ));
+                    }
+                }
+            }
+        }
+
         // Alliance events drained from each tribute's local buffer this cycle.
         // Appended to self.alliance_events after the mutable borrow ends, then
         // processed via process_alliance_events so cascades resolve before the
         // next cycle.
         let mut drained_alliance_events: Vec<crate::tributes::alliances::AllianceEvent> =
             Vec::new();
+
+        // Apply alliance formations symmetrically. Both sides get each
+        // other's id pushed onto `allies` so the graph stays consistent.
+        // Skip duplicates defensively in case the same pair appears twice.
+        for (id_a, id_b, name_a, message) in &new_alliances {
+            // Find indices to satisfy the borrow checker for two-side mutation.
+            let mut idx_a: Option<usize> = None;
+            let mut idx_b: Option<usize> = None;
+            for (i, t) in self.tributes.iter().enumerate() {
+                if t.id == *id_a {
+                    idx_a = Some(i);
+                }
+                if t.id == *id_b {
+                    idx_b = Some(i);
+                }
+            }
+            let (Some(ia), Some(ib)) = (idx_a, idx_b) else {
+                continue;
+            };
+            // Re-check caps and existing membership at apply time in case
+            // multiple formations targeting the same tribute pushed the
+            // count over MAX_ALLIES.
+            if self.tributes[ia].allies.len() >= crate::tributes::alliances::MAX_ALLIES
+                || self.tributes[ib].allies.len() >= crate::tributes::alliances::MAX_ALLIES
+            {
+                continue;
+            }
+            if !self.tributes[ia].allies.contains(id_b) {
+                self.tributes[ia].allies.push(*id_b);
+            }
+            if !self.tributes[ib].allies.contains(id_a) {
+                self.tributes[ib].allies.push(*id_a);
+            }
+            collected_events.push((
+                self.tributes[ia].identifier.clone(),
+                name_a.clone(),
+                message.clone(),
+            ));
+        }
 
         // Process tributes
         for tribute in self.tributes.iter_mut() {
@@ -1459,5 +1552,64 @@ mod tests {
         let v = game.tributes.iter().find(|t| t.id == vid).unwrap();
         assert!(!v.allies.contains(&bid), "victim allies cleaned");
         assert!(v.pending_trust_shock, "victim flagged for trust shock");
+    }
+
+    #[test]
+    fn run_tribute_cycle_forms_alliance_between_compatible_same_area_tributes() {
+        // Two Friendly tributes from the same district sharing an area
+        // should be able to form an alliance during a cycle. With both
+        // sides starting at 0 allies, district bonus, and Friendly affinity
+        // 1.5 each, roll_chance ≈ 0.675; with a fixed seed and many trials
+        // we deterministically observe at least one cycle that forms.
+        use crate::tributes::traits::Trait;
+        let mut t1 = create_tribute("Cinna", true);
+        let mut t2 = create_tribute("Portia", true);
+        // Force compatibility: same district + Friendly traits.
+        t1.district = 1;
+        t2.district = 1;
+        t1.traits = vec![Trait::Friendly];
+        t2.traits = vec![Trait::Friendly];
+        // Place both in Cornucopia (default `Tribute::new` already does this,
+        // but be explicit for the test's intent).
+        t1.area = Area::Cornucopia;
+        t2.area = Area::Cornucopia;
+
+        let id1 = t1.id;
+        let id2 = t2.id;
+
+        let mut game = create_test_game_with_tributes(vec![t1.clone(), t2.clone()]);
+        let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
+        game.areas.push(area);
+        let closed_areas = game
+            .areas
+            .iter()
+            .filter(|ad| ad.area.is_some() & !ad.is_open())
+            .map(|ad| ad.area.unwrap())
+            .collect::<Vec<Area>>();
+
+        // Loop a few seeded cycles until at least one forms; if production
+        // wiring is correct this should hit within a handful of trials.
+        let mut formed = false;
+        for seed in [313u64, 419, 547, 23, 89, 211] {
+            let mut g = game.clone();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let _ = g.run_tribute_cycle(
+                true,
+                &mut rng,
+                closed_areas.clone(),
+                vec![t1.clone(), t2.clone()],
+                2,
+            );
+            let a1 = g.tributes.iter().find(|t| t.id == id1).unwrap();
+            let a2 = g.tributes.iter().find(|t| t.id == id2).unwrap();
+            if a1.allies.contains(&id2) && a2.allies.contains(&id1) {
+                formed = true;
+                break;
+            }
+        }
+        assert!(
+            formed,
+            "Friendly same-district pair must form an alliance within a few cycles"
+        );
     }
 }

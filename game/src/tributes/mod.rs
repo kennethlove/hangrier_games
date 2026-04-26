@@ -402,7 +402,6 @@ impl Tribute {
         }
     }
 
-    /// Pick an appropriate target from nearby tributes prioritizing targets as follows:
     /// Pick a target tribute from `targets` to attack, given the number of
     /// living tributes in the game.
     ///

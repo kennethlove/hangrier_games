@@ -1,6 +1,7 @@
 //! Tribute trait system. Replaces `BrainPersonality`. See spec
 //! `docs/superpowers/specs/2026-04-25-tribute-alliances-design.md` §5.
 
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -178,9 +179,47 @@ pub fn pool_for(district: u8) -> &'static [(Trait, u8)] {
     }
 }
 
+/// Generate a trait set for a tribute in `district`. Rolls 2–6 uniformly,
+/// then draws weighted picks from the district pool, rejecting conflicts and
+/// duplicates. Stops early if the pool cannot satisfy the count; never spins.
+pub fn generate_traits(district: u8, rng: &mut impl Rng) -> Vec<Trait> {
+    let pool = pool_for(district);
+    let target_count = rng.random_range(2..=6);
+    let mut chosen: Vec<Trait> = Vec::with_capacity(target_count);
+
+    let mut remaining: Vec<(Trait, u8)> = pool.to_vec();
+
+    while chosen.len() < target_count && !remaining.is_empty() {
+        let total: u32 = remaining.iter().map(|(_, w)| *w as u32).sum();
+        if total == 0 {
+            break;
+        }
+        let mut roll = rng.random_range(0..total);
+        let mut picked_idx: Option<usize> = None;
+        for (i, (_, w)) in remaining.iter().enumerate() {
+            if roll < *w as u32 {
+                picked_idx = Some(i);
+                break;
+            }
+            roll -= *w as u32;
+        }
+        let idx = picked_idx.expect("weighted pick must succeed when total > 0");
+        let (candidate, _) = remaining.remove(idx);
+
+        if chosen.iter().any(|t| conflicts_with(*t, candidate)) {
+            continue;
+        }
+        chosen.push(candidate);
+    }
+
+    chosen
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::SeedableRng;
+    use rand::rngs::StdRng;
 
     #[test]
     fn affinity_known_values() {
@@ -256,5 +295,27 @@ mod tests {
     fn pool_for_unknown_district_falls_back() {
         // Districts outside 1..=12 fall back to district 1's pool; assert non-panic.
         let _ = pool_for(99);
+    }
+
+    #[test]
+    fn generate_respects_count_when_pool_supports() {
+        let mut rng = StdRng::seed_from_u64(42);
+        let traits = generate_traits(1, &mut rng);
+        assert!(traits.len() >= 2 && traits.len() <= 6);
+        for i in 0..traits.len() {
+            for j in (i + 1)..traits.len() {
+                assert!(!conflicts_with(traits[i], traits[j]));
+            }
+        }
+    }
+
+    #[test]
+    fn generate_no_duplicates() {
+        let mut rng = StdRng::seed_from_u64(7);
+        let traits = generate_traits(2, &mut rng);
+        let mut sorted: Vec<_> = traits.clone();
+        sorted.sort_by_key(|t| *t as u8);
+        sorted.dedup();
+        assert_eq!(sorted.len(), traits.len());
     }
 }

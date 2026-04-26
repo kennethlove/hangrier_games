@@ -30,7 +30,6 @@ use uuid::Uuid;
 
 /// Consts
 const SANITY_BREAK_LEVEL: u32 = 9;
-const LOYALTY_BREAK_LEVEL: f64 = 0.25;
 
 #[derive(Clone, Debug)]
 pub struct ActionSuggestion {
@@ -478,8 +477,6 @@ pub struct Attributes {
     pub defense: u32,
     /// Will they jump into dangerous situations?
     pub bravery: u32,
-    /// Are they a backstabber?
-    pub loyalty: u32,
     /// How well do they avoid traps?
     pub intelligence: u32,
     /// Can they talk their way out of, or into, things?
@@ -500,7 +497,6 @@ impl Default for Attributes {
             strength: 50,
             defense: 50,
             bravery: 100,
-            loyalty: 100,
             intelligence: 100,
             persuasion: 100,
             luck: 100,
@@ -522,7 +518,6 @@ impl Attributes {
             strength: rng.random_range(1..=config.max_strength),
             defense: rng.random_range(1..=config.max_defense),
             bravery: rng.random_range(1..=config.max_bravery),
-            loyalty: rng.random_range(1..=config.max_loyalty),
             intelligence: rng.random_range(1..=config.max_intelligence),
             persuasion: rng.random_range(1..=config.max_persuasion),
             luck: rng.random_range(1..=config.max_luck),

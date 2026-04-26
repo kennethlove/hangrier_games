@@ -312,8 +312,6 @@ fn TributeAttributes(attributes: Attributes) -> Element {
             dd { "{attributes.defense}"}
             dt { "Bravery" }
             dd { "{attributes.bravery}"}
-            dt { "Loyalty" }
-            dd { "{attributes.loyalty}"}
             dt { "Intelligence" }
             dd { "{attributes.intelligence}"}
             dt { "Persuasion" }

@@ -616,6 +616,54 @@ mod tests {
     }
 
     #[rstest]
+    fn serde_roundtrip_alliance_fields() {
+        use crate::tributes::traits::Trait;
+        use uuid::Uuid;
+
+        let mut tribute = Tribute::new("Rue".to_string(), None, None);
+        let ally = Uuid::new_v4();
+        tribute.allies.push(ally);
+        tribute.traits.clear();
+        tribute.traits.push(Trait::Loyal);
+        tribute.traits.push(Trait::Treacherous);
+        tribute.turns_since_last_betrayal = 7;
+        tribute.pending_trust_shock = true;
+
+        let json = serde_json::to_string(&tribute).expect("serialize");
+        assert!(json.contains("\"allies\""));
+        assert!(json.contains("\"traits\""));
+        assert!(json.contains("\"Loyal\""));
+        assert!(json.contains("\"turns_since_last_betrayal\":7"));
+        assert!(json.contains("\"pending_trust_shock\":true"));
+
+        let restored: Tribute = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(restored.allies, vec![ally]);
+        assert_eq!(restored.traits, vec![Trait::Loyal, Trait::Treacherous]);
+        assert_eq!(restored.turns_since_last_betrayal, 7);
+        assert!(restored.pending_trust_shock);
+    }
+
+    #[rstest]
+    fn serde_defaults_for_missing_alliance_fields() {
+        // Persisted tribute records written before the alliance fields existed
+        // must still deserialize. Simulate this by serialising a fresh tribute,
+        // stripping the new fields, then round-tripping.
+        let baseline = Tribute::new("Legacy".to_string(), None, None);
+        let mut value: serde_json::Value = serde_json::to_value(&baseline).expect("to_value");
+        let obj = value.as_object_mut().expect("object");
+        obj.remove("allies");
+        obj.remove("traits");
+        obj.remove("turns_since_last_betrayal");
+        obj.remove("pending_trust_shock");
+
+        let restored: Tribute = serde_json::from_value(value).expect("legacy deserialize");
+        assert!(restored.allies.is_empty());
+        assert!(restored.traits.is_empty());
+        assert_eq!(restored.turns_since_last_betrayal, 0);
+        assert!(!restored.pending_trust_shock);
+    }
+
+    #[rstest]
     fn new() {
         let tribute = Tribute::new("Katniss".to_string(), Some(12), None);
         assert_eq!(tribute.name, "Katniss");

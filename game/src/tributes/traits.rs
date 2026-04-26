@@ -90,6 +90,94 @@ pub fn conflicts_with(a: Trait, b: Trait) -> bool {
         .any(|(x, y)| (*x == a && *y == b) || (*x == b && *y == a))
 }
 
+pub const DISTRICT_1_POOL: &[(Trait, u8)] = &[
+    (Trait::Loyal, 4),
+    (Trait::Aggressive, 4),
+    (Trait::Paranoid, 3),
+    (Trait::Tough, 2),
+];
+pub const DISTRICT_2_POOL: &[(Trait, u8)] = &[
+    (Trait::Aggressive, 4),
+    (Trait::Defensive, 4),
+    (Trait::Loyal, 3),
+    (Trait::Tough, 2),
+];
+pub const DISTRICT_3_POOL: &[(Trait, u8)] = &[
+    (Trait::Cunning, 4),
+    (Trait::Cautious, 3),
+    (Trait::Dim, 2),
+    (Trait::Nearsighted, 2),
+    (Trait::Asthmatic, 1),
+];
+pub const DISTRICT_4_POOL: &[(Trait, u8)] = &[
+    (Trait::Resilient, 4),
+    (Trait::Aggressive, 3),
+    (Trait::Loyal, 3),
+    (Trait::Tough, 2),
+];
+pub const DISTRICT_5_POOL: &[(Trait, u8)] = &[
+    (Trait::Cunning, 4),
+    (Trait::Cautious, 3),
+    (Trait::Treacherous, 2),
+];
+pub const DISTRICT_6_POOL: &[(Trait, u8)] = &[
+    (Trait::Fragile, 3),
+    (Trait::Friendly, 3),
+    (Trait::Asthmatic, 2),
+    (Trait::Nearsighted, 2),
+];
+pub const DISTRICT_7_POOL: &[(Trait, u8)] = &[
+    (Trait::Resilient, 4),
+    (Trait::Defensive, 3),
+    (Trait::Tough, 3),
+];
+pub const DISTRICT_8_POOL: &[(Trait, u8)] = &[
+    (Trait::Fragile, 2),
+    (Trait::Friendly, 4),
+    (Trait::Loyal, 3),
+    (Trait::Asthmatic, 2),
+];
+pub const DISTRICT_9_POOL: &[(Trait, u8)] = &[
+    (Trait::Cautious, 3),
+    (Trait::Friendly, 3),
+    (Trait::Asthmatic, 2),
+];
+pub const DISTRICT_10_POOL: &[(Trait, u8)] = &[
+    (Trait::Resilient, 4),
+    (Trait::Defensive, 3),
+    (Trait::Tough, 3),
+];
+pub const DISTRICT_11_POOL: &[(Trait, u8)] = &[
+    (Trait::Loyal, 3),
+    (Trait::Friendly, 4),
+    (Trait::Resilient, 3),
+    (Trait::Tough, 2),
+];
+pub const DISTRICT_12_POOL: &[(Trait, u8)] = &[
+    (Trait::Resilient, 3),
+    (Trait::LoneWolf, 3),
+    (Trait::Cunning, 3),
+    (Trait::Asthmatic, 2),
+];
+
+pub fn pool_for(district: u8) -> &'static [(Trait, u8)] {
+    match district {
+        1 => DISTRICT_1_POOL,
+        2 => DISTRICT_2_POOL,
+        3 => DISTRICT_3_POOL,
+        4 => DISTRICT_4_POOL,
+        5 => DISTRICT_5_POOL,
+        6 => DISTRICT_6_POOL,
+        7 => DISTRICT_7_POOL,
+        8 => DISTRICT_8_POOL,
+        9 => DISTRICT_9_POOL,
+        10 => DISTRICT_10_POOL,
+        11 => DISTRICT_11_POOL,
+        12 => DISTRICT_12_POOL,
+        _ => DISTRICT_1_POOL,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,5 +242,19 @@ mod tests {
     fn conflict_allowed_combos_do_not_conflict() {
         assert!(!conflicts_with(Trait::Friendly, Trait::Treacherous));
         assert!(!conflicts_with(Trait::Paranoid, Trait::LoneWolf));
+    }
+
+    #[test]
+    fn pool_for_returns_correct_pool_per_district() {
+        let p1 = pool_for(1);
+        assert!(p1.iter().any(|(t, _)| *t == Trait::Loyal));
+        let p12 = pool_for(12);
+        assert!(p12.iter().any(|(t, _)| *t == Trait::LoneWolf));
+    }
+
+    #[test]
+    fn pool_for_unknown_district_falls_back() {
+        // Districts outside 1..=12 fall back to district 1's pool; assert non-panic.
+        let _ = pool_for(99);
     }
 }

@@ -228,6 +228,37 @@ impl Tribute {
             return;
         }
 
+        // Treacherous active betrayal (spec §7.4(b)). When the timer has
+        // elapsed and the tribute carries the Treacherous trait, attempt to
+        // betray a same-area ally. On success, drop the symmetric pair
+        // locally, enqueue BetrayalRecorded so the victim's `allies` is
+        // cleaned and `pending_trust_shock` flips on the next drain. The
+        // timer resets unconditionally so a missed opportunity does not
+        // stack (one chance per cadence).
+        if self.traits.contains(&traits::Trait::Treacherous)
+            && self.turns_since_last_betrayal >= alliances::TREACHEROUS_BETRAYAL_INTERVAL
+        {
+            let same_area_ally = encounter_context
+                .potential_targets
+                .iter()
+                .find(|t| self.allies.contains(&t.id) && t.is_alive())
+                .cloned();
+            if let Some(victim) = same_area_ally {
+                self.allies.retain(|id| id != &victim.id);
+                self.alliance_events
+                    .push(alliances::AllianceEvent::BetrayalRecorded {
+                        betrayer: self.id,
+                        victim: victim.id,
+                    });
+                events.push(format!(
+                    "{} betrays {} — true to their treacherous nature.",
+                    self.name, victim.name
+                ));
+            }
+            // Reset the timer whether or not an ally was available.
+            self.turns_since_last_betrayal = 0;
+        }
+
         // Any generous patrons this round?
         if let Some(gift) = self.receive_patron_gift(&mut *rng) {
             events.push(GameOutput::SponsorGift(self.name.as_str(), &gift).to_string());

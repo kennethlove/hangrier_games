@@ -1612,4 +1612,120 @@ mod tests {
             "Friendly same-district pair must form an alliance within a few cycles"
         );
     }
+
+    #[test]
+    fn run_tribute_cycle_treacherous_tribute_betrays_same_area_ally_when_timer_elapses() {
+        // Treacherous tribute with an ally in the same area, timer at the
+        // betrayal interval, must enqueue BetrayalRecorded during the cycle.
+        // After process_alliance_events, the victim must have:
+        //   - pending_trust_shock set
+        //   - betrayer removed from allies
+        // and the betrayer must have:
+        //   - victim removed from allies
+        //   - timer reset to 0
+        use crate::tributes::alliances::TREACHEROUS_BETRAYAL_INTERVAL;
+        use crate::tributes::traits::Trait;
+
+        let mut betrayer = create_tribute("Cato", true);
+        let mut victim = create_tribute("Glimmer", true);
+        betrayer.traits = vec![Trait::Treacherous];
+        // Strip any auto-generated traits from victim that might accidentally
+        // form an alliance back during the cycle (we want a pre-existing ally).
+        victim.traits = vec![Trait::Tough];
+        // Pre-existing alliance set up manually.
+        betrayer.allies.push(victim.id);
+        victim.allies.push(betrayer.id);
+        // Timer at threshold so betrayal fires this turn.
+        betrayer.turns_since_last_betrayal = TREACHEROUS_BETRAYAL_INTERVAL;
+        // Same area.
+        betrayer.area = Area::Cornucopia;
+        victim.area = Area::Cornucopia;
+        // Different districts so we don't accidentally re-form alliances
+        // during the formation pass.
+        betrayer.district = 1;
+        victim.district = 2;
+
+        let bid = betrayer.id;
+        let vid = victim.id;
+
+        let mut game =
+            create_test_game_with_tributes(vec![betrayer.clone(), victim.clone()]);
+        let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
+        game.areas.push(area);
+        let closed_areas = game
+            .areas
+            .iter()
+            .filter(|ad| ad.area.is_some() & !ad.is_open())
+            .map(|ad| ad.area.unwrap())
+            .collect::<Vec<Area>>();
+
+        let mut rng = SmallRng::seed_from_u64(313);
+        let _ = game.run_tribute_cycle(
+            true,
+            &mut rng,
+            closed_areas,
+            vec![betrayer.clone(), victim.clone()],
+            2,
+        );
+
+        let v = game.tributes.iter().find(|t| t.id == vid).unwrap();
+        let b = game.tributes.iter().find(|t| t.id == bid).unwrap();
+        assert!(!v.allies.contains(&bid), "victim allies cleaned by event");
+        assert!(v.pending_trust_shock, "victim flagged for trust shock");
+        assert!(!b.allies.contains(&vid), "betrayer dropped victim locally");
+        // tick_alliance_timers ran and incremented to TREACHEROUS_BETRAYAL_INTERVAL+1
+        // before betrayal fired? No: betrayal logic must reset to 0. After reset,
+        // the rest of process_turn_phase doesn't tick again, so we expect 0.
+        assert_eq!(
+            b.turns_since_last_betrayal, 0,
+            "betrayal resets the cooldown timer"
+        );
+    }
+
+    #[test]
+    fn run_tribute_cycle_treacherous_no_betrayal_without_same_area_ally_resets_timer() {
+        // Treacherous tribute alone in its area: no betrayal possible, but
+        // the timer should still reset (one missed opportunity per cycle).
+        use crate::tributes::alliances::TREACHEROUS_BETRAYAL_INTERVAL;
+        use crate::tributes::traits::Trait;
+
+        let mut loner = create_tribute("Foxface", true);
+        let mut other = create_tribute("Marvel", true);
+        loner.traits = vec![Trait::Treacherous];
+        other.traits = vec![Trait::Tough];
+        loner.turns_since_last_betrayal = TREACHEROUS_BETRAYAL_INTERVAL;
+        // Different areas so other is not a same-area ally.
+        loner.area = Area::North;
+        other.area = Area::South;
+        loner.district = 5;
+        other.district = 6;
+        let lid = loner.id;
+
+        let mut game = create_test_game_with_tributes(vec![loner.clone(), other.clone()]);
+        game.areas
+            .push(AreaDetails::new(Some("Hill".to_string()), Area::North));
+        game.areas
+            .push(AreaDetails::new(Some("Lake".to_string()), Area::South));
+        let closed_areas = game
+            .areas
+            .iter()
+            .filter(|ad| ad.area.is_some() & !ad.is_open())
+            .map(|ad| ad.area.unwrap())
+            .collect::<Vec<Area>>();
+
+        let mut rng = SmallRng::seed_from_u64(419);
+        let _ = game.run_tribute_cycle(
+            true,
+            &mut rng,
+            closed_areas,
+            vec![loner.clone(), other.clone()],
+            2,
+        );
+
+        let l = game.tributes.iter().find(|t| t.id == lid).unwrap();
+        assert_eq!(
+            l.turns_since_last_betrayal, 0,
+            "missed opportunity also resets the timer per spec §7.4(b)"
+        );
+    }
 }

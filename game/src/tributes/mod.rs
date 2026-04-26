@@ -352,14 +352,17 @@ impl Tribute {
     }
 
     /// Pick an appropriate target from nearby tributes prioritizing targets as follows:
-    /// (for this function, "nearby" means in the same area and "ally" means
-    /// from the same district)
-    /// 1. If there are enemy tributes nearby, target them.
-    /// 2. If there are no enemies and the tribute is feeling suicidal, target self.
-    /// 3. If there are no enemies nearby, but they exist elsewhere, target no one.
-    /// 4. If there are no enemies nearby and no enemies left in the game:
-    ///    a. If loyalty is low, target ally.
-    ///    b. Otherwise, target no one.
+    /// Pick a target tribute from `targets` to attack, given the number of
+    /// living tributes in the game.
+    ///
+    /// Selection rules:
+    /// 1. If there are no targets and the tribute is suicidal (very low sanity),
+    ///    target self.
+    /// 2. Otherwise, filter out current allies — they are off-limits regardless
+    ///    of district.
+    /// 3. If any non-allies remain, pick one at random.
+    /// 4. If only allies are nearby (and we're not the last two alive), pick no
+    ///    target. Final confrontation (only two alive) overrides alliance.
     fn pick_target(
         &self,
         mut targets: Vec<Tribute>,
@@ -368,48 +371,32 @@ impl Tribute {
     ) -> Option<Tribute> {
         // If there are no targets, check if the tribute is feeling suicidal.
         if targets.is_empty() {
-            match self.attributes.sanity {
+            return match self.attributes.sanity {
                 0..=SANITY_BREAK_LEVEL => {
                     // attempt suicide
                     events.push(GameOutput::TributeSuicide(self.name.as_str()).to_string());
                     Some(self.clone())
                 }
                 _ => None, // Attack no one
-            }
-        } else {
-            let enemies: Vec<Tribute> = targets
-                .iter()
-                .filter(|t| t.district != self.district)
-                .cloned()
-                .collect();
-
-            match enemies.len() {
-                0 => {
-                    // No enemies, check for a "friend"
-                    // If there are two of us in the area
-                    if targets.len() == 1 {
-                        let target = targets.pop().unwrap();
-                        // And we're the only two left in the game
-                        if living_tributes_count == 2 {
-                            // Kill the other tribute (final confrontation)
-                            Some(target)
-                        } else if (self.attributes.loyalty as f64 / 100.0) < LOYALTY_BREAK_LEVEL {
-                            // ...or they're unloyal (betrayal)
-                            Some(target)
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                }
-                _ => {
-                    // If there are enemies
-                    let mut rng = SmallRng::from_rng(&mut rand::rng());
-                    Some(enemies.choose(&mut rng).unwrap().clone())
-                }
-            }
+            };
         }
+
+        let enemies: Vec<Tribute> = targets
+            .iter()
+            .filter(|t| !self.allies.contains(&t.id))
+            .cloned()
+            .collect();
+
+        if enemies.is_empty() {
+            // Only allies in range. Final confrontation overrides loyalty.
+            if targets.len() == 1 && living_tributes_count == 2 {
+                return Some(targets.pop().unwrap());
+            }
+            return None;
+        }
+
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+        Some(enemies.choose(&mut rng).unwrap().clone())
     }
 }
 
@@ -607,5 +594,45 @@ mod tests {
         let tribute = Tribute::new("Katniss".to_string(), Some(12), None);
         // generate_traits rolls 2..=6 traits from the district pool.
         assert!((2..=6).contains(&tribute.traits.len()));
+    }
+
+    #[rstest]
+    fn pick_target_skips_allies() {
+        // An ally is in the same area but must not be picked as a target.
+        let mut me = Tribute::new("Katniss".to_string(), Some(12), None);
+        me.attributes.sanity = 100; // not suicidal
+        let ally = Tribute::new("Peeta".to_string(), Some(12), None);
+        me.allies.push(ally.id);
+
+        let mut events: Vec<String> = vec![];
+        let target = me.pick_target(vec![ally.clone()], 5, &mut events);
+        // Only candidate was an ally and we're not in final confrontation.
+        assert!(target.is_none());
+    }
+
+    #[rstest]
+    fn pick_target_allows_same_district_when_not_ally() {
+        // Same-district tributes can now be targeted unless they're allies.
+        let me = Tribute::new("Katniss".to_string(), Some(12), None);
+        let same_district = Tribute::new("Peeta".to_string(), Some(12), None);
+
+        let mut events: Vec<String> = vec![];
+        let target = me.pick_target(vec![same_district.clone()], 5, &mut events);
+        assert!(target.is_some());
+        assert_eq!(target.unwrap().id, same_district.id);
+    }
+
+    #[rstest]
+    fn pick_target_final_confrontation_overrides_alliance() {
+        // When only two tributes remain alive, even an ally is a valid target.
+        let mut me = Tribute::new("Katniss".to_string(), Some(12), None);
+        me.attributes.sanity = 100;
+        let ally = Tribute::new("Peeta".to_string(), Some(12), None);
+        me.allies.push(ally.id);
+
+        let mut events: Vec<String> = vec![];
+        let target = me.pick_target(vec![ally.clone()], 2, &mut events);
+        assert!(target.is_some());
+        assert_eq!(target.unwrap().id, ally.id);
     }
 }

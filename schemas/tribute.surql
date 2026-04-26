@@ -15,6 +15,9 @@ DEFINE FIELD OVERWRITE attributes ON tribute;
 DEFINE FIELD OVERWRITE stamina ON tribute;
 DEFINE FIELD OVERWRITE max_stamina ON tribute;
 DEFINE FIELD OVERWRITE terrain_affinity ON tribute;
+DEFINE FIELD OVERWRITE allies ON tribute TYPE array<uuid> DEFAULT [];
+DEFINE FIELD OVERWRITE traits ON tribute TYPE array<string> DEFAULT [];
+DEFINE FIELD OVERWRITE turns_since_last_betrayal ON tribute TYPE int DEFAULT 0;
 DEFINE FIELD OVERWRITE created_by ON tribute VALUE $auth READONLY;
 
 DEFINE INDEX OVERWRITE tribute_identifier ON tribute FIELDS identifier UNIQUE;

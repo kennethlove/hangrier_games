@@ -63,6 +63,16 @@ impl Trait {
 
 pub const REFUSERS: &[Trait] = &[Trait::Paranoid, Trait::LoneWolf];
 
+/// Geometric mean of trait affinity values. Returns 1.0 for empty input.
+pub fn geometric_mean_affinity(traits: &[Trait]) -> f64 {
+    if traits.is_empty() {
+        return 1.0;
+    }
+    let n = traits.len() as f64;
+    let product: f64 = traits.iter().map(|t| t.alliance_affinity()).product();
+    product.powf(1.0 / n)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,5 +93,22 @@ mod tests {
         assert!(REFUSERS.contains(&Trait::Paranoid));
         assert!(REFUSERS.contains(&Trait::LoneWolf));
         assert!(!REFUSERS.contains(&Trait::Friendly));
+    }
+
+    #[test]
+    fn geometric_mean_empty_is_one() {
+        assert_eq!(geometric_mean_affinity(&[]), 1.0);
+    }
+
+    #[test]
+    fn geometric_mean_single_is_identity() {
+        assert!((geometric_mean_affinity(&[Trait::Friendly]) - 1.5).abs() < f64::EPSILON * 10.0);
+    }
+
+    #[test]
+    fn geometric_mean_two_friendly_one_lonewolf() {
+        let g = geometric_mean_affinity(&[Trait::Friendly, Trait::Friendly, Trait::LoneWolf]);
+        let expected = (1.5_f64 * 1.5 * 0.6).powf(1.0 / 3.0);
+        assert!((g - expected).abs() < f64::EPSILON * 10.0);
     }
 }

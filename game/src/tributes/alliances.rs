@@ -65,6 +65,56 @@ pub fn roll_chance(
     raw.clamp(0.0, 0.95)
 }
 
+/// Human-readable deciding factor for a successful alliance roll.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DecidingFactor {
+    SameDistrict,
+    TraitOnSelf(Trait),
+    TraitOnTarget(Trait),
+}
+
+impl DecidingFactor {
+    pub fn label(&self) -> &'static str {
+        match self {
+            DecidingFactor::SameDistrict => "same district",
+            DecidingFactor::TraitOnSelf(t) | DecidingFactor::TraitOnTarget(t) => t.label(),
+        }
+    }
+}
+
+/// Returns the deciding factor for a successful alliance roll, or `None`
+/// if no factor exceeded 1.0. Same-district contributes a 1.5 weight; each
+/// trait contributes its `alliance_affinity`. Ties break by label sort to
+/// keep test output deterministic.
+pub fn deciding_factor(
+    self_traits: &[Trait],
+    target_traits: &[Trait],
+    same_district: bool,
+) -> Option<DecidingFactor> {
+    let mut candidates: Vec<(f64, DecidingFactor)> = Vec::new();
+    if same_district {
+        candidates.push((1.5, DecidingFactor::SameDistrict));
+    }
+    for t in self_traits {
+        let a = t.alliance_affinity();
+        if a > 1.0 {
+            candidates.push((a, DecidingFactor::TraitOnSelf(*t)));
+        }
+    }
+    for t in target_traits {
+        let a = t.alliance_affinity();
+        if a > 1.0 {
+            candidates.push((a, DecidingFactor::TraitOnTarget(*t)));
+        }
+    }
+    candidates.sort_by(|(a, df_a), (b, df_b)| {
+        b.partial_cmp(a)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| df_a.label().cmp(df_b.label()))
+    });
+    candidates.into_iter().next().map(|(_, df)| df)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,5 +251,37 @@ mod tests {
         let a = roll_chance(&[Trait::Friendly], &[Trait::Loyal], true, 0, 0);
         let b = roll_chance(&[Trait::Loyal], &[Trait::Friendly], true, 0, 0);
         assert!((a - b).abs() < 1e-9);
+    }
+
+    // ---- Task 2.4: deciding_factor ---------------------------------------
+
+    #[test]
+    fn deciding_factor_picks_largest_above_one() {
+        let f = deciding_factor(&[Trait::Friendly], &[Trait::Loyal], true);
+        assert!(f.is_some());
+    }
+
+    #[test]
+    fn deciding_factor_none_when_nothing_exceeds_one() {
+        let f = deciding_factor(&[], &[], false);
+        assert!(f.is_none());
+    }
+
+    #[test]
+    fn deciding_factor_friendly_beats_loyal() {
+        // Friendly 1.5 > Loyal 1.4. Without same_district, only the trait
+        // candidates are in play; Friendly wins.
+        let f = deciding_factor(&[Trait::Friendly], &[Trait::Loyal], false);
+        match f {
+            Some(DecidingFactor::TraitOnSelf(Trait::Friendly)) => {}
+            other => panic!("expected TraitOnSelf(Friendly), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn deciding_factor_neutral_only_loses_to_district() {
+        // No trait > 1.0, but same_district adds 1.5 → SameDistrict wins.
+        let f = deciding_factor(&[Trait::Tough], &[Trait::Tough], true);
+        assert_eq!(f, Some(DecidingFactor::SameDistrict));
     }
 }

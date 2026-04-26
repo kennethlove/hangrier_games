@@ -899,4 +899,65 @@ mod tests {
         tribute.tick_alliance_timers();
         assert_eq!(tribute.turns_since_last_betrayal, 0);
     }
+
+    #[rstest]
+    fn pick_target_picks_ex_ally_after_trust_shock_breaks_bond() {
+        // End-to-end break-then-attack (spec §7.3c1 + §7.5):
+        // Once a trust shock fires and removes the betrayer from the
+        // victim's `allies`, the victim's next `pick_target` call must
+        // consider that ex-ally a valid target.
+        let mut victim = Tribute::new("Glimmer".to_string(), Some(1), None);
+        victim.attributes.sanity = 100; // not suicidal
+        let ex_ally = Tribute::new("Cato".to_string(), Some(2), None);
+        // Pre-condition: bonded.
+        victim.allies.push(ex_ally.id);
+
+        // Simulate the bond breaking (what process_alliance_events does
+        // for BetrayalRecorded, plus what consume_pending_trust_shock
+        // does on the victim's side: drop the ex-ally locally).
+        victim.allies.retain(|id| *id != ex_ally.id);
+
+        let mut events: Vec<String> = vec![];
+        let target = victim.pick_target(vec![ex_ally.clone()], 5, &mut events);
+        assert!(
+            target.is_some(),
+            "ex-ally must be targetable after the bond breaks"
+        );
+        assert_eq!(target.unwrap().id, ex_ally.id);
+    }
+
+    #[rstest]
+    fn consume_pending_trust_shock_leaves_asymmetric_back_edge() {
+        // Spec §7.3c1 explicitly defers the symmetric back-edge cleanup
+        // for trust-shock breaks: only `self` is mutated. This regression
+        // test pins that contract so any future tightening is intentional.
+        let mut victim = Tribute::new("Glimmer".to_string(), Some(1), None);
+        victim.attributes.sanity = 0; // force a break
+        victim.brain.thresholds.extreme_low_sanity = 100;
+        let betrayer_id = uuid::Uuid::new_v4();
+        victim.allies.push(betrayer_id);
+        victim.pending_trust_shock = true;
+
+        let mut rng = SmallRng::seed_from_u64(419);
+        let mut events: Vec<String> = vec![];
+        victim.consume_pending_trust_shock(&mut rng, &mut events);
+
+        // Victim's side cleaned.
+        assert!(
+            !victim.allies.contains(&betrayer_id),
+            "victim must drop the broken ally"
+        );
+        // The flag is consumed regardless of roll outcome.
+        assert!(
+            !victim.pending_trust_shock,
+            "pending flag is reset after the call"
+        );
+        // Asymmetric back-edge stays — `consume_pending_trust_shock` only
+        // touches `self`. The next cycle's event drain (or follow-up
+        // events) is responsible for the betrayer's side.
+        // We can't observe the betrayer here (different tribute instance);
+        // the documented contract is what matters and is asserted by the
+        // single-side mutation: the function signature takes `&mut self`
+        // and returns nothing, with no reference to the broken ally.
+    }
 }

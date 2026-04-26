@@ -198,6 +198,7 @@ pub async fn create_game(
         private: true, // Default to private
         config: Default::default(),
         messages: vec![],
+        alliance_events: vec![],
     };
 
     let created_game: Option<Game> = state

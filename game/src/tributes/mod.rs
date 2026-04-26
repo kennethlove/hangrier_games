@@ -208,6 +208,11 @@ impl Tribute {
             return;
         }
 
+        // Advance per-tribute alliance timers (spec §7.4). Ticks
+        // turns_since_last_betrayal so Treacherous tributes can betray on
+        // cadence. Skipped for dead tributes via `is_alive` guard above.
+        self.tick_alliance_timers();
+
         // Consume any pending trust-shock from a betrayal recorded last turn
         // (spec §7.3c1). Rolls per ally; broken allies are removed locally.
         self.consume_pending_trust_shock(rng, events);
@@ -420,6 +425,20 @@ impl Tribute {
     /// tribute acts. See spec §7.5.
     pub fn drain_alliance_events(&mut self) -> Vec<alliances::AllianceEvent> {
         std::mem::take(&mut self.alliance_events)
+    }
+
+    /// Advance per-tribute alliance bookkeeping for one turn (spec §7.4).
+    ///
+    /// Ticks `turns_since_last_betrayal`, which gates Treacherous-trait
+    /// betrayals to fire at most every
+    /// [`alliances::TREACHEROUS_BETRAYAL_INTERVAL`] turns. Saturates at
+    /// `u8::MAX` so a long-lived tribute never overflows or wraps back
+    /// through the betrayal trigger. Dead tributes are skipped.
+    pub fn tick_alliance_timers(&mut self) {
+        if !self.is_alive() {
+            return;
+        }
+        self.turns_since_last_betrayal = self.turns_since_last_betrayal.saturating_add(1);
     }
 
     /// Consume a pending trust-shock flag (set when this tribute was the
@@ -818,5 +837,35 @@ mod tests {
         let target = me.pick_target(vec![ally.clone()], 2, &mut events);
         assert!(target.is_some());
         assert_eq!(target.unwrap().id, ally.id);
+    }
+
+    #[rstest]
+    fn tick_alliance_timers_increments_betrayal_counter() {
+        // Living tribute: counter increments by exactly one per tick.
+        let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        assert_eq!(tribute.turns_since_last_betrayal, 0);
+        tribute.tick_alliance_timers();
+        assert_eq!(tribute.turns_since_last_betrayal, 1);
+        tribute.tick_alliance_timers();
+        assert_eq!(tribute.turns_since_last_betrayal, 2);
+    }
+
+    #[rstest]
+    fn tick_alliance_timers_saturates_does_not_overflow() {
+        // u8 saturating add: never panics, never wraps to zero.
+        let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        tribute.turns_since_last_betrayal = u8::MAX;
+        tribute.tick_alliance_timers();
+        assert_eq!(tribute.turns_since_last_betrayal, u8::MAX);
+    }
+
+    #[rstest]
+    fn tick_alliance_timers_skips_dead_tributes() {
+        // Dead tributes don't accumulate betrayal cooldown.
+        let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        tribute.attributes.health = 0;
+        tribute.status = crate::tributes::TributeStatus::RecentlyDead;
+        tribute.tick_alliance_timers();
+        assert_eq!(tribute.turns_since_last_betrayal, 0);
     }
 }

@@ -208,6 +208,10 @@ impl Tribute {
             return;
         }
 
+        // Consume any pending trust-shock from a betrayal recorded last turn
+        // (spec §7.3c1). Rolls per ally; broken allies are removed locally.
+        self.consume_pending_trust_shock(rng, events);
+
         let area_details = &mut environment_details.area_details;
 
         // Update the tribute based on the period's events.
@@ -417,6 +421,42 @@ impl Tribute {
     pub fn drain_alliance_events(&mut self) -> Vec<alliances::AllianceEvent> {
         std::mem::take(&mut self.alliance_events)
     }
+
+    /// Consume a pending trust-shock flag (set when this tribute was the
+    /// victim of a betrayal). For each current ally, roll
+    /// [`alliances::trust_shock_roll`]; on success drop that ally from this
+    /// tribute's `allies` list and emit a message. The flag is reset
+    /// unconditionally so it never carries past the turn it fires.
+    ///
+    /// Note: this only mutates `self`. The symmetric back-edge on the broken
+    /// ally's side is left to the next cycle's processing or to subsequent
+    /// alliance events; per Phase 4 of the implementation plan, full
+    /// symmetric cleanup is deferred. See spec §7.3c1.
+    pub fn consume_pending_trust_shock(
+        &mut self,
+        rng: &mut impl rand::Rng,
+        events: &mut Vec<String>,
+    ) {
+        if !self.pending_trust_shock {
+            return;
+        }
+        let limit = self.brain.thresholds.extreme_low_sanity;
+        let sanity = self.attributes.sanity;
+        let mut broken: Vec<Uuid> = Vec::new();
+        for ally_id in &self.allies {
+            if alliances::trust_shock_roll(sanity, limit, rng) {
+                broken.push(*ally_id);
+            }
+        }
+        for ally_id in &broken {
+            self.allies.retain(|x| x != ally_id);
+            events.push(format!(
+                "{} loses faith and breaks ties with ally {}.",
+                self.name, ally_id
+            ));
+        }
+        self.pending_trust_shock = false;
+    }
 }
 
 /// Calculates the stamina cost for a tribute action based on:
@@ -623,6 +663,61 @@ mod tests {
         let drained = tribute.drain_alliance_events();
         assert_eq!(drained.len(), 1);
         assert!(tribute.alliance_events.is_empty());
+    }
+
+    #[rstest]
+    fn consume_pending_trust_shock_resets_flag_when_not_set() {
+        // No flag → no rolls, flag stays false, allies untouched.
+        let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        let ally = uuid::Uuid::new_v4();
+        tribute.allies.push(ally);
+        let mut events: Vec<String> = vec![];
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(53);
+        tribute.consume_pending_trust_shock(&mut rng, &mut events);
+        assert!(!tribute.pending_trust_shock);
+        assert_eq!(tribute.allies, vec![ally]);
+        assert!(events.is_empty());
+    }
+
+    #[rstest]
+    fn consume_pending_trust_shock_breaks_allies_on_success_and_clears_flag() {
+        // Force trust_shock to fire deterministically: sanity=0, threshold>0
+        // gives p = 0.5 + 0.5 * 1.0 = 1.0 → always true.
+        let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        tribute.attributes.sanity = 0;
+        tribute.brain.thresholds.extreme_low_sanity = 50;
+        let ally1 = uuid::Uuid::new_v4();
+        let ally2 = uuid::Uuid::new_v4();
+        tribute.allies.push(ally1);
+        tribute.allies.push(ally2);
+        tribute.pending_trust_shock = true;
+
+        let mut events: Vec<String> = vec![];
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(211);
+        tribute.consume_pending_trust_shock(&mut rng, &mut events);
+
+        assert!(!tribute.pending_trust_shock, "flag must reset");
+        assert!(tribute.allies.is_empty(), "all allies broken on guaranteed success");
+        assert_eq!(events.len(), 2, "one message per broken ally");
+    }
+
+    #[rstest]
+    fn consume_pending_trust_shock_no_break_when_sanity_above_threshold() {
+        // Sanity at/above threshold → trust_shock_roll returns false → no break.
+        let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        tribute.attributes.sanity = 100;
+        tribute.brain.thresholds.extreme_low_sanity = 50;
+        let ally = uuid::Uuid::new_v4();
+        tribute.allies.push(ally);
+        tribute.pending_trust_shock = true;
+
+        let mut events: Vec<String> = vec![];
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(89);
+        tribute.consume_pending_trust_shock(&mut rng, &mut events);
+
+        assert!(!tribute.pending_trust_shock, "flag must reset");
+        assert_eq!(tribute.allies, vec![ally], "ally retained");
+        assert!(events.is_empty());
     }
 
     #[rstest]

@@ -127,13 +127,13 @@ impl Tribute {
 
         // Assign terrain affinity, traits, and personality based on district
         let mut rng = SmallRng::from_rng(&mut rand::rng());
-        let brain = Brain::new_with_random_personality(&mut rng);
         let terrain_affinity = if (1..=12).contains(&district) {
             crate::districts::assign_terrain_affinity(district as u8, &mut rng)
         } else {
             vec![]
         };
         let traits = traits::generate_traits(district as u8, &mut rng);
+        let brain = Brain::from_traits(&traits, &mut rng);
 
         Self {
             identifier: id,

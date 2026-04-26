@@ -296,6 +296,19 @@ impl Brain {
         }
     }
 
+    /// Build a brain whose thresholds are derived from a tribute's traits.
+    /// `personality` is set to `Balanced` as a placeholder until the
+    /// `BrainPersonality` enum is removed; thresholds are the load-bearing field.
+    pub fn from_traits(traits: &[Trait], rng: &mut impl Rng) -> Self {
+        Self {
+            personality: BrainPersonality::Balanced,
+            thresholds: PersonalityThresholds::from_traits(traits, rng),
+            psychotic_break: None,
+            preferred_action: None,
+            preferred_action_percentage: 0.0,
+        }
+    }
+
     /// Check if tribute should have a psychotic break
     ///
     /// Break type is randomly determined, not tied to personality.

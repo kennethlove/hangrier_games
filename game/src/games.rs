@@ -1803,4 +1803,56 @@ mod tests {
             "survivor must not retain a dead ally edge"
         );
     }
+
+    #[test]
+    fn run_tribute_cycle_three_way_preserves_existing_alliance() {
+        // Three-way scenario: A and B are pre-allied; C is a LoneWolf in
+        // the same area (refuser → cannot form an alliance with either).
+        // After a cycle, A and B's bond must remain intact and C must
+        // remain unallied. This pins that:
+        //   1. The formation pass does not silently rebreak existing
+        //      same-area alliances.
+        //   2. The presence of a third unalliable tribute does not
+        //      perturb the pair's bond.
+        use crate::tributes::traits::Trait;
+
+        let mut a = create_tribute("Katniss", true);
+        let mut b = create_tribute("Peeta", true);
+        let mut c = create_tribute("Cato", true);
+        a.traits = vec![Trait::Friendly];
+        b.traits = vec![Trait::Loyal];
+        c.traits = vec![Trait::LoneWolf];
+        // Pre-existing symmetric alliance between A and B.
+        a.allies.push(b.id);
+        b.allies.push(a.id);
+        a.area = Area::Cornucopia;
+        b.area = Area::Cornucopia;
+        c.area = Area::Cornucopia;
+        a.district = 1;
+        b.district = 2;
+        c.district = 3;
+
+        let aid = a.id;
+        let bid = b.id;
+        let cid = c.id;
+
+        let mut game =
+            create_test_game_with_tributes(vec![a.clone(), b.clone(), c.clone()]);
+        game.areas
+            .push(AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia));
+        let living = game.living_tributes();
+        let closed_areas: Vec<Area> = vec![];
+
+        let mut rng = SmallRng::seed_from_u64(547);
+        let _ = game.run_tribute_cycle(true, &mut rng, closed_areas, living, 3);
+
+        let a2 = game.tributes.iter().find(|t| t.id == aid).unwrap();
+        let b2 = game.tributes.iter().find(|t| t.id == bid).unwrap();
+        let c2 = game.tributes.iter().find(|t| t.id == cid).unwrap();
+        assert!(a2.allies.contains(&bid), "A still allied with B");
+        assert!(b2.allies.contains(&aid), "B still allied with A");
+        assert!(!a2.allies.contains(&cid), "A did not bond with LoneWolf C");
+        assert!(!b2.allies.contains(&cid), "B did not bond with LoneWolf C");
+        assert!(c2.allies.is_empty(), "LoneWolf C remains unallied");
+    }
 }

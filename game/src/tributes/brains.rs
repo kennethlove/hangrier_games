@@ -2,6 +2,7 @@ use crate::areas::{Area, AreaDetails};
 use crate::terrain::{BaseTerrain, Harshness, TerrainType, Visibility};
 use crate::tributes::Tribute;
 use crate::tributes::actions::Action;
+use crate::tributes::traits::{ThresholdDelta, Trait};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
@@ -36,6 +37,70 @@ pub struct PersonalityThresholds {
     pub high_intelligence: u32,
     pub low_intelligence: u32,
     pub psychotic_break_threshold: u32, // Sanity level that triggers break
+}
+
+impl PersonalityThresholds {
+    /// Derive thresholds from a tribute's traits. Sums each trait's
+    /// `ThresholdDelta`, applies it to baseline values, then applies ±20%
+    /// individual variance. Each field is clamped to at least 1.
+    ///
+    /// Field mapping from `ThresholdDelta` to `PersonalityThresholds`:
+    /// - `low_health_limit`        → `low_health`
+    /// - `mid_health_limit`        → `mid_health`
+    /// - `low_sanity_limit`        → `extreme_low_sanity`
+    /// - `mid_sanity_limit`        → `low_sanity`
+    /// - `high_sanity_limit`       → `mid_sanity`
+    /// - `movement_limit`          → `low_movement`
+    /// - `high_intelligence_limit` → `high_intelligence`
+    /// - `low_intelligence_limit`  → `low_intelligence`
+    /// - `psychotic_break_threshold` → `psychotic_break_threshold`
+    pub fn from_traits(traits: &[Trait], rng: &mut impl Rng) -> Self {
+        fn apply_variance(base: i32, rng: &mut impl Rng) -> u32 {
+            let variance = rng.random_range(-0.2_f32..=0.2_f32);
+            ((base as f32) * (1.0 + variance)).max(1.0) as u32
+        }
+
+        fn apply_delta(base: i32, delta: i32) -> i32 {
+            (base + delta).max(1)
+        }
+
+        // Baseline values match the original `Balanced` personality.
+        let base_low_health: i32 = 20;
+        let base_mid_health: i32 = 40;
+        let base_extreme_low_sanity: i32 = 10;
+        let base_low_sanity: i32 = 20;
+        let base_mid_sanity: i32 = 35;
+        let base_low_movement: i32 = 10;
+        let base_high_intelligence: i32 = 35;
+        let base_low_intelligence: i32 = 80;
+        let base_break_threshold: i32 = 8;
+
+        let delta: ThresholdDelta = traits.iter().map(|t| t.threshold_modifiers()).sum();
+
+        PersonalityThresholds {
+            low_health: apply_variance(apply_delta(base_low_health, delta.low_health_limit), rng),
+            mid_health: apply_variance(apply_delta(base_mid_health, delta.mid_health_limit), rng),
+            extreme_low_sanity: apply_variance(
+                apply_delta(base_extreme_low_sanity, delta.low_sanity_limit),
+                rng,
+            ),
+            low_sanity: apply_variance(apply_delta(base_low_sanity, delta.mid_sanity_limit), rng),
+            mid_sanity: apply_variance(apply_delta(base_mid_sanity, delta.high_sanity_limit), rng),
+            low_movement: apply_variance(apply_delta(base_low_movement, delta.movement_limit), rng),
+            high_intelligence: apply_variance(
+                apply_delta(base_high_intelligence, delta.high_intelligence_limit),
+                rng,
+            ),
+            low_intelligence: apply_variance(
+                apply_delta(base_low_intelligence, delta.low_intelligence_limit),
+                rng,
+            ),
+            psychotic_break_threshold: apply_variance(
+                apply_delta(base_break_threshold, delta.psychotic_break_threshold),
+                rng,
+            ),
+        }
+    }
 }
 
 impl BrainPersonality {
@@ -1106,5 +1171,57 @@ mod tests {
         let action = tribute.brain.act(&tribute.clone(), 2, &[], &mut small_rng);
         // Self-destructive ignores health and attacks
         assert_eq!(action, Action::Attack);
+    }
+
+    #[rstest]
+    fn from_traits_empty_uses_balanced_baseline() {
+        // With no traits and zero variance, thresholds collapse to the
+        // documented baseline values (the original `Balanced` numbers).
+        let mut rng = SmallRng::seed_from_u64(101);
+        let thresholds = PersonalityThresholds::from_traits(&[], &mut rng);
+        // Each base ±20% — assert each lies in the expected window.
+        assert!(
+            (16..=24).contains(&thresholds.low_health),
+            "low_health={}",
+            thresholds.low_health
+        );
+        assert!((32..=48).contains(&thresholds.mid_health));
+        assert!((8..=12).contains(&thresholds.extreme_low_sanity));
+        assert!((16..=24).contains(&thresholds.low_sanity));
+        assert!((28..=42).contains(&thresholds.mid_sanity));
+        assert!((8..=12).contains(&thresholds.low_movement));
+        assert!((28..=42).contains(&thresholds.high_intelligence));
+        assert!((64..=96).contains(&thresholds.low_intelligence));
+        assert!((6..=10).contains(&thresholds.psychotic_break_threshold));
+    }
+
+    #[rstest]
+    fn from_traits_aggressive_lowers_health_thresholds() {
+        // Aggressive: low_health -5 (→15), mid_health -10 (→30) before variance.
+        // Use many seeds and check the mean is shifted below baseline.
+        let aggressive = vec![Trait::Aggressive];
+        let mut total_low: u32 = 0;
+        let mut total_mid: u32 = 0;
+        for seed in 0..50 {
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let t = PersonalityThresholds::from_traits(&aggressive, &mut rng);
+            total_low += t.low_health;
+            total_mid += t.mid_health;
+        }
+        // Mean low_health ≈ 15, mean mid_health ≈ 30.
+        let mean_low = total_low / 50;
+        let mean_mid = total_mid / 50;
+        assert!((12..=18).contains(&mean_low), "mean_low={}", mean_low);
+        assert!((25..=35).contains(&mean_mid), "mean_mid={}", mean_mid);
+    }
+
+    #[rstest]
+    fn from_traits_clamps_to_minimum_one() {
+        // Stack many sanity-lowering traits to push past the clamp boundary.
+        let traits = vec![Trait::Reckless, Trait::Aggressive];
+        let mut rng = SmallRng::seed_from_u64(17);
+        let t = PersonalityThresholds::from_traits(&traits, &mut rng);
+        assert!(t.extreme_low_sanity >= 1);
+        assert!(t.low_health >= 1);
     }
 }

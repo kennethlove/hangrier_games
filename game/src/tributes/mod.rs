@@ -125,7 +125,7 @@ impl Tribute {
         let id_uuid: Uuid = Uuid::new_v4();
         let id: String = id_uuid.to_string();
 
-        // Assign terrain affinity and personality based on district
+        // Assign terrain affinity, traits, and personality based on district
         let mut rng = SmallRng::from_rng(&mut rand::rng());
         let brain = Brain::new_with_random_personality(&mut rng);
         let terrain_affinity = if (1..=12).contains(&district) {
@@ -133,6 +133,7 @@ impl Tribute {
         } else {
             vec![]
         };
+        let traits = traits::generate_traits(district as u8, &mut rng);
 
         Self {
             identifier: id,
@@ -152,7 +153,7 @@ impl Tribute {
             terrain_affinity,
             stamina: 100,
             max_stamina: 100,
-            traits: Vec::new(),
+            traits,
             allies: Vec::new(),
             turns_since_last_betrayal: 0,
         }
@@ -599,5 +600,12 @@ mod tests {
         assert_eq!(tribute.turns_since_last_betrayal, 0);
         // `id` mirrors `identifier`.
         assert_eq!(tribute.id.to_string(), tribute.identifier);
+    }
+
+    #[rstest]
+    fn new_tribute_has_traits_for_valid_district() {
+        let tribute = Tribute::new("Katniss".to_string(), Some(12), None);
+        // generate_traits rolls 2..=6 traits from the district pool.
+        assert!((2..=6).contains(&tribute.traits.len()));
     }
 }

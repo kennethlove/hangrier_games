@@ -115,9 +115,29 @@ pub fn deciding_factor(
     candidates.into_iter().next().map(|(_, df)| df)
 }
 
+/// Per-ally sanity-break roll (spec §7.3a). Returns `true` if the
+/// symmetric pair should be removed. Probability scales linearly with
+/// the deficit below `low_sanity_limit`; at or above the limit the
+/// function always returns `false`.
+pub fn sanity_break_roll(
+    current_sanity: u32,
+    low_sanity_limit: u32,
+    rng: &mut impl rand::Rng,
+) -> bool {
+    if current_sanity >= low_sanity_limit {
+        return false;
+    }
+    let deficit_ratio = (low_sanity_limit.saturating_sub(current_sanity) as f64)
+        / (low_sanity_limit.max(1) as f64);
+    let p = deficit_ratio.clamp(0.0, 1.0);
+    rng.random_bool(p)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::SeedableRng;
+    use rand::rngs::StdRng;
 
     #[test]
     fn alliance_event_variants_distinct() {
@@ -283,5 +303,39 @@ mod tests {
         // No trait > 1.0, but same_district adds 1.5 → SameDistrict wins.
         let f = deciding_factor(&[Trait::Tough], &[Trait::Tough], true);
         assert_eq!(f, Some(DecidingFactor::SameDistrict));
+    }
+
+    // ---- Task 2.5: sanity_break_roll -------------------------------------
+
+    #[test]
+    fn sanity_break_above_limit_no_break() {
+        let mut rng = StdRng::seed_from_u64(1);
+        for _ in 0..32 {
+            assert!(!sanity_break_roll(50, 20, &mut rng));
+        }
+    }
+
+    #[test]
+    fn sanity_break_far_below_always_breaks() {
+        let mut rng = StdRng::seed_from_u64(1);
+        // Sanity 0 vs limit 20: deficit ratio 1.0 → p=1.0 → always breaks.
+        for _ in 0..32 {
+            assert!(sanity_break_roll(0, 20, &mut rng));
+        }
+    }
+
+    #[test]
+    fn sanity_break_at_limit_no_break() {
+        let mut rng = StdRng::seed_from_u64(1);
+        for _ in 0..32 {
+            assert!(!sanity_break_roll(20, 20, &mut rng));
+        }
+    }
+
+    #[test]
+    fn sanity_break_zero_limit_safe() {
+        let mut rng = StdRng::seed_from_u64(1);
+        // Degenerate limit must not panic and must not break (sanity >= 0).
+        assert!(!sanity_break_roll(0, 0, &mut rng));
     }
 }

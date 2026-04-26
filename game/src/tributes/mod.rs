@@ -656,10 +656,12 @@ mod tests {
         use uuid::Uuid;
         let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
         let other = Uuid::new_v4();
-        tribute.alliance_events.push(AllianceEvent::BetrayalRecorded {
-            betrayer: tribute.id,
-            victim: other,
-        });
+        tribute
+            .alliance_events
+            .push(AllianceEvent::BetrayalRecorded {
+                betrayer: tribute.id,
+                victim: other,
+            });
         let drained = tribute.drain_alliance_events();
         assert_eq!(drained.len(), 1);
         assert!(tribute.alliance_events.is_empty());
@@ -697,7 +699,10 @@ mod tests {
         tribute.consume_pending_trust_shock(&mut rng, &mut events);
 
         assert!(!tribute.pending_trust_shock, "flag must reset");
-        assert!(tribute.allies.is_empty(), "all allies broken on guaranteed success");
+        assert!(
+            tribute.allies.is_empty(),
+            "all allies broken on guaranteed success"
+        );
         assert_eq!(events.len(), 2, "one message per broken ally");
     }
 

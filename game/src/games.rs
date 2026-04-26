@@ -959,11 +959,7 @@ impl Game {
                                 );
                                 let aid = ally.identifier.clone();
                                 let aname = ally.name.clone();
-                                self.log(
-                                    crate::messages::MessageSource::Tribute(aid),
-                                    aname,
-                                    line,
-                                );
+                                self.log(crate::messages::MessageSource::Tribute(aid), aname, line);
                             }
                         }
                     }
@@ -1339,11 +1335,12 @@ mod tests {
         let vid = victim.id;
 
         let mut game = create_test_game_with_tributes(vec![betrayer, victim]);
-        game.alliance_events
-            .push(crate::tributes::alliances::AllianceEvent::BetrayalRecorded {
+        game.alliance_events.push(
+            crate::tributes::alliances::AllianceEvent::BetrayalRecorded {
                 betrayer: bid,
                 victim: vid,
-            });
+            },
+        );
 
         let mut rng = SmallRng::seed_from_u64(53);
         game.process_alliance_events(&mut rng);
@@ -1362,11 +1359,12 @@ mod tests {
         let vid = victim.id;
 
         let mut game = create_test_game_with_tributes(vec![betrayer, victim]);
-        game.alliance_events
-            .push(crate::tributes::alliances::AllianceEvent::BetrayalRecorded {
+        game.alliance_events.push(
+            crate::tributes::alliances::AllianceEvent::BetrayalRecorded {
                 betrayer: bid,
                 victim: vid,
-            });
+            },
+        );
 
         let mut rng = SmallRng::seed_from_u64(53);
         game.process_alliance_events(&mut rng);
@@ -1429,8 +1427,7 @@ mod tests {
             },
         );
 
-        let mut game =
-            create_test_game_with_tributes(vec![tribute1.clone(), tribute2.clone()]);
+        let mut game = create_test_game_with_tributes(vec![tribute1.clone(), tribute2.clone()]);
         let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
         game.areas.push(area);
         let closed_areas = game

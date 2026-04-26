@@ -2,7 +2,7 @@
 
 **Bead:** `hangrier_games-0ug`
 **Date:** 2026-04-25
-**Status:** Draft v2 (awaiting user review)
+**Status:** Implemented (2026-04-26)
 
 ## 1. Problem & Goal
 

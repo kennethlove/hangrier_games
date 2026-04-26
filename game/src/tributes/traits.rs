@@ -73,6 +73,23 @@ pub fn geometric_mean_affinity(traits: &[Trait]) -> f64 {
     product.powf(1.0 / n)
 }
 
+pub const CONFLICTS: &[(Trait, Trait)] = &[
+    (Trait::Friendly, Trait::Paranoid),
+    (Trait::Loyal, Trait::Treacherous),
+    (Trait::Loyal, Trait::LoneWolf),
+    (Trait::Aggressive, Trait::Cautious),
+    (Trait::Aggressive, Trait::Defensive),
+    (Trait::Reckless, Trait::Cautious),
+    (Trait::Resilient, Trait::Fragile),
+    (Trait::Cunning, Trait::Dim),
+];
+
+pub fn conflicts_with(a: Trait, b: Trait) -> bool {
+    CONFLICTS
+        .iter()
+        .any(|(x, y)| (*x == a && *y == b) || (*x == b && *y == a))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -110,5 +127,32 @@ mod tests {
         let g = geometric_mean_affinity(&[Trait::Friendly, Trait::Friendly, Trait::LoneWolf]);
         let expected = (1.5_f64 * 1.5 * 0.6).powf(1.0 / 3.0);
         assert!((g - expected).abs() < f64::EPSILON * 10.0);
+    }
+
+    #[test]
+    fn conflict_symmetry() {
+        let pairs = [
+            (Trait::Friendly, Trait::Paranoid),
+            (Trait::Loyal, Trait::Treacherous),
+            (Trait::Loyal, Trait::LoneWolf),
+            (Trait::Aggressive, Trait::Cautious),
+            (Trait::Aggressive, Trait::Defensive),
+            (Trait::Reckless, Trait::Cautious),
+            (Trait::Resilient, Trait::Fragile),
+            (Trait::Cunning, Trait::Dim),
+        ];
+        for (a, b) in pairs {
+            assert!(conflicts_with(a, b), "{a:?} should conflict with {b:?}");
+            assert!(
+                conflicts_with(b, a),
+                "{b:?} should conflict with {a:?} (symmetry)"
+            );
+        }
+    }
+
+    #[test]
+    fn conflict_allowed_combos_do_not_conflict() {
+        assert!(!conflicts_with(Trait::Friendly, Trait::Treacherous));
+        assert!(!conflicts_with(Trait::Paranoid, Trait::LoneWolf));
     }
 }

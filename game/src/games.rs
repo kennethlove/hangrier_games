@@ -73,6 +73,11 @@ pub struct Game {
     /// Skipped during serialization since events live in their own table.
     #[serde(default, skip_serializing)]
     pub messages: Vec<crate::messages::GameMessage>,
+    /// Transient queue of alliance lifecycle events drained between tribute
+    /// turns inside `run_day_night_cycle`. Lives only for the duration of a
+    /// single cycle; never persisted. See spec §7.5.
+    #[serde(default, skip)]
+    pub alliance_events: Vec<crate::tributes::alliances::AllianceEvent>,
 }
 
 impl Default for Game {
@@ -94,6 +99,7 @@ impl Default for Game {
             private: true,
             config: Default::default(),
             messages: vec![],
+            alliance_events: vec![],
         }
     }
 }
@@ -900,6 +906,7 @@ mod tests {
             private: true,
             config: Default::default(),
             messages: vec![],
+            alliance_events: vec![],
         }
     }
 
@@ -922,6 +929,12 @@ mod tests {
         assert_eq!(game.status, GameStatus::NotStarted);
         assert_eq!(game.day, None);
         assert_eq!(game.tributes.len(), 0);
+    }
+
+    #[test]
+    fn game_has_empty_alliance_event_queue_on_new() {
+        let g = Game::default();
+        assert!(g.alliance_events.is_empty());
     }
 
     #[test]

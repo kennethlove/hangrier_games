@@ -410,14 +410,8 @@ mod tests {
     fn try_form_alliance_returns_false_when_gate_blocks() {
         // LoneWolf vs Friendly fails passes_gate; helper must short-circuit.
         let mut rng = StdRng::seed_from_u64(313);
-        let formed = try_form_alliance(
-            &[Trait::LoneWolf],
-            &[Trait::Friendly],
-            true,
-            0,
-            0,
-            &mut rng,
-        );
+        let formed =
+            try_form_alliance(&[Trait::LoneWolf], &[Trait::Friendly], true, 0, 0, &mut rng);
         assert!(!formed);
     }
 
@@ -451,14 +445,7 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(547);
         let mut successes = 0;
         for _ in 0..200 {
-            if try_form_alliance(
-                &[Trait::Friendly],
-                &[Trait::Friendly],
-                true,
-                0,
-                0,
-                &mut rng,
-            ) {
+            if try_form_alliance(&[Trait::Friendly], &[Trait::Friendly], true, 0, 0, &mut rng) {
                 successes += 1;
             }
         }

@@ -1662,8 +1662,7 @@ mod tests {
         let bid = betrayer.id;
         let vid = victim.id;
 
-        let mut game =
-            create_test_game_with_tributes(vec![betrayer.clone(), victim.clone()]);
+        let mut game = create_test_game_with_tributes(vec![betrayer.clone(), victim.clone()]);
         let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
         game.areas.push(area);
         let closed_areas = game
@@ -1836,8 +1835,7 @@ mod tests {
         let bid = b.id;
         let cid = c.id;
 
-        let mut game =
-            create_test_game_with_tributes(vec![a.clone(), b.clone(), c.clone()]);
+        let mut game = create_test_game_with_tributes(vec![a.clone(), b.clone(), c.clone()]);
         game.areas
             .push(AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia));
         let living = game.living_tributes();

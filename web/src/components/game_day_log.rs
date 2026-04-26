@@ -3,8 +3,20 @@ use crate::env::APP_API_HOST;
 use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
-use game::messages::GameMessage;
+use game::messages::{GameMessage, MessageKind};
 use shared::DisplayGame;
+
+/// Returns (container_classes, leading_glyph) for a categorised message.
+/// `None` keeps the legacy plain rendering.
+fn kind_styles(kind: &MessageKind) -> (&'static str, &'static str) {
+    match kind {
+        MessageKind::AllianceFormed => {
+            ("border-l-4 border-emerald-500 pl-2 bg-emerald-500/10", "🤝")
+        }
+        MessageKind::BetrayalTriggered => ("border-l-4 border-rose-500 pl-2 bg-rose-500/10", "🗡️"),
+        MessageKind::TrustShockBreak => ("border-l-4 border-amber-500 pl-2 bg-amber-500/10", "💔"),
+    }
+}
 
 async fn fetch_game_day_log(
     keys: Vec<QueryKey>,
@@ -61,8 +73,22 @@ pub fn GameDayLog(game: DisplayGame, day: u32) -> Element {
                     theme3:text-stone-800
                     "#,
                     for log in logs {
-                        li {
-                            "{log.content}"
+                        {
+                            match log.kind.as_ref() {
+                                Some(kind) => {
+                                    let (classes, glyph) = kind_styles(kind);
+                                    rsx! {
+                                        li {
+                                            class: "{classes}",
+                                            span { class: "mr-2", "{glyph}" }
+                                            "{log.content}"
+                                        }
+                                    }
+                                }
+                                _ => rsx! {
+                                    li { "{log.content}" }
+                                },
+                            }
                         }
                     }
                 }

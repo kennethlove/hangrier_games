@@ -215,6 +215,101 @@ pub fn generate_traits(district: u8, rng: &mut impl Rng) -> Vec<Trait> {
     chosen
 }
 
+/// Additive deltas applied to `PersonalityThresholds`. `i32` so deltas can be
+/// signed; final values clamp to u32 ranges in `compute_thresholds`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ThresholdDelta {
+    pub low_health_limit: i32,
+    pub mid_health_limit: i32,
+    pub low_sanity_limit: i32,
+    pub mid_sanity_limit: i32,
+    pub high_sanity_limit: i32,
+    pub movement_limit: i32,
+    pub low_intelligence_limit: i32,
+    pub high_intelligence_limit: i32,
+    pub psychotic_break_threshold: i32,
+}
+
+impl std::ops::Add for ThresholdDelta {
+    type Output = ThresholdDelta;
+    fn add(self, rhs: Self) -> Self {
+        ThresholdDelta {
+            low_health_limit: self.low_health_limit + rhs.low_health_limit,
+            mid_health_limit: self.mid_health_limit + rhs.mid_health_limit,
+            low_sanity_limit: self.low_sanity_limit + rhs.low_sanity_limit,
+            mid_sanity_limit: self.mid_sanity_limit + rhs.mid_sanity_limit,
+            high_sanity_limit: self.high_sanity_limit + rhs.high_sanity_limit,
+            movement_limit: self.movement_limit + rhs.movement_limit,
+            low_intelligence_limit: self.low_intelligence_limit + rhs.low_intelligence_limit,
+            high_intelligence_limit: self.high_intelligence_limit + rhs.high_intelligence_limit,
+            psychotic_break_threshold: self.psychotic_break_threshold
+                + rhs.psychotic_break_threshold,
+        }
+    }
+}
+
+impl std::iter::Sum for ThresholdDelta {
+    fn sum<I: Iterator<Item = ThresholdDelta>>(iter: I) -> Self {
+        iter.fold(ThresholdDelta::default(), |a, b| a + b)
+    }
+}
+
+impl Trait {
+    pub fn threshold_modifiers(&self) -> ThresholdDelta {
+        match self {
+            Trait::Aggressive => ThresholdDelta {
+                low_health_limit: -5,
+                mid_health_limit: -10,
+                low_sanity_limit: -2,
+                psychotic_break_threshold: 2,
+                ..Default::default()
+            },
+            Trait::Defensive => ThresholdDelta {
+                low_health_limit: 10,
+                mid_health_limit: 10,
+                psychotic_break_threshold: -2,
+                ..Default::default()
+            },
+            Trait::Cautious => ThresholdDelta {
+                low_health_limit: 15,
+                mid_health_limit: 15,
+                low_sanity_limit: 10,
+                mid_sanity_limit: 10,
+                psychotic_break_threshold: -3,
+                ..Default::default()
+            },
+            Trait::Reckless => ThresholdDelta {
+                low_health_limit: -10,
+                low_sanity_limit: -10,
+                psychotic_break_threshold: 4,
+                ..Default::default()
+            },
+            Trait::Resilient => ThresholdDelta {
+                psychotic_break_threshold: -3,
+                low_sanity_limit: -3,
+                ..Default::default()
+            },
+            Trait::Fragile => ThresholdDelta {
+                psychotic_break_threshold: 3,
+                low_sanity_limit: 5,
+                ..Default::default()
+            },
+            Trait::Cunning => ThresholdDelta {
+                low_intelligence_limit: -5,
+                high_intelligence_limit: -5,
+                ..Default::default()
+            },
+            Trait::Dim => ThresholdDelta {
+                low_intelligence_limit: 10,
+                high_intelligence_limit: 5,
+                ..Default::default()
+            },
+            // Social and physical traits leave thresholds untouched.
+            _ => ThresholdDelta::default(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -317,5 +412,17 @@ mod tests {
         sorted.sort_by_key(|t| *t as u8);
         sorted.dedup();
         assert_eq!(sorted.len(), traits.len());
+    }
+
+    #[test]
+    fn threshold_delta_aggressive_lowers_health_threshold() {
+        let d = Trait::Aggressive.threshold_modifiers();
+        assert!(d.low_health_limit < 0);
+    }
+
+    #[test]
+    fn threshold_delta_zero_traits_is_identity() {
+        let total: ThresholdDelta = [].iter().map(|t: &Trait| t.threshold_modifiers()).sum();
+        assert_eq!(total, ThresholdDelta::default());
     }
 }

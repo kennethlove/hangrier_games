@@ -148,6 +148,37 @@ pub fn trust_shock_roll(
     rng.random_bool(p)
 }
 
+/// Attempt to form an alliance between two tributes. Returns `true` on
+/// success — gate passes, `roll_chance` is positive, and the dice roll
+/// hits. The caller is responsible for mutating both sides' `allies`
+/// lists and for fetching a [`DecidingFactor`] via [`deciding_factor`]
+/// for human-readable messaging. Composes [`passes_gate`] and
+/// [`roll_chance`] so the game cycle has a single integration point per
+/// spec §6.
+pub fn try_form_alliance(
+    self_traits: &[Trait],
+    target_traits: &[Trait],
+    same_district: bool,
+    self_allies_len: usize,
+    target_allies_len: usize,
+    rng: &mut impl rand::Rng,
+) -> bool {
+    if !passes_gate(self_traits, target_traits) {
+        return false;
+    }
+    let chance = roll_chance(
+        self_traits,
+        target_traits,
+        same_district,
+        self_allies_len,
+        target_allies_len,
+    );
+    if chance <= 0.0 {
+        return false;
+    }
+    rng.random_bool(chance)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -370,6 +401,86 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(1);
         for _ in 0..32 {
             assert!(!trust_shock_roll(20, 20, &mut rng));
+        }
+    }
+
+    // ---- Phase 6: try_form_alliance integration helper -------------------
+
+    #[test]
+    fn try_form_alliance_returns_false_when_gate_blocks() {
+        // LoneWolf vs Friendly fails passes_gate; helper must short-circuit.
+        let mut rng = StdRng::seed_from_u64(313);
+        let formed = try_form_alliance(
+            &[Trait::LoneWolf],
+            &[Trait::Friendly],
+            true,
+            0,
+            0,
+            &mut rng,
+        );
+        assert!(!formed);
+    }
+
+    #[test]
+    fn try_form_alliance_returns_false_when_either_at_cap() {
+        let mut rng = StdRng::seed_from_u64(419);
+        let r1 = try_form_alliance(
+            &[Trait::Friendly],
+            &[Trait::Friendly],
+            true,
+            MAX_ALLIES,
+            0,
+            &mut rng,
+        );
+        assert!(!r1, "self at cap blocks");
+        let r2 = try_form_alliance(
+            &[Trait::Friendly],
+            &[Trait::Friendly],
+            true,
+            0,
+            MAX_ALLIES,
+            &mut rng,
+        );
+        assert!(!r2, "target at cap blocks");
+    }
+
+    #[test]
+    fn try_form_alliance_can_succeed_for_high_chance_pair() {
+        // Friendly + same district + 0 allies → ~0.675 chance. Sample many
+        // trials and assert at least some succeed.
+        let mut rng = StdRng::seed_from_u64(547);
+        let mut successes = 0;
+        for _ in 0..200 {
+            if try_form_alliance(
+                &[Trait::Friendly],
+                &[Trait::Friendly],
+                true,
+                0,
+                0,
+                &mut rng,
+            ) {
+                successes += 1;
+            }
+        }
+        assert!(
+            successes > 100,
+            "expected majority success at p≈0.675, got {successes}"
+        );
+    }
+
+    #[test]
+    fn try_form_alliance_zero_chance_never_forms() {
+        // Both at cap → roll_chance = 0.0 → never forms.
+        let mut rng = StdRng::seed_from_u64(101);
+        for _ in 0..32 {
+            assert!(!try_form_alliance(
+                &[],
+                &[],
+                false,
+                MAX_ALLIES,
+                MAX_ALLIES,
+                &mut rng
+            ));
         }
     }
 }

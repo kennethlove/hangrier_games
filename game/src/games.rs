@@ -718,6 +718,13 @@ impl Game {
         // Drained into self.messages after the mutable borrow of self.tributes ends.
         let mut collected_events: Vec<(String, String, String)> = Vec::new();
 
+        // Alliance events drained from each tribute's local buffer this cycle.
+        // Appended to self.alliance_events after the mutable borrow ends, then
+        // processed via process_alliance_events so cascades resolve before the
+        // next cycle.
+        let mut drained_alliance_events: Vec<crate::tributes::alliances::AllianceEvent> =
+            Vec::new();
+
         // Process tributes
         for tribute in self.tributes.iter_mut() {
             if !tribute.is_alive() {
@@ -802,6 +809,7 @@ impl Game {
             for line in tribute_events {
                 collected_events.push((tribute.identifier.clone(), tribute.name.clone(), line));
             }
+            drained_alliance_events.append(&mut tribute.drain_alliance_events());
         }
 
         // Drain collected events into game messages now that the mutable borrow ends.
@@ -811,6 +819,13 @@ impl Game {
                 name,
                 line,
             );
+        }
+
+        // Promote drained alliance events into the game queue and process them
+        // so betrayal/death cascades take effect before the next cycle.
+        if !drained_alliance_events.is_empty() {
+            self.alliance_events.append(&mut drained_alliance_events);
+            self.process_alliance_events(rng);
         }
         Ok(())
     }
@@ -1392,5 +1407,60 @@ mod tests {
             );
         }
         assert!(game.alliance_events.is_empty());
+    }
+
+    #[test]
+    fn run_tribute_cycle_drains_tribute_alliance_events_into_game_queue() {
+        // Pre-load tribute1's alliance_events buffer; after run_tribute_cycle
+        // it must be drained into the game queue and processed (BetrayalRecorded
+        // cleans the victim's allies and flags pending_trust_shock).
+        let mut tribute1 = create_tribute("Tribute1", true);
+        let mut tribute2 = create_tribute("Tribute2", true);
+        // Make tribute2 list tribute1 as ally; betrayal has tribute1 as betrayer,
+        // tribute2 as victim. Plumbing only — we just need the side effects we
+        // can observe on the victim.
+        tribute2.allies.push(tribute1.id);
+        let bid = tribute1.id;
+        let vid = tribute2.id;
+        tribute1.alliance_events.push(
+            crate::tributes::alliances::AllianceEvent::BetrayalRecorded {
+                betrayer: bid,
+                victim: vid,
+            },
+        );
+
+        let mut game =
+            create_test_game_with_tributes(vec![tribute1.clone(), tribute2.clone()]);
+        let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
+        game.areas.push(area);
+        let closed_areas = game
+            .areas
+            .iter()
+            .filter(|ad| ad.area.is_some() & !ad.is_open())
+            .map(|ad| ad.area.unwrap())
+            .collect::<Vec<Area>>();
+
+        let mut rng = SmallRng::seed_from_u64(211);
+        let _ = game.run_tribute_cycle(
+            true,
+            &mut rng,
+            closed_areas,
+            vec![tribute1.clone(), tribute2.clone()],
+            2,
+        );
+
+        // After cycle: queue empty (drained + processed), each tribute's local
+        // buffer empty, victim's allies cleaned, victim flagged for trust shock.
+        assert!(game.alliance_events.is_empty(), "game queue must drain");
+        for t in &game.tributes {
+            assert!(
+                t.alliance_events.is_empty(),
+                "tribute {} buffer must drain",
+                t.name
+            );
+        }
+        let v = game.tributes.iter().find(|t| t.id == vid).unwrap();
+        assert!(!v.allies.contains(&bid), "victim allies cleaned");
+        assert!(v.pending_trust_shock, "victim flagged for trust shock");
     }
 }

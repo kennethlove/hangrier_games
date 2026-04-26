@@ -889,6 +889,80 @@ impl Game {
     fn get_area_details_mut(&mut self, area: Area) -> Option<&mut AreaDetails> {
         self.areas.iter_mut().find(|ad| ad.area == Some(area))
     }
+
+    /// Drain the alliance event queue accumulated during the current cycle.
+    /// Called between tribute turns inside `run_tribute_cycle` so cascades
+    /// resolve before the next tribute acts. Per spec §7.5:
+    /// - `BetrayalRecorded`: remove the symmetric pair on the victim's side
+    ///   (betrayer's side was already cleaned at trigger time) and flag the
+    ///   victim for a trust-shock roll on their next turn. The betrayer is
+    ///   never flagged.
+    /// - `DeathRecorded`: roll a sanity-break per direct ally of the deceased
+    ///   (consistent with §7.3a thresholds) and emit a break message on
+    ///   success. After the cascade, unconditionally scrub the deceased's
+    ///   id from every surviving tribute's `allies` list.
+    pub fn process_alliance_events(&mut self, rng: &mut impl Rng) {
+        use crate::tributes::alliances::{AllianceEvent, sanity_break_roll};
+
+        // Collect drained events into a local Vec so we can release the
+        // borrow on `self.alliance_events` before mutating `self.tributes`.
+        let drained: Vec<AllianceEvent> = self.alliance_events.drain(..).collect();
+
+        for ev in drained {
+            match ev {
+                AllianceEvent::BetrayalRecorded { betrayer, victim } => {
+                    if let Some(v) = self.tributes.iter_mut().find(|t| t.id == victim) {
+                        v.allies.retain(|x| *x != betrayer);
+                        v.pending_trust_shock = true;
+                    }
+                    // Spec §7.5: betrayer is never enqueued for trust-shock.
+                }
+                AllianceEvent::DeathRecorded {
+                    deceased,
+                    killer: _,
+                } => {
+                    // Snapshot the deceased's allies before mutation so we
+                    // can roll the cascade per direct ally.
+                    let allies_of_deceased: Vec<Uuid> = self
+                        .tributes
+                        .iter()
+                        .find(|t| t.id == deceased)
+                        .map(|d| d.allies.clone())
+                        .unwrap_or_default();
+
+                    for ally_id in allies_of_deceased {
+                        if let Some(ally) = self.tributes.iter_mut().find(|t| t.id == ally_id) {
+                            // `extreme_low_sanity` is the §7.3a low-limit
+                            // mapping (see PersonalityThresholds doc).
+                            let limit = ally.brain.thresholds.extreme_low_sanity;
+                            let sanity = ally.attributes.sanity;
+                            if sanity_break_roll(sanity, limit, rng) {
+                                ally.allies.retain(|x| *x != deceased);
+                                let line = format!(
+                                    "{} is shaken by their ally's death and breaks the bond.",
+                                    ally.name
+                                );
+                                let aid = ally.identifier.clone();
+                                let aname = ally.name.clone();
+                                self.log(
+                                    crate::messages::MessageSource::Tribute(aid),
+                                    aname,
+                                    line,
+                                );
+                            }
+                        }
+                    }
+
+                    // Unconditional cleanup: ensure the deceased's id is
+                    // removed from every surviving tribute's allies list,
+                    // even if their cascade roll failed.
+                    for t in self.tributes.iter_mut() {
+                        t.allies.retain(|x| *x != deceased);
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1232,5 +1306,91 @@ mod tests {
 
         assert_eq!(game.open_areas().len(), 1);
         assert_eq!(game.closed_areas().len(), 1);
+    }
+
+    // ---- Phase 4: alliance event drain -----------------------------------
+
+    #[test]
+    fn process_alliance_events_betrayal_removes_pair_on_victim_side() {
+        // Victim still lists betrayer in allies (betrayer's own list was
+        // already cleaned by the betrayal trigger that enqueued the event).
+        let mut betrayer = Tribute::new("Betrayer".to_string(), Some(1), None);
+        let mut victim = Tribute::new("Victim".to_string(), Some(2), None);
+        victim.allies.push(betrayer.id);
+        // Sanity force victim to a state where the drain path runs cleanly.
+        victim.attributes.health = 100;
+        betrayer.attributes.health = 100;
+        let bid = betrayer.id;
+        let vid = victim.id;
+
+        let mut game = create_test_game_with_tributes(vec![betrayer, victim]);
+        game.alliance_events
+            .push(crate::tributes::alliances::AllianceEvent::BetrayalRecorded {
+                betrayer: bid,
+                victim: vid,
+            });
+
+        let mut rng = SmallRng::seed_from_u64(53);
+        game.process_alliance_events(&mut rng);
+
+        let v = game.tributes.iter().find(|t| t.id == vid).unwrap();
+        assert!(!v.allies.contains(&bid));
+        assert!(v.pending_trust_shock);
+        assert!(game.alliance_events.is_empty());
+    }
+
+    #[test]
+    fn process_alliance_events_betrayer_not_marked_for_trust_shock() {
+        let betrayer = Tribute::new("Betrayer".to_string(), Some(1), None);
+        let victim = Tribute::new("Victim".to_string(), Some(2), None);
+        let bid = betrayer.id;
+        let vid = victim.id;
+
+        let mut game = create_test_game_with_tributes(vec![betrayer, victim]);
+        game.alliance_events
+            .push(crate::tributes::alliances::AllianceEvent::BetrayalRecorded {
+                betrayer: bid,
+                victim: vid,
+            });
+
+        let mut rng = SmallRng::seed_from_u64(53);
+        game.process_alliance_events(&mut rng);
+
+        let b = game.tributes.iter().find(|t| t.id == bid).unwrap();
+        assert!(!b.pending_trust_shock, "betrayer must not roll trust-shock");
+    }
+
+    #[test]
+    fn process_alliance_events_death_removes_deceased_from_all_ally_lists() {
+        // Three tributes; the deceased was in two allies' lists.
+        let deceased = Tribute::new("Deceased".to_string(), Some(1), None);
+        let mut a = Tribute::new("A".to_string(), Some(2), None);
+        let mut b = Tribute::new("B".to_string(), Some(3), None);
+        a.allies.push(deceased.id);
+        b.allies.push(deceased.id);
+        // Force ally sanity well above any threshold so the cascade roll
+        // never fires; we want to verify the unconditional cleanup path.
+        a.attributes.sanity = 100;
+        b.attributes.sanity = 100;
+
+        let did = deceased.id;
+        let mut game = create_test_game_with_tributes(vec![deceased, a, b]);
+        game.alliance_events
+            .push(crate::tributes::alliances::AllianceEvent::DeathRecorded {
+                deceased: did,
+                killer: None,
+            });
+
+        let mut rng = SmallRng::seed_from_u64(89);
+        game.process_alliance_events(&mut rng);
+
+        for t in game.tributes.iter().filter(|t| t.id != did) {
+            assert!(
+                !t.allies.contains(&did),
+                "tribute {} still lists deceased",
+                t.name
+            );
+        }
+        assert!(game.alliance_events.is_empty());
     }
 }

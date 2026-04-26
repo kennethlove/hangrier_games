@@ -7,6 +7,7 @@ pub mod lifecycle;
 pub mod movement;
 pub mod statuses;
 pub mod traits;
+pub mod alliances;
 
 // Re-export key items from sub-modules
 pub use combat::{attack_contest, update_stats};

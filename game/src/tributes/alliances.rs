@@ -52,10 +52,8 @@ pub fn roll_chance(
     let trait_factor = geometric_mean_affinity(self_traits);
     let target_factor = geometric_mean_affinity(target_traits);
     let district_bonus = if same_district { 1.5 } else { 1.0 };
-    let self_cap_pen =
-        ((MAX_ALLIES as f64) - (self_allies_len as f64)) / (MAX_ALLIES as f64);
-    let target_cap_pen =
-        ((MAX_ALLIES as f64) - (target_allies_len as f64)) / (MAX_ALLIES as f64);
+    let self_cap_pen = ((MAX_ALLIES as f64) - (self_allies_len as f64)) / (MAX_ALLIES as f64);
+    let target_cap_pen = ((MAX_ALLIES as f64) - (target_allies_len as f64)) / (MAX_ALLIES as f64);
     let raw = BASE_ALLIANCE_CHANCE
         * trait_factor
         * target_factor
@@ -127,9 +125,26 @@ pub fn sanity_break_roll(
     if current_sanity >= low_sanity_limit {
         return false;
     }
-    let deficit_ratio = (low_sanity_limit.saturating_sub(current_sanity) as f64)
-        / (low_sanity_limit.max(1) as f64);
+    let deficit_ratio =
+        (low_sanity_limit.saturating_sub(current_sanity) as f64) / (low_sanity_limit.max(1) as f64);
     let p = deficit_ratio.clamp(0.0, 1.0);
+    rng.random_bool(p)
+}
+
+/// Trust-shock roll for a betrayal victim (spec §7.3c1). Same threshold
+/// gating as `sanity_break_roll` but with a higher baseline of
+/// `0.5 + 0.5 * deficit_ratio`.
+pub fn trust_shock_roll(
+    current_sanity: u32,
+    low_sanity_limit: u32,
+    rng: &mut impl rand::Rng,
+) -> bool {
+    if current_sanity >= low_sanity_limit {
+        return false;
+    }
+    let deficit_ratio =
+        (low_sanity_limit.saturating_sub(current_sanity) as f64) / (low_sanity_limit.max(1) as f64);
+    let p = (0.5 + 0.5 * deficit_ratio).clamp(0.0, 1.0);
     rng.random_bool(p)
 }
 
@@ -218,25 +233,13 @@ mod tests {
 
     #[test]
     fn roll_chance_zero_when_self_at_cap() {
-        let chance = roll_chance(
-            &[Trait::Friendly],
-            &[Trait::Friendly],
-            true,
-            MAX_ALLIES,
-            0,
-        );
+        let chance = roll_chance(&[Trait::Friendly], &[Trait::Friendly], true, MAX_ALLIES, 0);
         assert_eq!(chance, 0.0);
     }
 
     #[test]
     fn roll_chance_zero_when_target_at_cap() {
-        let chance = roll_chance(
-            &[Trait::Friendly],
-            &[Trait::Friendly],
-            true,
-            0,
-            MAX_ALLIES,
-        );
+        let chance = roll_chance(&[Trait::Friendly], &[Trait::Friendly], true, 0, MAX_ALLIES);
         assert_eq!(chance, 0.0);
     }
 
@@ -337,5 +340,36 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(1);
         // Degenerate limit must not panic and must not break (sanity >= 0).
         assert!(!sanity_break_roll(0, 0, &mut rng));
+    }
+
+    // ---- Task 2.6: trust_shock_roll --------------------------------------
+
+    #[test]
+    fn trust_shock_above_limit_no_break() {
+        let mut rng = StdRng::seed_from_u64(1);
+        for _ in 0..32 {
+            assert!(!trust_shock_roll(50, 20, &mut rng));
+        }
+    }
+
+    #[test]
+    fn trust_shock_below_limit_high_baseline() {
+        let mut rng = StdRng::seed_from_u64(7);
+        let mut breaks = 0;
+        for _ in 0..200 {
+            if trust_shock_roll(10, 20, &mut rng) {
+                breaks += 1;
+            }
+        }
+        // p = 0.5 + 0.5 * 0.5 = 0.75; expect majority to break.
+        assert!(breaks > 100, "expected most to break, got {breaks}");
+    }
+
+    #[test]
+    fn trust_shock_at_limit_no_break() {
+        let mut rng = StdRng::seed_from_u64(1);
+        for _ in 0..32 {
+            assert!(!trust_shock_roll(20, 20, &mut rng));
+        }
     }
 }

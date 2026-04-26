@@ -1,4 +1,5 @@
 pub mod actions;
+pub mod alliances;
 pub mod brains;
 pub mod combat;
 pub mod events;
@@ -7,7 +8,6 @@ pub mod lifecycle;
 pub mod movement;
 pub mod statuses;
 pub mod traits;
-pub mod alliances;
 
 // Re-export key items from sub-modules
 pub use combat::{attack_contest, update_stats};

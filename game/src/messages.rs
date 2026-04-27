@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::events::GameEvent;
 use crate::terrain::{BaseTerrain, Harshness, Visibility};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -26,6 +27,20 @@ pub enum MessageKind {
     TrustShockBreak,
 }
 
+/// Transcoding helpers for the structured event payload on
+/// [`GameMessage`]. The field is stored as a JSON-encoded `String` so it
+/// survives SurrealDB's bespoke (de)serializer (which collapses
+/// externally-tagged Rust enums to `{}` when bound into an `object`
+/// column); these helpers give callers strong-typed access without
+/// leaking the wire format.
+impl GameMessage {
+    /// Decode this message's structured event payload into a strong-typed
+    /// [`GameEvent`]. Returns `None` if no payload is attached.
+    pub fn structured_event(&self) -> Option<Result<GameEvent, serde_json::Error>> {
+        self.event.as_deref().map(serde_json::from_str::<GameEvent>)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GameMessage {
     pub identifier: String,
@@ -40,6 +55,25 @@ pub struct GameMessage {
     /// absent to keep JSON compact.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kind: Option<MessageKind>,
+    /// Optional structured payload — the externally-tagged JSON form of
+    /// [`GameEvent`], serialized to a `String`. Stored as a string (not
+    /// a structured `serde_json::Value`) so it survives SurrealDB's
+    /// bespoke (de)serializer, which collapses externally-tagged Rust
+    /// enums to `{}` when bound into an `object` column. `None` for
+    /// legacy rows (and plain `log` calls that have no structured
+    /// event). Skipped on serialize when absent to keep JSON compact.
+    /// Use [`Self::structured_event`] to decode it back into a
+    /// strong-typed [`GameEvent`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event: Option<String>,
+    /// Stable per-row identifier for the structured event payload, distinct
+    /// from `identifier` on the message itself. `Some` when `event` is
+    /// `Some`; `None` for legacy rows. Stored as a string-form UUID to
+    /// match the repo's existing on-the-wire UUID convention. Enables
+    /// future hashing / dedup of structured events without coupling to
+    /// message row identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event_id: Option<String>,
 }
 
 impl GameMessage {
@@ -53,6 +87,8 @@ impl GameMessage {
             timestamp: Utc::now(),
             content,
             kind: None,
+            event: None,
+            event_id: None,
         }
     }
 
@@ -72,6 +108,62 @@ impl GameMessage {
             timestamp: Utc::now(),
             content,
             kind: Some(kind),
+            event: None,
+            event_id: None,
+        }
+    }
+
+    /// Create a new game message carrying a structured [`GameEvent`] payload.
+    /// `content` is typically the rendered `Display` form of `event`, kept as
+    /// a denormalised string so legacy consumers still work. Generates a
+    /// fresh `event_id` so future dedup / hashing has a stable handle.
+    /// The event is JSON-encoded into a `String` for transport (see
+    /// [`Self::event`]); use [`Self::structured_event`] to decode it back.
+    pub fn with_event(
+        source: MessageSource,
+        game_day: u32,
+        subject: String,
+        content: String,
+        event: GameEvent,
+    ) -> Self {
+        let event_json =
+            serde_json::to_string(&event).expect("GameEvent serialization is infallible");
+        GameMessage {
+            identifier: Uuid::new_v4().to_string(),
+            source,
+            game_day,
+            subject,
+            timestamp: Utc::now(),
+            content,
+            kind: None,
+            event: Some(event_json),
+            event_id: Some(Uuid::new_v4().to_string()),
+        }
+    }
+
+    /// Create a new game message carrying both a typed [`MessageKind`] and a
+    /// structured [`GameEvent`] payload. See [`Self::with_event`] for the
+    /// `event_id` rationale and the JSON-on-the-wire note.
+    pub fn with_event_kind(
+        source: MessageSource,
+        game_day: u32,
+        subject: String,
+        content: String,
+        event: GameEvent,
+        kind: MessageKind,
+    ) -> Self {
+        let event_json =
+            serde_json::to_string(&event).expect("GameEvent serialization is infallible");
+        GameMessage {
+            identifier: Uuid::new_v4().to_string(),
+            source,
+            game_day,
+            subject,
+            timestamp: Utc::now(),
+            content,
+            kind: Some(kind),
+            event: Some(event_json),
+            event_id: Some(Uuid::new_v4().to_string()),
         }
     }
 }
@@ -458,5 +550,106 @@ mod tests {
         );
         let s = serde_json::to_string(&msg).expect("serialize");
         assert!(!s.contains("\"kind\""), "kind field should be skipped: {s}");
+    }
+
+    #[test]
+    fn game_message_skips_event_fields_when_none() {
+        let msg = GameMessage::new(
+            MessageSource::Game("g".into()),
+            1,
+            "subj".into(),
+            "c".into(),
+        );
+        let s = serde_json::to_string(&msg).expect("serialize");
+        assert!(!s.contains("\"event\""), "event should be skipped: {s}");
+        assert!(
+            !s.contains("\"event_id\""),
+            "event_id should be skipped: {s}"
+        );
+    }
+
+    #[test]
+    fn game_message_with_event_populates_event_and_event_id() {
+        let event = GameEvent::TributeRest {
+            tribute_id: Uuid::new_v4(),
+            tribute_name: "Alice".into(),
+        };
+        let msg = GameMessage::with_event(
+            MessageSource::Tribute("t".into()),
+            3,
+            "tribute:t".into(),
+            event.to_string(),
+            event.clone(),
+        );
+        assert_eq!(
+            msg.structured_event()
+                .expect("event present")
+                .expect("decode ok"),
+            event
+        );
+        assert!(msg.event_id.is_some());
+        assert!(msg.kind.is_none());
+    }
+
+    #[test]
+    fn game_message_with_event_kind_populates_all() {
+        let event = GameEvent::TributeRest {
+            tribute_id: Uuid::new_v4(),
+            tribute_name: "Alice".into(),
+        };
+        let msg = GameMessage::with_event_kind(
+            MessageSource::Tribute("t".into()),
+            3,
+            "tribute:t".into(),
+            event.to_string(),
+            event.clone(),
+            MessageKind::AllianceFormed,
+        );
+        assert_eq!(
+            msg.structured_event()
+                .expect("event present")
+                .expect("decode ok"),
+            event
+        );
+        assert_eq!(msg.kind, Some(MessageKind::AllianceFormed));
+        assert!(msg.event_id.is_some());
+    }
+
+    #[test]
+    fn game_message_event_roundtrip_serde() {
+        let event = GameEvent::TributeRest {
+            tribute_id: Uuid::new_v4(),
+            tribute_name: "Alice".into(),
+        };
+        let msg = GameMessage::with_event(
+            MessageSource::Tribute("t".into()),
+            3,
+            "tribute:t".into(),
+            event.to_string(),
+            event,
+        );
+        let s = serde_json::to_string(&msg).expect("serialize");
+        let back: GameMessage = serde_json::from_str(&s).expect("deserialize");
+        assert_eq!(msg, back);
+        assert!(back.event.is_some());
+        assert!(back.event_id.is_some());
+    }
+
+    #[test]
+    fn game_message_legacy_row_without_event_fields_deserializes() {
+        // Legacy row: no `event` / `event_id` / `kind` fields present.
+        let ts = Utc.timestamp_nanos(0);
+        let raw = json!({
+            "identifier": "abc",
+            "source": { "type": "Game", "value": "g1" },
+            "game_day": 1,
+            "subject": "game:g1",
+            "timestamp": ts.timestamp_nanos_opt().unwrap(),
+            "content": "hello",
+        });
+        let msg: GameMessage = serde_json::from_value(raw).expect("deserialize legacy row");
+        assert!(msg.kind.is_none());
+        assert!(msg.event.is_none());
+        assert!(msg.event_id.is_none());
     }
 }

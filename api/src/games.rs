@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use game::areas::{Area, AreaDetails};
 use game::games::Game;
 use game::items::Item;
-use game::messages::{GameMessage, MessageSource};
+use game::messages::{GameMessage, MessageKind, MessageSource};
 use game::terrain::BaseTerrain;
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
@@ -759,6 +759,18 @@ struct GameLog {
     #[serde(with = "chrono::serde::ts_nanoseconds")]
     pub timestamp: DateTime<Utc>,
     pub content: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<MessageKind>,
+    /// Structured event payload, stored as a JSON-encoded `String`.
+    /// SurrealDB's bespoke serializer collapses externally-tagged Rust
+    /// enums (the form `GameEvent` uses) and arbitrary
+    /// `serde_json::Value::Object` payloads to `{}` when bound into an
+    /// `object` column, so we transit the wire as a plain string and
+    /// decode on the read side via [`game::messages::GameMessage::structured_event`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event_id: Option<String>,
 }
 
 async fn save_game(
@@ -806,6 +818,9 @@ async fn save_game(
                 subject: log.subject,
                 timestamp: log.timestamp,
                 content: log.content,
+                kind: log.kind,
+                event: log.event,
+                event_id: log.event_id,
             })
             .collect();
 
@@ -865,6 +880,11 @@ async fn save_game(
             }
         }
 
+        // The structured `event` payload rides as a plain JSON string
+        // on the `GameLog.event` field, sidestepping the SurrealDB SDK
+        // serializer's habit of collapsing externally-tagged enums and
+        // `serde_json::Value::Object` payloads to `{}` when bound into
+        // an `object` column. mqi.3.
         if let Err(e) = db.insert::<Vec<GameMessage>>(()).content(game_logs).await {
             let _ = db.query("ROLLBACK").await;
             return Err(AppError::InternalServerError(format!(

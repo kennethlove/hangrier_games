@@ -239,31 +239,31 @@ impl Game {
     }
 
     /// Log a structured [`GameEvent`] by rendering its `Display` impl into a
-    /// [`GameMessage`] (mqi.2 plumbing).
+    /// [`GameMessage`] and persisting the typed payload alongside (mqi.3).
     ///
-    /// This is the structured counterpart to [`Self::log_output`]. The event
-    /// itself is currently dropped after rendering — only the rendered
-    /// `content` string flows into `GameMessage`. mqi.3 will persist the
-    /// structured event alongside the message; until then this helper exists
-    /// so emission sites can construct typed `GameEvent` values today and the
-    /// migration to a structured event log is a one-line swap later.
+    /// `content` is set to the rendered string so legacy consumers (UI text,
+    /// announcers using the stringly path) keep working. The full structured
+    /// `event` and a fresh `event_id` are stored on the message for typed
+    /// consumers (filters, dedup, downstream pipelines).
     pub fn log_event(
         &mut self,
         source: crate::messages::MessageSource,
         subject: String,
         event: crate::events::GameEvent,
     ) {
+        let game_day = self.day.unwrap_or(0);
         let content = event.to_string();
-        // Drop `event` here. mqi.3 will store it instead.
-        let _ = event;
-        self.log(source, subject, content);
+        self.messages.push(crate::messages::GameMessage::with_event(
+            source, game_day, subject, content, event,
+        ));
     }
 
     /// Log a structured [`GameEvent`] and tag the resulting `GameMessage`
-    /// with a typed [`crate::messages::MessageKind`] (mqi.2 plumbing).
+    /// with a typed [`crate::messages::MessageKind`] (mqi.3).
     ///
-    /// See [`Self::log_event`] for the rationale; this variant adds a typed
-    /// category for downstream consumers (UI filters, announcers).
+    /// See [`Self::log_event`] for the persistence contract; this variant
+    /// adds a typed category for downstream consumers (UI filters,
+    /// announcers).
     pub fn log_event_kind(
         &mut self,
         source: crate::messages::MessageSource,
@@ -273,11 +273,10 @@ impl Game {
     ) {
         let game_day = self.day.unwrap_or(0);
         let content = event.to_string();
-        // Drop `event` here. mqi.3 will store it instead.
-        let _ = event;
-        self.messages.push(crate::messages::GameMessage::with_kind(
-            source, game_day, subject, content, kind,
-        ));
+        self.messages
+            .push(crate::messages::GameMessage::with_event_kind(
+                source, game_day, subject, content, event, kind,
+            ));
     }
 
     fn check_for_winner(&mut self) -> Result<(), GameError> {

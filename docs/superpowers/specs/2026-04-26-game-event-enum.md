@@ -137,3 +137,13 @@ Each step is independently shippable; if any step regresses, the parallel `GameO
 - WASM check on `web` — clean.
 - `display_matches_game_output_for_every_variant` asserts byte-identical Display output across all 77 variants.
 - `parity_table_covers_every_variant` ensures the table grows in lockstep with the enum.
+
+## Implementation deviations
+
+### mqi.3 — `event` column is `option<string>`, not `option<object>`
+
+The original spec called for `event option<object>` on the `message` table, holding the externally-tagged JSON form of `GameEvent` as a structured Surreal `object`. In implementation, this proved infeasible: SurrealDB's bespoke SDK serializer collapses externally-tagged Rust enums (and arbitrary `serde_json::Value::Object` payloads) to `{}` whenever they are bound into an `object` column, on every write path tested (`db.insert(...).content(...)`, `db.query("INSERT INTO ... $rows").bind(...)`, etc.). The collapse happens server-side: `RETURN type::string(event)` returns the literal string `"{  }"`.
+
+mqi.3 therefore stores the event payload as `event option<string>` — the JSON-serialized form of `GameEvent` as a plain string. `GameMessage::with_event` / `with_event_kind` perform the JSON encoding; `GameMessage::structured_event` decodes on the read side. Wire shape (externally-tagged JSON) is preserved verbatim, all acceptance criteria from mqi.3 are met (roundtrip, legacy readable, structured decode), and the choice mirrors the existing `event_id` precedent in this repo (originally spec'd as `Uuid`, stored as `String` for the same SDK-serializer mismatch reason).
+
+If a future SurrealDB SDK release fixes externally-tagged enum handling on `object` columns, the column type can be migrated back to `option<object>` and the JSON-string transit dropped without any change to `GameEvent`'s serde shape or `GameMessage`'s public API.

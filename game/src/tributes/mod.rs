@@ -58,7 +58,12 @@ pub struct Tribute {
     pub identifier: String,
     /// Stable typed UUID. Mirrors `identifier` for callers that want a
     /// non-stringly-typed key (alliance graph, betrayal events).
-    #[serde(default = "Uuid::new_v4")]
+    ///
+    /// Serialized as `tribute_id` to avoid collision with SurrealDB's
+    /// reserved `id` column on the `tribute` table — the SDK rejects any
+    /// payload that carries a non-RecordId `id` field when a record id is
+    /// also specified explicitly via `db.create(("tribute", ...))`.
+    #[serde(default = "Uuid::new_v4", rename = "tribute_id")]
     pub id: Uuid,
     /// Where are they?
     pub area: Area,

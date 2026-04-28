@@ -8,6 +8,8 @@ mod create_game;
 pub use create_game::{CreateGameButton, CreateGameForm};
 mod credits;
 pub use credits::Credits;
+mod filter_chips;
+pub use filter_chips::FilterChips;
 mod game_areas;
 mod game_log_stub;
 pub mod timeline;

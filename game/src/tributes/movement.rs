@@ -49,11 +49,9 @@ impl Tribute {
         // 1. Can the tribute move at all?
         if self.attributes.movement == 0 {
             let current_area_name = self.area.to_string();
-            let line = GameOutput::TributeTravelTooTired(
-                self.name.as_str(),
-                current_area_name.as_str(),
-            )
-            .to_string();
+            let line =
+                GameOutput::TributeTravelTooTired(self.name.as_str(), current_area_name.as_str())
+                    .to_string();
             events.push(TaggedEvent::new(
                 line,
                 MessagePayload::TributeHidden {

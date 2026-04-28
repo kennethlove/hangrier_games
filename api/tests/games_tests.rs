@@ -448,7 +448,10 @@ async fn timeline_summary_includes_current_period_even_when_empty() {
 
     let current = &summaries[0];
     assert_eq!(current["day"], 0, "current period day should be 0");
-    assert_eq!(current["phase"], "day", "current period phase should be Day");
+    assert_eq!(
+        current["phase"], "day",
+        "current period phase should be Day"
+    );
     assert_eq!(
         current["message_count"], 0,
         "current period should have zero messages for an unstarted game"

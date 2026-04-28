@@ -54,8 +54,7 @@ impl Tribute {
             events.extend(stress_events);
 
             return if self.attributes.health > 0 {
-                let content =
-                    GameOutput::TributeSelfHarm(self.name.as_str()).to_string();
+                let content = GameOutput::TributeSelfHarm(self.name.as_str()).to_string();
                 events.push(TaggedEvent::new(
                     content,
                     MessagePayload::TributeWounded {
@@ -125,11 +124,9 @@ impl Tribute {
                     self.statistics.killed_by = Some("themselves (fumble)".to_string());
                     self.status = crate::tributes::statuses::TributeStatus::RecentlyDead;
                     self.recently_killed_by = Some(self.id);
-                    let died_content = GameOutput::TributeAttackDied(
-                        tribute_name.as_str(),
-                        "themselves",
-                    )
-                    .to_string();
+                    let died_content =
+                        GameOutput::TributeAttackDied(tribute_name.as_str(), "themselves")
+                            .to_string();
                     let combined = format!("{fumble_content} {died_content}");
                     events.push(TaggedEvent::new(
                         combined,
@@ -227,8 +224,7 @@ impl Tribute {
                 );
 
                 let outcome = CombatOutcome::Stalemate;
-                let summary =
-                    format!("{} attacks {} ({:?})", self.name, target.name, outcome);
+                let summary = format!("{} attacks {} ({:?})", self.name, target.name, outcome);
                 events.push(TaggedEvent::new(
                     summary,
                     MessagePayload::Combat(CombatEngagement {
@@ -384,9 +380,8 @@ pub fn attack_contest(
         match outcome {
             crate::items::WearOutcome::Pristine => {}
             crate::items::WearOutcome::Worn => {
-                let content =
-                    GameOutput::WeaponWear(attacker.name.as_str(), weapon.name.as_str())
-                        .to_string();
+                let content = GameOutput::WeaponWear(attacker.name.as_str(), weapon.name.as_str())
+                    .to_string();
                 events.push(TaggedEvent::new(
                     content,
                     MessagePayload::ItemUsed {
@@ -399,9 +394,8 @@ pub fn attack_contest(
                 ));
             }
             crate::items::WearOutcome::Broken => {
-                let content =
-                    GameOutput::WeaponBreak(attacker.name.as_str(), weapon.name.as_str())
-                        .to_string();
+                let content = GameOutput::WeaponBreak(attacker.name.as_str(), weapon.name.as_str())
+                    .to_string();
                 events.push(TaggedEvent::new(
                     content,
                     MessagePayload::ItemUsed {

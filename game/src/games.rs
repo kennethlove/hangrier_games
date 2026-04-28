@@ -66,6 +66,7 @@ impl TickCounter {
     pub fn reset(&mut self) {
         self.current = 0;
     }
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> u32 {
         self.current += 1;
         self.current
@@ -251,9 +252,7 @@ impl Game {
     fn fallback_payload(
         source: &crate::messages::MessageSource,
     ) -> crate::messages::MessagePayload {
-        use crate::messages::{
-            AreaEventKind, AreaRef, MessagePayload, MessageSource, TributeRef,
-        };
+        use crate::messages::{AreaEventKind, AreaRef, MessagePayload, MessageSource, TributeRef};
         match source {
             MessageSource::Tribute(id) => MessagePayload::SanityBreak {
                 tribute: TributeRef {
@@ -1154,8 +1153,7 @@ impl Game {
                 last_identifier = Some(identifier.clone());
             }
             let source = crate::messages::MessageSource::Tribute(identifier.clone());
-            let payload =
-                payload.unwrap_or_else(|| Self::fallback_payload(&source));
+            let payload = payload.unwrap_or_else(|| Self::fallback_payload(&source));
             self.push_message(source, identifier, content, payload, current_tick);
         }
 
@@ -1355,14 +1353,13 @@ impl Game {
                                     tribute_id: ally_uuid,
                                     tribute_name: aname.clone(),
                                 };
-                                let payload =
-                                    crate::messages::MessagePayload::TrustShockBreak {
-                                        tribute: crate::messages::TributeRef {
-                                            identifier: aid.clone(),
-                                            name: aname.clone(),
-                                        },
-                                        partner: deceased_ref.clone(),
-                                    };
+                                let payload = crate::messages::MessagePayload::TrustShockBreak {
+                                    tribute: crate::messages::TributeRef {
+                                        identifier: aid.clone(),
+                                        name: aname.clone(),
+                                    },
+                                    partner: deceased_ref.clone(),
+                                };
                                 let tick = self.tick_counter.next();
                                 self.push_message(
                                     crate::messages::MessageSource::Tribute(aid),
@@ -2332,7 +2329,6 @@ mod tests {
 
     #[test]
     fn betrayal_emits_message_with_betrayal_triggered_kind() {
-
         use crate::tributes::alliances::TREACHEROUS_BETRAYAL_INTERVAL;
         use crate::tributes::traits::Trait;
 
@@ -2386,7 +2382,6 @@ mod tests {
     /// by the parity table in `events::tests`).
     #[test]
     fn alliance_formed_message_content_matches_game_event_display() {
-
         use crate::tributes::traits::Trait;
 
         let mut t1 = create_tribute("Cinna", true);

@@ -70,10 +70,7 @@ pub static GAMES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
             get(tribute_logs),
         )
         .route("/{game_identifier}/next", put(next_step))
-        .route(
-            "/{game_identifier}/timeline-summary",
-            get(timeline_summary),
-        )
+        .route("/{game_identifier}/timeline-summary", get(timeline_summary))
         .route("/{game_identifier}/publish", put(publish_game))
         .route("/{game_identifier}/unpublish", put(unpublish_game))
         .nest("/{game_identifier}/tributes", TRIBUTES_ROUTER.clone())
@@ -857,8 +854,7 @@ async fn save_game(
                 phase: log.phase,
                 tick: log.tick,
                 emit_index: log.emit_index,
-                payload: serde_json::to_string(&log.payload)
-                    .unwrap_or_else(|_| "null".to_string()),
+                payload: serde_json::to_string(&log.payload).unwrap_or_else(|_| "null".to_string()),
             })
             .collect();
 
@@ -1326,7 +1322,9 @@ async fn timeline_summary(
         .ok_or_else(|| AppError::NotFound(format!("Game {game_identifier} not found")))?;
 
     let current_day = game_row.day.unwrap_or(0);
-    let current_phase = game_row.current_phase.unwrap_or(shared::messages::Phase::Day);
+    let current_phase = game_row
+        .current_phase
+        .unwrap_or(shared::messages::Phase::Day);
 
     let mut msg_resp = state
         .db
@@ -1337,9 +1335,7 @@ async fn timeline_summary(
         )
         .bind(("identifier", game_identifier_str))
         .await
-        .map_err(|err| {
-            AppError::NotFound(format!("Failed to query timeline messages: {err:?}"))
-        })?;
+        .map_err(|err| AppError::NotFound(format!("Failed to query timeline messages: {err:?}")))?;
 
     let rows: Vec<GameLog> = msg_resp.take(0).unwrap_or_else(|err| {
         eprintln!("Error taking timeline logs: {err:?}");

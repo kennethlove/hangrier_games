@@ -99,7 +99,7 @@ Combined sort key for in-period rendering:
 (game_day, phase, tick, emit_index)
 ```
 
-`emit_index` is the position of the message within the per-period emit sequence, persisted as a real field on `GameMessage` (HIGH-4). Filling it: the drain site in `api/src/games.rs` increments a per-period counter as it builds `GameMessage`s from `Vec<TaggedEvent>` and assigns `emit_index` accordingly. No `ORDER BY id ASC` reliance.
+`emit_index` is the position of the message within the per-period emit sequence, persisted as a real field on `GameMessage` (HIGH-4). Filling it: the drain site in `game/src/games.rs::Game::do_step` (~L1001) increments a per-period counter as it builds `GameMessage`s from `Vec<TaggedEvent>` and assigns `emit_index` accordingly. No `ORDER BY id ASC` reliance.
 
 ### `MessagePayload`
 
@@ -238,7 +238,7 @@ impl GameMessage {
 
 ### Problem
 
-Today, `Tribute::attacks()` in `game/src/tributes/combat.rs` pushes 3-6 `String` lines into `events: &mut Vec<String>`. The drain site at `api/src/games.rs` ~L957 turns each line into a `GameMessage` with `kind=None`. We can't tag combat messages at the drain site because the drain only sees strings.
+Today, `Tribute::attacks()` in `game/src/tributes/combat.rs` pushes 3-6 `String` lines into `events: &mut Vec<String>`. The drain site at `game/src/games.rs::Game::do_step` (~L1001) turns each line into a `GameMessage` with `kind=None`. We can't tag combat messages at the drain site because the drain only sees strings.
 
 ### Approach: tag at emit
 
@@ -257,7 +257,7 @@ Thread `&mut Vec<TaggedEvent>` (replacing `&mut Vec<String>`) through these know
 - `game/src/tributes/mod.rs::do_day_action` / `do_night_action`
 - `game/src/tributes/lifecycle.rs::take_damage` / death emission helpers
 - `game/src/tributes/movement.rs::move_to_area` and movement helpers
-- `game/src/tributes/state.rs` (rest, starve, dehydrate, sanity-break helpers)
+- `game/src/tributes/mod.rs` (rest, starve, dehydrate, sanity-break helpers — no separate state.rs file exists)
 - `game/src/areas/*` area-event / area-closure emit sites
 - `game/src/alliances/*` alliance-lifecycle emit sites
 
@@ -284,7 +284,7 @@ Death stays a separate `TaggedEvent` emitted from `lifecycle.rs` with `MessagePa
 
 ### Drain site
 
-`api/src/games.rs` ~L957 takes `Vec<TaggedEvent>` and builds `GameMessage`s, attaching `(game_day, phase, tick, emit_index)` from the cycle context. `emit_index` increments per message within the period. `log_output_kind` is removed; `log_output` is removed entirely (no more untagged emissions).
+`game/src/games.rs::Game::do_step` (~L1001) takes `Vec<TaggedEvent>` and builds `GameMessage`s, attaching `(game_day, phase, tick, emit_index)` from the cycle context. `emit_index` increments per message within the period. `log_output_kind` is removed; `log_output` is removed entirely (no more untagged emissions).
 
 ### Test impact
 

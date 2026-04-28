@@ -214,10 +214,9 @@ impl MessagePayload {
             | AllianceDissolved { .. }
             | BetrayalTriggered { .. }
             | TrustShockBreak { .. } => MessageKind::Alliance,
-            TributeMoved { .. }
-            | TributeHidden { .. }
-            | AreaClosed { .. }
-            | AreaEvent { .. } => MessageKind::Movement,
+            TributeMoved { .. } | TributeHidden { .. } | AreaClosed { .. } | AreaEvent { .. } => {
+                MessageKind::Movement
+            }
             ItemFound { .. } | ItemUsed { .. } | ItemDropped { .. } | SponsorGift { .. } => {
                 MessageKind::Item
             }
@@ -256,6 +255,7 @@ impl PartialEq for GameMessage {
 }
 
 impl GameMessage {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         source: MessageSource,
         game_day: u32,
@@ -449,9 +449,7 @@ mod tests {
                 tribute: t("a"),
                 area: area.clone(),
             },
-            MessagePayload::AreaClosed {
-                area: area.clone(),
-            },
+            MessagePayload::AreaClosed { area: area.clone() },
             MessagePayload::AreaEvent {
                 area: area.clone(),
                 kind: AreaEventKind::Storm,
@@ -565,7 +563,10 @@ mod tests {
 
     #[test]
     fn summarize_groups_by_day_and_phase() {
-        let tref = TributeRef { identifier: "t".into(), name: "T".into() };
+        let tref = TributeRef {
+            identifier: "t".into(),
+            name: "T".into(),
+        };
         let killed = MessagePayload::TributeKilled {
             victim: tref.clone(),
             killer: None,
@@ -573,7 +574,10 @@ mod tests {
         };
         let moved = MessagePayload::TributeHidden {
             tribute: tref.clone(),
-            area: AreaRef { identifier: "a".into(), name: "A".into() },
+            area: AreaRef {
+                identifier: "a".into(),
+                name: "A".into(),
+            },
         };
 
         let msgs = vec![
@@ -586,15 +590,33 @@ mod tests {
         assert_eq!(result.len(), 3);
         assert_eq!(
             result[0],
-            PeriodSummary { day: 1, phase: Phase::Day, deaths: 1, event_count: 2, is_current: false }
+            PeriodSummary {
+                day: 1,
+                phase: Phase::Day,
+                deaths: 1,
+                event_count: 2,
+                is_current: false
+            }
         );
         assert_eq!(
             result[1],
-            PeriodSummary { day: 1, phase: Phase::Night, deaths: 0, event_count: 1, is_current: false }
+            PeriodSummary {
+                day: 1,
+                phase: Phase::Night,
+                deaths: 0,
+                event_count: 1,
+                is_current: false
+            }
         );
         assert_eq!(
             result[2],
-            PeriodSummary { day: 2, phase: Phase::Day, deaths: 1, event_count: 1, is_current: true }
+            PeriodSummary {
+                day: 2,
+                phase: Phase::Day,
+                deaths: 1,
+                event_count: 1,
+                is_current: true
+            }
         );
     }
 
@@ -604,22 +626,46 @@ mod tests {
         assert_eq!(result.len(), 3);
         assert_eq!(
             result[0],
-            PeriodSummary { day: 1, phase: Phase::Day, deaths: 0, event_count: 0, is_current: false }
+            PeriodSummary {
+                day: 1,
+                phase: Phase::Day,
+                deaths: 0,
+                event_count: 0,
+                is_current: false
+            }
         );
         assert_eq!(
             result[1],
-            PeriodSummary { day: 1, phase: Phase::Night, deaths: 0, event_count: 0, is_current: false }
+            PeriodSummary {
+                day: 1,
+                phase: Phase::Night,
+                deaths: 0,
+                event_count: 0,
+                is_current: false
+            }
         );
         assert_eq!(
             result[2],
-            PeriodSummary { day: 2, phase: Phase::Day, deaths: 0, event_count: 0, is_current: true }
+            PeriodSummary {
+                day: 2,
+                phase: Phase::Day,
+                deaths: 0,
+                event_count: 0,
+                is_current: true
+            }
         );
     }
 
     #[test]
     fn summarize_is_current_flag_set_correctly() {
-        let tref = TributeRef { identifier: "t".into(), name: "T".into() };
-        let p = MessagePayload::TributeRested { tribute: tref, hp_restored: 1 };
+        let tref = TributeRef {
+            identifier: "t".into(),
+            name: "T".into(),
+        };
+        let p = MessagePayload::TributeRested {
+            tribute: tref,
+            hp_restored: 1,
+        };
         let msgs = vec![make_msg(2, Phase::Night, p.clone())];
         let result = summarize_periods(&msgs, (2, Phase::Night));
         let current: Vec<_> = result.iter().filter(|s| s.is_current).collect();

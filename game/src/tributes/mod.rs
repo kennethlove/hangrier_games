@@ -450,8 +450,8 @@ impl Tribute {
             }
             Action::TakeItem => {
                 if let Some(item) = self.take_nearby_item(area_details) {
-                    let line = GameOutput::TributeTakeItem(self.name.as_str(), &item.name)
-                        .to_string();
+                    let line =
+                        GameOutput::TributeTakeItem(self.name.as_str(), &item.name).to_string();
                     let item_ref = ItemRef {
                         identifier: item.identifier.clone(),
                         name: item.name.clone(),
@@ -488,8 +488,7 @@ impl Tribute {
                             },
                         ));
                     } else {
-                        let line =
-                            GameOutput::TributeUseItem(self.name.as_str(), item).to_string();
+                        let line = GameOutput::TributeUseItem(self.name.as_str(), item).to_string();
                         let item_ref = ItemRef {
                             identifier: item.identifier.clone(),
                             name: item.name.clone(),

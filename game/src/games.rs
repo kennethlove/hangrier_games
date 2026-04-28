@@ -2519,4 +2519,37 @@ mod tests {
             "GameMessage.content must equal GameEvent::BetrayalTriggered Display"
         );
     }
+
+    #[test]
+    #[ignore = "scenario gap: needs game with populated areas + deterministic combat outcome; \
+                see plan 2026-04-26-game-timeline-pr1-backend.md task 12. Asserts no \
+                TributeMoved for tribute B at a later (tick, emit_index) than B's \
+                TributeKilled within the same (game_day, phase)."]
+    fn dead_tribute_has_no_movement_event_after_death_in_same_period() {
+        use crate::messages::MessagePayload;
+
+        let tribute_a = create_tribute("A", true);
+        let tribute_b = create_tribute("B", true);
+        let mut game = create_test_game_with_tributes(vec![tribute_a, tribute_b]);
+        let _ = game.run_day_night_cycle(true);
+
+        let b_killed = game.messages.iter().find(|m| {
+            matches!(&m.payload,
+                MessagePayload::TributeKilled { victim, .. } if victim.name == "B")
+        });
+        let b_killed = b_killed.expect("B should have died");
+
+        let later_b_move = game.messages.iter().find(|m| {
+            m.game_day == b_killed.game_day
+                && m.phase == b_killed.phase
+                && (m.tick, m.emit_index) > (b_killed.tick, b_killed.emit_index)
+                && matches!(&m.payload,
+                    MessagePayload::TributeMoved { tribute, .. } if tribute.name == "B")
+        });
+
+        assert!(
+            later_b_move.is_none(),
+            "no TributeMoved for B should appear after B's TributeKilled in the same period"
+        );
+    }
 }

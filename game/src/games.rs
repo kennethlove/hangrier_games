@@ -253,7 +253,7 @@ impl Game {
     ) {
         let game_day = self.day.unwrap_or(0);
         let content = event.to_string();
-        self.messages.push(crate::messages::GameMessage::with_event(
+        self.messages.push(crate::messages::with_event(
             source, game_day, subject, content, event,
         ));
     }
@@ -274,7 +274,7 @@ impl Game {
         let game_day = self.day.unwrap_or(0);
         let content = event.to_string();
         self.messages
-            .push(crate::messages::GameMessage::with_event_kind(
+            .push(crate::messages::with_event_kind(
                 source, game_day, subject, content, event, kind,
             ));
     }

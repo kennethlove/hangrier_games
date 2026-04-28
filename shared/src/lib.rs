@@ -3,6 +3,8 @@ use std::fmt::{Debug, Display};
 use std::str::FromStr;
 use validator::{Validate, ValidationError};
 
+pub mod messages;
+
 /// WebSocket message protocol for real-time game updates
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]

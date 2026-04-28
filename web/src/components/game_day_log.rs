@@ -123,8 +123,7 @@ pub fn GameDayLog(game: DisplayGame, day: u32) -> Element {
                         {
                             // 1. Prefer the structured event payload when
                             //    present and decodable.
-                            let structured = log
-                                .structured_event()
+                            let structured = game::messages::structured_event(log)
                                 .and_then(Result::ok)
                                 .and_then(|event| {
                                     event_styles(&event).map(|(classes, glyph)| {

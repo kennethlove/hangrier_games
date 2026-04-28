@@ -40,6 +40,8 @@ mod modal;
 pub use modal::Modal;
 mod navbar;
 pub use navbar::Navbar;
+mod period_card;
+pub use period_card::PeriodCard;
 mod tribute_detail;
 pub use tribute_detail::TributeDetail;
 mod server_version;

@@ -27,23 +27,23 @@ pub struct AppState {
 
 #[derive(Debug, Error)]
 pub enum AppError {
-    #[error("Not Found")]
+    #[error("Not Found: {0}")]
     NotFound(String),
-    #[error("Internal Server Error")]
+    #[error("Internal Server Error: {0}")]
     InternalServerError(String),
-    #[error("Bad Request")]
+    #[error("Bad Request: {0}")]
     BadRequest(String),
-    #[error("Unauthorized")]
+    #[error("Unauthorized: {0}")]
     Unauthorized(String),
-    #[error("Game is full")]
+    #[error("Game is full: {0}")]
     GameFull(String),
-    #[error("Database error")]
+    #[error("Database error: {0}")]
     DbError(String),
-    #[error("Conflict")]
+    #[error("Conflict: {0}")]
     Conflict(String),
-    #[error("Invalid status")]
+    #[error("Invalid status: {0}")]
     InvalidStatus(String),
-    #[error("Validation error")]
+    #[error("Validation error: {0}")]
     ValidationError(String),
 }
 

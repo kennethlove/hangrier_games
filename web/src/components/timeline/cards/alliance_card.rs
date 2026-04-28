@@ -16,14 +16,12 @@ pub fn AllianceCard(props: AllianceCardProps) -> Element {
             "📜",
             format!("{} proposed an alliance to {}", proposer.name, target.name),
         ),
-        MessagePayload::AllianceDissolved { members, reason } => (
-            "💔",
-            format!("{} dissolved ({reason})", joined(members)),
-        ),
-        MessagePayload::BetrayalTriggered { betrayer, victim } => (
-            "🗡️",
-            format!("{} betrayed {}", betrayer.name, victim.name),
-        ),
+        MessagePayload::AllianceDissolved { members, reason } => {
+            ("💔", format!("{} dissolved ({reason})", joined(members)))
+        }
+        MessagePayload::BetrayalTriggered { betrayer, victim } => {
+            ("🗡️", format!("{} betrayed {}", betrayer.name, victim.name))
+        }
         MessagePayload::TrustShockBreak { tribute, partner } => (
             "⚡",
             format!("{} broke trust with {}", tribute.name, partner.name),

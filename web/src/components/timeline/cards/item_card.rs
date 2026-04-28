@@ -10,13 +10,17 @@ pub struct ItemCardProps {
 pub fn ItemCard(props: ItemCardProps) -> Element {
     let body = match &props.message.payload {
         MessagePayload::ItemFound {
-            tribute, item, area,
+            tribute,
+            item,
+            area,
         } => format!("{} found {} in {}", tribute.name, item.name, area.name),
         MessagePayload::ItemUsed { tribute, item } => {
             format!("{} used {}", tribute.name, item.name)
         }
         MessagePayload::ItemDropped {
-            tribute, item, area,
+            tribute,
+            item,
+            area,
         } => format!("{} dropped {} in {}", tribute.name, item.name, area.name),
         MessagePayload::SponsorGift {
             recipient,

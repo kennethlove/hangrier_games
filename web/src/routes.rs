@@ -1,6 +1,6 @@
 use crate::components::{
-    Accounts, AccountsPage, Credits, GamePage, GamePeriodPage, Games, GamesList, Home,
-    IconsPage, Navbar, TributeDetail,
+    Accounts, AccountsPage, Credits, GamePage, GamePeriodPage, Games, GamesList, Home, IconsPage,
+    Navbar, TributeDetail,
 };
 use dioxus::prelude::*;
 

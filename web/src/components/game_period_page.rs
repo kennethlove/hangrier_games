@@ -15,19 +15,19 @@ use shared::messages::{GameMessage, Phase};
 
 async fn fetch_day_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
     let Some(QueryKey::GameDayLog(id, day)) = keys.first() else {
-        return Err(QueryError::Unknown).into();
+        return Err(QueryError::Unknown);
     };
     let url = format!("{APP_API_HOST}/api/games/{id}/log/{day}");
     match reqwest::get(&url).await {
         Ok(resp) => match resp.status() {
             StatusCode::OK => match resp.json::<Vec<GameMessage>>().await {
-                Ok(v) => Ok(QueryValue::Logs(v)).into(),
-                Err(_) => Err(QueryError::BadJson).into(),
+                Ok(v) => Ok(QueryValue::Logs(v)),
+                Err(_) => Err(QueryError::BadJson),
             },
-            StatusCode::NOT_FOUND => Err(QueryError::GameNotFound(id.clone())).into(),
-            _ => Err(QueryError::Unknown).into(),
+            StatusCode::NOT_FOUND => Err(QueryError::GameNotFound(id.clone())),
+            _ => Err(QueryError::Unknown),
         },
-        Err(_) => Err(QueryError::ServerNotFound).into(),
+        Err(_) => Err(QueryError::ServerNotFound),
     }
 }
 
@@ -58,8 +58,10 @@ pub fn GamePeriodPage(identifier: String, day: u32, phase: Phase) -> Element {
         };
     }
 
-    let log_q =
-        use_get_query([QueryKey::GameDayLog(identifier.clone(), day)], fetch_day_log);
+    let log_q = use_get_query(
+        [QueryKey::GameDayLog(identifier.clone(), day)],
+        fetch_day_log,
+    );
 
     rsx! {
         div { class: "space-y-4",

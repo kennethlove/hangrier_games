@@ -1344,7 +1344,9 @@ async fn timeline_summary(
     let messages: Vec<GameMessage> = rows.into_iter().map(GameMessage::from).collect();
 
     let summaries = shared::messages::summarize_periods(&messages, (current_day, current_phase));
-    Ok(Json(shared::messages::TimelineSummary { periods: summaries }))
+    Ok(Json(shared::messages::TimelineSummary {
+        periods: summaries,
+    }))
 }
 
 async fn publish_game(

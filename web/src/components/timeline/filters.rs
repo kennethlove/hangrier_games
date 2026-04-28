@@ -2,16 +2,11 @@ use gloo_storage::Storage;
 use shared::messages::MessageKind;
 use std::collections::{HashMap, HashSet};
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub enum FilterMode {
+    #[default]
     All,
     Subset(HashSet<MessageKind>),
-}
-
-impl Default for FilterMode {
-    fn default() -> Self {
-        FilterMode::All
-    }
 }
 
 impl FilterMode {
@@ -41,7 +36,7 @@ impl PeriodFilters {
         self.by_game.insert(game_id.to_string(), mode.clone());
         let key = format!("period_filters:{game_id}");
         // best-effort persist; ignore failure
-        let _ = gloo_storage::LocalStorage::set(&key, &SerializableFilter::from(&mode));
+        let _ = gloo_storage::LocalStorage::set(&key, SerializableFilter::from(&mode));
     }
 
     pub fn hydrate(&mut self, game_id: &str) {

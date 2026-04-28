@@ -81,8 +81,8 @@ pub fn DeleteGameModal() -> Element {
                 if let MutationState::Settled(Ok(MutationValue::GameDeleted(id, _))) =
                     mutate.result().deref()
                 {
-                    let _ = gloo_storage::LocalStorage::delete(&format!("recap_collapsed:{id}"));
-                    let _ = gloo_storage::LocalStorage::delete(&format!("period_filters:{id}"));
+                    gloo_storage::LocalStorage::delete(format!("recap_collapsed:{id}"));
+                    gloo_storage::LocalStorage::delete(format!("period_filters:{id}"));
                     client.invalidate_queries(&[QueryKey::Games]);
                     delete_game_signal.set(None);
                 }

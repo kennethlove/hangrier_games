@@ -26,7 +26,7 @@ pub fn RecapCard(props: RecapCardProps) -> Element {
         move |_| {
             let new = !collapsed();
             collapsed.set(new);
-            let _ = LocalStorage::set(&key, &new);
+            let _ = LocalStorage::set(&key, new);
         }
     };
 

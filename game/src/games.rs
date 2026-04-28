@@ -54,6 +54,27 @@ const FEAST_CONSUMABLE_COUNT: u32 = 4;
 const DAY_EVENT_FREQUENCY: f64 = 1.0 / 4.0;
 const NIGHT_EVENT_FREQUENCY: f64 = 1.0 / 8.0;
 
+/// Per-period tick counter. Resets to 0 at every phase boundary.
+/// Phase-boundary side-effect messages get tick=0.
+/// First action in a phase gets tick=1.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct TickCounter {
+    current: u32,
+}
+
+impl TickCounter {
+    pub fn reset(&mut self) {
+        self.current = 0;
+    }
+    pub fn next(&mut self) -> u32 {
+        self.current += 1;
+        self.current
+    }
+    pub fn boundary(&self) -> u32 {
+        0
+    }
+}
+
 /// Represents the current state of the game.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Game {
@@ -78,6 +99,9 @@ pub struct Game {
     /// single cycle; never persisted. See spec §7.5.
     #[serde(default, skip)]
     pub alliance_events: Vec<crate::tributes::alliances::AllianceEvent>,
+    /// Per-period tick counter; transient, never persisted.
+    #[serde(skip, default)]
+    pub tick_counter: TickCounter,
 }
 
 impl Default for Game {
@@ -100,6 +124,7 @@ impl Default for Game {
             config: Default::default(),
             messages: vec![],
             alliance_events: vec![],
+            tick_counter: TickCounter::default(),
         }
     }
 }
@@ -1254,6 +1279,7 @@ mod tests {
             config: Default::default(),
             messages: vec![],
             alliance_events: vec![],
+            tick_counter: TickCounter::default(),
         }
     }
 

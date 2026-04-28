@@ -70,6 +70,10 @@ pub static GAMES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
             get(tribute_logs),
         )
         .route("/{game_identifier}/next", put(next_step))
+        .route(
+            "/{game_identifier}/timeline-summary",
+            get(timeline_summary),
+        )
         .route("/{game_identifier}/publish", put(publish_game))
         .route("/{game_identifier}/unpublish", put(unpublish_game))
         .nest("/{game_identifier}/tributes", TRIBUTES_ROUTER.clone())
@@ -1294,6 +1298,57 @@ async fn tribute_logs(
         }
         Err(err) => Err(AppError::NotFound(format!("Failed to get logs: {err:?}"))),
     }
+}
+
+async fn timeline_summary(
+    Path(game_identifier): Path<Uuid>,
+    state: State<AppState>,
+) -> Result<Json<Vec<shared::messages::PeriodSummary>>, AppError> {
+    #[derive(serde::Deserialize)]
+    struct GameDayPhase {
+        day: Option<u32>,
+        current_phase: Option<shared::messages::Phase>,
+    }
+
+    let game_identifier_str = game_identifier.to_string();
+
+    let mut game_resp = state
+        .db
+        .query("SELECT day, current_phase FROM game WHERE identifier = $identifier;")
+        .bind(("identifier", game_identifier_str.clone()))
+        .await
+        .map_err(|err| AppError::NotFound(format!("Failed to query game: {err:?}")))?;
+
+    let game_rows: Vec<GameDayPhase> = game_resp.take(0).unwrap_or_default();
+    let game_row = game_rows
+        .into_iter()
+        .next()
+        .ok_or_else(|| AppError::NotFound(format!("Game {game_identifier} not found")))?;
+
+    let current_day = game_row.day.unwrap_or(0);
+    let current_phase = game_row.current_phase.unwrap_or(shared::messages::Phase::Day);
+
+    let mut msg_resp = state
+        .db
+        .query(
+            r#"SELECT * FROM message
+            WHERE string::starts_with(subject, $identifier)
+            ORDER BY game_day, phase, tick, emit_index;"#,
+        )
+        .bind(("identifier", game_identifier_str))
+        .await
+        .map_err(|err| {
+            AppError::NotFound(format!("Failed to query timeline messages: {err:?}"))
+        })?;
+
+    let rows: Vec<GameLog> = msg_resp.take(0).unwrap_or_else(|err| {
+        eprintln!("Error taking timeline logs: {err:?}");
+        vec![]
+    });
+    let messages: Vec<GameMessage> = rows.into_iter().map(GameMessage::from).collect();
+
+    let summaries = shared::messages::summarize_periods(&messages, (current_day, current_phase));
+    Ok(Json(summaries))
 }
 
 async fn publish_game(

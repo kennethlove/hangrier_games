@@ -45,6 +45,8 @@ pub use period_card::PeriodCard;
 mod period_grid;
 pub use period_grid::PeriodGrid;
 mod period_grid_empty;
+mod recap_card;
+pub use recap_card::RecapCard;
 mod tribute_detail;
 pub use tribute_detail::TributeDetail;
 mod server_version;

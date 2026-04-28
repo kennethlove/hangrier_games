@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use game::areas::{Area, AreaDetails};
 use game::games::Game;
 use game::items::Item;
-use game::messages::{GameMessage, MessageKind, MessageSource};
+use game::messages::{GameMessage, MessageSource};
 use game::terrain::BaseTerrain;
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
@@ -199,6 +199,7 @@ pub async fn create_game(
         config: Default::default(),
         messages: vec![],
         alliance_events: vec![],
+        ..Default::default()
     };
 
     let created_game: Option<Game> = state
@@ -750,7 +751,7 @@ async fn get_full_game(identifier: Uuid, db: &Surreal<Any>) -> Result<Json<Game>
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-struct GameLog {
+pub(crate) struct GameLog {
     pub id: RecordId,
     pub identifier: String,
     pub source: MessageSource,
@@ -759,18 +760,49 @@ struct GameLog {
     #[serde(with = "chrono::serde::ts_nanoseconds")]
     pub timestamp: DateTime<Utc>,
     pub content: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub kind: Option<MessageKind>,
-    /// Structured event payload, stored as a JSON-encoded `String`.
-    /// SurrealDB's bespoke serializer collapses externally-tagged Rust
-    /// enums (the form `GameEvent` uses) and arbitrary
-    /// `serde_json::Value::Object` payloads to `{}` when bound into an
-    /// `object` column, so we transit the wire as a plain string and
-    /// decode on the read side via [`game::messages::GameMessage::structured_event`].
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub event: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub event_id: Option<String>,
+    /// Period phase (Day or Night) — see `shared::messages::Phase`.
+    pub phase: shared::messages::Phase,
+    /// Per-period monotonic action counter; resets each phase boundary.
+    pub tick: u32,
+    /// Within-period emit ordinal; resets each phase boundary.
+    pub emit_index: u32,
+    /// Structured `MessagePayload` stored as a JSON-encoded `String`.
+    /// SurrealDB's bespoke serializer collapses internally-tagged Rust
+    /// enums and arbitrary `serde_json::Value::Object` payloads to `{}`
+    /// when bound into an `object` column, so we transit the wire as a
+    /// plain string and decode on the read side.
+    pub payload: String,
+}
+
+impl From<GameLog> for GameMessage {
+    fn from(row: GameLog) -> Self {
+        let payload = serde_json::from_str(&row.payload).unwrap_or_else(|err| {
+            eprintln!(
+                "Warning: failed to decode message payload for {}: {err:?}",
+                row.identifier
+            );
+            shared::messages::MessagePayload::AreaEvent {
+                area: shared::messages::AreaRef {
+                    identifier: String::new(),
+                    name: String::new(),
+                },
+                kind: shared::messages::AreaEventKind::Other,
+                description: row.content.clone(),
+            }
+        });
+        GameMessage {
+            identifier: row.identifier,
+            source: row.source,
+            game_day: row.game_day,
+            phase: row.phase,
+            tick: row.tick,
+            emit_index: row.emit_index,
+            subject: row.subject,
+            timestamp: row.timestamp,
+            content: row.content,
+            payload,
+        }
+    }
 }
 
 async fn save_game(
@@ -818,9 +850,11 @@ async fn save_game(
                 subject: log.subject,
                 timestamp: log.timestamp,
                 content: log.content,
-                kind: log.kind,
-                event: log.event,
-                event_id: log.event_id,
+                phase: log.phase,
+                tick: log.tick,
+                emit_index: log.emit_index,
+                payload: serde_json::to_string(&log.payload)
+                    .unwrap_or_else(|_| "null".to_string()),
             })
             .collect();
 
@@ -1218,10 +1252,11 @@ async fn game_day_logs(
         .await
     {
         Ok(mut logs) => {
-            let logs: Vec<GameMessage> = logs.take(0).unwrap_or_else(|err| {
+            let rows: Vec<GameLog> = logs.take(0).unwrap_or_else(|err| {
                 eprintln!("Error taking logs: {err:?}");
                 vec![]
             });
+            let logs: Vec<GameMessage> = rows.into_iter().map(GameMessage::from).collect();
             Ok(Json(logs))
         }
         Err(err) => Err(AppError::NotFound(format!("Failed to get logs: {err:?}"))),
@@ -1251,9 +1286,10 @@ async fn tribute_logs(
         .await
     {
         Ok(mut logs) => {
-            let logs: Vec<GameMessage> = logs.take(0).map_err(|e| {
+            let rows: Vec<GameLog> = logs.take(0).map_err(|e| {
                 AppError::InternalServerError(format!("Failed to take logs: {}", e))
             })?;
+            let logs: Vec<GameMessage> = rows.into_iter().map(GameMessage::from).collect();
             Ok(Json(logs))
         }
         Err(err) => Err(AppError::NotFound(format!("Failed to get logs: {err:?}"))),

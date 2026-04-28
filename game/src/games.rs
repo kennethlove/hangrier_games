@@ -77,10 +77,13 @@ impl TickCounter {
 
 /// Represents the current state of the game.
 ///
-/// `PartialEq` is intentionally NOT derived: the transient `messages` buffer
-/// holds `GameMessage`s carrying `MessagePayload`, which is not `PartialEq`
-/// (and adding it would require deriving across the entire payload graph).
-/// No production code compares `Game` values for equality.
+/// `PartialEq` is implemented manually (identity-only via `identifier`) because
+/// the transient `messages` buffer holds `GameMessage`s carrying
+/// `MessagePayload`, which is not `PartialEq` (and adding it would require
+/// deriving across the entire payload graph). The web crate's
+/// `dioxus-query` cache enums require `PartialEq` on their variants; identity
+/// equality is sufficient for cache dedup since a game is uniquely keyed by
+/// its identifier.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Game {
     pub identifier: String,
@@ -120,6 +123,14 @@ pub struct Game {
 
 fn default_phase() -> crate::messages::Phase {
     crate::messages::Phase::Day
+}
+
+impl PartialEq for Game {
+    /// Identity equality: two `Game`s are considered equal iff they share an
+    /// `identifier`. See struct docs for rationale.
+    fn eq(&self, other: &Self) -> bool {
+        self.identifier == other.identifier
+    }
 }
 
 impl Default for Game {

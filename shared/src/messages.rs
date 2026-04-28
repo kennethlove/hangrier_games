@@ -245,6 +245,16 @@ pub struct GameMessage {
     pub payload: MessagePayload,
 }
 
+impl PartialEq for GameMessage {
+    /// Identity equality via `identifier`. `MessagePayload` is not `PartialEq`
+    /// (would require deriving across the entire payload graph); identity
+    /// equality is sufficient for cache dedup since each persisted message
+    /// has a unique identifier.
+    fn eq(&self, other: &Self) -> bool {
+        self.identifier == other.identifier
+    }
+}
+
 impl GameMessage {
     pub fn new(
         source: MessageSource,

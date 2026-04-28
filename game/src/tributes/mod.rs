@@ -771,6 +771,7 @@ impl Attributes {
 #[cfg(test)]
 mod tests {
 
+    use crate::messages::TaggedEvent;
     use crate::tributes::Tribute;
     use crate::tributes::brains::Brain;
     use rand::SeedableRng;

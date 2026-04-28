@@ -76,7 +76,12 @@ impl TickCounter {
 }
 
 /// Represents the current state of the game.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+///
+/// `PartialEq` is intentionally NOT derived: the transient `messages` buffer
+/// holds `GameMessage`s carrying `MessagePayload`, which is not `PartialEq`
+/// (and adding it would require deriving across the entire payload graph).
+/// No production code compares `Game` values for equality.
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Game {
     pub identifier: String,
     pub name: String,
@@ -102,6 +107,19 @@ pub struct Game {
     /// Per-period tick counter; transient, never persisted.
     #[serde(skip, default)]
     pub tick_counter: TickCounter,
+    /// Current phase (Day/Night) for the in-flight cycle. Transient, used
+    /// by helper logging methods to stamp `GameMessage.phase`. Defaults to
+    /// `Day` outside of an active cycle.
+    #[serde(skip, default = "default_phase")]
+    pub current_phase: crate::messages::Phase,
+    /// Per-period emit index for the in-flight cycle. Transient. Reset at
+    /// every phase boundary alongside `tick_counter`.
+    #[serde(skip, default)]
+    pub emit_index: u32,
+}
+
+fn default_phase() -> crate::messages::Phase {
+    crate::messages::Phase::Day
 }
 
 impl Default for Game {
@@ -125,6 +143,8 @@ impl Default for Game {
             messages: vec![],
             alliance_events: vec![],
             tick_counter: TickCounter::default(),
+            current_phase: crate::messages::Phase::Day,
+            emit_index: 0,
         }
     }
 }
@@ -212,28 +232,91 @@ impl Game {
             .collect()
     }
 
-    /// Checks if the game has concluded (i.e., if there is a winner or if all tributes are dead).
-    /// If concluded, it updates the game status, posts the final messages, and returns the game.
+    /// Construct a fallback `MessagePayload` when a caller doesn't supply
+    /// a typed payload. Picks an existing variant suited to the message
+    /// source so the schema-required `payload` field is always present.
+    /// This is a transitional helper used by the legacy log helpers
+    /// pending full migration of every emission site to typed payloads.
+    fn fallback_payload(
+        source: &crate::messages::MessageSource,
+    ) -> crate::messages::MessagePayload {
+        use crate::messages::{
+            AreaEventKind, AreaRef, MessagePayload, MessageSource, TributeRef,
+        };
+        match source {
+            MessageSource::Tribute(id) => MessagePayload::SanityBreak {
+                tribute: TributeRef {
+                    identifier: id.clone(),
+                    name: String::new(),
+                },
+            },
+            MessageSource::Area(name) => MessagePayload::AreaEvent {
+                area: AreaRef {
+                    identifier: name.clone(),
+                    name: name.clone(),
+                },
+                kind: AreaEventKind::Other,
+                description: String::new(),
+            },
+            MessageSource::Game(id) => MessagePayload::AreaEvent {
+                area: AreaRef {
+                    identifier: id.clone(),
+                    name: id.clone(),
+                },
+                kind: AreaEventKind::Other,
+                description: String::new(),
+            },
+        }
+    }
+
+    /// Build and push a `GameMessage` with the supplied typed payload.
+    /// Stamps `(game_day, phase, tick, emit_index)` from the game's
+    /// transient cycle state. The `tick` argument is supplied by the
+    /// caller because some sites (cycle announcements, area events)
+    /// emit at the phase boundary (`tick = 0`) while per-tribute
+    /// action emissions advance the tick counter.
+    fn push_message(
+        &mut self,
+        source: crate::messages::MessageSource,
+        subject: String,
+        content: String,
+        payload: crate::messages::MessagePayload,
+        tick: u32,
+    ) {
+        let game_day = self.day.unwrap_or(0);
+        let msg = crate::messages::GameMessage::new(
+            source,
+            game_day,
+            self.current_phase,
+            tick,
+            self.emit_index,
+            subject,
+            content,
+            payload,
+        );
+        self.messages.push(msg);
+        self.emit_index = self.emit_index.saturating_add(1);
+    }
+
     /// Push a message into the cycle's transient event buffer.
     /// The API layer drains and persists this buffer after each cycle.
+    ///
+    /// This legacy helper synthesises a fallback payload (see
+    /// `fallback_payload`) suited to the source. New emission sites
+    /// should construct a typed `MessagePayload` and call
+    /// [`Self::push_message`] directly.
     pub fn log(
         &mut self,
         source: crate::messages::MessageSource,
         subject: String,
         content: String,
     ) {
-        let game_day = self.day.unwrap_or(0);
-        self.messages.push(crate::messages::GameMessage::new(
-            source, game_day, subject, content,
-        ));
+        let payload = Self::fallback_payload(&source);
+        let tick = self.tick_counter.boundary();
+        self.push_message(source, subject, content, payload, tick);
     }
 
     /// Log a structured game output by rendering its `Display` impl into a `GameMessage`.
-    ///
-    /// Use this when emitting events from inside the engine: build a `GameOutput<'_>` at
-    /// the call site and pass it here. Until `hangrier_games-mqi` lands and we have a
-    /// serializable structured event, this is the bridge between typed events and the
-    /// stringly-typed `GameMessage.content` field.
     pub fn log_output<D: std::fmt::Display>(
         &mut self,
         source: crate::messages::MessageSource,
@@ -243,65 +326,47 @@ impl Game {
         self.log(source, subject, output.to_string());
     }
 
-    /// Log a structured game output and tag the resulting `GameMessage` with a typed
-    /// [`MessageKind`]. Used by the alliance event sites so consumers (UI, announcers)
-    /// can filter by category without parsing strings.
+    /// Legacy helper: log a string output and tag with a typed `MessageKind`.
+    /// `kind` is now derived from `MessagePayload::kind()` so the explicit
+    /// `kind` argument is ignored — the variant of the synthesised
+    /// fallback payload determines the kind. New sites should construct
+    /// a typed `MessagePayload` and call [`Self::push_message`] directly.
     pub fn log_output_kind<D: std::fmt::Display>(
         &mut self,
         source: crate::messages::MessageSource,
         subject: String,
         output: D,
-        kind: crate::messages::MessageKind,
+        _kind: crate::messages::MessageKind,
     ) {
-        let game_day = self.day.unwrap_or(0);
-        self.messages.push(crate::messages::GameMessage::with_kind(
-            source,
-            game_day,
-            subject,
-            output.to_string(),
-            kind,
-        ));
+        self.log(source, subject, output.to_string());
     }
 
-    /// Log a structured [`GameEvent`] by rendering its `Display` impl into a
-    /// [`GameMessage`] and persisting the typed payload alongside (mqi.3).
-    ///
-    /// `content` is set to the rendered string so legacy consumers (UI text,
-    /// announcers using the stringly path) keep working. The full structured
-    /// `event` and a fresh `event_id` are stored on the message for typed
-    /// consumers (filters, dedup, downstream pipelines).
+    /// Log a structured [`crate::events::GameEvent`] by rendering its
+    /// `Display` impl into the `GameMessage.content`. The typed
+    /// `MessagePayload` defaults to a source-appropriate fallback;
+    /// callers needing a specific payload variant should instead build
+    /// it themselves and call [`Self::push_message`].
     pub fn log_event(
         &mut self,
         source: crate::messages::MessageSource,
         subject: String,
         event: crate::events::GameEvent,
     ) {
-        let game_day = self.day.unwrap_or(0);
-        let content = event.to_string();
-        self.messages.push(crate::messages::with_event(
-            source, game_day, subject, content, event,
-        ));
+        self.log(source, subject, event.to_string());
     }
 
-    /// Log a structured [`GameEvent`] and tag the resulting `GameMessage`
-    /// with a typed [`crate::messages::MessageKind`] (mqi.3).
-    ///
-    /// See [`Self::log_event`] for the persistence contract; this variant
-    /// adds a typed category for downstream consumers (UI filters,
-    /// announcers).
+    /// Log a structured `GameEvent` and tag with `MessageKind`.
+    /// As with [`Self::log_output_kind`], the `kind` argument is now
+    /// derived from the payload and is accepted for backwards
+    /// compatibility only.
     pub fn log_event_kind(
         &mut self,
         source: crate::messages::MessageSource,
         subject: String,
         event: crate::events::GameEvent,
-        kind: crate::messages::MessageKind,
+        _kind: crate::messages::MessageKind,
     ) {
-        let game_day = self.day.unwrap_or(0);
-        let content = event.to_string();
-        self.messages
-            .push(crate::messages::with_event_kind(
-                source, game_day, subject, content, event, kind,
-            ));
+        self.log(source, subject, event.to_string());
     }
 
     fn check_for_winner(&mut self) -> Result<(), GameError> {
@@ -585,6 +650,17 @@ impl Game {
 
     /// Runs the day and night cycles of one game round.
     pub fn run_day_night_cycle(&mut self, day: bool) -> Result<(), GameError> {
+        // Phase boundary: reset transient cycle state. `tick` and `emit_index`
+        // are per-period and must restart at every Day/Night flip so causal
+        // ordering inside a phase is contiguous from zero.
+        self.current_phase = if day {
+            crate::messages::Phase::Day
+        } else {
+            crate::messages::Phase::Night
+        };
+        self.tick_counter.reset();
+        self.emit_index = 0;
+
         // Check if the game is over, and if so, end it.
         // This will also post the final messages.
         self.check_for_winner()?;
@@ -808,21 +884,19 @@ impl Game {
                 .push(tribute);
         }
 
-        // Collected (actor_identifier, actor_name, line, kind, structured_event) tuples
-        // from all tributes this cycle. Drained into self.messages after the mutable
-        // borrow of self.tributes ends.
+        // Collected (actor_identifier, actor_name, content, payload, optional GameEvent)
+        // tuples from all tributes this cycle. Drained into `self.messages` after
+        // the mutable borrow of `self.tributes` ends.
         //
-        // The optional `GameEvent` (mqi.2) is constructed at sites where the call
-        // site has access to the typed inputs (UUIDs, names) — currently only the
-        // alliance-formation path. Sites that flow through `Vec<String>` from
-        // `Tribute::process_turn_phase` carry `None` and will be migrated when the
-        // tribute action layer learns to emit `GameEvent` directly (tracked as a
-        // discovered-from bead under hangrier_games-mqi).
+        // `payload` (Some) carries the typed `MessagePayload` produced by tribute
+        // action sites that have been migrated to emit `TaggedEvent`. Sites
+        // still using the legacy stringly path carry `None` and synthesise a
+        // fallback payload in the drain.
         type CollectedEvent = (
             String,
             String,
             String,
-            Option<crate::messages::MessageKind>,
+            Option<crate::messages::MessagePayload>,
             Option<crate::events::GameEvent>,
         );
         let mut collected_events: Vec<CollectedEvent> = Vec::new();
@@ -928,7 +1002,18 @@ impl Game {
                 self.tributes[ia].identifier.clone(),
                 name_a.clone(),
                 event.to_string(),
-                Some(crate::messages::MessageKind::AllianceFormed),
+                Some(crate::messages::MessagePayload::AllianceFormed {
+                    members: vec![
+                        crate::messages::TributeRef {
+                            identifier: self.tributes[ia].identifier.clone(),
+                            name: self.tributes[ia].name.clone(),
+                        },
+                        crate::messages::TributeRef {
+                            identifier: self.tributes[ib].identifier.clone(),
+                            name: self.tributes[ib].name.clone(),
+                        },
+                    ],
+                }),
                 Some(event.clone()),
             ));
         }
@@ -1023,7 +1108,7 @@ impl Game {
                 total_living_tributes: living_tributes_count as u32,
             };
 
-            let mut tribute_events: Vec<String> = Vec::new();
+            let mut tribute_events: Vec<crate::messages::TaggedEvent> = Vec::new();
             tribute.process_turn_phase(
                 action_suggestion.clone(),
                 &mut environment_details,
@@ -1031,12 +1116,12 @@ impl Game {
                 rng,
                 &mut tribute_events,
             );
-            for line in tribute_events {
+            for tagged in tribute_events {
                 collected_events.push((
                     tribute.identifier.clone(),
                     tribute.name.clone(),
-                    line,
-                    None,
+                    tagged.content,
+                    Some(tagged.payload),
                     None,
                 ));
             }
@@ -1044,36 +1129,23 @@ impl Game {
         }
 
         // Drain collected events into game messages now that the mutable borrow ends.
-        // When a structured `GameEvent` is present (currently only the alliance
-        // formation path) we route through `log_event*`; otherwise we fall back
-        // to the legacy stringly-typed path. Both paths produce byte-identical
-        // `GameMessage.content` because `log_event*` simply renders the event's
-        // `Display` impl, which is parity-tested against `GameOutput`.
-        for (identifier, name, line, kind, event) in collected_events {
-            match (kind, event) {
-                (Some(k), Some(ev)) => self.log_event_kind(
-                    crate::messages::MessageSource::Tribute(identifier),
-                    name,
-                    ev,
-                    k,
-                ),
-                (Some(k), None) => self.log_output_kind(
-                    crate::messages::MessageSource::Tribute(identifier),
-                    name,
-                    line,
-                    k,
-                ),
-                (None, Some(ev)) => self.log_event(
-                    crate::messages::MessageSource::Tribute(identifier),
-                    name,
-                    ev,
-                ),
-                (None, None) => self.log_output(
-                    crate::messages::MessageSource::Tribute(identifier),
-                    name,
-                    line,
-                ),
+        // Each contiguous run of events sharing the same `identifier` is one
+        // tribute action and gets a single fresh tick from `self.tick_counter`.
+        // Per-event `emit_index` (advanced inside `push_message`) preserves
+        // intra-tribute ordering. Sites carrying a typed `MessagePayload`
+        // (alliance formation today, more after future migrations) push that
+        // payload directly; legacy stringly sites synthesise a fallback.
+        let mut last_identifier: Option<String> = None;
+        let mut current_tick: u32 = self.tick_counter.boundary();
+        for (identifier, _name, content, payload, _event) in collected_events {
+            if last_identifier.as_ref() != Some(&identifier) {
+                current_tick = self.tick_counter.next();
+                last_identifier = Some(identifier.clone());
             }
+            let source = crate::messages::MessageSource::Tribute(identifier.clone());
+            let payload =
+                payload.unwrap_or_else(|| Self::fallback_payload(&source));
+            self.push_message(source, identifier, content, payload, current_tick);
         }
 
         // Promote drained alliance events into the game queue and process them
@@ -1183,11 +1255,11 @@ impl Game {
                 AllianceEvent::BetrayalRecorded { betrayer, victim } => {
                     // Snapshot names before the mutable borrow on `victim` so
                     // we can emit the message after victim mutation completes.
-                    let betrayer_name = self
+                    let betrayer_info = self
                         .tributes
                         .iter()
                         .find(|t| t.id == betrayer)
-                        .map(|t| t.name.clone());
+                        .map(|t| (t.identifier.clone(), t.name.clone()));
                     let victim_info = self
                         .tributes
                         .iter()
@@ -1198,18 +1270,32 @@ impl Game {
                         v.pending_trust_shock = true;
                     }
                     // Spec §7.5: betrayer is never enqueued for trust-shock.
-                    if let (Some(b_name), Some((v_id, v_name))) = (betrayer_name, victim_info) {
+                    if let (Some((b_id, b_name)), Some((v_id, v_name))) =
+                        (betrayer_info, victim_info)
+                    {
                         let event = crate::events::GameEvent::BetrayalTriggered {
                             betrayer_id: betrayer,
-                            betrayer_name: b_name,
+                            betrayer_name: b_name.clone(),
                             victim_id: victim,
                             victim_name: v_name.clone(),
                         };
-                        self.log_event_kind(
+                        let payload = crate::messages::MessagePayload::BetrayalTriggered {
+                            betrayer: crate::messages::TributeRef {
+                                identifier: b_id,
+                                name: b_name,
+                            },
+                            victim: crate::messages::TributeRef {
+                                identifier: v_id.clone(),
+                                name: v_name.clone(),
+                            },
+                        };
+                        let tick = self.tick_counter.next();
+                        self.push_message(
                             crate::messages::MessageSource::Tribute(v_id),
                             v_name,
-                            event,
-                            crate::messages::MessageKind::BetrayalTriggered,
+                            event.to_string(),
+                            payload,
+                            tick,
                         );
                     }
                 }
@@ -1217,14 +1303,31 @@ impl Game {
                     deceased,
                     killer: _,
                 } => {
-                    // Snapshot the deceased's allies before mutation so we
-                    // can roll the cascade per direct ally.
-                    let allies_of_deceased: Vec<Uuid> = self
+                    // Snapshot the deceased's allies and identifying refs
+                    // before mutation so we can roll the cascade per direct
+                    // ally and emit typed `TrustShockBreak` payloads.
+                    let (allies_of_deceased, deceased_ref): (Vec<Uuid>, _) = self
                         .tributes
                         .iter()
                         .find(|t| t.id == deceased)
-                        .map(|d| d.allies.clone())
-                        .unwrap_or_default();
+                        .map(|d| {
+                            (
+                                d.allies.clone(),
+                                crate::messages::TributeRef {
+                                    identifier: d.identifier.clone(),
+                                    name: d.name.clone(),
+                                },
+                            )
+                        })
+                        .unwrap_or_else(|| {
+                            (
+                                Vec::new(),
+                                crate::messages::TributeRef {
+                                    identifier: deceased.to_string(),
+                                    name: String::new(),
+                                },
+                            )
+                        });
 
                     for ally_id in allies_of_deceased {
                         if let Some(ally) = self.tributes.iter_mut().find(|t| t.id == ally_id) {
@@ -1241,11 +1344,21 @@ impl Game {
                                     tribute_id: ally_uuid,
                                     tribute_name: aname.clone(),
                                 };
-                                self.log_event_kind(
+                                let payload =
+                                    crate::messages::MessagePayload::TrustShockBreak {
+                                        tribute: crate::messages::TributeRef {
+                                            identifier: aid.clone(),
+                                            name: aname.clone(),
+                                        },
+                                        partner: deceased_ref.clone(),
+                                    };
+                                let tick = self.tick_counter.next();
+                                self.push_message(
                                     crate::messages::MessageSource::Tribute(aid),
                                     aname,
-                                    event,
-                                    crate::messages::MessageKind::TrustShockBreak,
+                                    event.to_string(),
+                                    payload,
+                                    tick,
                                 );
                             }
                         }
@@ -1280,6 +1393,8 @@ mod tests {
             messages: vec![],
             alliance_events: vec![],
             tick_counter: TickCounter::default(),
+            current_phase: crate::messages::Phase::Day,
+            emit_index: 0,
         }
     }
 
@@ -2148,7 +2263,7 @@ mod tests {
         // a few seeds until at least one cycle forms an alliance and assert
         // the resulting message carries kind = AllianceFormed and the exact
         // display string from `GameOutput::AllianceFormed`.
-        use crate::messages::MessageKind;
+
         use crate::tributes::traits::Trait;
 
         let mut t1 = create_tribute("Cinna", true);
@@ -2178,17 +2293,25 @@ mod tests {
                 vec![t1.clone(), t2.clone()],
                 2,
             );
-            if let Some(m) = g
-                .messages
-                .iter()
-                .find(|m| m.kind == Some(MessageKind::AllianceFormed))
-            {
+            if let Some(m) = g.messages.iter().find(|m| {
+                matches!(
+                    m.payload,
+                    crate::messages::MessagePayload::AllianceFormed { .. }
+                )
+            }) {
                 hit = Some(m.clone());
                 break;
             }
         }
         let m = hit.expect("at least one cycle must emit AllianceFormed");
-        assert_eq!(m.kind, Some(MessageKind::AllianceFormed));
+        assert!(
+            matches!(
+                m.payload,
+                crate::messages::MessagePayload::AllianceFormed { .. }
+            ),
+            "expected AllianceFormed payload, got {:?}",
+            m.payload
+        );
         assert!(
             m.content.contains("form an alliance"),
             "content should match GameOutput::AllianceFormed display, got: {}",
@@ -2198,7 +2321,7 @@ mod tests {
 
     #[test]
     fn betrayal_emits_message_with_betrayal_triggered_kind() {
-        use crate::messages::MessageKind;
+
         use crate::tributes::alliances::TREACHEROUS_BETRAYAL_INTERVAL;
         use crate::tributes::traits::Trait;
 
@@ -2231,7 +2354,12 @@ mod tests {
         let m = game
             .messages
             .iter()
-            .find(|m| m.kind == Some(MessageKind::BetrayalTriggered))
+            .find(|m| {
+                matches!(
+                    m.payload,
+                    crate::messages::MessagePayload::BetrayalTriggered { .. }
+                )
+            })
             .expect("betrayal cycle must emit BetrayalTriggered message");
         assert_eq!(
             m.content,
@@ -2247,7 +2375,7 @@ mod tests {
     /// by the parity table in `events::tests`).
     #[test]
     fn alliance_formed_message_content_matches_game_event_display() {
-        use crate::messages::MessageKind;
+
         use crate::tributes::traits::Trait;
 
         let mut t1 = create_tribute("Cinna", true);
@@ -2277,11 +2405,12 @@ mod tests {
                 vec![t1.clone(), t2.clone()],
                 2,
             );
-            if let Some(m) = g
-                .messages
-                .iter()
-                .find(|m| m.kind == Some(MessageKind::AllianceFormed))
-            {
+            if let Some(m) = g.messages.iter().find(|m| {
+                matches!(
+                    m.payload,
+                    crate::messages::MessagePayload::AllianceFormed { .. }
+                )
+            }) {
                 hit = Some(m.clone());
                 break;
             }
@@ -2332,7 +2461,7 @@ mod tests {
     #[test]
     fn betrayal_triggered_message_content_matches_game_event_display() {
         use crate::events::GameEvent;
-        use crate::messages::MessageKind;
+
         use crate::tributes::alliances::TREACHEROUS_BETRAYAL_INTERVAL;
         use crate::tributes::traits::Trait;
 
@@ -2370,7 +2499,12 @@ mod tests {
         let m = game
             .messages
             .iter()
-            .find(|m| m.kind == Some(MessageKind::BetrayalTriggered))
+            .find(|m| {
+                matches!(
+                    m.payload,
+                    crate::messages::MessagePayload::BetrayalTriggered { .. }
+                )
+            })
             .expect("betrayal cycle must emit BetrayalTriggered message");
 
         let event = GameEvent::BetrayalTriggered {

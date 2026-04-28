@@ -1299,7 +1299,7 @@ async fn tribute_logs(
 async fn timeline_summary(
     Path(game_identifier): Path<Uuid>,
     state: State<AppState>,
-) -> Result<Json<Vec<shared::messages::PeriodSummary>>, AppError> {
+) -> Result<Json<shared::messages::TimelineSummary>, AppError> {
     #[derive(serde::Deserialize)]
     struct GameDayPhase {
         day: Option<u32>,
@@ -1344,7 +1344,9 @@ async fn timeline_summary(
     let messages: Vec<GameMessage> = rows.into_iter().map(GameMessage::from).collect();
 
     let summaries = shared::messages::summarize_periods(&messages, (current_day, current_phase));
-    Ok(Json(summaries))
+    Ok(Json(shared::messages::TimelineSummary {
+        periods: summaries,
+    }))
 }
 
 async fn publish_game(

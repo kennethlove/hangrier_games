@@ -1,0 +1,54 @@
+{
+  "name": "Hangrier Games",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "dev",
+  "workspaceFolder": "/workspaces/hangrier_games",
+  "shutdownAction": "stopCompose",
+
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/guiyomh/features/just:0": {}
+  },
+
+  "forwardPorts": [3000, 8000, 8080],
+  "portsAttributes": {
+    "3000": { "label": "API", "onAutoForward": "notify" },
+    "8000": { "label": "SurrealDB", "onAutoForward": "silent" },
+    "8080": { "label": "Web (Dioxus)", "onAutoForward": "openBrowser" }
+  },
+
+  "remoteEnv": {
+    "ENV": "development",
+    "APP_API_HOST": "http://127.0.0.1:3000",
+    "SURREAL_HOST": "ws://surrealdb:8000",
+    "SURREAL_USER": "root",
+    "SURREAL_PASS": "root",
+    "RUSTFLAGS": "--cfg getrandom_backend=\"wasm_js\""
+  },
+
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "vadimcn.vscode-lldb",
+        "bradlc.vscode-tailwindcss",
+        "DioxusLabs.dioxus",
+        "skellock.just",
+        "GitHub.vscode-pull-request-github"
+      ],
+      "settings": {
+        "rust-analyzer.cargo.targetDir": true,
+        "editor.formatOnSave": true,
+        "[rust]": { "editor.defaultFormatter": "rust-lang.rust-analyzer" }
+      }
+    }
+  },
+
+  "remoteUser": "vscode"
+}

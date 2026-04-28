@@ -1,0 +1,28 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ../..:/workspaces:cached
+      - cargo-cache:/usr/local/cargo/registry
+      - target-cache:/workspaces/hangrier_games/target
+    command: sleep infinity
+    depends_on:
+      - surrealdb
+    networks:
+      - hangrier
+
+  surrealdb:
+    image: surrealdb/surrealdb:v2.1.4
+    command: start --user root --pass root --bind 0.0.0.0:8000 memory
+    restart: unless-stopped
+    networks:
+      - hangrier
+
+networks:
+  hangrier:
+
+volumes:
+  cargo-cache:
+  target-cache:

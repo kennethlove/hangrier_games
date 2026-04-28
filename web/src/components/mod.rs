@@ -10,6 +10,7 @@ mod credits;
 pub use credits::Credits;
 mod game_areas;
 mod game_log_stub;
+pub mod timeline;
 pub use game_log_stub::GameLogStub;
 mod game_delete;
 pub use game_delete::{DeleteGameModal, GameDelete};

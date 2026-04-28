@@ -9,6 +9,7 @@ use dioxus::prelude::*;
 pub fn Navbar() -> Element {
     let mut storage = use_persistent("hangry-games", AppState::default);
     let mut theme_signal: Signal<Colorscheme> = use_context();
+    use_context_provider(|| Signal::new(crate::components::timeline::PeriodFilters::default()));
 
     if storage.get().jwt.is_some() {
         let jwt_string = storage.get().jwt.clone().unwrap_or_default();

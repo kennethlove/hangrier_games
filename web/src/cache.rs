@@ -20,6 +20,7 @@ pub(crate) enum QueryKey {
     _TributeDayLog(String, u32), // Tribute identifier, day
     _GameSummary(String),
     _GameDaySummary(String, u32), // Game identifier, day
+    TimelineSummary(String),      // Game identifier (PR2: timeline UI)
     User,
     ServerVersion,
 }
@@ -49,6 +50,7 @@ pub(crate) enum QueryValue {
     Logs(Vec<GameMessage>),
     Summary(String),
     ServerVersion(String),
+    TimelineSummary(shared::messages::TimelineSummary),
     // Pagination variants
     PaginatedGames(super::components::games_list::PaginatedGamesResponse),
     PaginatedTributes(super::components::game_tributes::PaginatedTributesResponse),

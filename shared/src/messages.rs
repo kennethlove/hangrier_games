@@ -271,6 +271,59 @@ impl GameMessage {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PeriodSummary {
+    pub day: u32,
+    pub phase: Phase,
+    pub deaths: u32,
+    pub event_count: u32,
+    pub is_current: bool,
+}
+
+/// Aggregate messages into one summary per (day, phase). Includes empty periods
+/// up to and including `current` so the hub shows the live period even when
+/// nothing has been emitted there yet. Periods past `current` are not emitted.
+pub fn summarize_periods(messages: &[GameMessage], current: (u32, Phase)) -> Vec<PeriodSummary> {
+    use std::collections::BTreeMap;
+
+    let (current_day, current_phase) = current;
+    let mut bucket: BTreeMap<(u32, u32), (u32, u32)> = BTreeMap::new();
+    let phase_ord = |p: Phase| match p {
+        Phase::Day => 0,
+        Phase::Night => 1,
+    };
+
+    for m in messages {
+        let key = (m.game_day, phase_ord(m.phase));
+        let entry = bucket.entry(key).or_insert((0, 0));
+        entry.1 += 1;
+        if matches!(m.payload, MessagePayload::TributeKilled { .. }) {
+            entry.0 += 1;
+        }
+    }
+
+    for d in 1..=current_day {
+        bucket.entry((d, 0)).or_insert((0, 0));
+        if d < current_day || matches!(current_phase, Phase::Night) {
+            bucket.entry((d, 1)).or_insert((0, 0));
+        }
+    }
+
+    bucket
+        .into_iter()
+        .map(|((day, p), (deaths, count))| {
+            let phase = if p == 0 { Phase::Day } else { Phase::Night };
+            PeriodSummary {
+                day,
+                phase,
+                deaths,
+                event_count: count,
+                is_current: day == current_day && phase == current_phase,
+            }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -479,5 +532,89 @@ mod tests {
         assert_eq!(msg.tick, 3);
         assert_eq!(msg.emit_index, 0);
         assert_eq!(msg.payload.kind(), MessageKind::State);
+    }
+
+    fn make_msg(day: u32, phase: Phase, payload: MessagePayload) -> GameMessage {
+        GameMessage::new(
+            MessageSource::Game("g".into()),
+            day,
+            phase,
+            1,
+            0,
+            "subject".into(),
+            "content".into(),
+            payload,
+        )
+    }
+
+    #[test]
+    fn summarize_empty_input_with_current_day_zero() {
+        let result = summarize_periods(&[], (0, Phase::Day));
+        assert!(result.is_empty(), "no periods reached when current_day=0");
+    }
+
+    #[test]
+    fn summarize_groups_by_day_and_phase() {
+        let tref = TributeRef { identifier: "t".into(), name: "T".into() };
+        let killed = MessagePayload::TributeKilled {
+            victim: tref.clone(),
+            killer: None,
+            cause: "x".into(),
+        };
+        let moved = MessagePayload::TributeHidden {
+            tribute: tref.clone(),
+            area: AreaRef { identifier: "a".into(), name: "A".into() },
+        };
+
+        let msgs = vec![
+            make_msg(1, Phase::Day, killed.clone()),
+            make_msg(1, Phase::Day, moved.clone()),
+            make_msg(1, Phase::Night, moved.clone()),
+            make_msg(2, Phase::Day, killed.clone()),
+        ];
+        let result = summarize_periods(&msgs, (2, Phase::Day));
+        assert_eq!(result.len(), 3);
+        assert_eq!(
+            result[0],
+            PeriodSummary { day: 1, phase: Phase::Day, deaths: 1, event_count: 2, is_current: false }
+        );
+        assert_eq!(
+            result[1],
+            PeriodSummary { day: 1, phase: Phase::Night, deaths: 0, event_count: 1, is_current: false }
+        );
+        assert_eq!(
+            result[2],
+            PeriodSummary { day: 2, phase: Phase::Day, deaths: 1, event_count: 1, is_current: true }
+        );
+    }
+
+    #[test]
+    fn summarize_includes_empty_reached_periods() {
+        let result = summarize_periods(&[], (2, Phase::Day));
+        assert_eq!(result.len(), 3);
+        assert_eq!(
+            result[0],
+            PeriodSummary { day: 1, phase: Phase::Day, deaths: 0, event_count: 0, is_current: false }
+        );
+        assert_eq!(
+            result[1],
+            PeriodSummary { day: 1, phase: Phase::Night, deaths: 0, event_count: 0, is_current: false }
+        );
+        assert_eq!(
+            result[2],
+            PeriodSummary { day: 2, phase: Phase::Day, deaths: 0, event_count: 0, is_current: true }
+        );
+    }
+
+    #[test]
+    fn summarize_is_current_flag_set_correctly() {
+        let tref = TributeRef { identifier: "t".into(), name: "T".into() };
+        let p = MessagePayload::TributeRested { tribute: tref, hp_restored: 1 };
+        let msgs = vec![make_msg(2, Phase::Night, p.clone())];
+        let result = summarize_periods(&msgs, (2, Phase::Night));
+        let current: Vec<_> = result.iter().filter(|s| s.is_current).collect();
+        assert_eq!(current.len(), 1);
+        assert_eq!(current[0].day, 2);
+        assert_eq!(current[0].phase, Phase::Night);
     }
 }

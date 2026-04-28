@@ -6,6 +6,7 @@
 //! - Area selection logic
 
 use crate::areas::Area;
+use crate::messages::{AreaRef, MessagePayload, TaggedEvent, TributeRef};
 use crate::output::GameOutput;
 use crate::tributes::Tribute;
 use rand::prelude::*;
@@ -27,19 +28,39 @@ impl Tribute {
         &self,
         closed_areas: &[Area],
         suggested_area: Option<Area>,
-        events: &mut Vec<String>,
+        events: &mut Vec<TaggedEvent>,
     ) -> TravelResult {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
         // Where is the tribute?
         let current_area = self.area;
 
+        let tribute_ref = || TributeRef {
+            identifier: self.identifier.clone(),
+            name: self.name.clone(),
+        };
+        let area_ref = |a: Area| {
+            let s = a.to_string();
+            AreaRef {
+                identifier: s.clone(),
+                name: s,
+            }
+        };
+
         // 1. Can the tribute move at all?
         if self.attributes.movement == 0 {
-            let current_area = self.area.to_string();
-            events.push(
-                GameOutput::TributeTravelTooTired(self.name.as_str(), current_area.as_str())
-                    .to_string(),
-            );
+            let current_area_name = self.area.to_string();
+            let line = GameOutput::TributeTravelTooTired(
+                self.name.as_str(),
+                current_area_name.as_str(),
+            )
+            .to_string();
+            events.push(TaggedEvent::new(
+                line,
+                MessagePayload::TributeHidden {
+                    tribute: tribute_ref(),
+                    area: area_ref(current_area),
+                },
+            ));
             return TravelResult::Failure;
         }
 
@@ -49,11 +70,19 @@ impl Tribute {
             && !closed_areas.contains(&suggestion)
         {
             if suggestion == current_area {
-                let suggestion = suggestion.to_string();
-                events.push(
-                    GameOutput::TributeTravelAlreadyThere(self.name.as_str(), suggestion.as_str())
-                        .to_string(),
-                );
+                let suggestion_name = suggestion.to_string();
+                let line = GameOutput::TributeTravelAlreadyThere(
+                    self.name.as_str(),
+                    suggestion_name.as_str(),
+                )
+                .to_string();
+                events.push(TaggedEvent::new(
+                    line,
+                    MessagePayload::TributeHidden {
+                        tribute: tribute_ref(),
+                        area: area_ref(suggestion),
+                    },
+                ));
                 return TravelResult::Failure;
             }
             target_area = Some(suggestion);
@@ -64,42 +93,59 @@ impl Tribute {
             // Low movement: can only move to suggested_area if it's valid and set.
             1..=10 => {
                 if let Some(new_area) = target_area {
-                    let current_area = current_area.to_string();
+                    let current_area_name = current_area.to_string();
                     let new_area_name = new_area.to_string();
-                    events.push(
-                        GameOutput::TributeTravel(
-                            self.name.as_str(),
-                            current_area.as_str(),
-                            new_area_name.as_str(),
-                        )
-                        .to_string(),
-                    );
+                    let line = GameOutput::TributeTravel(
+                        self.name.as_str(),
+                        current_area_name.as_str(),
+                        new_area_name.as_str(),
+                    )
+                    .to_string();
+                    events.push(TaggedEvent::new(
+                        line,
+                        MessagePayload::TributeMoved {
+                            tribute: tribute_ref(),
+                            from: area_ref(current_area),
+                            to: area_ref(new_area),
+                        },
+                    ));
                     TravelResult::Success(new_area)
                 } else {
-                    let current_area = current_area.to_string();
-                    events.push(
-                        GameOutput::TributeTravelTooTired(
-                            self.name.as_str(),
-                            current_area.as_str(),
-                        )
-                        .to_string(),
-                    );
+                    let current_area_name = current_area.to_string();
+                    let line = GameOutput::TributeTravelTooTired(
+                        self.name.as_str(),
+                        current_area_name.as_str(),
+                    )
+                    .to_string();
+                    events.push(TaggedEvent::new(
+                        line,
+                        MessagePayload::TributeHidden {
+                            tribute: tribute_ref(),
+                            area: area_ref(current_area),
+                        },
+                    ));
                     TravelResult::Failure
                 }
             }
             // High movement: can move to any open neighbor or the suggested area.
             _ => {
                 if let Some(new_area) = target_area {
-                    let current_area = current_area.to_string();
+                    let current_area_name = current_area.to_string();
                     let new_area_name = new_area.to_string();
-                    events.push(
-                        GameOutput::TributeTravel(
-                            self.name.as_str(),
-                            current_area.as_str(),
-                            new_area_name.as_str(),
-                        )
-                        .to_string(),
-                    );
+                    let line = GameOutput::TributeTravel(
+                        self.name.as_str(),
+                        current_area_name.as_str(),
+                        new_area_name.as_str(),
+                    )
+                    .to_string();
+                    events.push(TaggedEvent::new(
+                        line,
+                        MessagePayload::TributeMoved {
+                            tribute: tribute_ref(),
+                            from: area_ref(current_area),
+                            to: area_ref(new_area),
+                        },
+                    ));
                     return TravelResult::Success(new_area);
                 }
 
@@ -111,13 +157,18 @@ impl Tribute {
 
                 if available_neighbors.is_empty() {
                     let current_area_name = current_area.to_string();
-                    events.push(
-                        GameOutput::TributeTravelNoOptions(
-                            self.name.as_str(),
-                            current_area_name.as_str(),
-                        )
-                        .to_string(),
-                    );
+                    let line = GameOutput::TributeTravelNoOptions(
+                        self.name.as_str(),
+                        current_area_name.as_str(),
+                    )
+                    .to_string();
+                    events.push(TaggedEvent::new(
+                        line,
+                        MessagePayload::TributeHidden {
+                            tribute: tribute_ref(),
+                            area: area_ref(current_area),
+                        },
+                    ));
                     return TravelResult::Success(current_area);
                 }
 
@@ -126,14 +177,20 @@ impl Tribute {
                 let chosen_neighbor = available_neighbors.choose(&mut rng).unwrap();
                 let current_area_name = current_area.to_string();
                 let chosen_area_name = chosen_neighbor.to_string();
-                events.push(
-                    GameOutput::TributeTravel(
-                        self.name.as_str(),
-                        current_area_name.as_str(),
-                        chosen_area_name.as_str(),
-                    )
-                    .to_string(),
-                );
+                let line = GameOutput::TributeTravel(
+                    self.name.as_str(),
+                    current_area_name.as_str(),
+                    chosen_area_name.as_str(),
+                )
+                .to_string();
+                events.push(TaggedEvent::new(
+                    line,
+                    MessagePayload::TributeMoved {
+                        tribute: tribute_ref(),
+                        from: area_ref(current_area),
+                        to: area_ref(*chosen_neighbor),
+                    },
+                ));
                 TravelResult::Success(*chosen_neighbor)
             }
         }

@@ -9,6 +9,7 @@
 
 use crate::areas::AreaDetails;
 use crate::areas::events::AreaEvent;
+use crate::messages::{MessagePayload, TaggedEvent, TributeRef};
 use crate::output::GameOutput;
 use crate::tributes::Tribute;
 use crate::tributes::statuses::TributeStatus;
@@ -207,7 +208,7 @@ impl Tribute {
         &mut self,
         area_details: &AreaDetails,
         rng: &mut impl Rng,
-        events: &mut Vec<String>,
+        events: &mut Vec<TaggedEvent>,
     ) {
         // First, apply any area events for the current area
         self.apply_area_effects(area_details);
@@ -279,10 +280,19 @@ impl Tribute {
 
         if self.attributes.health == 0 {
             let killer = self.status.clone();
-            events.push(
-                GameOutput::TributeDiesFromStatus(self.name.as_str(), &killer.to_string())
-                    .to_string(),
-            );
+            let line = GameOutput::TributeDiesFromStatus(self.name.as_str(), &killer.to_string())
+                .to_string();
+            events.push(TaggedEvent::new(
+                line,
+                MessagePayload::TributeKilled {
+                    victim: TributeRef {
+                        identifier: self.identifier.clone(),
+                        name: self.name.clone(),
+                    },
+                    killer: None,
+                    cause: killer.to_string(),
+                },
+            ));
             self.statistics.killed_by = Some(killer.to_string());
             self.status = TributeStatus::RecentlyDead;
         }

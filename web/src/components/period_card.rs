@@ -2,10 +2,6 @@
 //!
 //! Renders death/event counts and links into the per-period view. The current
 //! (in-progress) period is highlighted with a ring + "live" badge.
-//!
-//! NOTE: The destination route `Routes::GamePeriodPage` is added in T8.
-//! Until then this links to `Routes::Home {}` as a placeholder so the build
-//! stays green commit-by-commit. T8 swaps it in.
 
 use crate::routes::Routes;
 use dioxus::prelude::*;
@@ -23,7 +19,6 @@ pub struct PeriodCardProps {
 
 #[component]
 pub fn PeriodCard(props: PeriodCardProps) -> Element {
-    let _ = props.game_identifier; // wired to GamePeriodPage in T8
     let phase_label = match props.phase {
         Phase::Day => "Day",
         Phase::Night => "Night",
@@ -35,9 +30,15 @@ pub fn PeriodCard(props: PeriodCardProps) -> Element {
         ""
     };
 
+    let route = Routes::GamePeriodPage {
+        identifier: props.game_identifier.clone(),
+        day: props.day,
+        phase: props.phase,
+    };
+
     rsx! {
         Link {
-            to: Routes::Home {}, // TODO(T8): swap to Routes::GamePeriodPage { ... }
+            to: route,
             class: "block rounded-lg border p-4 hover:shadow-lg transition theme1:bg-amber-50 theme1:border-amber-200 theme2:bg-slate-800 theme2:border-green-700 theme3:bg-purple-900 theme3:border-purple-600 {current_class}",
             div { class: "flex items-center justify-between mb-2",
                 h3 { class: "font-semibold", "Day {props.day} — {phase_label}" }

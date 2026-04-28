@@ -19,6 +19,8 @@ pub use game_delete::{DeleteGameModal, GameDelete};
 mod game_detail;
 pub use game_detail::GamePage;
 mod game_edit;
+mod game_period_page;
+pub use game_period_page::GamePeriodPage;
 pub mod game_tributes;
 mod games;
 pub use games::Games;

@@ -4,7 +4,9 @@ use dioxus_query::prelude::*;
 use reqwest::StatusCode;
 use shared::messages::TimelineSummary;
 
-async fn fetch_timeline_summary(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
+pub(crate) async fn fetch_timeline_summary(
+    keys: Vec<QueryKey>,
+) -> QueryResult<QueryValue, QueryError> {
     let Some(QueryKey::TimelineSummary(id)) = keys.first() else {
         return Err(QueryError::Unknown).into();
     };

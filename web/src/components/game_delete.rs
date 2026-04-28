@@ -5,6 +5,7 @@ use crate::env::APP_API_HOST;
 use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
 use dioxus_query::prelude::{MutationResult, MutationState, use_mutation, use_query_client};
+use gloo_storage::Storage;
 use shared::DeleteGame;
 use std::ops::Deref;
 
@@ -77,9 +78,11 @@ pub fn DeleteGameModal() -> Element {
             let token = storage.get().jwt.expect("No JWT found");
             spawn(async move {
                 mutate.mutate_async((dg.clone(), token)).await;
-                if let MutationState::Settled(Ok(MutationValue::GameDeleted(_, _))) =
+                if let MutationState::Settled(Ok(MutationValue::GameDeleted(id, _))) =
                     mutate.result().deref()
                 {
+                    let _ = gloo_storage::LocalStorage::delete(&format!("recap_collapsed:{id}"));
+                    let _ = gloo_storage::LocalStorage::delete(&format!("period_filters:{id}"));
                     client.invalidate_queries(&[QueryKey::Games]);
                     delete_game_signal.set(None);
                 }

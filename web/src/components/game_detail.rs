@@ -3,9 +3,11 @@ use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValu
 use crate::components::ThemedButton;
 use crate::components::game_areas::GameAreaList;
 use crate::components::game_edit::GameEdit;
-use crate::components::game_log_stub::GameLogStub;
 use crate::components::game_tributes::GameTributes;
 use crate::components::info_detail::InfoDetail;
+use crate::components::period_grid::PeriodGrid;
+use crate::components::recap_card::RecapCard;
+use crate::components::timeline::PeriodFilters;
 use crate::env::APP_API_HOST;
 use crate::hooks::{ConnectionState, use_game_websocket};
 use crate::routes::Routes;
@@ -133,6 +135,7 @@ async fn handle_next_step(
     mutate: UseMutation<MutationValue, MutationError, (String, String)>,
     client: UseQueryClient<QueryValue, QueryError, QueryKey>,
     mut loading_signal: Signal<LoadingState>,
+    mut filters: Signal<PeriodFilters>,
 ) {
     loading_signal.set(LoadingState::Loading);
     mutate.mutate_async((game_id.clone(), token)).await;
@@ -143,6 +146,7 @@ async fn handle_next_step(
                 MutationValue::GameStarted(game_identifier)
                 | MutationValue::GameFinished(game_identifier)
                 | MutationValue::GameAdvanced(game_identifier) => {
+                    filters.write().bump(game_identifier);
                     client.invalidate_queries(&[
                         QueryKey::DisplayGame(game_identifier.clone()),
                         QueryKey::Games,
@@ -250,6 +254,7 @@ fn GameState(identifier: String) -> Element {
     let token = storage.get().jwt.unwrap_or_default();
 
     let loading_signal = use_context::<Signal<LoadingState>>();
+    let filters = use_context::<Signal<PeriodFilters>>();
 
     let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
@@ -287,6 +292,7 @@ fn GameState(identifier: String) -> Element {
                 let mutate_clone = mutate;
                 let client_clone = client;
                 let loading_signal_clone = loading_signal;
+                let filters_clone = filters;
 
                 spawn(async move {
                     handle_next_step(
@@ -295,6 +301,7 @@ fn GameState(identifier: String) -> Element {
                         mutate_clone,
                         client_clone,
                         loading_signal_clone,
+                        filters_clone,
                     )
                     .await;
                 });
@@ -623,13 +630,11 @@ fn GameDetails(identifier: String) -> Element {
                         GameTributes { game: display_game.clone() }
                     }
 
-                    if day > 0 {
-                        InfoDetail {
-                            title: "Day log",
-                            open: false,
-                            GameLogStub { game: display_game.clone(), day: day }
-                        }
+                    if display_game.status == GameStatus::Finished {
+                        RecapCard { game: display_game.clone() }
                     }
+
+                    PeriodGrid { game_identifier: display_game.identifier.clone() }
                 }
             }
         }

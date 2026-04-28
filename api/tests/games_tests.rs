@@ -403,3 +403,80 @@ async fn test_unauthorized_game_access() {
 
     test_db.cleanup().await;
 }
+
+/// Test that an unstarted game returns at least the current period summary (Day 0/Day).
+#[tokio::test]
+async fn timeline_summary_includes_current_period_even_when_empty() {
+    let test_db = TestDb::new().await;
+    let app_state = test_db.app_state();
+    let router = create_test_router(app_state);
+    let server = TestServer::new(router);
+
+    let user = create_authenticated_user(&server, "timeline_user_1").await;
+
+    // Create a game (status = NotStarted, day = 0)
+    let create_response = server
+        .post("/api/games")
+        .add_header("Authorization", user.auth_header())
+        .json(&json!({
+            "max_tributes": 24,
+            "tribute_pool": 24,
+            "tribute_list": [],
+        }))
+        .await;
+    create_response.assert_status_ok();
+    let game_id = create_response.json::<serde_json::Value>()["identifier"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Hit the timeline-summary endpoint
+    let response = server
+        .get(&format!("/api/games/{}/timeline-summary", game_id))
+        .add_header("Authorization", user.auth_header())
+        .await;
+
+    response.assert_status_ok();
+    let body = response.json::<serde_json::Value>();
+    let summaries = body.as_array().expect("response should be an array");
+
+    // summarize_periods always seeds at least the current period, even with no messages.
+    assert!(
+        !summaries.is_empty(),
+        "expected at least one PeriodSummary for the current period"
+    );
+
+    let current = &summaries[0];
+    assert_eq!(current["day"], 0, "current period day should be 0");
+    assert_eq!(
+        current["phase"], "day",
+        "current period phase should be Day"
+    );
+    assert_eq!(
+        current["message_count"], 0,
+        "current period should have zero messages for an unstarted game"
+    );
+
+    test_db.cleanup().await;
+}
+
+/// Test the endpoint returns 404 for a game that does not exist.
+#[tokio::test]
+async fn timeline_summary_returns_404_for_missing_game() {
+    let test_db = TestDb::new().await;
+    let app_state = test_db.app_state();
+    let router = create_test_router(app_state);
+    let server = TestServer::new(router);
+
+    let user = create_authenticated_user(&server, "timeline_user_2").await;
+
+    let bogus_id = uuid::Uuid::new_v4();
+    let response = server
+        .get(&format!("/api/games/{}/timeline-summary", bogus_id))
+        .add_header("Authorization", user.auth_header())
+        .await;
+
+    response.assert_status(axum::http::StatusCode::NOT_FOUND);
+
+    test_db.cleanup().await;
+}

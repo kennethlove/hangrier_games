@@ -2,8 +2,8 @@ use crate::LoadingState;
 use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
 use crate::components::ThemedButton;
 use crate::components::game_areas::GameAreaList;
-use crate::components::game_day_log::GameDayLog;
 use crate::components::game_edit::GameEdit;
+use crate::components::game_log_stub::GameLogStub;
 use crate::components::game_tributes::GameTributes;
 use crate::components::info_detail::InfoDetail;
 use crate::env::APP_API_HOST;
@@ -627,7 +627,7 @@ fn GameDetails(identifier: String) -> Element {
                         InfoDetail {
                             title: "Day log",
                             open: false,
-                            GameDayLog { game: display_game.clone(), day: day }
+                            GameLogStub { game: display_game.clone(), day: day }
                         }
                     }
                 }

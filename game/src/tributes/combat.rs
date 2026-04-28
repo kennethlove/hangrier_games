@@ -7,6 +7,7 @@
 //! - Statistics updates
 
 use crate::items::OwnsItems;
+use crate::messages::{CombatEngagement, CombatOutcome, MessagePayload, TaggedEvent, TributeRef};
 use crate::output::GameOutput;
 use crate::tributes::Tribute;
 use crate::tributes::actions::{AttackOutcome, AttackResult};
@@ -21,49 +22,82 @@ const STRESS_FINAL_DIVISOR: f64 = 2.0;
 const KILL_STRESS_CONTRIBUTION: f64 = 50.0;
 const NON_KILL_WIN_STRESS_CONTRIBUTION: f64 = 20.0;
 
+/// Build a `TributeRef` from a tribute.
+fn tref(t: &Tribute) -> TributeRef {
+    TributeRef {
+        identifier: t.identifier.clone(),
+        name: t.name.clone(),
+    }
+}
+
 impl Tribute {
     /// Tribute attacks another tribute
     /// Potentially fatal to either tribute
     ///
-    /// Narration is pushed into `events` (one entry per `GameOutput`). The cycle loop
-    /// drains this vec into `Game.messages` after the turn phase completes.
+    /// Emits exactly one `MessagePayload::Combat` `TaggedEvent` per call when
+    /// a real two-tribute engagement occurs. Self-harm / suicide / critical
+    /// fumble paths are not engagements; they emit a single standalone
+    /// `TributeKilled` or `TributeWounded` `TaggedEvent` instead.
     pub(crate) fn attacks(
         &mut self,
         target: &mut Tribute,
         rng: &mut impl Rng,
-        events: &mut Vec<String>,
+        events: &mut Vec<TaggedEvent>,
     ) -> AttackOutcome {
         // Is the tribute attempting suicide?
         if self == target {
-            events.push(GameOutput::TributeSelfHarm(self.name.as_str()).to_string());
-
             // Attack always succeeds
             self.takes_physical_damage(self.attributes.strength);
-            self.apply_violence_stress(events);
-
-            events.push(
-                GameOutput::TributeAttackWin(self.name.as_str(), target.name.as_str()).to_string(),
-            );
+            // Capture violence-stress events as standalone (self-harm is not an engagement).
+            let mut stress_events: Vec<TaggedEvent> = Vec::new();
+            self.apply_violence_stress(&mut stress_events);
+            events.extend(stress_events);
 
             return if self.attributes.health > 0 {
-                events.push(
-                    GameOutput::TributeAttackWound(self.name.as_str(), target.name.as_str())
-                        .to_string(),
-                );
+                let content = GameOutput::TributeSelfHarm(self.name.as_str()).to_string();
+                events.push(TaggedEvent::new(
+                    content,
+                    MessagePayload::TributeWounded {
+                        victim: tref(self),
+                        attacker: None,
+                        hp_lost: self.attributes.strength,
+                    },
+                ));
                 AttackOutcome::Wound(self.clone(), target.clone())
             } else {
-                events.push(GameOutput::TributeSuicide(self.name.as_str()).to_string());
+                let content = GameOutput::TributeSuicide(self.name.as_str()).to_string();
+                events.push(TaggedEvent::new(
+                    content,
+                    MessagePayload::TributeKilled {
+                        victim: tref(self),
+                        killer: None,
+                        cause: "suicide".into(),
+                    },
+                ));
                 AttackOutcome::Kill(self.clone(), target.clone())
             };
         }
 
         let tribute_name = self.name.clone();
         let target_name = target.name.clone();
+
+        // Local accumulator for prose lines that become this engagement's
+        // `detail_lines`. Helpers (`attack_contest`, `apply_combat_results`,
+        // `apply_violence_stress`) push `TaggedEvent`s into a sub-buffer; we
+        // then flatten their `.content` into `detail_lines`.
+        let mut detail_lines: Vec<String> = Vec::new();
+        let mut sub_events: Vec<TaggedEvent> = Vec::new();
+
         // `self` is the attacker
-        match attack_contest(self, target, rng, events) {
+        let result = attack_contest(self, target, rng, &mut sub_events);
+        for ev in sub_events.drain(..) {
+            detail_lines.push(ev.content);
+        }
+
+        match result {
             AttackResult::CriticalHit => {
                 // Triple damage on critical hit!
-                events.push(
+                detail_lines.push(
                     GameOutput::TributeCriticalHit(tribute_name.as_str(), target_name.as_str())
                         .to_string(),
                 );
@@ -72,12 +106,16 @@ impl Tribute {
                     target,
                     self.attributes.strength * 3, // triple damage
                     GameOutput::TributeAttackWin(tribute_name.as_str(), target_name.as_str()),
-                    events,
+                    &mut sub_events,
                 );
+                for ev in sub_events.drain(..) {
+                    detail_lines.push(ev.content);
+                }
             }
             AttackResult::CriticalFumble => {
-                // Fumble! Attacker hurts themself
-                events.push(GameOutput::TributeCriticalFumble(tribute_name.as_str()).to_string());
+                // Fumble! Attacker hurts themself. Standalone (non-engagement) event.
+                let fumble_content =
+                    GameOutput::TributeCriticalFumble(tribute_name.as_str()).to_string();
                 self.takes_physical_damage(5); // Fixed fumble damage
                 self.statistics.defeats += 1;
 
@@ -86,18 +124,34 @@ impl Tribute {
                     self.statistics.killed_by = Some("themselves (fumble)".to_string());
                     self.status = crate::tributes::statuses::TributeStatus::RecentlyDead;
                     self.recently_killed_by = Some(self.id);
-                    events.push(
+                    let died_content =
                         GameOutput::TributeAttackDied(tribute_name.as_str(), "themselves")
-                            .to_string(),
-                    );
+                            .to_string();
+                    let combined = format!("{fumble_content} {died_content}");
+                    events.push(TaggedEvent::new(
+                        combined,
+                        MessagePayload::TributeKilled {
+                            victim: tref(self),
+                            killer: None,
+                            cause: "critical_fumble".into(),
+                        },
+                    ));
                     return AttackOutcome::Kill(target.clone(), self.clone());
                 }
 
+                events.push(TaggedEvent::new(
+                    fumble_content,
+                    MessagePayload::TributeWounded {
+                        victim: tref(self),
+                        attacker: None,
+                        hp_lost: 5,
+                    },
+                ));
                 return AttackOutcome::Wound(self.clone(), target.clone());
             }
             AttackResult::PerfectBlock => {
                 // Perfect block! Defender counters
-                events.push(
+                detail_lines.push(
                     GameOutput::TributePerfectBlock(target_name.as_str(), tribute_name.as_str())
                         .to_string(),
                 );
@@ -106,8 +160,11 @@ impl Tribute {
                     self,
                     target.attributes.strength * 2, // double damage counter
                     GameOutput::TributeAttackLose(tribute_name.as_str(), target_name.as_str()),
-                    events,
+                    &mut sub_events,
                 );
+                for ev in sub_events.drain(..) {
+                    detail_lines.push(ev.content);
+                }
             }
             AttackResult::AttackerWins => {
                 apply_combat_results(
@@ -115,8 +172,11 @@ impl Tribute {
                     target,
                     self.attributes.strength,
                     GameOutput::TributeAttackWin(tribute_name.as_str(), target_name.as_str()),
-                    events,
+                    &mut sub_events,
                 );
+                for ev in sub_events.drain(..) {
+                    detail_lines.push(ev.content);
+                }
             }
             AttackResult::AttackerWinsDecisively => {
                 apply_combat_results(
@@ -124,8 +184,11 @@ impl Tribute {
                     target,
                     self.attributes.strength * 2, // double damage
                     GameOutput::TributeAttackWinExtra(tribute_name.as_str(), target_name.as_str()),
-                    events,
+                    &mut sub_events,
                 );
+                for ev in sub_events.drain(..) {
+                    detail_lines.push(ev.content);
+                }
             }
             AttackResult::DefenderWins => {
                 apply_combat_results(
@@ -133,8 +196,11 @@ impl Tribute {
                     self,
                     target.attributes.strength,
                     GameOutput::TributeAttackLose(tribute_name.as_str(), target_name.as_str()),
-                    events,
+                    &mut sub_events,
                 );
+                for ev in sub_events.drain(..) {
+                    detail_lines.push(ev.content);
+                }
             }
             AttackResult::DefenderWinsDecisively => {
                 apply_combat_results(
@@ -142,57 +208,95 @@ impl Tribute {
                     self,
                     target.attributes.strength * 2, // double damage
                     GameOutput::TributeAttackLoseExtra(tribute_name.as_str(), target_name.as_str()),
-                    events,
+                    &mut sub_events,
                 );
+                for ev in sub_events.drain(..) {
+                    detail_lines.push(ev.content);
+                }
             }
             AttackResult::Miss => {
                 self.statistics.draws += 1;
                 target.statistics.draws += 1;
 
-                events.push(
+                detail_lines.push(
                     GameOutput::TributeAttackMiss(tribute_name.as_str(), target_name.as_str())
                         .to_string(),
                 );
+
+                let outcome = CombatOutcome::Stalemate;
+                let summary = format!("{} attacks {} ({:?})", self.name, target.name, outcome);
+                events.push(TaggedEvent::new(
+                    summary,
+                    MessagePayload::Combat(CombatEngagement {
+                        attacker: tref(self),
+                        target: tref(target),
+                        outcome,
+                        detail_lines,
+                    }),
+                ));
 
                 return AttackOutcome::Miss(self.clone(), target.clone());
             }
         };
 
-        if self.attributes.health == 0 {
+        // Determine outcome and finalise. Prefer death over flee/wound.
+        let (outcome, attack_outcome) = if self.attributes.health == 0 {
             // Target killed attacker
             self.statistics.killed_by = Some(target_name.clone());
             self.status = crate::tributes::statuses::TributeStatus::RecentlyDead;
             self.recently_killed_by = Some(target.id);
 
-            events.push(
+            detail_lines.push(
                 GameOutput::TributeAttackDied(tribute_name.as_str(), target_name.as_str())
                     .to_string(),
             );
 
-            AttackOutcome::Kill(target.clone(), self.clone())
+            (
+                CombatOutcome::Killed,
+                AttackOutcome::Kill(target.clone(), self.clone()),
+            )
         } else if target.attributes.health == 0 {
             // Attacker killed Target
             target.statistics.killed_by = Some(tribute_name.clone());
             target.status = crate::tributes::statuses::TributeStatus::RecentlyDead;
             target.recently_killed_by = Some(self.id);
 
-            events.push(
+            detail_lines.push(
                 GameOutput::TributeAttackSuccessKill(tribute_name.as_str(), target_name.as_str())
                     .to_string(),
             );
 
-            AttackOutcome::Kill(self.clone(), target.clone())
+            (
+                CombatOutcome::Killed,
+                AttackOutcome::Kill(self.clone(), target.clone()),
+            )
         } else {
-            events.push(
+            detail_lines.push(
                 GameOutput::TributeAttackWound(tribute_name.as_str(), target_name.as_str())
                     .to_string(),
             );
-            AttackOutcome::Wound(self.clone(), target.clone())
-        }
+            (
+                CombatOutcome::Wounded,
+                AttackOutcome::Wound(self.clone(), target.clone()),
+            )
+        };
+
+        let summary = format!("{} attacks {} ({:?})", self.name, target.name, outcome);
+        events.push(TaggedEvent::new(
+            summary,
+            MessagePayload::Combat(CombatEngagement {
+                attacker: tref(self),
+                target: tref(target),
+                outcome,
+                detail_lines,
+            }),
+        ));
+
+        attack_outcome
     }
 
     /// Apply violence stress to tribute based on their combat history
-    pub(crate) fn apply_violence_stress(&mut self, events: &mut Vec<String>) {
+    pub(crate) fn apply_violence_stress(&mut self, events: &mut Vec<TaggedEvent>) {
         let stress_damage = calculate_violence_stress(
             self.statistics.kills,
             self.statistics.wins,
@@ -200,8 +304,14 @@ impl Tribute {
         );
 
         if stress_damage > 0 {
-            events
-                .push(GameOutput::TributeHorrified(self.name.as_str(), stress_damage).to_string());
+            let content =
+                GameOutput::TributeHorrified(self.name.as_str(), stress_damage).to_string();
+            events.push(TaggedEvent::new(
+                content,
+                MessagePayload::SanityBreak {
+                    tribute: tref(self),
+                },
+            ));
             self.takes_mental_damage(stress_damage);
         }
     }
@@ -251,7 +361,7 @@ pub fn attack_contest(
     attacker: &mut Tribute,
     target: &mut Tribute,
     rng: &mut impl Rng,
-    events: &mut Vec<String>,
+    events: &mut Vec<TaggedEvent>,
 ) -> AttackResult {
     // Get attack roll and strength modifier
     let base_attack_roll: i32 = rng.random_range(1..=20); // Base roll
@@ -270,16 +380,32 @@ pub fn attack_contest(
         match outcome {
             crate::items::WearOutcome::Pristine => {}
             crate::items::WearOutcome::Worn => {
-                events.push(
-                    GameOutput::WeaponWear(attacker.name.as_str(), weapon.name.as_str())
-                        .to_string(),
-                );
+                let content = GameOutput::WeaponWear(attacker.name.as_str(), weapon.name.as_str())
+                    .to_string();
+                events.push(TaggedEvent::new(
+                    content,
+                    MessagePayload::ItemUsed {
+                        tribute: tref(attacker),
+                        item: shared::messages::ItemRef {
+                            identifier: weapon.identifier.clone(),
+                            name: weapon.name.clone(),
+                        },
+                    },
+                ));
             }
             crate::items::WearOutcome::Broken => {
-                events.push(
-                    GameOutput::WeaponBreak(attacker.name.as_str(), weapon.name.as_str())
-                        .to_string(),
-                );
+                let content = GameOutput::WeaponBreak(attacker.name.as_str(), weapon.name.as_str())
+                    .to_string();
+                events.push(TaggedEvent::new(
+                    content,
+                    MessagePayload::ItemUsed {
+                        tribute: tref(attacker),
+                        item: shared::messages::ItemRef {
+                            identifier: weapon.identifier.clone(),
+                            name: weapon.name.clone(),
+                        },
+                    },
+                ));
                 if let Err(err) = attacker.remove_item(&weapon) {
                     eprintln!("Failed to remove weapon: {}", err);
                 }
@@ -304,14 +430,32 @@ pub fn attack_contest(
         match outcome {
             crate::items::WearOutcome::Pristine => {}
             crate::items::WearOutcome::Worn => {
-                events.push(
-                    GameOutput::ShieldWear(target.name.as_str(), shield.name.as_str()).to_string(),
-                );
+                let content =
+                    GameOutput::ShieldWear(target.name.as_str(), shield.name.as_str()).to_string();
+                events.push(TaggedEvent::new(
+                    content,
+                    MessagePayload::ItemUsed {
+                        tribute: tref(target),
+                        item: shared::messages::ItemRef {
+                            identifier: shield.identifier.clone(),
+                            name: shield.name.clone(),
+                        },
+                    },
+                ));
             }
             crate::items::WearOutcome::Broken => {
-                events.push(
-                    GameOutput::ShieldBreak(target.name.as_str(), shield.name.as_str()).to_string(),
-                );
+                let content =
+                    GameOutput::ShieldBreak(target.name.as_str(), shield.name.as_str()).to_string();
+                events.push(TaggedEvent::new(
+                    content,
+                    MessagePayload::ItemUsed {
+                        tribute: tref(target),
+                        item: shared::messages::ItemRef {
+                            identifier: shield.identifier.clone(),
+                            name: shield.name.clone(),
+                        },
+                    },
+                ));
                 if let Err(err) = target.remove_item(&shield) {
                     eprintln!("Failed to remove shield: {}", err);
                 }
@@ -363,13 +507,21 @@ pub(crate) fn apply_combat_results(
     loser: &mut Tribute,
     damage_to_loser: u32,
     log_event: GameOutput,
-    events: &mut Vec<String>,
+    events: &mut Vec<TaggedEvent>,
 ) {
     loser.takes_physical_damage(damage_to_loser);
     loser.statistics.defeats += 1;
     winner.statistics.wins += 1;
     winner.apply_violence_stress(events);
-    events.push(log_event.to_string());
+    let content = log_event.to_string();
+    events.push(TaggedEvent::new(
+        content,
+        MessagePayload::TributeWounded {
+            victim: tref(loser),
+            attacker: Some(tref(winner)),
+            hp_lost: damage_to_loser,
+        },
+    ));
 }
 
 /// Update statistics for a pair of tributes based on the attack result
@@ -782,6 +934,47 @@ mod tests {
             // The seed didn't produce a kill; not a failure of attribution
             // logic, just RNG. Re-skip rather than flake.
             eprintln!("seed did not produce attacker death; skipping attribution check");
+        }
+    }
+
+    /// Contract test: a real two-tribute engagement emits exactly one
+    /// `MessagePayload::Combat` `TaggedEvent`, with the attacker/target
+    /// names and a recognised outcome.
+    #[rstest]
+    fn attacks_emits_one_combat_taggedevent(mut small_rng: SmallRng) {
+        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut target = Tribute::new("Peeta".to_string(), None, None);
+
+        attacker.attributes.strength = 50;
+        target.attributes.defense = 0;
+        target.attributes.health = 10;
+
+        let mut events: Vec<TaggedEvent> = Vec::new();
+        attacker.attacks(&mut target, &mut small_rng, &mut events);
+
+        let combat_events: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e.payload, MessagePayload::Combat(_)))
+            .collect();
+        assert_eq!(
+            combat_events.len(),
+            1,
+            "exactly one Combat payload per attacks() call"
+        );
+
+        if let MessagePayload::Combat(eng) = &combat_events[0].payload {
+            assert_eq!(eng.attacker.name, attacker.name);
+            assert_eq!(eng.target.name, target.name);
+            assert!(matches!(
+                eng.outcome,
+                CombatOutcome::Killed
+                    | CombatOutcome::Wounded
+                    | CombatOutcome::TargetFled
+                    | CombatOutcome::AttackerFled
+                    | CombatOutcome::Stalemate
+            ));
+        } else {
+            panic!("expected Combat payload");
         }
     }
 }

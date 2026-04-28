@@ -193,9 +193,10 @@ pub async fn tribute_log(
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to fetch logs: {}", e)))?;
 
-    let logs: Vec<GameMessage> = result
+    let rows: Vec<crate::games::GameLog> = result
         .take(0)
         .map_err(|e| AppError::InternalServerError(format!("Failed to take logs: {}", e)))?;
+    let logs: Vec<GameMessage> = rows.into_iter().map(GameMessage::from).collect();
     Ok(Json(logs))
 }
 

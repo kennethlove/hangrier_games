@@ -15,6 +15,7 @@ pub use movement::TravelResult;
 
 use crate::areas::{Area, AreaDetails};
 use crate::items::{Item, OwnsItems};
+use crate::messages::{AreaRef, ItemRef, MessagePayload, TaggedEvent, TributeRef};
 use crate::output::GameOutput;
 use crate::tributes::events::TributeEvent;
 use actions::{Action, AttackOutcome};
@@ -216,11 +217,24 @@ impl Tribute {
         environment_details: &mut EnvironmentContext<'_>,
         encounter_context: EncounterContext,
         rng: &mut impl Rng,
-        events: &mut Vec<String>,
+        events: &mut Vec<TaggedEvent>,
     ) {
-        // Tribute is already dead, do nothing.
+        let self_identifier = self.identifier.clone();
+        let self_name = self.name.clone();
+        let tribute_ref = || TributeRef {
+            identifier: self_identifier.clone(),
+            name: self_name.clone(),
+        };
+        let area_ref = |a: Area| {
+            let s = a.to_string();
+            AreaRef {
+                identifier: s.clone(),
+                name: s,
+            }
+        };
+
+        // Tribute is already dead, do nothing. (No event emitted — noise drop.)
         if !self.is_alive() {
-            events.push(GameOutput::TributeAlreadyDead(self.name.as_str()).to_string());
             return;
         }
 
@@ -240,7 +254,15 @@ impl Tribute {
 
         // Tribute died to the period's events.
         if self.status == TributeStatus::RecentlyDead || self.attributes.health == 0 {
-            events.push(GameOutput::TributeDead(self.name.as_str()).to_string());
+            let line = GameOutput::TributeDead(self.name.as_str()).to_string();
+            events.push(TaggedEvent::new(
+                line,
+                MessagePayload::TributeKilled {
+                    victim: tribute_ref(),
+                    killer: None,
+                    cause: "untracked".into(),
+                },
+            ));
             return;
         }
 
@@ -276,7 +298,19 @@ impl Tribute {
 
         // Any generous patrons this round?
         if let Some(gift) = self.receive_patron_gift(&mut *rng) {
-            events.push(GameOutput::SponsorGift(self.name.as_str(), &gift).to_string());
+            let line = GameOutput::SponsorGift(self.name.as_str(), &gift).to_string();
+            let item_ref = ItemRef {
+                identifier: gift.identifier.clone(),
+                name: gift.name.clone(),
+            };
+            events.push(TaggedEvent::new(
+                line,
+                MessagePayload::SponsorGift {
+                    recipient: tribute_ref(),
+                    item: item_ref,
+                    donor: "Sponsor".into(),
+                },
+            ));
             self.add_item(gift);
         }
 
@@ -335,13 +369,18 @@ impl Tribute {
                                 } else {
                                     // Insufficient stamina - exhausted
                                     self.short_rests();
-                                    events.push(
-                                        GameOutput::TributeTravelExhausted(
-                                            self.name.as_str(),
-                                            &self.area.to_string(),
-                                        )
-                                        .to_string(),
-                                    );
+                                    let line = GameOutput::TributeTravelExhausted(
+                                        self.name.as_str(),
+                                        &self.area.to_string(),
+                                    )
+                                    .to_string();
+                                    events.push(TaggedEvent::new(
+                                        line,
+                                        MessagePayload::TributeRested {
+                                            tribute: tribute_ref(),
+                                            hp_restored: 0,
+                                        },
+                                    ));
                                 }
                             }
                             None => {
@@ -356,16 +395,38 @@ impl Tribute {
                 }
             }
             Action::Rest => {
-                events.push(GameOutput::TributeRest(self.name.as_str()).to_string());
+                let line = GameOutput::TributeRest(self.name.as_str()).to_string();
+                events.push(TaggedEvent::new(
+                    line,
+                    MessagePayload::TributeRested {
+                        tribute: tribute_ref(),
+                        hp_restored: 0,
+                    },
+                ));
                 self.long_rests();
             }
             Action::Hide => {
                 let hidden = self.hides();
+                let current_area = self.area;
                 if hidden {
-                    events.push(GameOutput::TributeHide(self.name.as_str()).to_string());
+                    let line = GameOutput::TributeHide(self.name.as_str()).to_string();
+                    events.push(TaggedEvent::new(
+                        line,
+                        MessagePayload::TributeHidden {
+                            tribute: tribute_ref(),
+                            area: area_ref(current_area),
+                        },
+                    ));
                 } else {
                     // Just log as regular hide, game doesn't distinguish failure in output
-                    events.push(GameOutput::TributeHide(self.name.as_str()).to_string());
+                    let line = GameOutput::TributeHide(self.name.as_str()).to_string();
+                    events.push(TaggedEvent::new(
+                        line,
+                        MessagePayload::TributeHidden {
+                            tribute: tribute_ref(),
+                            area: area_ref(current_area),
+                        },
+                    ));
                 }
             }
             Action::Attack => {
@@ -389,25 +450,56 @@ impl Tribute {
             }
             Action::TakeItem => {
                 if let Some(item) = self.take_nearby_item(area_details) {
-                    events.push(
-                        GameOutput::TributeTakeItem(self.name.as_str(), &item.name).to_string(),
-                    );
+                    let line =
+                        GameOutput::TributeTakeItem(self.name.as_str(), &item.name).to_string();
+                    let item_ref = ItemRef {
+                        identifier: item.identifier.clone(),
+                        name: item.name.clone(),
+                    };
+                    let current_area = self.area;
+                    events.push(TaggedEvent::new(
+                        line,
+                        MessagePayload::ItemFound {
+                            tribute: tribute_ref(),
+                            item: item_ref,
+                            area: area_ref(current_area),
+                        },
+                    ));
                 }
                 // If no items available, no output
             }
             Action::UseItem(maybe_item) => {
                 if let Some(item) = maybe_item {
                     if let Err(error) = self.try_use_consumable(item) {
-                        events.push(
-                            GameOutput::TributeCannotUseItem(
-                                self.name.as_str(),
-                                &error.to_string(),
-                            )
-                            .to_string(),
-                        );
+                        let line = GameOutput::TributeCannotUseItem(
+                            self.name.as_str(),
+                            &error.to_string(),
+                        )
+                        .to_string();
+                        let item_ref = ItemRef {
+                            identifier: item.identifier.clone(),
+                            name: item.name.clone(),
+                        };
+                        events.push(TaggedEvent::new(
+                            line,
+                            MessagePayload::ItemUsed {
+                                tribute: tribute_ref(),
+                                item: item_ref,
+                            },
+                        ));
                     } else {
-                        events
-                            .push(GameOutput::TributeUseItem(self.name.as_str(), item).to_string());
+                        let line = GameOutput::TributeUseItem(self.name.as_str(), item).to_string();
+                        let item_ref = ItemRef {
+                            identifier: item.identifier.clone(),
+                            name: item.name.clone(),
+                        };
+                        events.push(TaggedEvent::new(
+                            line,
+                            MessagePayload::ItemUsed {
+                                tribute: tribute_ref(),
+                                item: item_ref,
+                            },
+                        ));
                     }
                 }
             }
@@ -432,14 +524,25 @@ impl Tribute {
         &self,
         mut targets: Vec<Tribute>,
         living_tributes_count: u32,
-        events: &mut Vec<String>,
+        events: &mut Vec<TaggedEvent>,
     ) -> Option<Tribute> {
         // If there are no targets, check if the tribute is feeling suicidal.
         if targets.is_empty() {
             return match self.attributes.sanity {
                 0..=SANITY_BREAK_LEVEL => {
                     // attempt suicide
-                    events.push(GameOutput::TributeSuicide(self.name.as_str()).to_string());
+                    let line = GameOutput::TributeSuicide(self.name.as_str()).to_string();
+                    events.push(TaggedEvent::new(
+                        line,
+                        MessagePayload::TributeKilled {
+                            victim: TributeRef {
+                                identifier: self.identifier.clone(),
+                                name: self.name.clone(),
+                            },
+                            killer: None,
+                            cause: "suicide".into(),
+                        },
+                    ));
                     Some(self.clone())
                 }
                 _ => None, // Attack no one
@@ -499,7 +602,7 @@ impl Tribute {
     pub fn consume_pending_trust_shock(
         &mut self,
         rng: &mut impl rand::Rng,
-        events: &mut Vec<String>,
+        events: &mut Vec<TaggedEvent>,
     ) {
         if !self.pending_trust_shock {
             return;
@@ -514,9 +617,23 @@ impl Tribute {
         }
         for ally_id in &broken {
             self.allies.retain(|x| x != ally_id);
-            events.push(format!(
+            let ally_str = ally_id.to_string();
+            let line = format!(
                 "{} loses faith and breaks ties with ally {}.",
                 self.name, ally_id
+            );
+            events.push(TaggedEvent::new(
+                line,
+                MessagePayload::TrustShockBreak {
+                    tribute: TributeRef {
+                        identifier: self.identifier.clone(),
+                        name: self.name.clone(),
+                    },
+                    partner: TributeRef {
+                        identifier: ally_str.clone(),
+                        name: ally_str,
+                    },
+                },
             ));
         }
         self.pending_trust_shock = false;
@@ -653,6 +770,7 @@ impl Attributes {
 #[cfg(test)]
 mod tests {
 
+    use crate::messages::TaggedEvent;
     use crate::tributes::Tribute;
     use crate::tributes::brains::Brain;
     use rand::SeedableRng;
@@ -834,7 +952,7 @@ mod tests {
         let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
         let ally = uuid::Uuid::new_v4();
         tribute.allies.push(ally);
-        let mut events: Vec<String> = vec![];
+        let mut events: Vec<TaggedEvent> = vec![];
         let mut rng = rand::rngs::SmallRng::seed_from_u64(53);
         tribute.consume_pending_trust_shock(&mut rng, &mut events);
         assert!(!tribute.pending_trust_shock);
@@ -855,7 +973,7 @@ mod tests {
         tribute.allies.push(ally2);
         tribute.pending_trust_shock = true;
 
-        let mut events: Vec<String> = vec![];
+        let mut events: Vec<TaggedEvent> = vec![];
         let mut rng = rand::rngs::SmallRng::seed_from_u64(211);
         tribute.consume_pending_trust_shock(&mut rng, &mut events);
 
@@ -877,7 +995,7 @@ mod tests {
         tribute.allies.push(ally);
         tribute.pending_trust_shock = true;
 
-        let mut events: Vec<String> = vec![];
+        let mut events: Vec<TaggedEvent> = vec![];
         let mut rng = rand::rngs::SmallRng::seed_from_u64(89);
         tribute.consume_pending_trust_shock(&mut rng, &mut events);
 
@@ -901,7 +1019,7 @@ mod tests {
         let ally = Tribute::new("Peeta".to_string(), Some(12), None);
         me.allies.push(ally.id);
 
-        let mut events: Vec<String> = vec![];
+        let mut events: Vec<TaggedEvent> = vec![];
         let target = me.pick_target(vec![ally.clone()], 5, &mut events);
         // Only candidate was an ally and we're not in final confrontation.
         assert!(target.is_none());
@@ -913,7 +1031,7 @@ mod tests {
         let me = Tribute::new("Katniss".to_string(), Some(12), None);
         let same_district = Tribute::new("Peeta".to_string(), Some(12), None);
 
-        let mut events: Vec<String> = vec![];
+        let mut events: Vec<TaggedEvent> = vec![];
         let target = me.pick_target(vec![same_district.clone()], 5, &mut events);
         assert!(target.is_some());
         assert_eq!(target.unwrap().id, same_district.id);
@@ -927,7 +1045,7 @@ mod tests {
         let ally = Tribute::new("Peeta".to_string(), Some(12), None);
         me.allies.push(ally.id);
 
-        let mut events: Vec<String> = vec![];
+        let mut events: Vec<TaggedEvent> = vec![];
         let target = me.pick_target(vec![ally.clone()], 2, &mut events);
         assert!(target.is_some());
         assert_eq!(target.unwrap().id, ally.id);
@@ -980,7 +1098,7 @@ mod tests {
         // does on the victim's side: drop the ex-ally locally).
         victim.allies.retain(|id| *id != ex_ally.id);
 
-        let mut events: Vec<String> = vec![];
+        let mut events: Vec<TaggedEvent> = vec![];
         let target = victim.pick_target(vec![ex_ally.clone()], 5, &mut events);
         assert!(
             target.is_some(),
@@ -1002,7 +1120,7 @@ mod tests {
         victim.pending_trust_shock = true;
 
         let mut rng = SmallRng::seed_from_u64(419);
-        let mut events: Vec<String> = vec![];
+        let mut events: Vec<TaggedEvent> = vec![];
         victim.consume_pending_trust_shock(&mut rng, &mut events);
 
         // Victim's side cleaned.

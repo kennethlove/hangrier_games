@@ -290,6 +290,14 @@ pub struct PeriodSummary {
     pub is_current: bool,
 }
 
+/// Newtype wrapper around the period list returned by `summarize_periods`.
+/// Exists so the API surface stays a stable named type as the timeline payload
+/// grows (e.g. recap, totals) without breaking clients.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TimelineSummary {
+    pub periods: Vec<PeriodSummary>,
+}
+
 /// Aggregate messages into one summary per (day, phase). Includes empty periods
 /// up to and including `current` so the hub shows the live period even when
 /// nothing has been emitted there yet. Periods past `current` are not emitted.

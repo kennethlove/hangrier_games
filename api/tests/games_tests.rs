@@ -438,7 +438,9 @@ async fn timeline_summary_includes_current_period_even_when_empty() {
 
     response.assert_status_ok();
     let body = response.json::<serde_json::Value>();
-    let summaries = body.as_array().expect("response should be an array");
+    let summaries = body["periods"]
+        .as_array()
+        .expect("response.periods should be an array");
 
     // summarize_periods always seeds at least the current period, even with no messages.
     assert!(
@@ -453,8 +455,8 @@ async fn timeline_summary_includes_current_period_even_when_empty() {
         "current period phase should be Day"
     );
     assert_eq!(
-        current["message_count"], 0,
-        "current period should have zero messages for an unstarted game"
+        current["event_count"], 0,
+        "current period should have zero events for an unstarted game"
     );
 
     test_db.cleanup().await;

@@ -202,7 +202,7 @@ bd close <id>         # Complete work
    ```bash
    jj git fetch                                    # Sync with remote
    jj rebase -d main@origin                        # Rebase if needed
-   bd dolt push                                    # Push beads data
+   bd backup export-git --branch beads-backup      # Push beads JSONL snapshot to beads-backup branch
    jj bookmark create <branch-name> -r @-          # Create feature bookmark
    jj git push --bookmark <branch-name>            # Push the bookmark (NOT main)
    gh pr create --base main --head <branch-name> \

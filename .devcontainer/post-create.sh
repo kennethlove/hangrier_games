@@ -3,6 +3,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+echo "==> Fixing volume ownership (named volumes mount as root by default)"
+sudo chown -R vscode:vscode /usr/local/cargo/registry /workspaces/hangrier_games/target 2>/dev/null || true
+
 echo "==> Installing web/assets npm deps"
 if [ -d web/assets ]; then
   (cd web/assets && npm install --no-audit --no-fund)

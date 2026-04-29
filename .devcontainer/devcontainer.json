@@ -25,8 +25,7 @@
     "APP_API_HOST": "http://127.0.0.1:3000",
     "SURREAL_HOST": "ws://surrealdb:8000",
     "SURREAL_USER": "root",
-    "SURREAL_PASS": "root",
-    "RUSTFLAGS": "--cfg getrandom_backend=\"wasm_js\""
+    "SURREAL_PASS": "root"
   },
 
   "postCreateCommand": "bash .devcontainer/post-create.sh",

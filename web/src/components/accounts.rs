@@ -363,10 +363,6 @@ fn RegisterForm() -> Element {
                                             let lowered = message.to_lowercase();
                                             if lowered.contains("password") {
                                                 password_error_signal.set(message.clone());
-                                            } else if lowered.contains("username")
-                                                || lowered.contains("already taken")
-                                            {
-                                                username_error_signal.set(message.clone());
                                             } else if !message.is_empty() {
                                                 username_error_signal.set(message.clone());
                                             } else {

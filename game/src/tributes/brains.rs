@@ -97,9 +97,39 @@ impl PersonalityThresholds {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Brain {
     pub thresholds: PersonalityThresholds,
+    #[serde(default, deserialize_with = "deserialize_optional_enum_lenient")]
     pub psychotic_break: Option<PsychoticBreakType>,
+    /// Transient per-turn AI preference. Not persisted (recomputed each cycle)
+    /// because the SurrealDB SDK's bespoke serializer collapses externally-
+    /// tagged enums with payloads to `{}`, which would then fail to round-trip.
+    /// Lenient deserializer absorbs any pre-existing corruption from before
+    /// this fix landed.
+    #[serde(
+        default,
+        skip_serializing,
+        deserialize_with = "deserialize_optional_enum_lenient"
+    )]
     pub preferred_action: Option<Action>,
+    #[serde(default)]
     pub preferred_action_percentage: f64,
+}
+
+/// Deserialize an `Option<E>` for any externally-tagged enum `E`, treating
+/// SurrealDB-corrupted empty objects (`{}`) as `None` instead of failing.
+fn deserialize_optional_enum_lenient<'de, D, E>(deserializer: D) -> Result<Option<E>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    E: serde::de::DeserializeOwned,
+{
+    use serde::Deserialize as _;
+    let value = serde_json::Value::deserialize(deserializer)?;
+    match value {
+        serde_json::Value::Null => Ok(None),
+        serde_json::Value::Object(ref map) if map.is_empty() => Ok(None),
+        other => serde_json::from_value(other)
+            .map(Some)
+            .map_err(serde::de::Error::custom),
+    }
 }
 
 impl Default for Brain {

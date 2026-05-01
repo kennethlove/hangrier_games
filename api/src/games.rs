@@ -919,7 +919,7 @@ async fn save_game(
         // serializer's habit of collapsing externally-tagged enums and
         // `serde_json::Value::Object` payloads to `{}` when bound into
         // an `object` column. mqi.3.
-        if let Err(e) = db.insert::<Vec<GameMessage>>(()).content(game_logs).await {
+        if let Err(e) = db.insert::<Vec<GameLog>>(()).content(game_logs).await {
             let _ = db.query("ROLLBACK").await;
             return Err(AppError::InternalServerError(format!(
                 "Failed to save game logs: {}",
@@ -934,18 +934,27 @@ async fn save_game(
 
         let mut area_without_items = area.clone();
         area_without_items.items = vec![];
-        db.update::<Option<AreaDetails>>(id.clone())
-            .content(area_without_items)
+        // Bind via serde_json::Value to bypass the SurrealDB SDK's bespoke
+        // type serializer, which collapses externally-tagged enums and Option
+        // fields. The generic JSON bind path round-trips cleanly.
+        let body = serde_json::to_value(&area_without_items)
+            .map_err(|e| AppError::InternalServerError(format!("Failed to encode area: {}", e)))?;
+        db.query("UPDATE $rid CONTENT $body")
+            .bind(("rid", id.clone()))
+            .bind(("body", body))
             .await
             .map_err(|e| AppError::InternalServerError(format!("Failed to update area: {}", e)))
+            .map(|_| ())
     }))
     .await;
 
-    if area_results.iter().any(|result| result.is_err()) {
+    if let Some(err) = area_results.iter().find_map(|r| r.as_ref().err()) {
+        let msg = format!("{}", err);
         let _ = db.query("ROLLBACK").await;
-        return Err(AppError::InternalServerError(
-            "Failed to save area items".into(),
-        ));
+        return Err(AppError::InternalServerError(format!(
+            "Failed to save area items: {}",
+            msg
+        )));
     }
 
     let tribute_results = futures::future::join_all(game.tributes.iter().map(|tribute| async {
@@ -956,47 +965,52 @@ async fn save_game(
 
         let mut tribute_without_items = tribute.clone();
         tribute_without_items.items = vec![];
-        db.update::<Option<Tribute>>(id.clone())
-            .content(tribute_without_items)
+        // Same workaround as the area UPDATE above: serde_json::Value bypasses
+        // the SDK's enum-collapsing serializer.
+        let body = serde_json::to_value(&tribute_without_items).map_err(|e| {
+            AppError::InternalServerError(format!("Failed to encode tribute: {}", e))
+        })?;
+        db.query("UPDATE $rid CONTENT $body")
+            .bind(("rid", id.clone()))
+            .bind(("body", body))
             .await
             .map_err(|e| AppError::InternalServerError(format!("Failed to update tribute: {}", e)))
+            .map(|_| ())
     }))
     .await;
 
-    if tribute_results.iter().any(|result| result.is_err()) {
+    if let Some(err) = tribute_results.iter().find_map(|r| r.as_ref().err()) {
+        let msg = format!("{}", err);
         let _ = db.query("ROLLBACK").await;
-        return Err(AppError::InternalServerError(
-            "Failed to save tribute items".into(),
-        ));
+        return Err(AppError::InternalServerError(format!(
+            "Failed to save tribute items: {}",
+            msg
+        )));
     }
 
-    let mut saved_game = game.clone();
-    saved_game.tributes = vec![];
-    saved_game.areas = vec![];
-    match db
-        .update::<Option<Game>>(game_identifier.clone())
-        .content(saved_game)
+    // Persist mutable game fields explicitly. `db.update().content()` with the
+    // SurrealDB SDK's bespoke serializer drops `Option<u32>` fields like `day`
+    // (same family of bugs as the externally-tagged-enum collapse called out
+    // around the message payload above), so we use a plain UPDATE query that
+    // names the fields we want written.
+    if let Err(e) = db
+        .query("UPDATE $record_id SET day = $day, status = $status")
+        .bind(("record_id", game_identifier.clone()))
+        .bind(("day", game.day))
+        .bind(("status", game.status.to_string()))
         .await
     {
-        Ok(Some(game)) => {
-            // Commit transaction
-            db.query("COMMIT").await.map_err(|e| {
-                AppError::InternalServerError(format!("Failed to commit transaction: {}", e))
-            })?;
-            Ok(Json(game))
-        }
-        Ok(None) => {
-            let _ = db.query("ROLLBACK").await;
-            Err(AppError::NotFound("Failed to find game".into()))
-        }
-        Err(e) => {
-            let _ = db.query("ROLLBACK").await;
-            Err(AppError::InternalServerError(format!(
-                "Failed to update game: {}",
-                e
-            )))
-        }
+        let _ = db.query("ROLLBACK").await;
+        return Err(AppError::InternalServerError(format!(
+            "Failed to update game: {}",
+            e
+        )));
     }
+
+    db.query("COMMIT").await.map_err(|e| {
+        AppError::InternalServerError(format!("Failed to commit transaction: {}", e))
+    })?;
+    Ok(Json(game.clone()))
 }
 
 async fn save_area_items(
@@ -1073,11 +1087,12 @@ async fn save_area_items(
 
     // Batch update operations
     if !items_to_update.is_empty() {
-        // Build bulk update query
+        // Build bulk update query. Hyphenated UUIDs must be wrapped in
+        // ⟨angle brackets⟩ or Surreal's SQL parser splits them on `-`.
         let mut query_parts = Vec::new();
         for item in &items_to_update {
             query_parts.push(format!(
-                "UPDATE item:{} CONTENT {{
+                "UPDATE item:⟨{}⟩ CONTENT {{
                     identifier: '{}',
                     name: '{}',
                     item_type: '{:?}',
@@ -1105,7 +1120,10 @@ async fn save_area_items(
         // Batch insert relations
         let mut relation_parts = Vec::new();
         for item in &items_to_update {
-            relation_parts.push(format!("RELATE {}->items->item:{}", owner, item.identifier));
+            relation_parts.push(format!(
+                "RELATE {}->items->item:⟨{}⟩",
+                owner, item.identifier
+            ));
         }
 
         let bulk_relations = relation_parts.join(";\n");
@@ -1191,11 +1209,12 @@ async fn save_tribute_items(
 
     // Batch update operations
     if !items_to_update.is_empty() {
-        // Build bulk update query
+        // Build bulk update query. Hyphenated UUIDs must be wrapped in
+        // ⟨angle brackets⟩ or Surreal's SQL parser splits them on `-`.
         let mut query_parts = Vec::new();
         for item in &items_to_update {
             query_parts.push(format!(
-                "UPDATE item:{} CONTENT {{
+                "UPDATE item:⟨{}⟩ CONTENT {{
                     identifier: '{}',
                     name: '{}',
                     item_type: '{:?}',
@@ -1223,7 +1242,10 @@ async fn save_tribute_items(
         // Batch insert relations
         let mut relation_parts = Vec::new();
         for item in &items_to_update {
-            relation_parts.push(format!("RELATE {}->owns->item:{}", owner, item.identifier));
+            relation_parts.push(format!(
+                "RELATE {}->owns->item:⟨{}⟩",
+                owner, item.identifier
+            ));
         }
 
         let bulk_relations = relation_parts.join(";\n");

@@ -190,7 +190,14 @@ pub struct RegistrationUser {
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct AuthenticatedUser {
+    // The API returns this field as `access_token` (see api::auth::TokenResponse).
+    // We keep the in-memory field name `jwt` to avoid touching every call site,
+    // but accept both names on the wire via serde alias and emit `access_token`
+    // when serializing so future producers stay compatible with the API contract.
+    #[serde(rename = "access_token", alias = "jwt")]
     pub jwt: String,
+    #[serde(default)]
+    pub refresh_token: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Default, Serialize, Deserialize)]

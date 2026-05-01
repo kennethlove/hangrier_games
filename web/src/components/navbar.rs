@@ -1,3 +1,4 @@
+use crate::auth::maybe_refresh_token;
 use crate::components::icons::mockingjay::Mockingjay;
 use crate::components::icons::mockingjay_arrow::MockingjayArrow;
 use crate::components::icons::mockingjay_flight::MockingjayFlight;
@@ -11,18 +12,13 @@ pub fn Navbar() -> Element {
     let mut theme_signal: Signal<Colorscheme> = use_context();
     use_context_provider(|| Signal::new(crate::components::timeline::PeriodFilters::default()));
 
+    // Best-effort token rotation: if the access token is near expiry and we
+    // have a refresh token, swap to a fresh pair before any protected route
+    // render reads `storage.get().jwt`. Failures clear the session in place.
     if storage.get().jwt.is_some() {
-        let jwt_string = storage.get().jwt.clone().unwrap_or_default();
-        dioxus_logger::tracing::debug!("JWT String: {}", &jwt_string);
-        let decoded = jwt_rustcrypto::decode_only(&jwt_string).expect("Failed to decode JWT");
-        let is_expired = decoded.payload.get("exp").is_some_and(|exp| {
-            let exp_time = exp.as_i64().unwrap_or(0);
-            let current_time = chrono::Utc::now().timestamp();
-            dioxus_logger::tracing::debug!("difference: {}", current_time - exp_time);
-            current_time > exp_time
+        use_future(move || async move {
+            let _ = maybe_refresh_token(&mut storage).await;
         });
-        dioxus_logger::tracing::debug!("Decoded Payload: {:?}", decoded.payload);
-        dioxus_logger::tracing::debug!("Is expired: {}", is_expired);
     }
 
     let link_theme = r#"

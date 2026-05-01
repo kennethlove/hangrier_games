@@ -169,6 +169,7 @@ fn LoginForm() -> Element {
 
                                         let mut state = storage.get();
                                         state.jwt = Some(user.jwt.clone());
+                                        state.refresh_token = user.refresh_token.clone();
                                         state.username = Some(username.clone());
                                         storage.set(state);
 
@@ -308,6 +309,7 @@ fn RegisterForm() -> Element {
 
                                     let mut state = storage.get();
                                     state.jwt = Some(user.jwt.clone());
+                                    state.refresh_token = user.refresh_token.clone();
                                     state.username = Some(username.clone());
                                     storage.set(state);
 
@@ -396,10 +398,26 @@ fn LogoutButton() -> Element {
         form {
             class: "flex flex-col gap-4 mt-4",
             onsubmit: move |_| {
+                let prior_refresh = storage.get().refresh_token.clone();
                 let mut state = storage.get();
                 state.username = None;
                 state.jwt = None;
+                state.refresh_token = None;
                 storage.set(state);
+
+                // Best-effort revoke the refresh token on the server so it
+                // can't be reused if it leaks. Failures here are intentionally
+                // ignored — the local session is gone either way.
+                if let Some(token) = prior_refresh {
+                    spawn(async move {
+                        let _ = reqwest::Client::new()
+                            .post(format!("{}/api/auth/logout", APP_API_HOST))
+                            .json(&serde_json::json!({ "refresh_token": token }))
+                            .send()
+                            .await;
+                    });
+                }
+
                 let navigator = use_navigator();
                 navigator.replace(Routes::Home {});
             },

@@ -156,23 +156,22 @@ async fn create_game_area_edge(
         }
     };
 
-    let gar = db
-        .insert::<Option<GameAreaEdge>>(RecordId::from(("areas", area_uuid.to_string())))
-        .relation(GameAreaEdge {
-            game: game_id.clone(),
-            area: RecordId::from(("area", &area_uuid.to_string())),
-        })
+    let edge = GameAreaEdge {
+        game: game_id.clone(),
+        area: RecordId::from(("area", &area_uuid.to_string())),
+    };
+
+    // RELATE always returns an array; the SDK's typed Option<T> path fails to
+    // deserialize that into a single struct. Use a raw query so the response
+    // shape doesn't matter. The (game, area) unique index keeps duplicates out.
+    db.query("RELATE $game->areas->$area")
+        .bind(("game", edge.game.clone()))
+        .bind(("area", edge.area.clone()))
         .await
         .map_err(|e| {
             AppError::InternalServerError(format!("Failed to link game and area: {}", e))
         })?;
-
-    match gar {
-        Some(edge) => Ok(edge),
-        None => Err(AppError::InternalServerError(
-            "Failed to create game area record".into(),
-        )),
-    }
+    Ok(edge)
 }
 
 pub async fn create_game(
@@ -1087,37 +1086,25 @@ async fn save_area_items(
 
     // Batch update operations
     if !items_to_update.is_empty() {
-        // Build bulk update query. Hyphenated UUIDs must be wrapped in
-        // ⟨angle brackets⟩ or Surreal's SQL parser splits them on `-`.
-        let mut query_parts = Vec::new();
+        // Use serde_json::to_value + bound CONTENT so ALL Item fields round-trip
+        // (the previous hand-rolled CONTENT block silently dropped `rarity`,
+        // and string-interpolating fields is fragile around quoting).
         for item in &items_to_update {
-            query_parts.push(format!(
-                "UPDATE item:⟨{}⟩ CONTENT {{
-                    identifier: '{}',
-                    name: '{}',
-                    item_type: '{:?}',
-                    effect: {},
-                    current_durability: {},
-                    max_durability: {},
-                    attribute: '{:?}'
-                }}",
-                item.identifier,
-                item.identifier,
-                item.name.replace("'", "\\'"),
-                item.item_type,
-                item.effect,
-                item.current_durability,
-                item.max_durability,
-                item.attribute
-            ));
+            let rid = RecordId::from(("item", item.identifier.to_string().as_str()));
+            let body = serde_json::to_value(item).map_err(|e| {
+                AppError::InternalServerError(format!("Failed to encode item: {}", e))
+            })?;
+            db.query("UPDATE $rid CONTENT $body")
+                .bind(("rid", rid))
+                .bind(("body", body))
+                .await
+                .map_err(|e| {
+                    AppError::InternalServerError(format!("Failed to update item: {}", e))
+                })?;
         }
 
-        let bulk_query = query_parts.join(";\n");
-        db.query(&bulk_query).await.map_err(|e| {
-            AppError::InternalServerError(format!("Failed to batch update items: {}", e))
-        })?;
-
-        // Batch insert relations
+        // Batch insert relations. Hyphenated UUIDs must be wrapped in
+        // ⟨angle brackets⟩ or Surreal's SQL parser splits them on `-`.
         let mut relation_parts = Vec::new();
         for item in &items_to_update {
             relation_parts.push(format!(
@@ -1209,37 +1196,25 @@ async fn save_tribute_items(
 
     // Batch update operations
     if !items_to_update.is_empty() {
-        // Build bulk update query. Hyphenated UUIDs must be wrapped in
-        // ⟨angle brackets⟩ or Surreal's SQL parser splits them on `-`.
-        let mut query_parts = Vec::new();
+        // Use serde_json::to_value + bound CONTENT so ALL Item fields round-trip
+        // (the previous hand-rolled CONTENT block silently dropped `rarity`,
+        // and string-interpolating fields is fragile around quoting).
         for item in &items_to_update {
-            query_parts.push(format!(
-                "UPDATE item:⟨{}⟩ CONTENT {{
-                    identifier: '{}',
-                    name: '{}',
-                    item_type: '{:?}',
-                    effect: {},
-                    current_durability: {},
-                    max_durability: {},
-                    attribute: '{:?}'
-                }}",
-                item.identifier,
-                item.identifier,
-                item.name.replace("'", "\\'"),
-                item.item_type,
-                item.effect,
-                item.current_durability,
-                item.max_durability,
-                item.attribute
-            ));
+            let rid = RecordId::from(("item", item.identifier.to_string().as_str()));
+            let body = serde_json::to_value(item).map_err(|e| {
+                AppError::InternalServerError(format!("Failed to encode item: {}", e))
+            })?;
+            db.query("UPDATE $rid CONTENT $body")
+                .bind(("rid", rid))
+                .bind(("body", body))
+                .await
+                .map_err(|e| {
+                    AppError::InternalServerError(format!("Failed to update item: {}", e))
+                })?;
         }
 
-        let bulk_query = query_parts.join(";\n");
-        db.query(&bulk_query).await.map_err(|e| {
-            AppError::InternalServerError(format!("Failed to batch update items: {}", e))
-        })?;
-
-        // Batch insert relations
+        // Batch insert relations. Hyphenated UUIDs must be wrapped in
+        // ⟨angle brackets⟩ or Surreal's SQL parser splits them on `-`.
         let mut relation_parts = Vec::new();
         for item in &items_to_update {
             relation_parts.push(format!(

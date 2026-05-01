@@ -444,7 +444,11 @@ impl Tribute {
                                     self.area = destination;
                                     self.stamina = self.stamina.saturating_sub(info.stamina_cost);
                                 } else {
-                                    // Insufficient stamina - exhausted
+                                    // Insufficient stamina - exhausted. travels() already
+                                    // pushed a TributeMoves event optimistically; remove it
+                                    // so the log doesn't contradict itself ("moves from X"
+                                    // immediately followed by "too exhausted to move from X").
+                                    events.pop();
                                     self.short_rests();
                                     let line = GameOutput::TributeTravelExhausted(
                                         self.name.as_str(),

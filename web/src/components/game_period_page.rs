@@ -4,30 +4,38 @@
 //! day log via `/api/games/{id}/log/{day}`, filters down to the requested
 //! phase, and renders [`FilterChips`] + [`Timeline`].
 
-use crate::cache::{QueryError, QueryKey, QueryValue};
+use crate::cache::QueryError;
 use crate::components::filter_chips::FilterChips;
 use crate::components::timeline::{PeriodFilters, Timeline};
 use crate::env::APP_API_HOST;
+use crate::hooks::use_timeline_summary::use_timeline_summary;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use reqwest::StatusCode;
 use shared::messages::{GameMessage, Phase};
 
-async fn fetch_day_log(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
-    let Some(QueryKey::GameDayLog(id, day)) = keys.first() else {
-        return Err(QueryError::Unknown);
-    };
-    let url = format!("{APP_API_HOST}/api/games/{id}/log/{day}");
-    match reqwest::get(&url).await {
-        Ok(resp) => match resp.status() {
-            StatusCode::OK => match resp.json::<Vec<GameMessage>>().await {
-                Ok(v) => Ok(QueryValue::Logs(v)),
-                Err(_) => Err(QueryError::BadJson),
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct DayLogQ;
+
+impl QueryCapability for DayLogQ {
+    type Ok = Vec<GameMessage>;
+    type Err = QueryError;
+    type Keys = (String, u32);
+
+    async fn run(&self, keys: &(String, u32)) -> Result<Vec<GameMessage>, QueryError> {
+        let (id, day) = keys;
+        let url = format!("{APP_API_HOST}/api/games/{id}/log/{day}");
+        match reqwest::get(&url).await {
+            Ok(resp) => match resp.status() {
+                StatusCode::OK => match resp.json::<Vec<GameMessage>>().await {
+                    Ok(v) => Ok(v),
+                    Err(_) => Err(QueryError::BadJson),
+                },
+                StatusCode::NOT_FOUND => Err(QueryError::GameNotFound(id.clone())),
+                _ => Err(QueryError::Unknown),
             },
-            StatusCode::NOT_FOUND => Err(QueryError::GameNotFound(id.clone())),
-            _ => Err(QueryError::Unknown),
-        },
-        Err(_) => Err(QueryError::ServerNotFound),
+            Err(_) => Err(QueryError::ServerNotFound),
+        }
     }
 }
 
@@ -36,17 +44,18 @@ pub fn GamePeriodPage(identifier: String, day: u32, phase: Phase) -> Element {
     let filters: Signal<PeriodFilters> = use_context();
     let filter = filters.read().filter_for(&identifier);
 
-    let summary_q = use_get_query(
-        [QueryKey::TimelineSummary(identifier.clone())],
-        crate::hooks::use_timeline_summary::fetch_timeline_summary,
-    );
+    let summary_q = use_timeline_summary(identifier.clone());
 
-    let valid = match summary_q.result().value() {
-        QueryState::Settled(Ok(QueryValue::TimelineSummary(s))) => {
-            s.periods.iter().any(|p| p.day == day && p.phase == phase)
+    let valid = {
+        let reader = summary_q.read();
+        let state = reader.state();
+        match &*state {
+            QueryStateData::Settled { res: Ok(s), .. } => {
+                s.periods.iter().any(|p| p.day == day && p.phase == phase)
+            }
+            QueryStateData::Settled { res: Err(_), .. } => false,
+            _ => true,
         }
-        QueryState::Settled(Err(_)) => false,
-        _ => true,
     };
 
     if !valid {
@@ -58,17 +67,16 @@ pub fn GamePeriodPage(identifier: String, day: u32, phase: Phase) -> Element {
         };
     }
 
-    let log_q = use_get_query(
-        [QueryKey::GameDayLog(identifier.clone(), day)],
-        fetch_day_log,
-    );
+    let log_q = use_query(Query::new((identifier.clone(), day), DayLogQ));
+    let reader = log_q.read();
+    let state = reader.state();
 
     rsx! {
         div { class: "space-y-4",
             h1 { class: "text-2xl font-semibold", "Day {day} — {phase}" }
             FilterChips { game_identifier: identifier.clone() }
-            match log_q.result().value() {
-                QueryState::Settled(Ok(QueryValue::Logs(msgs))) => {
+            match &*state {
+                QueryStateData::Settled { res: Ok(msgs), .. } => {
                     let filtered: Vec<GameMessage> = msgs
                         .iter()
                         .filter(|m| m.phase == phase)
@@ -82,7 +90,7 @@ pub fn GamePeriodPage(identifier: String, day: u32, phase: Phase) -> Element {
                         }
                     }
                 }
-                QueryState::Settled(Err(_)) => rsx! {
+                QueryStateData::Settled { res: Err(_), .. } => rsx! {
                     p { class: "text-red-600", "Failed to load events." }
                 },
                 _ => rsx! {

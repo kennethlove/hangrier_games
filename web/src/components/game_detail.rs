@@ -1,9 +1,10 @@
 use crate::LoadingState;
-use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
+use crate::cache::{MutationError, QueryError};
 use crate::components::ThemedButton;
 use crate::components::game_areas::GameAreaList;
 use crate::components::game_edit::GameEdit;
 use crate::components::game_tributes::GameTributes;
+use crate::components::games_list::GamesListQ;
 use crate::components::info_detail::InfoDetail;
 use crate::components::period_grid::PeriodGrid;
 use crate::components::recap_card::RecapCard;
@@ -13,38 +14,34 @@ use crate::hooks::{ConnectionState, use_game_websocket};
 use crate::routes::Routes;
 use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{
-    MutationResult, MutationState, QueryResult, QueryState, UseMutation, UseQueryClient,
-    use_get_query, use_mutation, use_query_client,
-};
-use game::games::Game;
+use dioxus_query::prelude::*;
 use reqwest::StatusCode;
 use shared::{DisplayGame, GameEvent, GameStatus};
-use std::ops::Deref;
 
-async fn fetch_display_game(
-    keys: Vec<QueryKey>,
-    token: String,
-) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::DisplayGame(identifier)) = keys.first() {
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub(crate) struct DisplayGameQ {
+    pub token: String,
+}
+
+impl QueryCapability for DisplayGameQ {
+    type Ok = Box<DisplayGame>;
+    type Err = QueryError;
+    type Keys = String;
+
+    async fn run(&self, identifier: &String) -> Result<Box<DisplayGame>, QueryError> {
         let client = reqwest::Client::new();
-
         let request = client
             .request(
                 reqwest::Method::GET,
                 format!("{}/api/games/{}/display", APP_API_HOST, identifier),
             )
-            .bearer_auth(token);
-
+            .bearer_auth(&self.token);
         match request.send().await {
             Ok(response) => match response.error_for_status() {
-                Ok(response) => {
-                    if let Ok(game) = response.json::<DisplayGame>().await {
-                        Ok(QueryValue::DisplayGame(Box::new(game)))
-                    } else {
-                        Err(QueryError::BadJson)
-                    }
-                }
+                Ok(response) => match response.json::<DisplayGame>().await {
+                    Ok(game) => Ok(Box::new(game)),
+                    Err(_) => Err(QueryError::BadJson),
+                },
                 Err(e) => {
                     if e.status() == Some(StatusCode::UNAUTHORIZED) {
                         Err(QueryError::Unauthorized)
@@ -61,116 +58,61 @@ async fn fetch_display_game(
                 }
             }
         }
-    } else {
-        Err(QueryError::Unknown)
     }
 }
 
-async fn _fetch_full_game(
-    keys: Vec<QueryKey>,
-    token: String,
-) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::Game(identifier)) = keys.first() {
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub(crate) struct NextStepM;
+
+#[derive(Clone, PartialEq, Debug)]
+pub(crate) enum NextStepResult {
+    Started(String),
+    Finished(String),
+    Advanced(String),
+}
+
+impl NextStepResult {
+    pub fn identifier(&self) -> &String {
+        match self {
+            NextStepResult::Started(s)
+            | NextStepResult::Finished(s)
+            | NextStepResult::Advanced(s) => s,
+        }
+    }
+}
+
+impl MutationCapability for NextStepM {
+    type Ok = NextStepResult;
+    type Err = MutationError;
+    type Keys = (String, String);
+
+    async fn run(&self, args: &(String, String)) -> Result<NextStepResult, MutationError> {
+        let identifier = args.0.clone();
+        let token = args.1.clone();
         let client = reqwest::Client::new();
-
-        let request = client
-            .request(
-                reqwest::Method::GET,
-                format!("{}/api/games/{}", APP_API_HOST, identifier),
-            )
-            .bearer_auth(token);
-
+        let url: String = format!("{}/api/games/{}/next", APP_API_HOST, identifier);
+        let request = client.request(reqwest::Method::PUT, url).bearer_auth(token);
         match request.send().await {
-            Ok(response) => match response.error_for_status() {
-                Ok(response) => {
-                    if let Ok(game) = response.json::<Game>().await {
-                        QueryResult::Ok(QueryValue::Game(Box::new(game)))
-                    } else {
-                        QueryResult::Err(QueryError::BadJson)
-                    }
-                }
-                Err(e) => {
-                    if e.status() == Some(StatusCode::UNAUTHORIZED) {
-                        QueryResult::Err(QueryError::Unauthorized)
-                    } else {
-                        QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
-                    }
-                }
+            Ok(response) => match response.status() {
+                StatusCode::NO_CONTENT => Ok(NextStepResult::Finished(identifier)),
+                StatusCode::CREATED => Ok(NextStepResult::Started(identifier)),
+                StatusCode::OK => Ok(NextStepResult::Advanced(identifier)),
+                _ => Err(MutationError::UnableToAdvanceGame),
             },
-            Err(e) => {
-                if e.status() == Some(StatusCode::UNAUTHORIZED) {
-                    QueryResult::Err(QueryError::Unauthorized)
-                } else {
-                    QueryResult::Err(QueryError::GameNotFound(identifier.to_string()))
-                }
-            }
+            Err(_) => Err(MutationError::UnableToAdvanceGame),
         }
-    } else {
-        QueryResult::Err(QueryError::Unknown)
     }
-}
 
-async fn next_step(args: (String, String)) -> MutationResult<MutationValue, MutationError> {
-    let identifier = args.0.clone();
-    let token = args.1.clone();
-    let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}/next", APP_API_HOST, identifier);
-
-    let request = client.request(reqwest::Method::PUT, url).bearer_auth(token);
-
-    match request.send().await {
-        Ok(response) => match response.status() {
-            StatusCode::NO_CONTENT => Ok(MutationValue::GameFinished(identifier)),
-            StatusCode::CREATED => Ok(MutationValue::GameStarted(identifier)),
-            StatusCode::OK => Ok(MutationValue::GameAdvanced(identifier)),
-            _ => Err(MutationError::UnableToAdvanceGame),
-        },
-        Err(_) => Err(MutationError::UnableToAdvanceGame),
-    }
-}
-
-async fn handle_next_step(
-    game_id: String,
-    token: String,
-    mutate: UseMutation<MutationValue, MutationError, (String, String)>,
-    client: UseQueryClient<QueryValue, QueryError, QueryKey>,
-    mut loading_signal: Signal<LoadingState>,
-    mut filters: Signal<PeriodFilters>,
-) {
-    loading_signal.set(LoadingState::Loading);
-    mutate.mutate_async((game_id.clone(), token)).await;
-
-    match mutate.result().deref() {
-        MutationState::Settled(Ok(result)) => {
-            match result {
-                MutationValue::GameStarted(game_identifier)
-                | MutationValue::GameFinished(game_identifier)
-                | MutationValue::GameAdvanced(game_identifier) => {
-                    filters.write().bump(game_identifier);
-                    client.invalidate_queries(&[
-                        QueryKey::DisplayGame(game_identifier.clone()),
-                        QueryKey::Games,
-                    ]);
-                    loading_signal.set(LoadingState::Loaded);
-                }
-                _ => {
-                    loading_signal.set(LoadingState::Loaded); // Or an error state
-                }
-            }
+    async fn on_settled(&self, _keys: &Self::Keys, result: &Result<Self::Ok, Self::Err>) {
+        if result.is_ok() {
+            QueriesStorage::<DisplayGameQ>::invalidate_all().await;
+            QueriesStorage::<GamesListQ>::invalidate_all().await;
         }
-        MutationState::Settled(Err(MutationError::UnableToAdvanceGame)) => {
-            loading_signal.set(LoadingState::Loaded); // Or an error state
-        }
-        MutationState::Settled(Err(_)) => {
-            loading_signal.set(LoadingState::Loaded); // Or an error state
-        }
-        _ => {}
     }
 }
 
 #[component]
 pub fn GamePage(identifier: String) -> Element {
-    // WebSocket for real-time updates
     let (ws_events, ws_connection) = use_game_websocket(identifier.clone());
 
     rsx! {
@@ -182,7 +124,6 @@ pub fn GamePage(identifier: String) -> Element {
             gap-4
             "#,
 
-            // Connection status indicator
             {match ws_connection() {
                 ConnectionState::Connected => rsx! {
                     div { class: "text-sm text-green-600", "Live updates connected" }
@@ -198,7 +139,6 @@ pub fn GamePage(identifier: String) -> Element {
                 },
             }}
 
-            // Real-time event feed
             if !ws_events.read().is_empty() {
                 div {
                     class: "bg-gray-100 p-4 rounded-lg max-h-64 overflow-y-auto",
@@ -218,7 +158,6 @@ pub fn GamePage(identifier: String) -> Element {
     }
 }
 
-/// Format a GameEvent for display
 fn format_game_event(event: &GameEvent) -> String {
     match event {
         GameEvent::GameStarted { day } => format!("Game started - Day {}", day),
@@ -231,12 +170,8 @@ fn format_game_event(event: &GameEvent) -> String {
         }
         GameEvent::DayStarted { day } => format!("Day {} started", day),
         GameEvent::NightStarted { day } => format!("Night {} started", day),
-        GameEvent::TributeDied { name, cause, .. } => {
-            format!("{} died: {}", name, cause)
-        }
-        GameEvent::AreaEvent { area, event } => {
-            format!("{} in {}", event, area)
-        }
+        GameEvent::TributeDied { name, cause, .. } => format!("{} died: {}", name, cause),
+        GameEvent::AreaEvent { area, event } => format!("{} in {}", event, area),
         GameEvent::Combat {
             attacker,
             defender,
@@ -253,20 +188,27 @@ fn GameState(identifier: String) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.unwrap_or_default();
 
-    let loading_signal = use_context::<Signal<LoadingState>>();
-    let filters = use_context::<Signal<PeriodFilters>>();
+    let mut loading_signal = use_context::<Signal<LoadingState>>();
+    let mut filters = use_context::<Signal<PeriodFilters>>();
 
-    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
+    let token_for_query = token.clone();
+    let game_query = use_query(Query::new(
+        identifier.clone(),
+        DisplayGameQ {
+            token: token_for_query,
+        },
+    ));
 
-    let token_clone = token.clone();
-    let game_query = use_get_query(
-        [QueryKey::DisplayGame(identifier.clone()), QueryKey::Games],
-        move |keys: Vec<QueryKey>| fetch_display_game(keys, token.clone()),
-    );
+    let mutate = use_mutation(Mutation::new(NextStepM));
 
-    match game_query.result().value() {
-        QueryState::Settled(Ok(QueryValue::DisplayGame(game_data))) => {
-            let game = *game_data.clone();
+    let reader = game_query.read();
+    let state = reader.state();
+
+    match &*state {
+        QueryStateData::Settled {
+            res: Ok(game_data), ..
+        } => {
+            let game = (**game_data).clone();
             let game_id = game.identifier.clone();
             let g_id = game_id.clone();
             let game_name = game.name.clone();
@@ -278,8 +220,6 @@ fn GameState(identifier: String) -> Element {
             let creator = game.created_by.username.clone();
             let day = game.day.unwrap_or(0);
 
-            let mutate = use_mutation(next_step);
-
             let game_next_step = match game_status {
                 GameStatus::NotStarted => if is_ready { "Start" } else { "Wait" }.to_string(),
                 GameStatus::InProgress => format!("Play day {}", day + 1),
@@ -288,22 +228,22 @@ fn GameState(identifier: String) -> Element {
 
             let next_step_handler = move |_| {
                 let game_id_clone = game_id.clone();
-                let token_clone = token_clone.clone();
-                let mutate_clone = mutate;
-                let client_clone = client;
-                let loading_signal_clone = loading_signal;
-                let filters_clone = filters;
-
+                let token_clone = token.clone();
                 spawn(async move {
-                    handle_next_step(
-                        game_id_clone,
-                        token_clone,
-                        mutate_clone,
-                        client_clone,
-                        loading_signal_clone,
-                        filters_clone,
-                    )
-                    .await;
+                    loading_signal.set(LoadingState::Loading);
+                    let reader = mutate.mutate_async((game_id_clone, token_clone)).await;
+                    let state = reader.state();
+                    match &*state {
+                        MutationStateData::Settled {
+                            res: Ok(result), ..
+                        } => {
+                            filters.write().bump(result.identifier());
+                            loading_signal.set(LoadingState::Loaded);
+                        }
+                        _ => {
+                            loading_signal.set(LoadingState::Loaded);
+                        }
+                    }
                 });
             };
 
@@ -378,7 +318,10 @@ fn GameState(identifier: String) -> Element {
                 }
             }
         }
-        QueryState::Settled(Err(QueryError::GameNotFound(_))) => {
+        QueryStateData::Settled {
+            res: Err(QueryError::GameNotFound(_)),
+            ..
+        } => {
             rsx! {
                 p {
                     class: r#"
@@ -391,7 +334,10 @@ fn GameState(identifier: String) -> Element {
                 }
             }
         }
-        QueryState::Settled(Err(QueryError::Unauthorized)) => {
+        QueryStateData::Settled {
+            res: Err(QueryError::Unauthorized),
+            ..
+        } => {
             rsx! {
                 p {
                     class: r#"
@@ -429,7 +375,7 @@ fn GameState(identifier: String) -> Element {
                 }
             }
         }
-        QueryState::Settled(Err(e)) => {
+        QueryStateData::Settled { res: Err(e), .. } => {
             rsx! {
                 p {
                     class: r#"
@@ -442,7 +388,7 @@ fn GameState(identifier: String) -> Element {
                 }
             }
         }
-        QueryState::Loading(_) => {
+        QueryStateData::Loading { .. } => {
             rsx! {
                 p {
                     class: r#"
@@ -466,13 +412,12 @@ fn GameStats(identifier: String) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.unwrap_or_default();
 
-    let game_query = use_get_query(
-        [QueryKey::DisplayGame(identifier.clone()), QueryKey::Games],
-        move |keys: Vec<QueryKey>| fetch_display_game(keys, token.clone()),
-    );
+    let game_query = use_query(Query::new(identifier.clone(), DisplayGameQ { token }));
+    let reader = game_query.read();
+    let state = reader.state();
 
-    match game_query.result().value() {
-        QueryState::Settled(Ok(QueryValue::DisplayGame(game))) => {
+    match &*state {
+        QueryStateData::Settled { res: Ok(game), .. } => {
             let game_day = game.day.unwrap_or(0);
             let tribute_count = game.living_count;
 
@@ -561,10 +506,10 @@ fn GameStats(identifier: String) -> Element {
                 }
             }
         }
-        QueryState::Settled(Err(_)) => {
+        QueryStateData::Settled { res: Err(_), .. } => {
             rsx! {}
         }
-        QueryState::Loading(_) => {
+        QueryStateData::Loading { .. } => {
             rsx! {
                 p {
                     class: r#"
@@ -588,14 +533,18 @@ fn GameDetails(identifier: String) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
     let display_token = storage.get().jwt.unwrap_or_default();
 
-    let display_game_query = use_get_query(
-        [QueryKey::DisplayGame(identifier.clone()), QueryKey::Games],
-        move |keys: Vec<QueryKey>| fetch_display_game(keys, display_token.clone()),
-    );
+    let display_game_query = use_query(Query::new(
+        identifier.clone(),
+        DisplayGameQ {
+            token: display_token,
+        },
+    ));
+    let reader = display_game_query.read();
+    let state = reader.state();
 
-    match display_game_query.result().value() {
-        QueryState::Settled(Ok(QueryValue::DisplayGame(game))) => {
-            let display_game = *game.clone();
+    match &*state {
+        QueryStateData::Settled { res: Ok(game), .. } => {
+            let display_game = (**game).clone();
             let day = display_game.clone().day.unwrap_or(0);
 
             let xl_display = match day {
@@ -638,7 +587,7 @@ fn GameDetails(identifier: String) -> Element {
                 }
             }
         }
-        QueryState::Settled(Err(_)) => {
+        QueryStateData::Settled { res: Err(_), .. } => {
             rsx! {}
         }
         _ => {

@@ -1,5 +1,5 @@
-use crate::cache::{QueryError, QueryKey, QueryValue};
-use crate::components::game_tributes::PaginatedTributesResponse;
+use crate::cache::QueryError;
+use crate::components::game_tributes::GameTributesQ;
 use crate::components::icons::uturn::UTurnIcon;
 use crate::components::info_detail::InfoDetail;
 use crate::components::item_icon::ItemIcon;
@@ -8,81 +8,79 @@ use crate::env::APP_API_HOST;
 use crate::routes::Routes;
 use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{QueryResult, QueryState, use_get_query};
+use dioxus_query::prelude::*;
 use game::messages::GameMessage;
 use game::tributes::statuses::TributeStatus;
 use game::tributes::traits::Trait;
 use game::tributes::{Attributes, Tribute};
 
-async fn fetch_tribute(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::Tribute(_game_identifier, tribute_identifier)) = keys.first() {
-        if let Some(QueryKey::DisplayGame(game_identifier)) = keys.last() {
-            let client = reqwest::Client::new();
-
-            let request = client
-                .request(
-                    reqwest::Method::GET,
-                    format!(
-                        "{}/api/games/{}/tributes/{}",
-                        APP_API_HOST, game_identifier, tribute_identifier
-                    ),
-                )
-                .bearer_auth(token);
-
-            match request.send().await {
-                Ok(response) => {
-                    if response.status().is_success() {
-                        match response.json::<Option<Tribute>>().await {
-                            Ok(Some(tribute)) => {
-                                QueryResult::Ok(QueryValue::Tribute(Box::new(tribute)))
-                            }
-                            _ => QueryResult::Err(QueryError::TributeNotFound(
-                                tribute_identifier.to_string(),
-                            )),
-                        }
-                    } else {
-                        QueryResult::Err(QueryError::TributeNotFound(
-                            tribute_identifier.to_string(),
-                        ))
-                    }
-                }
-                Err(_) => QueryResult::Err(QueryError::Unknown),
-            }
-        } else {
-            QueryResult::Err(QueryError::Unknown)
-        }
-    } else {
-        QueryResult::Err(QueryError::Unknown)
-    }
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub(crate) struct TributeQ {
+    pub token: String,
 }
 
-/// Fetch the paginated tribute roster for a game (used to resolve ally UUIDs
-/// to names client-side without a new endpoint). Standard rosters are exactly
-/// 24 tributes (12 districts × 2), matching the API's default page size.
-async fn fetch_tribute_roster(
-    keys: Vec<QueryKey>,
-    token: String,
-) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::Tributes(game_identifier)) = keys.first() {
+impl QueryCapability for TributeQ {
+    type Ok = Box<Tribute>;
+    type Err = QueryError;
+    type Keys = (String, String);
+
+    async fn run(&self, keys: &(String, String)) -> Result<Box<Tribute>, QueryError> {
+        let (game_identifier, tribute_identifier) = keys;
         let client = reqwest::Client::new();
         let request = client
             .request(
                 reqwest::Method::GET,
                 format!(
-                    "{}/api/games/{}/tributes?limit=24&offset=0",
-                    APP_API_HOST, game_identifier
+                    "{}/api/games/{}/tributes/{}",
+                    APP_API_HOST, game_identifier, tribute_identifier
                 ),
             )
-            .bearer_auth(token);
+            .bearer_auth(&self.token);
         match request.send().await {
-            Ok(response) => match response.json::<PaginatedTributesResponse>().await {
-                Ok(tributes) => Ok(QueryValue::PaginatedTributes(tributes)),
-                Err(_) => Err(QueryError::BadJson),
-            },
-            Err(_) => Err(QueryError::GameNotFound(game_identifier.to_string())),
+            Ok(response) => {
+                if response.status().is_success() {
+                    match response.json::<Option<Tribute>>().await {
+                        Ok(Some(tribute)) => Ok(Box::new(tribute)),
+                        _ => Err(QueryError::TributeNotFound(tribute_identifier.to_string())),
+                    }
+                } else {
+                    Err(QueryError::TributeNotFound(tribute_identifier.to_string()))
+                }
+            }
+            Err(_) => Err(QueryError::Unknown),
         }
-    } else {
-        Err(QueryError::Unknown)
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub(crate) struct TributeLogQ {
+    pub token: String,
+}
+
+impl QueryCapability for TributeLogQ {
+    type Ok = Vec<GameMessage>;
+    type Err = QueryError;
+    type Keys = (String, String);
+
+    async fn run(&self, keys: &(String, String)) -> Result<Vec<GameMessage>, QueryError> {
+        let (game_identifier, identifier) = keys;
+        let client = reqwest::Client::new();
+        let request = client
+            .request(
+                reqwest::Method::GET,
+                format!(
+                    "{}/api/games/{}/tributes/{}/log",
+                    APP_API_HOST, game_identifier, identifier
+                ),
+            )
+            .bearer_auth(&self.token);
+        match request.send().await {
+            Ok(response) => match response.json::<Vec<GameMessage>>().await {
+                Ok(logs) => Ok(logs),
+                Err(_) => Err(QueryError::TributeNotFound(identifier.to_string())),
+            },
+            Err(_) => Err(QueryError::TributeNotFound(identifier.to_string())),
+        }
     }
 }
 
@@ -115,55 +113,22 @@ fn trait_chip_classes(t: &Trait) -> &'static str {
     }
 }
 
-async fn fetch_tribute_log(
-    keys: Vec<QueryKey>,
-    token: String,
-) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::TributeLog(identifier)) = keys.first() {
-        if let Some(QueryKey::DisplayGame(game_identifier)) = keys.last() {
-            let client = reqwest::Client::new();
-
-            let request = client
-                .request(
-                    reqwest::Method::GET,
-                    format!(
-                        "{}/api/games/{}/tributes/{}/log",
-                        APP_API_HOST, game_identifier, identifier
-                    ),
-                )
-                .bearer_auth(token);
-
-            match request.send().await {
-                Ok(response) => match response.json::<Vec<GameMessage>>().await {
-                    Ok(logs) => QueryResult::Ok(QueryValue::Logs(logs)),
-                    Err(_) => QueryResult::Err(QueryError::TributeNotFound(identifier.to_string())),
-                },
-                Err(_) => QueryResult::Err(QueryError::TributeNotFound(identifier.to_string())),
-            }
-        } else {
-            QueryResult::Err(QueryError::Unknown)
-        }
-    } else {
-        QueryResult::Err(QueryError::Unknown)
-    }
-}
-
 #[component]
 pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
 
-    let tribute_query = use_get_query(
-        [
-            QueryKey::Tribute(game_identifier.clone(), tribute_identifier.clone()),
-            QueryKey::Tributes(game_identifier.clone()),
-            QueryKey::DisplayGame(game_identifier.clone()),
-        ],
-        move |keys: Vec<QueryKey>| fetch_tribute(keys, token.clone()),
-    );
+    let tribute_query = use_query(Query::new(
+        (game_identifier.clone(), tribute_identifier.clone()),
+        TributeQ { token },
+    ));
+    let reader = tribute_query.read();
+    let state = reader.state();
 
-    match tribute_query.result().value() {
-        QueryState::Settled(Ok(QueryValue::Tribute(tribute))) => {
+    match &*state {
+        QueryStateData::Settled {
+            res: Ok(tribute), ..
+        } => {
             rsx! {
                 div {
                     class: "flex flex-row gap-4 mb-4 place-items-center place-content-between",
@@ -323,10 +288,13 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                 }
             }
         }
-        QueryState::Settled(Err(QueryError::TributeNotFound(identifier))) => {
+        QueryStateData::Settled {
+            res: Err(QueryError::TributeNotFound(identifier)),
+            ..
+        } => {
             rsx! { p { "{identifier} not found." } }
         }
-        QueryState::Loading(_) => {
+        QueryStateData::Loading { .. } => {
             rsx! { p { "Loading..." } }
         }
         _ => {
@@ -340,16 +308,15 @@ fn TributeLog(game_identifier: String, identifier: String) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
 
-    let log_query = use_get_query(
-        [
-            QueryKey::TributeLog(identifier.clone()),
-            QueryKey::DisplayGame(game_identifier.clone()),
-        ],
-        move |keys: Vec<QueryKey>| fetch_tribute_log(keys, token.clone()),
-    );
+    let log_query = use_query(Query::new(
+        (game_identifier.clone(), identifier.clone()),
+        TributeLogQ { token },
+    ));
+    let reader = log_query.read();
+    let state = reader.state();
 
-    match log_query.result().value() {
-        QueryState::Settled(Ok(QueryValue::Logs(logs))) => {
+    match &*state {
+        QueryStateData::Settled { res: Ok(logs), .. } => {
             rsx! {
                 ul {
                     class: "theme1:text-stone-200 theme2:text-green-200 theme3:text-stone-800",
@@ -365,10 +332,10 @@ fn TributeLog(game_identifier: String, identifier: String) -> Element {
                 }
             }
         }
-        QueryState::Settled(Err(_)) => {
+        QueryStateData::Settled { res: Err(_), .. } => {
             rsx! { p { "Failed to load." }  }
         }
-        QueryState::Loading(_) => {
+        QueryStateData::Loading { .. } => {
             rsx! { p { "Loading..." }  }
         }
         _ => {
@@ -443,16 +410,14 @@ fn TributeAllies(game_identifier: String, ally_ids: Vec<uuid::Uuid>) -> Element 
     let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
 
-    let roster_query = use_get_query(
-        [
-            QueryKey::Tributes(game_identifier.clone()),
-            QueryKey::DisplayGame(game_identifier.clone()),
-        ],
-        move |keys: Vec<QueryKey>| fetch_tribute_roster(keys, token.clone()),
-    );
+    let roster_query = use_query(Query::new(game_identifier.clone(), GameTributesQ { token }));
+    let reader = roster_query.read();
+    let state = reader.state();
 
-    match roster_query.result().value() {
-        QueryState::Settled(Ok(QueryValue::PaginatedTributes(response))) => {
+    match &*state {
+        QueryStateData::Settled {
+            res: Ok(response), ..
+        } => {
             let roster = response.tributes.clone();
             rsx! {
                 ul {
@@ -501,13 +466,13 @@ fn TributeAllies(game_identifier: String, ally_ids: Vec<uuid::Uuid>) -> Element 
                 }
             }
         }
-        QueryState::Settled(Err(_)) => rsx! {
+        QueryStateData::Settled { res: Err(_), .. } => rsx! {
             p {
                 class: "text-sm italic opacity-75",
                 "Failed to load allies."
             }
         },
-        QueryState::Loading(_) => rsx! {
+        QueryStateData::Loading { .. } => rsx! {
             p {
                 class: "text-sm italic opacity-75",
                 "Loading allies..."

@@ -118,7 +118,7 @@ quality: fmt check clippy test
 
 # Install Dioxus CLI
 setup-dx:
-    cargo install dioxus-cli@0.6.2 --locked
+    cargo install dioxus-cli@0.7.7 --locked
 
 # Create Ollama announcer model
 setup-ollama:

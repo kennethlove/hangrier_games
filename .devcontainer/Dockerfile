@@ -27,6 +27,6 @@ RUN rustup target add wasm32-unknown-unknown \
     && rustup component add clippy rustfmt rust-src
 
 # Pre-install Dioxus CLI (matches justfile pin)
-RUN cargo install dioxus-cli@0.6.2 --locked
+RUN cargo install dioxus-cli@0.7.7 --locked
 
 USER root

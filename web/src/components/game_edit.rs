@@ -1,36 +1,45 @@
-use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
+use crate::cache::MutationError;
+use crate::components::game_detail::DisplayGameQ;
+use crate::components::games_list::GamesListQ;
 use crate::components::icons::edit::EditIcon;
 use crate::components::modal::{Modal, Props as ModalProps};
 use crate::components::{Button, Input};
 use crate::env::APP_API_HOST;
 use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{MutationResult, MutationState, use_mutation, use_query_client};
+use dioxus_query::prelude::*;
 use shared::EditGame;
-use std::ops::Deref;
 
-async fn edit_game(args: (EditGame, String)) -> MutationResult<MutationValue, MutationError> {
-    let identifier = args.0.identifier.clone();
-    let token = args.1.clone();
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub(crate) struct EditGameM;
 
-    let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}", APP_API_HOST, identifier);
+impl MutationCapability for EditGameM {
+    type Ok = String;
+    type Err = MutationError;
+    type Keys = (EditGame, String);
 
-    let response = client
-        .put(url)
-        .bearer_auth(token)
-        .json(&args.0.clone())
-        .send()
-        .await;
+    async fn run(&self, args: &(EditGame, String)) -> Result<String, MutationError> {
+        let identifier = args.0.identifier.clone();
+        let token = args.1.clone();
+        let client = reqwest::Client::new();
+        let url: String = format!("{}/api/games/{}", APP_API_HOST, identifier);
+        let response = client
+            .put(url)
+            .bearer_auth(token)
+            .json(&args.0.clone())
+            .send()
+            .await;
+        match response {
+            Ok(r) if r.status().is_success() => Ok(identifier),
+            _ => Err(MutationError::Unknown),
+        }
+    }
 
-    if response
-        .expect("Failed to update game")
-        .status()
-        .is_success()
-    {
-        Ok(MutationValue::GameUpdated(identifier))
-    } else {
-        Err(MutationError::Unknown)
+    async fn on_settled(&self, _keys: &Self::Keys, result: &Result<Self::Ok, Self::Err>) {
+        if result.is_ok() {
+            QueriesStorage::<DisplayGameQ>::invalidate_all().await;
+            QueriesStorage::<GamesListQ>::invalidate_all().await;
+        }
     }
 }
 
@@ -95,26 +104,24 @@ pub fn EditGameForm() -> Element {
     let identifier = game_details.identifier.clone();
     let private = game_details.private;
 
-    let mutate = use_mutation(edit_game);
+    let mutate = use_mutation(Mutation::new(EditGameM));
 
     let dismiss = move |_| {
         edit_game_signal.set(None);
     };
 
-    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
-
     let save = move |e: Event<FormData>| {
         let identifier = identifier.clone();
         let token = storage.get().jwt.expect("No JWT found");
 
-        let data = e.data().values();
-        let name = data.get("name").expect("No name value").0[0].clone();
-        let private = matches!(
-            data.get("private").expect("No private value").0[0]
-                .clone()
-                .as_str(),
-            "on"
-        );
+        let name = match e.data().get_first("name") {
+            Some(FormValue::Text(s)) => s,
+            _ => return,
+        };
+        let private = match e.data().get_first("private") {
+            Some(FormValue::Text(s)) => s == "on",
+            _ => false,
+        };
 
         if !name.is_empty() {
             let edit_game = EditGame {
@@ -123,17 +130,9 @@ pub fn EditGameForm() -> Element {
                 private,
             };
             spawn(async move {
-                mutate.mutate_async((edit_game.clone(), token)).await;
-                edit_game_signal.set(Some(edit_game.clone()));
-
-                if let MutationState::Settled(MutationResult::Ok(MutationValue::GameUpdated(
-                    identifier,
-                ))) = mutate.result().deref()
-                {
-                    client.invalidate_queries(&[
-                        QueryKey::DisplayGame(identifier.clone()),
-                        QueryKey::Games,
-                    ]);
+                let reader = mutate.mutate_async((edit_game.clone(), token)).await;
+                let state = reader.state();
+                if matches!(&*state, MutationStateData::Settled { res: Ok(_), .. }) {
                     edit_game_signal.set(None);
                 }
             });

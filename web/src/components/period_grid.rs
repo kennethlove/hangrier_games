@@ -3,12 +3,12 @@
 //! Loads via `use_timeline_summary`. Surfaces empty/error states through
 //! `PeriodGridEmpty`. Distinguishes 404 (game not found) from other failures.
 
-use crate::cache::{QueryError, QueryValue};
+use crate::cache::QueryError;
 use crate::components::period_card::PeriodCard;
 use crate::components::period_grid_empty::{EmptyKind, PeriodGridEmpty};
 use crate::hooks::use_timeline_summary;
 use dioxus::prelude::*;
-use dioxus_query::prelude::QueryState;
+use dioxus_query::prelude::*;
 
 #[derive(Props, PartialEq, Clone)]
 pub struct PeriodGridProps {
@@ -18,8 +18,10 @@ pub struct PeriodGridProps {
 #[component]
 pub fn PeriodGrid(props: PeriodGridProps) -> Element {
     let query = use_timeline_summary(props.game_identifier.clone());
-    match query.result().value() {
-        QueryState::Settled(Ok(QueryValue::TimelineSummary(s))) => {
+    let reader = query.read();
+    let state = reader.state();
+    match &*state {
+        QueryStateData::Settled { res: Ok(s), .. } => {
             if s.periods.is_empty() {
                 rsx! { PeriodGridEmpty { kind: EmptyKind::NotStarted } }
             } else {
@@ -40,13 +42,13 @@ pub fn PeriodGrid(props: PeriodGridProps) -> Element {
                 }
             }
         }
-        QueryState::Settled(Ok(_)) => {
-            rsx! { PeriodGridEmpty { kind: EmptyKind::LoadFailed } }
-        }
-        QueryState::Settled(Err(QueryError::GameNotFound(_))) => {
+        QueryStateData::Settled {
+            res: Err(QueryError::GameNotFound(_)),
+            ..
+        } => {
             rsx! { PeriodGridEmpty { kind: EmptyKind::NotFound } }
         }
-        QueryState::Settled(Err(_)) => {
+        QueryStateData::Settled { res: Err(_), .. } => {
             rsx! { PeriodGridEmpty { kind: EmptyKind::LoadFailed } }
         }
         _ => rsx! { div { class: "animate-pulse h-32 rounded-lg bg-gray-200" } },

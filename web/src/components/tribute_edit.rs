@@ -1,43 +1,50 @@
-use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
+use crate::cache::MutationError;
+use crate::components::game_tributes::GameTributesQ;
 use crate::components::icons::edit::EditIcon;
 use crate::components::modal::{Modal, Props as ModalProps};
+use crate::components::tribute_detail::TributeQ;
 use crate::components::{Button, Input};
 use crate::env::APP_API_HOST;
 use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{MutationResult, MutationState, use_mutation, use_query_client};
+use dioxus_query::prelude::*;
 use shared::EditTribute;
-use std::ops::Deref;
 
-async fn edit_tribute(
-    args: (EditTribute, String, String),
-) -> MutationResult<MutationValue, MutationError> {
-    let tribute = args.clone().0;
-    let identifier = args.clone().0.identifier.clone();
-    let game_identifier = args.clone().1;
-    let token = args.clone().2;
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub(crate) struct EditTributeM;
 
-    let client = reqwest::Client::new();
-    let url: String = format!(
-        "{}/api/games/{}/tributes/{}",
-        APP_API_HOST, game_identifier, identifier
-    );
+impl MutationCapability for EditTributeM {
+    type Ok = String;
+    type Err = MutationError;
+    type Keys = (EditTribute, String, String);
 
-    let response = client
-        .put(url)
-        .bearer_auth(token)
-        .json(&tribute.clone())
-        .send()
-        .await;
+    async fn run(&self, args: &(EditTribute, String, String)) -> Result<String, MutationError> {
+        let tribute = args.0.clone();
+        let identifier = tribute.identifier.clone();
+        let game_identifier = args.1.clone();
+        let token = args.2.clone();
+        let client = reqwest::Client::new();
+        let url: String = format!(
+            "{}/api/games/{}/tributes/{}",
+            APP_API_HOST, game_identifier, identifier
+        );
+        let response = client
+            .put(url)
+            .bearer_auth(token)
+            .json(&tribute)
+            .send()
+            .await;
+        match response {
+            Ok(r) if r.status().is_success() => Ok(identifier),
+            _ => Err(MutationError::Unknown),
+        }
+    }
 
-    if response
-        .expect("Failed to update tribute")
-        .status()
-        .is_success()
-    {
-        Ok(MutationValue::TributeUpdated(identifier))
-    } else {
-        Err(MutationError::Unknown)
+    async fn on_settled(&self, _keys: &Self::Keys, result: &Result<Self::Ok, Self::Err>) {
+        if result.is_ok() {
+            QueriesStorage::<TributeQ>::invalidate_all().await;
+            QueriesStorage::<GameTributesQ>::invalidate_all().await;
+        }
     }
 }
 
@@ -118,13 +125,11 @@ pub fn EditTributeForm() -> Element {
     let mut avatar_preview = use_signal(|| avatar.clone());
     let mut upload_status = use_signal(String::new);
 
-    let mutate = use_mutation(edit_tribute);
+    let mutate = use_mutation(Mutation::new(EditTributeM));
 
     let dismiss = move |_| {
         edit_tribute_signal.set(None);
     };
-
-    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
 
     let game_identifier_for_upload = game_identifier.clone();
 
@@ -138,8 +143,10 @@ pub fn EditTributeForm() -> Element {
         let identifier = tribute_details.identifier.clone();
         let current_avatar = avatar_preview.read().clone();
 
-        let data = e.data().values();
-        let name = data.get("name").expect("No name value").0[0].clone();
+        let name = match e.data().get_first("name") {
+            Some(FormValue::Text(s)) => s,
+            _ => return,
+        };
 
         if !name.is_empty() {
             let edit_tribute = EditTribute {
@@ -149,18 +156,11 @@ pub fn EditTributeForm() -> Element {
                 game_identifier: game_identifier.clone(),
             };
             spawn(async move {
-                mutate
+                let reader = mutate
                     .mutate_async((edit_tribute.clone(), game_identifier.clone(), token))
                     .await;
-                edit_tribute_signal.set(Some(edit_tribute));
-
-                if let MutationState::Settled(Ok(MutationValue::TributeUpdated(identifier))) =
-                    mutate.result().deref()
-                {
-                    client.invalidate_queries(&[QueryKey::Tribute(
-                        game_identifier.clone(),
-                        identifier.clone(),
-                    )]);
+                let state = reader.state();
+                if matches!(&*state, MutationStateData::Settled { res: Ok(_), .. }) {
                     edit_tribute_signal.set(None);
                 }
             });
@@ -177,11 +177,14 @@ pub fn EditTributeForm() -> Element {
         spawn(async move {
             let files = e.files();
 
-            if let Some(file_engine) = files
-                && let Some(file_name) = file_engine.files().into_iter().next()
-                && let Some(file_data) = file_engine.read_file(&file_name).await
-            {
-                // Upload file using multipart/form-data
+            if let Some(file) = files.into_iter().next() {
+                let file_name = file.name();
+                let Ok(bytes) = file.read_bytes().await else {
+                    upload_status.set("Upload error: failed to read file".to_string());
+                    return;
+                };
+                let file_data = bytes.to_vec();
+
                 let client = reqwest::Client::new();
                 let url = format!(
                     "{}/api/games/{}/tributes/{}/avatar",

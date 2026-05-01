@@ -84,36 +84,27 @@ pub struct GameAreaEdge {
     area: RecordId,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct AreaItemEdge {
-    #[serde(rename = "in")]
-    area: RecordId,
-    #[serde(rename = "out")]
-    item: RecordId,
-}
-
 async fn create_game_area(area: Area, db: &Surreal<Any>) -> Result<GameArea, AppError> {
     let identifier = Uuid::new_v4().to_string();
     let area_id: RecordId = RecordId::from(("area", identifier.to_string()));
 
-    // create the `area` record
-    let game_area: Option<GameArea> = db
-        .insert::<Option<GameArea>>(area_id.clone())
-        .content(GameArea {
-            identifier: identifier.to_string(),
-            name: area.to_string(),
-            area: area.to_string(),
-        })
+    // create the `area` record. Bind via serde_json::Value + a raw
+    // UPDATE...CONTENT query so the SDK's bespoke serializer can't drop
+    // optional fields or collapse externally-tagged enums (see save_game).
+    let game_area = GameArea {
+        identifier: identifier.to_string(),
+        name: area.to_string(),
+        area: area.to_string(),
+    };
+    let body = serde_json::to_value(&game_area)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to encode area: {}", e)))?;
+    db.query("UPDATE $rid CONTENT $body")
+        .bind(("rid", area_id.clone()))
+        .bind(("body", body))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create area: {}", e)))?;
 
-    if let Some(game_area) = game_area {
-        Ok(game_area)
-    } else {
-        Err(AppError::InternalServerError(
-            "Failed to create game area".into(),
-        ))
-    }
+    Ok(game_area)
 }
 
 async fn create_game_area_edge(
@@ -202,16 +193,21 @@ pub async fn create_game(
         ..Default::default()
     };
 
-    let created_game: Option<Game> = state
+    // Use serde_json::Value + bound CONTENT to bypass the SurrealDB SDK's
+    // bespoke serializer (which collapses externally-tagged enums and drops
+    // Option fields like `day`). Same pattern as save_game.
+    let game_rid = RecordId::from(("game", game_identifier.as_str()));
+    let body = serde_json::to_value(&game)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to encode game: {}", e)))?;
+    state
         .db
-        .create(("game", &game_identifier))
-        .content(game)
+        .query("UPDATE $rid CONTENT $body")
+        .bind(("rid", game_rid))
+        .bind(("body", body))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create game: {}", e)))?;
 
-    let created_game = created_game.ok_or_else(|| {
-        AppError::InternalServerError("Game creation returned empty result".into())
-    })?;
+    let created_game = game;
 
     // Create tributes concurrently
     let tribute_futures =
@@ -297,9 +293,12 @@ pub async fn add_item_to_area(
         None => Item::new_random(None),
     };
     let new_item_id: RecordId = RecordId::from(("item", &new_item.identifier));
+    let body = serde_json::to_value(&new_item)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to encode item: {}", e)))?;
     if let Err(e) = db
-        .insert::<Option<Item>>(new_item_id.clone())
-        .content(new_item.clone())
+        .query("UPDATE $rid CONTENT $body")
+        .bind(("rid", new_item_id.clone()))
+        .bind(("body", body))
         .await
     {
         return Err(AppError::InternalServerError(format!(
@@ -308,14 +307,13 @@ pub async fn add_item_to_area(
         )));
     }
 
-    // Insert an area-item relationship
-    let area_item: AreaItemEdge = AreaItemEdge {
-        area: game_area_edge.area.clone(),
-        item: new_item_id.clone(),
-    };
+    // Insert an area-item relationship via a raw RELATE query. RELATE always
+    // returns an array, so the SDK's typed insert::<Vec<_>>().relation() path
+    // is fragile; the raw query with bound params sidesteps that.
     if let Err(e) = db
-        .insert::<Vec<AreaItemEdge>>("items")
-        .relation([area_item])
+        .query("RELATE $area->items->$item")
+        .bind(("area", game_area_edge.area.clone()))
+        .bind(("item", new_item_id.clone()))
         .await
     {
         Err(AppError::InternalServerError(format!(

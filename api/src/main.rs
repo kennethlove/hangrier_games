@@ -33,6 +33,7 @@ use tower_governor::GovernorLayer;
 use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::KeyExtractor;
 use tower_http::cors::CorsLayer;
+use tower_http::normalize_path::NormalizePathLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -281,7 +282,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|e| format!("Failed to get local address: {}", e))?;
     tracing::info!("listening on {}", local_addr);
 
-    axum::serve(listener, router)
+    // Wrap the router in NormalizePathLayer so e.g. `/api/users/` is rewritten
+    // to `/api/users` BEFORE route matching. Axum's per-route layers can't do
+    // this — the layer must sit outside the Router.
+    use axum::ServiceExt;
+    use tower::Layer;
+    let app = NormalizePathLayer::trim_trailing_slash().layer(router);
+
+    axum::serve(listener, ServiceExt::<Request>::into_make_service(app))
         .await
         .map_err(|e| format!("Server error: {}", e))?;
 

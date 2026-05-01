@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+@source "../../src/**/*.rs";
+@source "../../../shared/src/**/*.rs";
+
 @variant theme1 (&:where(.theme1, .theme1 *));
 @variant theme2 (&:where(.theme2, .theme2 *));
 @variant theme3 (&:where(.theme3, .theme3 *));

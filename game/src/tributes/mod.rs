@@ -25,9 +25,76 @@ use fake::faker::name::raw::*;
 use fake::locales::*;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeSeq};
 use statuses::TributeStatus;
 use uuid::Uuid;
+
+/// Serialize `Vec<Uuid>` as `Vec<String>` for SurrealDB compatibility.
+/// The Surreal Rust SDK's bespoke serializer wires `uuid::Uuid` as raw bytes,
+/// which Surreal then renders as base64 and rejects against `array<uuid>`
+/// constraints. Storing as strings on the wire (and as `array<string>` in
+/// the schema) follows the same convention as `message.event_id`.
+fn serialize_uuids_as_strings<S>(uuids: &[Uuid], serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut seq = serializer.serialize_seq(Some(uuids.len()))?;
+    for u in uuids {
+        seq.serialize_element(&u.to_string())?;
+    }
+    seq.end()
+}
+
+/// Deserialize `Vec<Uuid>` from either a sequence of strings (the wire format
+/// we write) or a sequence of native uuid values (test fixtures, JSON read
+/// back through serde's standard Uuid impl).
+fn deserialize_uuids_lenient<'de, D>(deserializer: D) -> Result<Vec<Uuid>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrUuid {
+        S(String),
+        U(Uuid),
+    }
+
+    let raw: Vec<StringOrUuid> = Vec::deserialize(deserializer)?;
+    raw.into_iter()
+        .map(|item| match item {
+            StringOrUuid::S(s) => Uuid::parse_str(&s).map_err(serde::de::Error::custom),
+            StringOrUuid::U(u) => Ok(u),
+        })
+        .collect()
+}
+
+/// Serialize a single `Uuid` as a string for the same reasons as
+/// `serialize_uuids_as_strings`.
+fn serialize_uuid_as_string<S>(uuid: &Uuid, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&uuid.to_string())
+}
+
+/// Deserialize a single `Uuid` from either a string (our wire format) or the
+/// SDK's native uuid bytes representation.
+fn deserialize_uuid_lenient<'de, D>(deserializer: D) -> Result<Uuid, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrUuid {
+        S(String),
+        U(Uuid),
+    }
+
+    match StringOrUuid::deserialize(deserializer)? {
+        StringOrUuid::S(s) => Uuid::parse_str(&s).map_err(serde::de::Error::custom),
+        StringOrUuid::U(u) => Ok(u),
+    }
+}
 
 /// Consts
 const SANITY_BREAK_LEVEL: u32 = 9;
@@ -64,7 +131,12 @@ pub struct Tribute {
     /// reserved `id` column on the `tribute` table — the SDK rejects any
     /// payload that carries a non-RecordId `id` field when a record id is
     /// also specified explicitly via `db.create(("tribute", ...))`.
-    #[serde(default = "Uuid::new_v4", rename = "tribute_id")]
+    #[serde(
+        default = "Uuid::new_v4",
+        rename = "tribute_id",
+        serialize_with = "serialize_uuid_as_string",
+        deserialize_with = "deserialize_uuid_lenient"
+    )]
     pub id: Uuid,
     /// Where are they?
     pub area: Area,
@@ -110,7 +182,12 @@ pub struct Tribute {
     pub traits: Vec<traits::Trait>,
     /// Pair-wise alliance graph. Symmetric: when A allies with B, both
     /// `allies` lists gain the other. Capped at `MAX_ALLIES`.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        serialize_with = "serialize_uuids_as_strings",
+        deserialize_with = "deserialize_uuids_lenient"
+    )]
     pub allies: Vec<Uuid>,
     /// Turn counter for the Treacherous betrayal cadence. Reset on betrayal.
     #[serde(default)]
@@ -865,7 +942,12 @@ mod tests {
     }
 
     #[rstest]
-    fn brain_roundtrips_preferred_action() {
+    fn brain_preferred_action_is_not_persisted() {
+        // preferred_action is transient AI state recomputed each cycle, so the
+        // field is `skip_serializing` and `deserialize_optional_enum_lenient`
+        // (which absorbs both null and the {} corruption left over from the
+        // SDK's enum-collapse bug). A roundtrip therefore intentionally drops
+        // any preferred_action that was set in memory.
         use crate::tributes::actions::Action;
 
         let mut tribute = Tribute::new("Foxface".to_string(), None, None);
@@ -875,8 +957,28 @@ mod tests {
         let json = serde_json::to_string(&tribute).expect("serialize");
 
         let restored: Tribute = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(restored.brain.preferred_action, Some(Action::Hide));
+        assert_eq!(restored.brain.preferred_action, None);
+        // Non-skipped fields still round-trip normally.
         assert!((restored.brain.preferred_action_percentage - 0.75).abs() < f64::EPSILON);
+    }
+
+    #[rstest]
+    fn brain_tolerates_corrupt_preferred_action_object() {
+        // SurrealDB rows written before the bug-5 fix have preferred_action: {}
+        // because the SDK's bespoke serializer collapsed the externally-tagged
+        // Action enum. The lenient deserializer must read those rows as None.
+        // Round-trip a real Brain to get a valid base JSON, then swap
+        // preferred_action's value to {} to simulate the corruption.
+        use crate::tributes::brains::Brain;
+
+        let brain = Brain {
+            preferred_action_percentage: 0.5,
+            ..Brain::default()
+        };
+        let mut value = serde_json::to_value(&brain).expect("serialize brain");
+        value["preferred_action"] = serde_json::json!({});
+        let restored: Brain = serde_json::from_value(value).expect("deserialize legacy row");
+        assert_eq!(restored.preferred_action, None);
     }
 
     #[rstest]

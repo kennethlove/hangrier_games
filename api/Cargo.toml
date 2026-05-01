@@ -15,7 +15,7 @@ jsonwebtoken = { version = "10.0", default-features = false, features = ["aws_lc
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 shared = { path = "../shared" }
-strum = { version = "0.27.1", features = ["derive"] }
+strum = { version = "0.28", features = ["derive"] }
 surrealdb = "2.3.2"
 surrealdb-migrations = "2.2.2"
 thiserror = "2.0.18"

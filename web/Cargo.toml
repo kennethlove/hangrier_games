@@ -4,22 +4,22 @@ version = "0.1.19"
 edition = "2024"
 
 [dependencies]
-chrono = "0.4.41"
+chrono = "0.4.44"
 dioxus = { version = "0.6.3", features = ["web", "router"] }
 dioxus-logger = "0.6.2"
 dioxus-query = "0.7.0"
-futures-util = { version = "0.3", features = ["sink"] }
+futures-util = { version = "0.3.32", features = ["sink"] }
 game = { path = "../game" }
 gloo-net = "0.6"
 gloo-storage = "0.3.0"
 jwt-rustcrypto = "0.2.1"
-serde = { version = "1.0.216", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
 shared = { path = "../shared" }
 reqwest = { version = "0.12.9", features = ["json", "multipart"] }
-serde_json = "1.0.140"
-tracing = "0.1"
-uuid = { version = "1.13.2", features = ["v4", "js", "serde"] }
-web-sys = { version = "0.3", features = ["console"] }
+serde_json = "1.0.149"
+tracing = "0.1.44"
+uuid = { version = "1.23.1", features = ["v4", "js", "serde"] }
+web-sys = { version = "0.3.97", features = ["console"] }
 
 [build-dependencies]
 dotenvy = "0.15.7"

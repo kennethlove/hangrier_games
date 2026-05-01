@@ -6,8 +6,8 @@ publish = false
 
 [dependencies]
 async-stream = "0.3.6"
-futures = "0.3.31"
-ollama-rs = { version = "0.3.0", features = ["stream"] }
-thiserror = "2.0.12"
-tokio = { version = "1.44.1", features = ["macros"] }
-tokio-stream = "0.1.17"
+futures = "0.3.32"
+ollama-rs = { version = "0.3.4", features = ["stream"] }
+thiserror = "2.0.18"
+tokio = { version = "1.52.1", features = ["macros"] }
+tokio-stream = "0.1.18"

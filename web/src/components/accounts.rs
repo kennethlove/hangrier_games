@@ -6,6 +6,7 @@ use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use shared::{AuthenticatedUser, RegistrationUser};
+use validator::Validate;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) struct RegisterUserM;
@@ -28,10 +29,23 @@ impl MutationCapability for RegisterUserM {
             .send()
             .await
         {
-            Ok(response) => match response.json::<AuthenticatedUser>().await {
-                Ok(user) => Ok(user),
-                Err(_) => Err(MutationError::UnableToRegisterUser),
-            },
+            Ok(response) => {
+                if response.status().is_success() {
+                    match response.json::<AuthenticatedUser>().await {
+                        Ok(user) => Ok(user),
+                        Err(_) => Err(MutationError::UnableToRegisterUser),
+                    }
+                } else {
+                    let body: serde_json::Value =
+                        response.json().await.unwrap_or(serde_json::Value::Null);
+                    let message = body
+                        .get("error")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    Err(MutationError::RegistrationFailed { message })
+                }
+            }
             Err(e) => {
                 tracing::error!("error creating user: {:?}", e);
                 Err(MutationError::UnableToRegisterUser)
@@ -289,12 +303,28 @@ fn RegisterForm() -> Element {
                     password_error_signal.set(String::default());
 
                     let username = username_signal.read().clone();
-                    if username.is_empty() {
-                        username_error_signal.set("Username is required".to_string());
-                    }
-
                     let password = password_signal.read().clone();
                     let password2 = password2_signal.read().clone();
+
+                    let user = RegistrationUser {
+                        username: username.clone(),
+                        password: password.clone(),
+                    };
+                    if let Err(errs) = user.validate() {
+                        for (field, ferrs) in errs.field_errors() {
+                            let msg = ferrs
+                                .iter()
+                                .filter_map(|e| e.message.as_ref())
+                                .next()
+                                .map(|c| c.to_string())
+                                .unwrap_or_else(|| format!("{field} is invalid"));
+                            match field.as_ref() {
+                                "username" => username_error_signal.set(msg),
+                                "password" => password_error_signal.set(msg),
+                                _ => {}
+                            }
+                        }
+                    }
 
                     if password != password2 {
                         password_error_signal.set("Passwords do not match".to_string());
@@ -328,8 +358,22 @@ fn RegisterForm() -> Element {
                                     navigator.replace(Routes::GamesList {});
                                 }
                                 MutationStateData::Settled { res: Err(err), .. } => {
-                                    if let MutationError::UnableToRegisterUser = err {
-                                        username_error_signal.set("Unable to register user".to_string());
+                                    match err {
+                                        MutationError::RegistrationFailed { message } => {
+                                            let lowered = message.to_lowercase();
+                                            if lowered.contains("password") {
+                                                password_error_signal.set(message.clone());
+                                            } else if !message.is_empty() {
+                                                username_error_signal.set(message.clone());
+                                            } else {
+                                                username_error_signal
+                                                    .set("Unable to register user".to_string());
+                                            }
+                                        }
+                                        _ => {
+                                            username_error_signal
+                                                .set("Unable to register user".to_string());
+                                        }
                                     }
                                     disabled_signal.set(false);
                                 }

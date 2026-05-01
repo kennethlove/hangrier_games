@@ -8170,6 +8170,7 @@ dependencies = [
  "shared",
  "tracing",
  "uuid",
+ "validator",
  "web-sys",
 ]
 

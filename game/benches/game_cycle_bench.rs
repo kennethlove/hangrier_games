@@ -1,7 +1,8 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use game::games::Game;
 use game::tributes::Tribute;
 use game::tributes::statuses::TributeStatus;
+use std::hint::black_box;
 
 fn create_test_game(tribute_count: usize) -> Game {
     let mut game = Game::new("bench-game");

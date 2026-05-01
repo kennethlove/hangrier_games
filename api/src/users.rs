@@ -17,7 +17,7 @@ pub static USERS_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
         .route("/authenticate", post(user_authenticate))
 });
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct JwtClaims {
     // SurrealDB-issued JWTs serialize the record id as `ID` (uppercase).
     // Our own `generate_access_token` (api/src/auth.rs) emits `id` (lowercase).

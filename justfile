@@ -16,13 +16,13 @@ web:
 
 # Start SurrealDB with persistent on-disk storage for local development
 db:
-    surreal start --log trace --user root --pass root surrealkv://.surrealdb
+    surreal start --log trace --user root --pass root --bind 0.0.0.0:8000 surrealkv://.surrealdb
 
 # Start full development environment (DB, API, and web frontend)
 dev:
     #!/usr/bin/env bash
     echo "Starting SurrealDB..."
-    surreal start --log info --user root --pass root surrealkv://.surrealdb &
+    surreal start --log info --user root --pass root --bind 0.0.0.0:8000 surrealkv://.surrealdb &
     DB_PID=$!
     sleep 2
     echo "Starting API server..."

@@ -57,9 +57,9 @@ DEFINE FUNCTION OVERWRITE fn::get_display_game($game_id: string) {
 
     LET $winner = (
         IF count($living_tributes) == 1 THEN
-            RETURN $living_tributes[0].name
+            RETURN { identifier: $living_tributes[0].identifier, name: $living_tributes[0].name }
         ELSE
-            RETURN ""
+            RETURN NONE
         END
     );
 

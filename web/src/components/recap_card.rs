@@ -2,10 +2,8 @@
 //!
 //! Persists collapsed state in `localStorage` per game so reloads remember the
 //! reader's choice. Shows the winner (or "all tributes died") and days played.
-//!
-//! NOTE: `DisplayGame.winner` is currently `String` (empty when no winner).
-//! Follow-up `hangrier_games-wjo` will move it to `Option<TributeRef>`.
 
+use crate::routes::Routes;
 use dioxus::prelude::*;
 use gloo_storage::{LocalStorage, Storage};
 use shared::DisplayGame;
@@ -30,13 +28,8 @@ pub fn RecapCard(props: RecapCardProps) -> Element {
         }
     };
 
-    let winner_line = if props.game.winner.is_empty() {
-        "All tributes died".to_string()
-    } else {
-        format!("🏆 Winner: {}", props.game.winner)
-    };
-
     let days_played = props.game.day.unwrap_or(0);
+    let game_id = props.game.identifier.clone();
 
     rsx! {
         section { class: "rounded-lg border bg-amber-50 theme2:bg-slate-800 theme3:bg-purple-900 p-4 mb-4",
@@ -48,7 +41,22 @@ pub fn RecapCard(props: RecapCardProps) -> Element {
             }
             if !collapsed() {
                 div { class: "mt-3 space-y-1 text-sm",
-                    p { "{winner_line}" }
+                    p {
+                        match props.game.winner.as_ref() {
+                            Some(w) => rsx! {
+                                "🏆 Winner: "
+                                Link {
+                                    to: Routes::TributeDetail {
+                                        game_identifier: game_id.clone(),
+                                        tribute_identifier: w.identifier.clone(),
+                                    },
+                                    class: "underline",
+                                    "{w.name}"
+                                }
+                            },
+                            None => rsx! { "All tributes died" },
+                        }
+                    }
                     p { "Days played: {days_played}" }
                 }
             }

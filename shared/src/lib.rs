@@ -5,6 +5,8 @@ use validator::{Validate, ValidationError};
 
 pub mod messages;
 
+use crate::messages::TributeRef;
+
 /// WebSocket message protocol for real-time game updates
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
@@ -251,7 +253,7 @@ pub struct DisplayGame {
     pub is_mine: bool,
     pub created_by: CreatedBy,
     #[serde(default)]
-    pub winner: String,
+    pub winner: Option<TributeRef>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]

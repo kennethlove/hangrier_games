@@ -143,7 +143,7 @@ pub fn GamePage(identifier: String) -> Element {
                 div {
                     class: "bg-gray-100 p-4 rounded-lg max-h-64 overflow-y-auto",
                     h3 { class: "font-bold mb-2", "Live Events" }
-                    for event in ws_events.read().iter().rev() {
+                    for event in ws_events.read().iter() {
                         div { class: "text-sm py-1 border-b border-gray-200",
                             {format_game_event(event)}
                         }

@@ -1,4 +1,4 @@
-use crate::cache::{QueryError, QueryKey, QueryValue};
+use crate::cache::QueryError;
 use crate::components::icons::lock_closed::LockClosedIcon;
 use crate::components::icons::lock_open::LockOpenIcon;
 use crate::components::item_icon::ItemIcon;
@@ -6,30 +6,35 @@ use crate::components::map::Map;
 use crate::env::APP_API_HOST;
 use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{QueryResult, QueryState, use_get_query};
+use dioxus_query::prelude::*;
 use game::areas::AreaDetails;
 use shared::DisplayGame;
 
-async fn fetch_areas(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::Areas(identifier)) = keys.first() {
-        let client = reqwest::Client::new();
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub(crate) struct GameAreasQ {
+    pub token: String,
+}
 
+impl QueryCapability for GameAreasQ {
+    type Ok = Vec<AreaDetails>;
+    type Err = QueryError;
+    type Keys = String;
+
+    async fn run(&self, identifier: &String) -> Result<Vec<AreaDetails>, QueryError> {
+        let client = reqwest::Client::new();
         let request = client
             .request(
                 reqwest::Method::GET,
                 format!("{}/api/games/{}/areas", APP_API_HOST, identifier),
             )
-            .bearer_auth(token);
-
+            .bearer_auth(&self.token);
         match request.send().await {
             Ok(response) => match response.json::<Vec<AreaDetails>>().await {
-                Ok(areas) => Ok(QueryValue::Areas(areas)),
+                Ok(areas) => Ok(areas),
                 Err(_) => Err(QueryError::GameNotFound(identifier.to_string())),
             },
             Err(_) => Err(QueryError::GameNotFound(identifier.to_string())),
         }
-    } else {
-        Err(QueryError::Unknown)
     }
 }
 
@@ -40,17 +45,12 @@ pub fn GameAreaList(game: DisplayGame) -> Element {
 
     let identifier = game.identifier.clone();
 
-    let area_query = use_get_query(
-        [
-            QueryKey::Areas(identifier.clone()),
-            QueryKey::Game(identifier.clone()),
-            QueryKey::Games,
-        ],
-        move |keys: Vec<QueryKey>| fetch_areas(keys, token.clone()),
-    );
+    let area_query = use_query(Query::new(identifier.clone(), GameAreasQ { token }));
+    let reader = area_query.read();
+    let state = reader.state();
 
-    match area_query.result().value() {
-        QueryState::Settled(Ok(QueryValue::Areas(areas))) => {
+    match &*state {
+        QueryStateData::Settled { res: Ok(areas), .. } => {
             rsx! {
                 ul {
                     class: "grid grid-cols-2 gap-4",
@@ -194,10 +194,10 @@ pub fn GameAreaList(game: DisplayGame) -> Element {
                 }
             }
         }
-        QueryState::Settled(Err(_)) => {
+        QueryStateData::Settled { res: Err(_), .. } => {
             rsx! { p { "Something went wrong" } }
         }
-        QueryState::Loading(_) => {
+        QueryStateData::Loading { .. } => {
             rsx! { p { "Loading..." } }
         }
         _ => {

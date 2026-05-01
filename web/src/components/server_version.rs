@@ -1,38 +1,36 @@
-use crate::cache::{QueryError, QueryKey, QueryValue};
 use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
-use dioxus_query::prelude::{QueryResult, QueryState, use_get_query};
+use dioxus_query::prelude::*;
 
-async fn fetch_server_version(keys: Vec<QueryKey>) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::ServerVersion) = keys.first() {
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub(crate) struct ServerVersionQ;
+
+impl QueryCapability for ServerVersionQ {
+    type Ok = String;
+    type Err = ();
+    type Keys = ();
+
+    async fn run(&self, _keys: &()) -> Result<String, ()> {
         let client = reqwest::Client::new();
-
         let request = client.request(reqwest::Method::GET, APP_API_HOST.to_string());
-
         match request.send().await {
             Ok(response) => match response.json::<String>().await {
-                Ok(version) => Ok(QueryValue::ServerVersion(version.to_string())),
-                Err(_) => Err(QueryError::ServerVersionNotFound),
+                Ok(version) => Ok(version),
+                Err(_) => Err(()),
             },
-            Err(_) => Err(QueryError::ServerNotFound),
+            Err(_) => Err(()),
         }
-    } else {
-        Err(QueryError::Unknown)
     }
 }
 
 #[component]
 pub fn ServerVersion() -> Element {
-    let version_query = use_get_query([QueryKey::ServerVersion], move |keys: Vec<QueryKey>| {
-        fetch_server_version(keys)
-    });
-
-    match version_query.result().value() {
-        QueryState::Settled(Ok(QueryValue::ServerVersion(version))) => {
-            rsx! { "Server: v{version}" }
-        }
-        _ => {
-            rsx! { "Server unavailable" }
-        }
+    let version_query = use_query(Query::new((), ServerVersionQ));
+    let reader = version_query.read();
+    let state = reader.state();
+    if let Some(version) = state.ok() {
+        rsx! { "Server: v{version}" }
+    } else {
+        rsx! { "Server unavailable" }
     }
 }

@@ -1,59 +1,74 @@
-use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
+use crate::cache::MutationError;
 use crate::components::{Input, ThemedButton};
 use crate::env::APP_API_HOST;
 use crate::routes::Routes;
 use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{MutationResult, MutationState, use_mutation, use_query_client};
+use dioxus_query::prelude::*;
 use shared::{AuthenticatedUser, RegistrationUser};
-use std::ops::Deref;
 
-async fn register_user(user: RegistrationUser) -> MutationResult<MutationValue, MutationError> {
-    let client = reqwest::Client::new();
-    let json_body = serde_json::json!({
-        "username": user.username,
-        "password": user.password,
-    });
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub(crate) struct RegisterUserM;
 
-    let response = client
-        .post(format!("{}/api/users", APP_API_HOST))
-        .json(&json_body)
-        .send()
-        .await;
+impl MutationCapability for RegisterUserM {
+    type Ok = AuthenticatedUser;
+    type Err = MutationError;
+    type Keys = RegistrationUser;
 
-    match response {
-        Ok(response) => match response.json::<AuthenticatedUser>().await {
-            Ok(user) => MutationResult::Ok(MutationValue::User(user)),
-            Err(_) => MutationResult::Err(MutationError::UnableToRegisterUser),
-        },
-        Err(e) => {
-            dioxus_logger::tracing::error!("error creating user: {:?}", e);
-            MutationResult::Err(MutationError::UnableToRegisterUser)
+    async fn run(&self, user: &RegistrationUser) -> Result<AuthenticatedUser, MutationError> {
+        let client = reqwest::Client::new();
+        let json_body = serde_json::json!({
+            "username": user.username,
+            "password": user.password,
+        });
+
+        match client
+            .post(format!("{}/api/users", APP_API_HOST))
+            .json(&json_body)
+            .send()
+            .await
+        {
+            Ok(response) => match response.json::<AuthenticatedUser>().await {
+                Ok(user) => Ok(user),
+                Err(_) => Err(MutationError::UnableToRegisterUser),
+            },
+            Err(e) => {
+                tracing::error!("error creating user: {:?}", e);
+                Err(MutationError::UnableToRegisterUser)
+            }
         }
     }
 }
 
-async fn authenticate_user(user: RegistrationUser) -> MutationResult<MutationValue, MutationError> {
-    let client = reqwest::Client::new();
-    let json_body = serde_json::json!({
-        "username": user.username,
-        "password": user.password,
-    });
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub(crate) struct LoginUserM;
 
-    let response = client
-        .post(format!("{}/api/users/authenticate", APP_API_HOST))
-        .json(&json_body)
-        .send()
-        .await;
+impl MutationCapability for LoginUserM {
+    type Ok = AuthenticatedUser;
+    type Err = MutationError;
+    type Keys = RegistrationUser;
 
-    match response {
-        Ok(response) => match response.json::<AuthenticatedUser>().await {
-            Ok(user) => MutationResult::Ok(MutationValue::User(user)),
-            Err(_) => MutationResult::Err(MutationError::UnableToAuthenticateUser),
-        },
-        Err(e) => {
-            dioxus_logger::tracing::error!("error authenticating user: {:?}", e);
-            MutationResult::Err(MutationError::UnableToAuthenticateUser)
+    async fn run(&self, user: &RegistrationUser) -> Result<AuthenticatedUser, MutationError> {
+        let client = reqwest::Client::new();
+        let json_body = serde_json::json!({
+            "username": user.username,
+            "password": user.password,
+        });
+
+        match client
+            .post(format!("{}/api/users/authenticate", APP_API_HOST))
+            .json(&json_body)
+            .send()
+            .await
+        {
+            Ok(response) => match response.json::<AuthenticatedUser>().await {
+                Ok(user) => Ok(user),
+                Err(_) => Err(MutationError::UnableToAuthenticateUser),
+            },
+            Err(e) => {
+                tracing::error!("error authenticating user: {:?}", e);
+                Err(MutationError::UnableToAuthenticateUser)
+            }
         }
     }
 }
@@ -103,17 +118,16 @@ pub fn AccountsPage() -> Element {
 
 #[component]
 fn LoginForm() -> Element {
-    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
-
     let mut username_signal = use_signal(String::default);
     let mut password_signal = use_signal(String::default);
     let mut disabled_signal = use_signal(|| false);
     let mut username_error_signal = use_signal(String::default);
     let mut password_error_signal = use_signal(String::default);
 
-    let mutate = use_mutation(authenticate_user);
+    let mutate = use_mutation(Mutation::new(LoginUserM));
 
     let mut storage = use_persistent("hangry-games", AppState::default);
+    let navigator = use_navigator();
 
     rsx! {
         div {
@@ -157,31 +171,30 @@ fn LoginForm() -> Element {
                                 username: username.clone(),
                                 password: password.clone(),
                             };
-                            mutate.mutate_async(user).await;
-                            if let MutationState::Settled(Ok(result)) = mutate.result().deref() {
-                                if let MutationValue::User(user) = result {
-                                        client.invalidate_queries(&[QueryKey::User]);
-                                        disabled_signal.set(false);
-                                        username_signal.set(String::default());
-                                        password_signal.set(String::default());
-                                        password_error_signal.set(String::default());
-                                        username_error_signal.set(String::default());
+                            let reader = mutate.mutate_async(user).await;
+                            let state = reader.state();
+                            match &*state {
+                                MutationStateData::Settled { res: Ok(user), .. } => {
+                                    disabled_signal.set(false);
+                                    username_signal.set(String::default());
+                                    password_signal.set(String::default());
+                                    password_error_signal.set(String::default());
+                                    username_error_signal.set(String::default());
 
-                                        let mut state = storage.get();
-                                        state.jwt = Some(user.jwt.clone());
-                                        state.refresh_token = user.refresh_token.clone();
-                                        state.username = Some(username.clone());
-                                        storage.set(state);
+                                    let mut state = storage.get();
+                                    state.jwt = Some(user.jwt.clone());
+                                    state.refresh_token = user.refresh_token.clone();
+                                    state.username = Some(username.clone());
+                                    storage.set(state);
 
-                                        let navigator = use_navigator();
-                                        navigator.replace(Routes::GamesList {});
+                                    navigator.replace(Routes::GamesList {});
                                 }
-                            } else if let MutationState::Settled(Err(err)) = mutate.result().deref()
-                                && let MutationError::UnableToAuthenticateUser = err {
-                                        username_error_signal.set("Unable to authenticate user".to_string());
-                                        disabled_signal.set(false);
-
+                                MutationStateData::Settled { res: Err(MutationError::UnableToAuthenticateUser), .. } => {
+                                    username_error_signal.set("Unable to authenticate user".to_string());
+                                    disabled_signal.set(false);
                                 }
+                                _ => {}
+                            }
                         });
                     }
                 },
@@ -237,8 +250,6 @@ fn LoginForm() -> Element {
 
 #[component]
 fn RegisterForm() -> Element {
-    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
-
     let mut username_signal = use_signal(String::default);
     let mut password_signal = use_signal(String::default);
     let mut password2_signal = use_signal(String::default);
@@ -246,9 +257,10 @@ fn RegisterForm() -> Element {
     let mut username_error_signal = use_signal(String::default);
     let mut password_error_signal = use_signal(String::default);
 
-    let mutate = use_mutation(register_user);
+    let mutate = use_mutation(Mutation::new(RegisterUserM));
 
     let mut storage = use_persistent("hangry-games", AppState::default);
+    let navigator = use_navigator();
 
     rsx! {
         div {
@@ -296,10 +308,10 @@ fn RegisterForm() -> Element {
                                 username: username.clone(),
                                 password: password.clone(),
                             };
-                            mutate.mutate_async(user).await;
-                            match mutate.result().deref() {
-                                MutationState::Settled(Ok(MutationValue::User(user))) => {
-                                    client.invalidate_queries(&[QueryKey::User]);
+                            let reader = mutate.mutate_async(user).await;
+                            let state = reader.state();
+                            match &*state {
+                                MutationStateData::Settled { res: Ok(user), .. } => {
                                     disabled_signal.set(false);
                                     username_signal.set(String::default());
                                     password_signal.set(String::default());
@@ -313,15 +325,14 @@ fn RegisterForm() -> Element {
                                     state.username = Some(username.clone());
                                     storage.set(state);
 
-                                    let navigator = use_navigator();
                                     navigator.replace(Routes::GamesList {});
-                                },
-                                MutationState::Settled(Err(err)) => {
+                                }
+                                MutationStateData::Settled { res: Err(err), .. } => {
                                     if let MutationError::UnableToRegisterUser = err {
                                         username_error_signal.set("Unable to register user".to_string());
                                     }
                                     disabled_signal.set(false);
-                                },
+                                }
                                 _ => {}
                             }
                         });
@@ -393,6 +404,7 @@ fn LogoutButton() -> Element {
         .username
         .clone()
         .unwrap_or("whoever you are".to_string());
+    let navigator = use_navigator();
 
     rsx! {
         form {
@@ -405,9 +417,6 @@ fn LogoutButton() -> Element {
                 state.refresh_token = None;
                 storage.set(state);
 
-                // Best-effort revoke the refresh token on the server so it
-                // can't be reused if it leaks. Failures here are intentionally
-                // ignored — the local session is gone either way.
                 if let Some(token) = prior_refresh {
                     spawn(async move {
                         let _ = reqwest::Client::new()
@@ -418,7 +427,6 @@ fn LogoutButton() -> Element {
                     });
                 }
 
-                let navigator = use_navigator();
                 navigator.replace(Routes::Home {});
             },
             p {

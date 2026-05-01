@@ -124,11 +124,11 @@ pub struct CreateGame {
 }
 
 pub type DeleteTribute = String;
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct DeleteGame(pub String, pub String); // Identifier, name
 
 /// Used to edit a tribute. Contains the identifier, name, avatar, and game identifier of the tribute.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize, Validate)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize, Validate)]
 pub struct EditTribute {
     #[validate(custom(function = "validate_uuid"))]
     pub identifier: String,
@@ -164,7 +164,7 @@ impl EditTribute {
 
 /// This struct is used to edit a game
 /// It contains the identifier, name, and a boolean indicating if the game is private
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Validate)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, Eq, Hash, PartialEq, Validate)]
 pub struct EditGame {
     #[validate(custom(function = "validate_uuid"))]
     pub identifier: String,
@@ -180,7 +180,7 @@ pub struct GameArea {
     pub area: String,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize, Validate)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize, Validate)]
 pub struct RegistrationUser {
     #[validate(length(min = 3, max = 50, message = "Username must be 3-50 characters"))]
     pub username: String,

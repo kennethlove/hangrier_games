@@ -1,65 +1,64 @@
 use crate::LoadingState;
-use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
+use crate::cache::MutationError;
+use crate::components::games_list::GamesListQ;
 use crate::components::{Input, ThemedButton};
 use crate::env::APP_API_HOST;
 use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{MutationResult, MutationState, use_mutation, use_query_client};
+use dioxus_query::prelude::*;
 use game::games::Game;
 use shared::CreateGame;
-use std::ops::Deref;
 
-// TODO: Game Customization Enhancement
-// To add ItemQuantity and EventFrequency dropdowns:
-// 1. Import: use shared::{ItemQuantity, EventFrequency};
-// 2. Add signals in CreateGameForm:
-//    let mut item_quantity: Signal<ItemQuantity> = use_signal(|| ItemQuantity::Normal);
-//    let mut event_frequency: Signal<EventFrequency> = use_signal(|| EventFrequency::Normal);
-// 3. Create dropdown components for each option
-// 4. Modify create_game() to accept and send these parameters to the API
-// 5. Update Game::new() to accept CreateGame DTO instead of just name
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub(crate) struct CreateGameM;
 
-async fn create_game(
-    args: (Option<String>, String),
-) -> MutationResult<MutationValue, MutationError> {
-    let name = args.0.clone();
-    let token = args.1.clone();
-    let client = reqwest::Client::new();
-    let json_body = CreateGame {
-        name,
-        item_quantity: Default::default(),
-        event_frequency: Default::default(),
-        starting_health_range: None,
-    };
+impl MutationCapability for CreateGameM {
+    type Ok = Game;
+    type Err = MutationError;
+    type Keys = (Option<String>, String);
 
-    let response = client
-        .request(reqwest::Method::POST, format!("{}/api/games", APP_API_HOST))
-        .bearer_auth(token)
-        .json(&json_body);
+    async fn run(&self, args: &Self::Keys) -> Result<Game, MutationError> {
+        let name = args.0.clone();
+        let token = args.1.clone();
+        let client = reqwest::Client::new();
+        let json_body = CreateGame {
+            name,
+            item_quantity: Default::default(),
+            event_frequency: Default::default(),
+            starting_health_range: None,
+        };
 
-    match response.send().await {
-        Ok(response) => {
-            let status = response.status();
-            if !status.is_success() {
-                let body = response.text().await.unwrap_or_default();
-                dioxus_logger::tracing::error!(
-                    "create_game failed: status={} body={}",
-                    status,
-                    body
-                );
-                return MutationResult::Err(MutationError::UnableToCreateGame);
-            }
-            match response.json::<Game>().await {
-                Ok(game) => MutationResult::Ok(MutationValue::NewGame(game)),
-                Err(e) => {
-                    dioxus_logger::tracing::error!("create_game parse error: {:?}", e);
-                    MutationResult::Err(MutationError::UnableToCreateGame)
+        let response = client
+            .request(reqwest::Method::POST, format!("{}/api/games", APP_API_HOST))
+            .bearer_auth(token)
+            .json(&json_body);
+
+        match response.send().await {
+            Ok(response) => {
+                let status = response.status();
+                if !status.is_success() {
+                    let body = response.text().await.unwrap_or_default();
+                    tracing::error!("create_game failed: status={} body={}", status, body);
+                    return Err(MutationError::UnableToCreateGame);
+                }
+                match response.json::<Game>().await {
+                    Ok(game) => Ok(game),
+                    Err(e) => {
+                        tracing::error!("create_game parse error: {:?}", e);
+                        Err(MutationError::UnableToCreateGame)
+                    }
                 }
             }
+            Err(e) => {
+                tracing::error!("error creating game: {:?}", e);
+                Err(MutationError::UnableToCreateGame)
+            }
         }
-        Err(e) => {
-            dioxus_logger::tracing::error!("error creating game: {:?}", e);
-            MutationResult::Err(MutationError::UnableToCreateGame)
+    }
+
+    async fn on_settled(&self, _keys: &Self::Keys, result: &Result<Game, MutationError>) {
+        if result.is_ok() {
+            QueriesStorage::<GamesListQ>::invalidate_all().await;
         }
     }
 }
@@ -67,20 +66,14 @@ async fn create_game(
 #[component]
 pub fn CreateGameButton() -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
-    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
-    let mutate = use_mutation(create_game);
+    let mutate = use_mutation(Mutation::new(CreateGameM));
     let mut loading_signal = use_context::<Signal<LoadingState>>();
 
     let onclick = move |_| {
         loading_signal.set(LoadingState::Loading);
         let token = storage.get().jwt.expect("No JWT found");
         spawn(async move {
-            mutate.mutate_async((None, token)).await;
-            if let MutationState::Settled(Ok(result)) = mutate.result().deref()
-                && let MutationValue::NewGame(_game) = result
-            {
-                client.invalidate_queries(&[QueryKey::Games]);
-            };
+            let _ = mutate.mutate_async((None, token)).await;
             loading_signal.set(LoadingState::Loaded);
         });
     };
@@ -97,9 +90,8 @@ pub fn CreateGameButton() -> Element {
 pub fn CreateGameForm() -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
 
-    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
     let mut game_name_signal: Signal<String> = use_signal(String::default);
-    let mutate = use_mutation(create_game);
+    let mutate = use_mutation(Mutation::new(CreateGameM));
     let mut loading_signal = use_context::<Signal<LoadingState>>();
 
     let onsubmit = move |_| {
@@ -111,11 +103,8 @@ pub fn CreateGameForm() -> Element {
         loading_signal.set(LoadingState::Loading);
 
         spawn(async move {
-            mutate.mutate_async((Some(name), token)).await;
-            if let MutationState::Settled(Ok(result)) = mutate.result().deref()
-                && let MutationValue::NewGame(_game) = result
-            {
-                client.invalidate_queries(&[QueryKey::Games]);
+            let reader = mutate.mutate_async((Some(name), token)).await;
+            if reader.state().is_ok() {
                 game_name_signal.set(String::default());
             }
             loading_signal.set(LoadingState::Loaded);

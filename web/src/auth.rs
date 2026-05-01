@@ -67,7 +67,7 @@ pub async fn maybe_refresh_token(storage: &mut UsePersistent<AppState>) -> Optio
     let remaining = match token_seconds_remaining(&jwt) {
         Some(r) => r,
         None => {
-            dioxus_logger::tracing::warn!("could not decode stored JWT; clearing session");
+            tracing::warn!("could not decode stored JWT; clearing session");
             clear_session(storage);
             return None;
         }
@@ -78,7 +78,7 @@ pub async fn maybe_refresh_token(storage: &mut UsePersistent<AppState>) -> Optio
     }
 
     let Some(refresh) = state.refresh_token.clone() else {
-        dioxus_logger::tracing::info!(
+        tracing::info!(
             "access token expiring (remaining={}s) but no refresh token; clearing session",
             remaining
         );
@@ -92,11 +92,11 @@ pub async fn maybe_refresh_token(storage: &mut UsePersistent<AppState>) -> Optio
             new_state.jwt = Some(new_access.clone());
             new_state.refresh_token = Some(new_refresh);
             storage.set(new_state);
-            dioxus_logger::tracing::debug!("rotated access token");
+            tracing::debug!("rotated access token");
             Some(new_access)
         }
         Err(e) => {
-            dioxus_logger::tracing::warn!("refresh failed: {e}; clearing session");
+            tracing::warn!("refresh failed: {e}; clearing session");
             clear_session(storage);
             None
         }

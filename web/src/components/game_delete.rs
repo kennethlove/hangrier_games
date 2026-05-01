@@ -1,27 +1,39 @@
-use crate::cache::{MutationError, MutationValue, QueryError, QueryKey, QueryValue};
+use crate::cache::MutationError;
 use crate::components::Button;
+use crate::components::games_list::GamesListQ;
 use crate::components::icons::delete::DeleteIcon;
 use crate::env::APP_API_HOST;
 use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{MutationResult, MutationState, use_mutation, use_query_client};
+use dioxus_query::prelude::*;
 use gloo_storage::Storage;
 use shared::DeleteGame;
-use std::ops::Deref;
 
-async fn delete_game(args: (DeleteGame, String)) -> MutationResult<MutationValue, MutationError> {
-    let identifier = args.0.0;
-    let name = args.0.1;
-    let token = args.1;
-    let client = reqwest::Client::new();
-    let url: String = format!("{}/api/games/{}", APP_API_HOST, identifier);
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub(crate) struct DeleteGameM;
 
-    let response = client.delete(url).bearer_auth(token).send().await;
+impl MutationCapability for DeleteGameM {
+    type Ok = (String, String);
+    type Err = MutationError;
+    type Keys = (DeleteGame, String);
 
-    if response.unwrap().status().is_success() {
-        MutationResult::Ok(MutationValue::GameDeleted(identifier, name))
-    } else {
-        MutationResult::Err(MutationError::Unknown)
+    async fn run(&self, args: &(DeleteGame, String)) -> Result<(String, String), MutationError> {
+        let identifier = args.0.0.clone();
+        let name = args.0.1.clone();
+        let token = args.1.clone();
+        let client = reqwest::Client::new();
+        let url: String = format!("{}/api/games/{}", APP_API_HOST, identifier);
+        let response = client.delete(url).bearer_auth(token).send().await;
+        match response {
+            Ok(r) if r.status().is_success() => Ok((identifier, name)),
+            _ => Err(MutationError::Unknown),
+        }
+    }
+
+    async fn on_settled(&self, _keys: &Self::Keys, result: &Result<Self::Ok, Self::Err>) {
+        if result.is_ok() {
+            QueriesStorage::<GamesListQ>::invalidate_all().await;
+        }
     }
 }
 
@@ -57,7 +69,7 @@ pub fn DeleteGameModal() -> Element {
 
     let mut delete_game_signal: Signal<Option<DeleteGame>> = use_context();
     let delete_game_info = delete_game_signal.read().clone();
-    let mutate = use_mutation(delete_game);
+    let mutate = use_mutation(Mutation::new(DeleteGameM));
 
     let name = {
         if let Some(details) = delete_game_info.clone() {
@@ -71,19 +83,18 @@ pub fn DeleteGameModal() -> Element {
         delete_game_signal.set(None);
     };
 
-    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
-
     let delete = move |_| {
         if let Some(dg) = delete_game_info.clone() {
             let token = storage.get().jwt.expect("No JWT found");
             spawn(async move {
-                mutate.mutate_async((dg.clone(), token)).await;
-                if let MutationState::Settled(Ok(MutationValue::GameDeleted(id, _))) =
-                    mutate.result().deref()
+                let reader = mutate.mutate_async((dg.clone(), token)).await;
+                let state = reader.state();
+                if let MutationStateData::Settled {
+                    res: Ok((id, _)), ..
+                } = &*state
                 {
                     gloo_storage::LocalStorage::delete(format!("recap_collapsed:{id}"));
                     gloo_storage::LocalStorage::delete(format!("period_filters:{id}"));
-                    client.invalidate_queries(&[QueryKey::Games]);
                     delete_game_signal.set(None);
                 }
             });

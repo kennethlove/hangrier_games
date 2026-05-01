@@ -1,4 +1,4 @@
-use crate::cache::{QueryError, QueryKey, QueryValue};
+use crate::cache::QueryError;
 use crate::components::game_edit::GameEdit;
 use crate::components::icons::eye_closed::EyeClosedIcon;
 use crate::components::icons::eye_open::EyeOpenIcon;
@@ -7,7 +7,7 @@ use crate::env::APP_API_HOST;
 use crate::routes::Routes;
 use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
-use dioxus_query::prelude::{QueryResult, QueryState, use_get_query, use_query_client};
+use dioxus_query::prelude::*;
 use serde::{Deserialize, Serialize};
 use shared::{GameStatus, ListDisplayGame, PaginationMetadata};
 
@@ -17,28 +17,32 @@ pub struct PaginatedGamesResponse {
     pub pagination: PaginationMetadata,
 }
 
-async fn fetch_games(keys: Vec<QueryKey>, token: String) -> QueryResult<QueryValue, QueryError> {
-    if let Some(QueryKey::AllGames) = keys.first() {
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub(crate) struct GamesListQ {
+    pub token: String,
+}
+
+impl QueryCapability for GamesListQ {
+    type Ok = PaginatedGamesResponse;
+    type Err = QueryError;
+    type Keys = ();
+
+    async fn run(&self, _keys: &()) -> Result<PaginatedGamesResponse, QueryError> {
         let client = reqwest::Client::new();
         let request = client
             .request(
                 reqwest::Method::GET,
                 format!("{}/api/games?limit=20&offset=0", APP_API_HOST),
             )
-            .bearer_auth(token);
+            .bearer_auth(&self.token);
 
         match request.send().await {
-            Ok(request) => {
-                if let Ok(response) = request.json::<PaginatedGamesResponse>().await {
-                    Ok(QueryValue::PaginatedGames(response))
-                } else {
-                    Err(QueryError::BadJson)
-                }
-            }
+            Ok(response) => match response.json::<PaginatedGamesResponse>().await {
+                Ok(r) => Ok(r),
+                Err(_) => Err(QueryError::BadJson),
+            },
             Err(_) => Err(QueryError::NoGames),
         }
-    } else {
-        Err(QueryError::Unknown)
     }
 }
 
@@ -56,10 +60,62 @@ fn NoGames() -> Element {
 pub fn GamesList() -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
     let token = storage.get().jwt.expect("No JWT found");
-    let games_query = use_get_query(
-        [QueryKey::AllGames, QueryKey::Games],
-        move |keys: Vec<QueryKey>| fetch_games(keys, token.clone()),
-    );
+    let games_query = use_query(Query::new((), GamesListQ { token }));
+
+    let reader = games_query.read();
+    let body = match &*reader.state() {
+        QueryStateData::Settled {
+            res: Ok(response), ..
+        }
+        | QueryStateData::Loading {
+            res: Some(Ok(response)),
+        } => {
+            let games = response.games.clone();
+            let pagination = response.pagination.clone();
+            rsx! {
+                if games.is_empty() {
+                    NoGames {}
+                } else {
+                    ul {
+                        class: r#"
+                        xl:grid
+                        xl:grid-cols-2
+                        xl:gap-4
+                        "#,
+                        for game in games {
+                            GameListMember { game: game.clone() }
+                        }
+                    }
+
+                    if pagination.has_more {
+                        div {
+                            class: "flex justify-center gap-2 mt-4",
+                            LoadMoreButton {
+                                current_offset: pagination.offset,
+                                limit: pagination.limit,
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        QueryStateData::Loading { .. } | QueryStateData::Pending => rsx! { p {
+            class: "pb-4 text-center theme1:text-stone-200 theme2:text-green-200 theme3:text-stone-700",
+            "Loading..."
+        } },
+        QueryStateData::Settled {
+            res: Err(QueryError::NoGames),
+            ..
+        } => rsx! { NoGames {} },
+        QueryStateData::Settled {
+            res: Err(QueryError::BadJson),
+            ..
+        } => rsx! { p {
+            class: "pb-4 text-center theme1:text-stone-200 theme2:text-green-200 theme3:text-stone-700",
+            "Bad JSON response"
+        } },
+        QueryStateData::Settled { res: Err(_), .. } => rsx! { p { "Something went wrong" } },
+    };
 
     rsx! {
         div {
@@ -80,48 +136,7 @@ pub fn GamesList() -> Element {
             CreateGameForm {}
         }
 
-        match games_query.result().value() {
-            QueryState::Settled(Ok(QueryValue::PaginatedGames(response))) => {
-                let games = response.games.clone();
-                rsx! {
-                    if games.is_empty() {
-                        NoGames {}
-                    } else {
-                        ul {
-                            class: r#"
-                            xl:grid
-                            xl:grid-cols-2
-                            xl:gap-4
-                            "#,
-                            for game in games {
-                                GameListMember { game: game.clone() }
-                            }
-                        }
-
-                        // Pagination controls
-                        if response.pagination.has_more {
-                            div {
-                                class: "flex justify-center gap-2 mt-4",
-                                LoadMoreButton {
-                                    current_offset: response.pagination.offset,
-                                    limit: response.pagination.limit,
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            QueryState::Loading(_) => rsx! { p {
-                class: "pb-4 text-center theme1:text-stone-200 theme2:text-green-200 theme3:text-stone-700",
-                "Loading..."
-            } },
-            QueryState::Settled(Err(QueryError::NoGames)) => rsx! { NoGames {} },
-            QueryState::Settled(Err(QueryError::BadJson)) => rsx! { p {
-                class: "pb-4 text-center theme1:text-stone-200 theme2:text-green-200 theme3:text-stone-700",
-                "Bad JSON response"
-            } },
-            _ => rsx! { p { "Something went wrong" } },
-        }
+        {body}
 
         div {
             class: "mt-4",
@@ -134,10 +149,10 @@ pub fn GamesList() -> Element {
 
 #[component]
 fn RefreshButton() -> Element {
-    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
-
     let onclick = move |_| {
-        client.invalidate_queries(&[QueryKey::Games]);
+        spawn(async move {
+            QueriesStorage::<GamesListQ>::invalidate_all().await;
+        });
     };
 
     rsx! {
@@ -302,15 +317,12 @@ pub fn GameListMember(game: ListDisplayGame) -> Element {
 
 #[component]
 fn LoadMoreButton(current_offset: u32, limit: u32) -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-    let _token = storage.get().jwt.expect("No JWT found");
-    let client = use_query_client::<QueryValue, QueryError, QueryKey>();
-
     let _next_offset = current_offset + limit;
 
     let onclick = move |_| {
-        // TODO: Implement actual loading - for now just refresh to get next page
-        client.invalidate_queries(&[QueryKey::Games]);
+        spawn(async move {
+            QueriesStorage::<GamesListQ>::invalidate_all().await;
+        });
     };
 
     rsx! {

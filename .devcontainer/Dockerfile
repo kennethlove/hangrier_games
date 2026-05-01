@@ -15,6 +15,12 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install SurrealDB into /usr/local/bin (must run as root for write access).
+# No '|| true' — fail the build if install fails so we don't end up with a
+# broken devcontainer that silently misses the binary.
+RUN curl -sSf https://install.surrealdb.com | sh -s -- --version v2.1.4 \
+    && surreal version
+
 # Add wasm32 target as the vscode user
 USER vscode
 RUN rustup target add wasm32-unknown-unknown \
@@ -22,10 +28,5 @@ RUN rustup target add wasm32-unknown-unknown \
 
 # Pre-install Dioxus CLI (matches justfile pin)
 RUN cargo install dioxus-cli@0.6.2 --locked
-
-# Install SurrealDB CLI for migrations / debugging
-RUN curl -sSf https://install.surrealdb.com | sh -s -- --version v2.1.4 \
-    || true
-ENV PATH="/home/vscode/.surrealdb:${PATH}"
 
 USER root

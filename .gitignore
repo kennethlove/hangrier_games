@@ -10,6 +10,9 @@ web/assets/dist
 web/src/env.rs
 .env
 
+# SurrealDB on-disk data (persistent dev database)
+.surrealdb/
+
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db

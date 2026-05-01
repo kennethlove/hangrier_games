@@ -2,6 +2,7 @@ mod name_generator;
 
 use crate::items::name_generator::{generate_shield_name, generate_weapon_name};
 use crate::terrain::BaseTerrain;
+use rand::RngExt;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;

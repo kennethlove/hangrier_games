@@ -11,6 +11,7 @@ use crate::messages::{CombatEngagement, CombatOutcome, MessagePayload, TaggedEve
 use crate::output::GameOutput;
 use crate::tributes::Tribute;
 use crate::tributes::actions::{AttackOutcome, AttackResult};
+use rand::RngExt;
 use rand::prelude::*;
 use std::cmp::Ordering;
 
@@ -561,8 +562,9 @@ pub fn update_stats(attacker: &mut Tribute, defender: &mut Tribute, result: Atta
 mod tests {
     use super::*;
     use crate::tributes::Tribute;
-    use rand::RngCore;
+    use core::convert::Infallible;
     use rand::SeedableRng;
+    use rand::TryRng;
     use rand::rngs::SmallRng;
     use rstest::*;
 
@@ -705,17 +707,19 @@ mod tests {
         // Use a custom RNG that always returns the high bits needed for
         // `random_range(1..=20)` to produce 20 under rand 0.9's algorithm.
         struct CritRng;
-        impl RngCore for CritRng {
-            fn next_u32(&mut self) -> u32 {
-                0xF333_3334
+        impl TryRng for CritRng {
+            type Error = Infallible;
+            fn try_next_u32(&mut self) -> Result<u32, Infallible> {
+                Ok(0xF333_3334)
             }
-            fn next_u64(&mut self) -> u64 {
-                ((self.next_u32() as u64) << 32) | self.next_u32() as u64
+            fn try_next_u64(&mut self) -> Result<u64, Infallible> {
+                Ok((0xF333_3334u64 << 32) | 0xF333_3334u64)
             }
-            fn fill_bytes(&mut self, dest: &mut [u8]) {
+            fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Infallible> {
                 for byte in dest.iter_mut() {
                     *byte = 0xFF;
                 }
+                Ok(())
             }
         }
 
@@ -734,17 +738,19 @@ mod tests {
     fn test_critical_fumble() {
         // Use a custom RNG that returns 0 so `random_range(1..=20)` yields 1.
         struct FumbleRng;
-        impl RngCore for FumbleRng {
-            fn next_u32(&mut self) -> u32 {
-                0
+        impl TryRng for FumbleRng {
+            type Error = Infallible;
+            fn try_next_u32(&mut self) -> Result<u32, Infallible> {
+                Ok(0)
             }
-            fn next_u64(&mut self) -> u64 {
-                0
+            fn try_next_u64(&mut self) -> Result<u64, Infallible> {
+                Ok(0)
             }
-            fn fill_bytes(&mut self, dest: &mut [u8]) {
+            fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Infallible> {
                 for byte in dest.iter_mut() {
                     *byte = 0;
                 }
+                Ok(())
             }
         }
 
@@ -770,19 +776,21 @@ mod tests {
                 }
             }
         }
-        impl RngCore for BlockRng {
-            fn next_u32(&mut self) -> u32 {
+        impl TryRng for BlockRng {
+            type Error = Infallible;
+            fn try_next_u32(&mut self) -> Result<u32, Infallible> {
                 let count = self.call_count.get();
                 self.call_count.set(count + 1);
-                if count == 0 { 0x7333_3334 } else { 0xF333_3334 }
+                Ok(if count == 0 { 0x7333_3334 } else { 0xF333_3334 })
             }
-            fn next_u64(&mut self) -> u64 {
-                self.next_u32() as u64
+            fn try_next_u64(&mut self) -> Result<u64, Infallible> {
+                Ok(self.try_next_u32().unwrap() as u64)
             }
-            fn fill_bytes(&mut self, dest: &mut [u8]) {
+            fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Infallible> {
                 for byte in dest.iter_mut() {
-                    *byte = self.next_u32() as u8;
+                    *byte = self.try_next_u32().unwrap() as u8;
                 }
+                Ok(())
             }
         }
 

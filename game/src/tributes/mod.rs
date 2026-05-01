@@ -23,6 +23,7 @@ use brains::Brain;
 use fake::Fake;
 use fake::faker::name::raw::*;
 use fake::locales::*;
+use rand::RngExt;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeSeq};

@@ -1,4 +1,5 @@
 use crate::threats::animals::Animal;
+use rand::RngExt;
 use rand::prelude::SmallRng;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};

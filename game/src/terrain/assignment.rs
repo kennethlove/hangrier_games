@@ -1,5 +1,6 @@
 use crate::terrain::config::Harshness;
 use crate::terrain::{BaseTerrain, TerrainDescriptor, TerrainType};
+use rand::RngExt;
 use rand::prelude::*;
 use strum::IntoEnumIterator;
 
@@ -68,7 +69,7 @@ impl TerrainType {
 
         // Pick 0-2 descriptors randomly
         let count = rng.random_range(0..=2);
-        compatible.choose_multiple(rng, count).copied().collect()
+        compatible.sample(rng, count).copied().collect()
     }
 }
 
@@ -90,10 +91,7 @@ pub fn enforce_balance_constraint(terrains: &mut [TerrainType], rng: &mut impl R
 
         // Reroll extras to Moderate terrains
         let to_reroll = harsh_count - 3;
-        let reroll_indices: Vec<usize> = harsh_indices
-            .choose_multiple(rng, to_reroll)
-            .copied()
-            .collect();
+        let reroll_indices: Vec<usize> = harsh_indices.sample(rng, to_reroll).copied().collect();
 
         for idx in reroll_indices {
             // Reroll to Moderate harshness terrain

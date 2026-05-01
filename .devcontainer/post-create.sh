@@ -19,11 +19,11 @@ if [ ! -f .env ]; then
   cat > .env <<'EOF'
 ENV=development
 APP_API_HOST=http://127.0.0.1:3000
-SURREAL_HOST=ws://surrealdb:8000
+SURREAL_HOST=ws://localhost:8000
 SURREAL_USER=root
 SURREAL_PASS=root
 EOF
-  echo "Created default .env (SurrealDB reachable at ws://surrealdb:8000 inside the devcontainer network)"
+  echo "Created default .env (SurrealDB runs in-container at ws://localhost:8000)"
 fi
 
-echo "==> Done. Run 'just api' and 'just web' (or 'just dev' if you have tmux)."
+echo "==> Done. Run 'just dev' (starts SurrealDB + API + web in one shell)."

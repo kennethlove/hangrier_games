@@ -7,8 +7,8 @@ Reproducible dev environment for Hangrier Games. Opens in VS Code or any editor 
 - **Rust 1.x** (Debian bookworm base) with `wasm32-unknown-unknown`, `clippy`, `rustfmt`, `rust-src`.
 - **Dioxus CLI 0.6.2** preinstalled (matches `justfile`).
 - **Node LTS** + npm for Tailwind CSS.
-- **just**, **gh**, **SurrealDB CLI**.
-- **SurrealDB sidecar** (in-memory) reachable at `ws://surrealdb:8000`.
+- **just**, **gh**.
+- **SurrealDB CLI** (`surreal` binary, v2.1.4) in `/usr/local/bin`. Started in-container by `just dev` / `just db` with persistent on-disk storage at `.surrealdb/` in the workspace root (gitignored). Listens on `ws://localhost:8000`.
 - System libs for Dioxus desktop builds (`libwebkit2gtk-4.1`, `libgtk-3`, `libsoup-3.0`, `libxdo`, `clang`).
 
 Ollama is **not** included; install on the host and point at it if you want announcer commentary.
@@ -28,11 +28,16 @@ Ollama is **not** included; install on the host and point at it if you want anno
 After it finishes:
 
 ```bash
-just api    # in one terminal
-just web    # in another
+just dev    # starts SurrealDB + API + web together
 ```
 
-Or use `just dev` if you have a multiplexer set up.
+Or run them individually in separate terminals:
+
+```bash
+just db     # SurrealDB (memory mode, ws://localhost:8000)
+just api    # API server
+just web    # Dioxus dev server
+```
 
 ## Caches
 

@@ -14,15 +14,15 @@ api:
 web:
     cd web && dx serve
 
-# Start SurrealDB in memory mode for local development
+# Start SurrealDB with persistent on-disk storage for local development
 db:
-    surrealdb start --log trace --user root --pass root memory
+    surreal start --log trace --user root --pass root surrealkv://.surrealdb
 
 # Start full development environment (DB, API, and web frontend)
 dev:
     #!/usr/bin/env bash
     echo "Starting SurrealDB..."
-    surrealdb start --log info --user root --pass root memory &
+    surreal start --log info --user root --pass root surrealkv://.surrealdb &
     DB_PID=$!
     sleep 2
     echo "Starting API server..."

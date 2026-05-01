@@ -208,7 +208,7 @@ dependencies = [
  "time",
  "tokio",
  "tokio-cron-scheduler",
- "tokio-tungstenite 0.26.2",
+ "tokio-tungstenite 0.29.0",
  "tower",
  "tower-http",
  "tower_governor",
@@ -7349,18 +7349,6 @@ dependencies = [
 
 [[package]]
 name = "tokio-tungstenite"
-version = "0.26.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a9daff607c6d2bf6c16fd681ccb7eecc83e4e2cdc1ca067ffaadfca5de7f084"
-dependencies = [
- "futures-util",
- "log",
- "tokio",
- "tungstenite 0.26.2",
-]
-
-[[package]]
-name = "tokio-tungstenite"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f72a05e828585856dacd553fba484c242c46e391fb0e58917c942ee9202915c"
@@ -7652,23 +7640,6 @@ dependencies = [
  "sha1",
  "thiserror 1.0.69",
  "url",
- "utf-8",
-]
-
-[[package]]
-name = "tungstenite"
-version = "0.26.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4793cb5e56680ecbb1d843515b23b6de9a75eb04b66643e256a396d43be33c13"
-dependencies = [
- "bytes",
- "data-encoding",
- "http",
- "httparse",
- "log",
- "rand 0.9.4",
- "sha1",
- "thiserror 2.0.18",
  "utf-8",
 ]
 

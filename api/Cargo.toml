@@ -32,7 +32,7 @@ validator = { version = "0.20", features = ["derive"] }
 
 [dev-dependencies]
 axum-test = "20.0.0"
-tokio-tungstenite = "0.26"
+tokio-tungstenite = "0.29"
 surrealdb = { version = "2.3.2", features = ["kv-mem"] }
 
 [target.'cfg(windows)'.dependencies]

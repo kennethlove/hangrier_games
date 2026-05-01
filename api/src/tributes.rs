@@ -37,14 +37,6 @@ pub struct TributeItemEdge {
     pub item: RecordId,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct TributeGameEdge {
-    #[serde(rename = "in")]
-    tribute: RecordId,
-    #[serde(rename = "out")]
-    game: RecordId,
-}
-
 pub async fn create_tribute(
     tribute: Option<Tribute>,
     game_identifier: &str,
@@ -67,17 +59,22 @@ pub async fn create_tribute(
 
     let id = RecordId::from(("tribute", &tribute.identifier));
 
-    let new_tribute: Option<Tribute> =
-        db.create(&id).content(tribute).await.map_err(|e| {
-            AppError::InternalServerError(format!("Failed to create tribute: {}", e))
-        })?;
+    // Bind via serde_json::Value to bypass the SurrealDB SDK's bespoke type
+    // serializer, which collapses externally-tagged enums and Option fields.
+    // The generic JSON bind path round-trips cleanly. Mirrors the pattern in
+    // save_game in api/src/games.rs.
+    let body = serde_json::to_value(&tribute)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to encode tribute: {}", e)))?;
+    db.query("UPDATE $rid CONTENT $body")
+        .bind(("rid", id.clone()))
+        .bind(("body", body))
+        .await
+        .map_err(|e| AppError::InternalServerError(format!("Failed to create tribute: {}", e)))?;
+    let new_tribute = Some(tribute);
 
-    let _: Vec<TributeGameEdge> = db
-        .insert("playing_in")
-        .relation(TributeGameEdge {
-            tribute: id.clone(),
-            game: game_id.clone(),
-        })
+    db.query("RELATE $tribute->playing_in->$game")
+        .bind(("tribute", id.clone()))
+        .bind(("game", game_id.clone()))
         .await
         .map_err(|e| {
             AppError::InternalServerError(format!("Failed to connect tribute to game: {}", e))
@@ -85,17 +82,16 @@ pub async fn create_tribute(
 
     let new_object: Item = Item::new_random(None);
     let new_object_id: RecordId = RecordId::from(("item", &new_object.identifier));
-    let _: Option<Item> = db
-        .insert(new_object_id.clone())
-        .content(new_object.clone())
+    let item_body = serde_json::to_value(&new_object)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to encode item: {}", e)))?;
+    db.query("UPDATE $rid CONTENT $body")
+        .bind(("rid", new_object_id.clone()))
+        .bind(("body", item_body))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create item: {}", e)))?;
-    let _: Vec<TributeItemEdge> = db
-        .insert("owns")
-        .relation(TributeItemEdge {
-            tribute: id.clone(),
-            item: new_object_id.clone(),
-        })
+    db.query("RELATE $tribute->owns->$item")
+        .bind(("tribute", id.clone()))
+        .bind(("item", new_object_id.clone()))
         .await
         .map_err(|e| {
             AppError::InternalServerError(format!("Failed to create owns relation: {}", e))

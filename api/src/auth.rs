@@ -75,10 +75,15 @@ pub async fn store_refresh_token(
     state: &AppState,
     refresh_token: &RefreshToken,
 ) -> Result<(), AppError> {
-    let _: Option<RefreshToken> = state
+    // Bind via serde_json::Value to bypass the SurrealDB SDK's bespoke
+    // type serializer (same workaround as save_game in games.rs), which
+    // can collapse externally-tagged enums and Option fields.
+    let body = serde_json::to_value(refresh_token)
+        .map_err(|e| AppError::DbError(format!("Failed to encode refresh token: {}", e)))?;
+    state
         .db
-        .create("refresh_token")
-        .content(refresh_token.clone())
+        .query("CREATE refresh_token CONTENT $body")
+        .bind(("body", body))
         .await
         .map_err(|e| AppError::DbError(format!("Failed to store refresh token: {}", e)))?;
     Ok(())

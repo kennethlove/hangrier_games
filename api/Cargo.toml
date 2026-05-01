@@ -20,7 +20,7 @@ surrealdb = "2.3.2"
 surrealdb-migrations = "2.2.2"
 thiserror = "2.0.18"
 tokio = { version = "1.52.1", features = ["full"] }
-tokio-cron-scheduler = "0.13.0"
+tokio-cron-scheduler = "0.15"
 tower-http = { version = "0.6.8", features = ["trace", "cors", "fs", "normalize-path"] }
 tower = { version = "0.5.3", features = ["util", "timeout"] }
 tower_governor = "0.8"

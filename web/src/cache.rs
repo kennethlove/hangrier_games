@@ -18,6 +18,7 @@ pub(crate) enum MutationError {
     Unknown,
     UnableToAdvanceGame,
     UnableToRegisterUser,
+    RegistrationFailed { message: String },
     UnableToAuthenticateUser,
     _UnableToPublishGame,
     _UnableToUnpublishGame,

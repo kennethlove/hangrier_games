@@ -6,6 +6,7 @@ use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
 use dioxus_query::prelude::{MutationResult, MutationState, use_mutation, use_query_client};
 use game::games::Game;
+use shared::CreateGame;
 use std::ops::Deref;
 
 // TODO: Game Customization Enhancement
@@ -24,9 +25,11 @@ async fn create_game(
     let name = args.0.clone();
     let token = args.1.clone();
     let client = reqwest::Client::new();
-    let json_body = match name {
-        Some(name) => Game::new(&name),
-        None => Game::default(),
+    let json_body = CreateGame {
+        name,
+        item_quantity: Default::default(),
+        event_frequency: Default::default(),
+        starting_health_range: None,
     };
 
     let response = client
@@ -35,10 +38,25 @@ async fn create_game(
         .json(&json_body);
 
     match response.send().await {
-        Ok(response) => match response.json::<Game>().await {
-            Ok(game) => MutationResult::Ok(MutationValue::NewGame(game)),
-            Err(_) => MutationResult::Err(MutationError::UnableToCreateGame),
-        },
+        Ok(response) => {
+            let status = response.status();
+            if !status.is_success() {
+                let body = response.text().await.unwrap_or_default();
+                dioxus_logger::tracing::error!(
+                    "create_game failed: status={} body={}",
+                    status,
+                    body
+                );
+                return MutationResult::Err(MutationError::UnableToCreateGame);
+            }
+            match response.json::<Game>().await {
+                Ok(game) => MutationResult::Ok(MutationValue::NewGame(game)),
+                Err(e) => {
+                    dioxus_logger::tracing::error!("create_game parse error: {:?}", e);
+                    MutationResult::Err(MutationError::UnableToCreateGame)
+                }
+            }
+        }
         Err(e) => {
             dioxus_logger::tracing::error!("error creating game: {:?}", e);
             MutationResult::Err(MutationError::UnableToCreateGame)
@@ -62,8 +80,8 @@ pub fn CreateGameButton() -> Element {
                 && let MutationValue::NewGame(_game) = result
             {
                 client.invalidate_queries(&[QueryKey::Games]);
-                loading_signal.set(LoadingState::Loaded);
             };
+            loading_signal.set(LoadingState::Loaded);
         });
     };
 
@@ -98,9 +116,9 @@ pub fn CreateGameForm() -> Element {
                 && let MutationValue::NewGame(_game) = result
             {
                 client.invalidate_queries(&[QueryKey::Games]);
-                loading_signal.set(LoadingState::Loaded);
                 game_name_signal.set(String::default());
             }
+            loading_signal.set(LoadingState::Loaded);
         });
     };
 

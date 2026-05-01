@@ -10,6 +10,7 @@ use crate::components::period_grid::PeriodGrid;
 use crate::components::recap_card::RecapCard;
 use crate::components::timeline::PeriodFilters;
 use crate::env::APP_API_HOST;
+use crate::hooks::use_timeline_summary::TimelineSummaryQ;
 use crate::hooks::{ConnectionState, use_game_websocket};
 use crate::routes::Routes;
 use crate::storage::{AppState, use_persistent};
@@ -107,6 +108,8 @@ impl MutationCapability for NextStepM {
         if result.is_ok() {
             QueriesStorage::<DisplayGameQ>::invalidate_all().await;
             QueriesStorage::<GamesListQ>::invalidate_all().await;
+            QueriesStorage::<TimelineSummaryQ>::invalidate_all().await;
+            QueriesStorage::<crate::components::game_period_page::DayLogQ>::invalidate_all().await;
         }
     }
 }
@@ -114,6 +117,30 @@ impl MutationCapability for NextStepM {
 #[component]
 pub fn GamePage(identifier: String) -> Element {
     let (ws_events, ws_connection) = use_game_websocket(identifier.clone());
+
+    let mut last_seen = use_signal(|| 0usize);
+    use_effect(move || {
+        let evs = ws_events.read();
+        let len = evs.len();
+        let start = (*last_seen.peek()).min(len);
+        let bump_phase = evs[start..].iter().any(|ev| {
+            matches!(
+                ev,
+                GameEvent::GameStarted { .. }
+                    | GameEvent::DayStarted { .. }
+                    | GameEvent::NightStarted { .. }
+                    | GameEvent::GameFinished { .. }
+            )
+        });
+        drop(evs);
+        last_seen.set(len);
+        if bump_phase {
+            spawn(async {
+                QueriesStorage::<TimelineSummaryQ>::invalidate_all().await;
+                QueriesStorage::<DisplayGameQ>::invalidate_all().await;
+            });
+        }
+    });
 
     rsx! {
         div {

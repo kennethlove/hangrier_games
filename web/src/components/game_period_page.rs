@@ -16,8 +16,8 @@ use reqwest::StatusCode;
 use shared::messages::{GameMessage, Phase};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-struct DayLogQ {
-    token: String,
+pub(crate) struct DayLogQ {
+    pub token: String,
 }
 
 impl QueryCapability for DayLogQ {

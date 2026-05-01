@@ -9,13 +9,16 @@ use crate::components::filter_chips::FilterChips;
 use crate::components::timeline::{PeriodFilters, Timeline};
 use crate::env::APP_API_HOST;
 use crate::hooks::use_timeline_summary::use_timeline_summary;
+use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use reqwest::StatusCode;
 use shared::messages::{GameMessage, Phase};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-struct DayLogQ;
+struct DayLogQ {
+    token: String,
+}
 
 impl QueryCapability for DayLogQ {
     type Ok = Vec<GameMessage>;
@@ -25,12 +28,18 @@ impl QueryCapability for DayLogQ {
     async fn run(&self, keys: &(String, u32)) -> Result<Vec<GameMessage>, QueryError> {
         let (id, day) = keys;
         let url = format!("{APP_API_HOST}/api/games/{id}/log/{day}");
-        match reqwest::get(&url).await {
+        let resp = reqwest::Client::new()
+            .get(&url)
+            .bearer_auth(&self.token)
+            .send()
+            .await;
+        match resp {
             Ok(resp) => match resp.status() {
                 StatusCode::OK => match resp.json::<Vec<GameMessage>>().await {
                     Ok(v) => Ok(v),
                     Err(_) => Err(QueryError::BadJson),
                 },
+                StatusCode::UNAUTHORIZED => Err(QueryError::Unauthorized),
                 StatusCode::NOT_FOUND => Err(QueryError::GameNotFound(id.clone())),
                 _ => Err(QueryError::Unknown),
             },
@@ -44,7 +53,10 @@ pub fn GamePeriodPage(identifier: String, day: u32, phase: Phase) -> Element {
     let filters: Signal<PeriodFilters> = use_context();
     let filter = filters.read().filter_for(&identifier);
 
-    let summary_q = use_timeline_summary(identifier.clone());
+    let storage = use_persistent("hangry-games", AppState::default);
+    let token = storage.get().jwt.unwrap_or_default();
+
+    let summary_q = use_timeline_summary(identifier.clone(), token.clone());
 
     let valid = {
         let reader = summary_q.read();
@@ -67,7 +79,12 @@ pub fn GamePeriodPage(identifier: String, day: u32, phase: Phase) -> Element {
         };
     }
 
-    let log_q = use_query(Query::new((identifier.clone(), day), DayLogQ));
+    let log_q = use_query(Query::new(
+        (identifier.clone(), day),
+        DayLogQ {
+            token: token.clone(),
+        },
+    ));
     let reader = log_q.read();
     let state = reader.state();
 

@@ -5,7 +5,9 @@ use reqwest::StatusCode;
 use shared::messages::TimelineSummary;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub(crate) struct TimelineSummaryQ;
+pub(crate) struct TimelineSummaryQ {
+    pub token: String,
+}
 
 impl QueryCapability for TimelineSummaryQ {
     type Ok = TimelineSummary;
@@ -14,12 +16,18 @@ impl QueryCapability for TimelineSummaryQ {
 
     async fn run(&self, id: &String) -> Result<TimelineSummary, QueryError> {
         let url = format!("{APP_API_HOST}/api/games/{id}/timeline-summary");
-        match reqwest::get(&url).await {
+        let resp = reqwest::Client::new()
+            .get(&url)
+            .bearer_auth(&self.token)
+            .send()
+            .await;
+        match resp {
             Ok(resp) => match resp.status() {
                 StatusCode::OK => match resp.json::<TimelineSummary>().await {
                     Ok(s) => Ok(s),
                     Err(_) => Err(QueryError::BadJson),
                 },
+                StatusCode::UNAUTHORIZED => Err(QueryError::Unauthorized),
                 StatusCode::NOT_FOUND => Err(QueryError::GameNotFound(id.clone())),
                 _ => Err(QueryError::Unknown),
             },
@@ -29,6 +37,6 @@ impl QueryCapability for TimelineSummaryQ {
 }
 
 #[allow(dead_code)]
-pub(crate) fn use_timeline_summary(game_id: String) -> UseQuery<TimelineSummaryQ> {
-    use_query(Query::new(game_id, TimelineSummaryQ))
+pub(crate) fn use_timeline_summary(game_id: String, token: String) -> UseQuery<TimelineSummaryQ> {
+    use_query(Query::new(game_id, TimelineSummaryQ { token }))
 }

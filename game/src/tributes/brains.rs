@@ -4,6 +4,7 @@ use crate::tributes::Tribute;
 use crate::tributes::actions::Action;
 use crate::tributes::traits::{ThresholdDelta, Trait};
 use rand::Rng;
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 
 const LOW_ENEMY_LIMIT: u32 = 6;

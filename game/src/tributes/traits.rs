@@ -2,6 +2,7 @@
 //! `docs/superpowers/specs/2026-04-25-tribute-alliances-design.md` §5.
 
 use rand::Rng;
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

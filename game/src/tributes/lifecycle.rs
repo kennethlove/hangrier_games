@@ -13,6 +13,7 @@ use crate::messages::{MessagePayload, TaggedEvent, TributeRef};
 use crate::output::GameOutput;
 use crate::tributes::Tribute;
 use crate::tributes::statuses::TributeStatus;
+use rand::RngExt;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
 

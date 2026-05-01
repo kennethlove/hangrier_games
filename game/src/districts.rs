@@ -1,5 +1,6 @@
 use crate::terrain::BaseTerrain;
 use rand::Rng;
+use rand::RngExt;
 
 /// Represents a district's industry and terrain preferences
 #[derive(Debug, Clone, Copy)]

@@ -1439,7 +1439,7 @@ checksum = "4aa42bcd3d846ebf66e15bd528d1087f75d1c6c1c66ebff626178a106353c576"
 dependencies = [
  "chrono",
  "derive_builder",
- "strum",
+ "strum 0.27.2",
 ]
 
 [[package]]
@@ -2833,7 +2833,7 @@ dependencies = [
  "fake",
  "indefinite",
  "once_cell",
- "rand 0.9.4",
+ "rand 0.10.1",
  "rstest",
  "serde",
  "serde_json",

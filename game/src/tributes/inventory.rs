@@ -10,6 +10,7 @@
 use crate::areas::AreaDetails;
 use crate::items::{Attribute, Item, ItemError, OwnsItems};
 use crate::tributes::Tribute;
+use rand::RngExt;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
 

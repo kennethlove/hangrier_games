@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand::RngExt;
 use rand::prelude::*;
 use rand::seq::SliceRandom;
 
@@ -84,7 +84,7 @@ impl WPGen {
         }
 
         let pool = pool[0..upper_bound]
-            .choose_multiple(&mut *self.rng.borrow_mut(), upper_bound)
+            .sample(&mut *self.rng.borrow_mut(), upper_bound)
             .collect::<Vec<&&&str>>();
 
         for selected in pool {

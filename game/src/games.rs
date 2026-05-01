@@ -8,6 +8,7 @@ use crate::tributes::statuses::TributeStatus;
 use crate::tributes::{
     ActionSuggestion, EncounterContext, EnvironmentContext, Tribute, calculate_stamina_cost,
 };
+use rand::RngExt;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};

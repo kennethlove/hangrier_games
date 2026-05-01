@@ -5,6 +5,7 @@
 //! `Tribute` mutation lives here; later phases wire these helpers into
 //! the simulation loop.
 
+use rand::RngExt;
 use uuid::Uuid;
 
 use crate::tributes::traits::{REFUSERS, Trait, geometric_mean_affinity};

@@ -70,6 +70,7 @@ pub async fn create_tribute(
         .bind(("body", body))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create tribute: {}", e)))?;
+    crate::verify_record_persisted(db, &id, "create_tribute").await?;
     let new_tribute = Some(tribute);
 
     db.query("RELATE $tribute->playing_in->$game")
@@ -89,6 +90,7 @@ pub async fn create_tribute(
         .bind(("body", item_body))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create item: {}", e)))?;
+    crate::verify_record_persisted(db, &new_object_id, "create_tribute: item").await?;
     db.query("RELATE $tribute->owns->$item")
         .bind(("tribute", id.clone()))
         .bind(("item", new_object_id.clone()))

@@ -12,7 +12,7 @@ api:
 
 # Run the frontend dev server (requires Dioxus CLI and Tailwind CSS built)
 web:
-    cd web && dx serve
+    cd web && dx serve --addr 0.0.0.0
 
 # Start SurrealDB with persistent on-disk storage for local development
 db:
@@ -21,6 +21,11 @@ db:
 # Start full development environment (DB, API, and web frontend)
 dev:
     #!/usr/bin/env bash
+    REQUIRED_DX="0.7.7"
+    if ! command -v dx >/dev/null 2>&1 || ! dx --version 2>/dev/null | grep -q "$REQUIRED_DX"; then
+        echo "Installing dioxus-cli@$REQUIRED_DX (mismatched or missing)..."
+        cargo install dioxus-cli@$REQUIRED_DX --locked --force
+    fi
     echo "Starting SurrealDB..."
     surreal start --log info --user root --pass root --bind 0.0.0.0:8000 surrealkv://.surrealdb &
     DB_PID=$!
@@ -29,17 +34,24 @@ dev:
     cargo run --package api &
     API_PID=$!
     sleep 2
+    echo "Building Tailwind CSS..."
+    (cd web/assets && npm install --silent && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css)
+    echo "Starting Tailwind watcher..."
+    (cd web/assets && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css --watch) &
+    CSS_PID=$!
+    sleep 1
     echo "Starting web frontend..."
-    cd web && dx serve &
+    cd web && dx serve --addr 0.0.0.0 &
     WEB_PID=$!
     echo ""
     echo "Development environment running:"
     echo "  - SurrealDB: ws://localhost:8000"
     echo "  - API: http://localhost:3000"
     echo "  - Web: http://localhost:8080"
+    echo "  - Tailwind: watching web/assets/src/main.css"
     echo ""
     echo "Press Ctrl+C to stop all services"
-    trap "kill $DB_PID $API_PID $WEB_PID 2>/dev/null" EXIT
+    trap "kill $DB_PID $API_PID $WEB_PID $CSS_PID 2>/dev/null" EXIT
     wait
 
 # Building recipes
@@ -118,7 +130,7 @@ quality: fmt check clippy test
 
 # Install Dioxus CLI
 setup-dx:
-    cargo install dioxus-cli@0.7.7 --locked
+    cargo install dioxus-cli@0.7.7 --locked --force
 
 # Create Ollama announcer model
 setup-ollama:

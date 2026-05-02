@@ -98,7 +98,7 @@ async fn create_game_area(area: Area, db: &Surreal<Any>) -> Result<GameArea, App
     };
     let body = serde_json::to_value(&game_area)
         .map_err(|e| AppError::InternalServerError(format!("Failed to encode area: {}", e)))?;
-    db.query("UPDATE $rid CONTENT $body")
+    db.query("UPSERT $rid CONTENT $body")
         .bind(("rid", area_id.clone()))
         .bind(("body", body))
         .await
@@ -201,7 +201,7 @@ pub async fn create_game(
         .map_err(|e| AppError::InternalServerError(format!("Failed to encode game: {}", e)))?;
     state
         .db
-        .query("UPDATE $rid CONTENT $body")
+        .query("UPSERT $rid CONTENT $body")
         .bind(("rid", game_rid))
         .bind(("body", body))
         .await
@@ -296,7 +296,7 @@ pub async fn add_item_to_area(
     let body = serde_json::to_value(&new_item)
         .map_err(|e| AppError::InternalServerError(format!("Failed to encode item: {}", e)))?;
     if let Err(e) = db
-        .query("UPDATE $rid CONTENT $body")
+        .query("UPSERT $rid CONTENT $body")
         .bind(("rid", new_item_id.clone()))
         .bind(("body", body))
         .await
@@ -936,7 +936,7 @@ async fn save_game(
         // fields. The generic JSON bind path round-trips cleanly.
         let body = serde_json::to_value(&area_without_items)
             .map_err(|e| AppError::InternalServerError(format!("Failed to encode area: {}", e)))?;
-        db.query("UPDATE $rid CONTENT $body")
+        db.query("UPSERT $rid CONTENT $body")
             .bind(("rid", id.clone()))
             .bind(("body", body))
             .await
@@ -967,7 +967,7 @@ async fn save_game(
         let body = serde_json::to_value(&tribute_without_items).map_err(|e| {
             AppError::InternalServerError(format!("Failed to encode tribute: {}", e))
         })?;
-        db.query("UPDATE $rid CONTENT $body")
+        db.query("UPSERT $rid CONTENT $body")
             .bind(("rid", id.clone()))
             .bind(("body", body))
             .await
@@ -1092,7 +1092,7 @@ async fn save_area_items(
             let body = serde_json::to_value(item).map_err(|e| {
                 AppError::InternalServerError(format!("Failed to encode item: {}", e))
             })?;
-            db.query("UPDATE $rid CONTENT $body")
+            db.query("UPSERT $rid CONTENT $body")
                 .bind(("rid", rid))
                 .bind(("body", body))
                 .await
@@ -1202,7 +1202,7 @@ async fn save_tribute_items(
             let body = serde_json::to_value(item).map_err(|e| {
                 AppError::InternalServerError(format!("Failed to encode item: {}", e))
             })?;
-            db.query("UPDATE $rid CONTENT $body")
+            db.query("UPSERT $rid CONTENT $body")
                 .bind(("rid", rid))
                 .bind(("body", body))
                 .await

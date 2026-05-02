@@ -65,7 +65,7 @@ pub async fn create_tribute(
     // save_game in api/src/games.rs.
     let body = serde_json::to_value(&tribute)
         .map_err(|e| AppError::InternalServerError(format!("Failed to encode tribute: {}", e)))?;
-    db.query("UPDATE $rid CONTENT $body")
+    db.query("UPSERT $rid CONTENT $body")
         .bind(("rid", id.clone()))
         .bind(("body", body))
         .await
@@ -84,7 +84,7 @@ pub async fn create_tribute(
     let new_object_id: RecordId = RecordId::from(("item", &new_object.identifier));
     let item_body = serde_json::to_value(&new_object)
         .map_err(|e| AppError::InternalServerError(format!("Failed to encode item: {}", e)))?;
-    db.query("UPDATE $rid CONTENT $body")
+    db.query("UPSERT $rid CONTENT $body")
         .bind(("rid", new_object_id.clone()))
         .bind(("body", item_body))
         .await

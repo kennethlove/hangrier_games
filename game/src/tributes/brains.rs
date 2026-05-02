@@ -2,7 +2,8 @@ use crate::areas::{Area, AreaDetails};
 use crate::terrain::{BaseTerrain, Harshness, TerrainType, Visibility};
 use crate::tributes::Tribute;
 use crate::tributes::actions::Action;
-use crate::tributes::traits::{ThresholdDelta, Trait};
+use crate::tributes::alliances::MAX_ALLIES;
+use crate::tributes::traits::{REFUSERS, ThresholdDelta, Trait, geometric_mean_affinity};
 use rand::Rng;
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
@@ -258,6 +259,14 @@ impl Brain {
             return preferred_action.clone();
         }
 
+        // Spec §6.1: alliance proposals are a deliberate first-class action,
+        // not an automatic encounter side-effect. Considered before the
+        // health/sanity branching below so a healthy social tribute
+        // occasionally spends a turn forming bonds instead of attacking.
+        if self.wants_to_propose_alliance(tribute, nearby_tributes, rng) {
+            return Action::ProposeAlliance;
+        }
+
         // Does the tribute have items?
         let has_consumables = !tribute.consumables().is_empty();
         if has_consumables {
@@ -397,6 +406,12 @@ impl Brain {
             return preferred_action.clone();
         }
 
+        // Spec §6.1: alliance proposals are a deliberate first-class action.
+        // Mirrors the gate in `act` so terrain-aware paths behave the same.
+        if self.wants_to_propose_alliance(tribute, nearby_tributes, rng) {
+            return Action::ProposeAlliance;
+        }
+
         // Check if we have consumables
         let has_consumables = !tribute.consumables().is_empty();
         if has_consumables {
@@ -510,6 +525,52 @@ impl Brain {
             _ if is_concealed => Action::Hide,
             _ => Action::Hide,
         }
+    }
+
+    /// Decide whether the tribute spends this turn proposing an alliance.
+    ///
+    /// Returns true with low probability when ALL of the following hold:
+    /// - At least one nearby tribute exists (potential candidate).
+    /// - Tribute has not yet hit the per-tribute alliance cap (`MAX_ALLIES`).
+    /// - Tribute is healthy enough to socialize (above `low_health`).
+    /// - Tribute is sane enough to think (above `low_sanity`).
+    /// - Tribute carries no refuser trait (Lone Wolf, Paranoid).
+    /// - Tribute's own trait affinity is at least neutral
+    ///   (`geometric_mean_affinity >= 1.0`).
+    ///
+    /// The base proposal chance is intentionally small (5%) and scales with
+    /// trait affinity (Friendly/Loyal push it up). Even at the upper bound
+    /// this fires for far fewer tributes per cycle than the legacy O(N\u00b2)
+    /// pre-pass, which is the entire point of moving the trigger here.
+    fn wants_to_propose_alliance(
+        &self,
+        tribute: &Tribute,
+        nearby_tributes: u32,
+        rng: &mut impl Rng,
+    ) -> bool {
+        if nearby_tributes == 0 {
+            return false;
+        }
+        if tribute.allies.len() >= MAX_ALLIES {
+            return false;
+        }
+        if tribute.attributes.health < self.thresholds.low_health
+            || tribute.attributes.sanity < self.thresholds.low_sanity
+        {
+            return false;
+        }
+        if tribute.traits.iter().any(|t| REFUSERS.contains(t)) {
+            return false;
+        }
+        let affinity = geometric_mean_affinity(&tribute.traits);
+        if affinity < 1.0 {
+            return false;
+        }
+        // Base 5% per turn, scaled by trait affinity (Friendly=1.5,
+        // Loyal=1.4 push above; neutral stays at base). Clamp at 15% so
+        // even Friendly+Loyal tributes don't propose every other turn.
+        let chance = (0.05 * affinity).clamp(0.0, 0.15);
+        rng.random_bool(chance)
     }
 
     fn decide_action_no_enemies(&self, tribute: &Tribute) -> Action {

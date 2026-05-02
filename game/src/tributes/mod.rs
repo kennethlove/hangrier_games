@@ -588,6 +588,77 @@ impl Tribute {
             Action::None => {
                 // Tribute does nothing - no output needed
             }
+            Action::ProposeAlliance => {
+                // Pick a candidate from potential_targets (already filtered to
+                // the actor's current area by the caller). Skip current allies,
+                // dead tributes, and those at the per-tribute cap. Skip
+                // candidates that fail the refuser gate so the message we emit
+                // doesn't promise something the alliance roll can never grant.
+                use crate::tributes::alliances::{
+                    self, MAX_ALLIES, deciding_factor, passes_gate, try_form_alliance,
+                };
+                let candidates: Vec<&Tribute> = encounter_context
+                    .potential_targets
+                    .iter()
+                    .filter(|t| t.is_alive())
+                    .filter(|t| !self.allies.contains(&t.id))
+                    .filter(|t| t.allies.len() < MAX_ALLIES)
+                    .filter(|t| passes_gate(&self.traits, &t.traits))
+                    .collect();
+                if candidates.is_empty() {
+                    // No viable candidate; treat as a wasted social attempt.
+                    // Emit nothing — the proposer is alone-among-rivals and
+                    // the log already records nearby tributes via earlier
+                    // events.
+                    return;
+                }
+                let target = {
+                    use rand::seq::IndexedRandom;
+                    candidates.choose(rng).cloned().unwrap()
+                };
+                let target_ref = TributeRef {
+                    identifier: target.identifier.clone(),
+                    name: target.name.clone(),
+                };
+                // Emit an AllianceProposed message regardless of outcome so
+                // the player sees the social action.
+                let proposed_line =
+                    format!("🤝 {} proposes an alliance to {}.", self.name, target.name);
+                events.push(TaggedEvent::new(
+                    proposed_line,
+                    MessagePayload::AllianceProposed {
+                        proposer: tribute_ref(),
+                        target: target_ref.clone(),
+                    },
+                ));
+
+                let same_district = self.district == target.district;
+                let formed = try_form_alliance(
+                    &self.traits,
+                    &target.traits,
+                    same_district,
+                    self.allies.len(),
+                    target.allies.len(),
+                    rng,
+                );
+                if formed {
+                    let factor = deciding_factor(&self.traits, &target.traits, same_district);
+                    let factor_label = factor
+                        .as_ref()
+                        .map(|f| f.label())
+                        .unwrap_or("mutual circumstance")
+                        .to_string();
+                    // Defer the symmetric `allies` push and the
+                    // AllianceFormed message to game::process_alliance_events
+                    // so we don't need a `&mut` borrow on `target` here.
+                    self.alliance_events
+                        .push(alliances::AllianceEvent::FormationRecorded {
+                            proposer: self.id,
+                            target: target.id,
+                            factor: factor_label,
+                        });
+                }
+            }
         }
     }
 
@@ -740,6 +811,8 @@ pub fn calculate_stamina_cost(
         Action::Attack => 25.0,
         Action::Rest | Action::None => 0.0,
         Action::UseItem(_) => 10.0,
+        // Proposing an alliance is a low-cost social action.
+        Action::ProposeAlliance => 5.0,
     };
 
     // If base cost is 0, no need to calculate multipliers

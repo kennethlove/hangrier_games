@@ -27,6 +27,11 @@ pub enum Action {
     Attack,
     Hide,
     TakeItem,
+    /// Spend the turn proposing an alliance to a non-allied tribute in the
+    /// current area. The proposal succeeds or fails via the existing alliance
+    /// roll (`game::tributes::alliances::try_form_alliance`); either way the
+    /// turn is consumed. See spec §6.1.
+    ProposeAlliance,
 }
 
 impl Display for Action {
@@ -39,6 +44,7 @@ impl Display for Action {
             Action::Attack => write!(f, "attack"),
             Action::Hide => write!(f, "hide"),
             Action::TakeItem => write!(f, "take item"),
+            Action::ProposeAlliance => write!(f, "propose alliance"),
         }
     }
 }
@@ -55,6 +61,7 @@ impl FromStr for Action {
             "attack" => Ok(Action::Attack),
             "hide" => Ok(Action::Hide),
             "take item" => Ok(Action::TakeItem),
+            "propose alliance" => Ok(Action::ProposeAlliance),
             _ => Err(()),
         }
     }

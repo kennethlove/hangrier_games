@@ -20,6 +20,15 @@ pub const TREACHEROUS_BETRAYAL_INTERVAL: u8 = 5;
 /// Events emitted by tribute turns and drained by the game cycle. Pure data.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AllianceEvent {
+    /// A successful alliance proposal during the proposer's turn. The game
+    /// loop applies the symmetric `allies` push to both tributes and emits
+    /// the `AllianceFormed` message. Carrying the deciding factor lets the
+    /// game-side message reuse the same prose as the legacy pre-pass.
+    FormationRecorded {
+        proposer: Uuid,
+        target: Uuid,
+        factor: String,
+    },
     BetrayalRecorded {
         betrayer: Uuid,
         victim: Uuid,

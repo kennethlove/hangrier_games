@@ -2,10 +2,12 @@ pub mod events;
 pub mod hex;
 
 use crate::areas::events::AreaEvent;
+use crate::areas::hex::{SUB_SLOTS, SubAxial};
 use crate::items::OwnsItems;
 use crate::items::{Item, ItemError};
 use crate::terrain::{BaseTerrain, TerrainType};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::str::FromStr;
 use strum_macros::EnumIter;
@@ -117,6 +119,12 @@ pub struct AreaDetails {
     pub events: Vec<AreaEvent>,
     #[serde(default = "default_terrain")]
     pub terrain: TerrainType,
+    /// Per-tribute sub-tile slot assignments within this area-hex.
+    /// Presentation/positioning only — game logic operates at the area
+    /// level. Keys are tribute identifiers; values are area-local sub
+    /// coordinates from `hex::SUB_SLOTS`.
+    #[serde(default)]
+    pub tribute_slots: HashMap<String, SubAxial>,
 }
 
 fn default_terrain() -> TerrainType {
@@ -132,6 +140,7 @@ impl Default for AreaDetails {
             items: vec![],
             events: vec![],
             terrain: TerrainType::new(BaseTerrain::Clearing, vec![]).unwrap(),
+            tribute_slots: HashMap::new(),
         }
     }
 }
@@ -179,6 +188,7 @@ impl AreaDetails {
             items: vec![],
             events: vec![],
             terrain: TerrainType::new(BaseTerrain::Clearing, vec![]).unwrap(),
+            tribute_slots: HashMap::new(),
         }
     }
 
@@ -190,11 +200,37 @@ impl AreaDetails {
             items: vec![],
             events: vec![],
             terrain,
+            tribute_slots: HashMap::new(),
         }
     }
 
     pub fn is_open(&self) -> bool {
         self.events.is_empty()
+    }
+
+    /// Assign the next available sub-tile slot to `tribute_id`. If the
+    /// tribute is already assigned, returns its existing slot. If all 7
+    /// slots are taken, falls back to the center slot (overflow — v1
+    /// accepts visual stacking past 7 tributes; sub-tiles are
+    /// presentation-only).
+    pub fn assign_slot(&mut self, tribute_id: &str) -> SubAxial {
+        if let Some(slot) = self.tribute_slots.get(tribute_id) {
+            return *slot;
+        }
+        let used: std::collections::HashSet<SubAxial> =
+            self.tribute_slots.values().copied().collect();
+        let chosen = SUB_SLOTS
+            .iter()
+            .copied()
+            .find(|s| !used.contains(s))
+            .unwrap_or(SUB_SLOTS[0]);
+        self.tribute_slots.insert(tribute_id.to_string(), chosen);
+        chosen
+    }
+
+    /// Release the slot currently held by `tribute_id`, if any.
+    pub fn release_slot(&mut self, tribute_id: &str) -> Option<SubAxial> {
+        self.tribute_slots.remove(tribute_id)
     }
 }
 
@@ -266,5 +302,53 @@ mod tests {
     fn partial_eq_with_reference() {
         let area = Area::Cornucopia;
         assert_eq!(area, &area);
+    }
+
+    #[test]
+    fn assign_slot_returns_center_first() {
+        let mut a = AreaDetails::new(None, Area::Cornucopia);
+        let s = a.assign_slot("t1");
+        assert_eq!(s, SUB_SLOTS[0]);
+    }
+
+    #[test]
+    fn assign_slot_is_idempotent_for_same_tribute() {
+        let mut a = AreaDetails::new(None, Area::Cornucopia);
+        let s1 = a.assign_slot("t1");
+        let s2 = a.assign_slot("t1");
+        assert_eq!(s1, s2);
+        assert_eq!(a.tribute_slots.len(), 1);
+    }
+
+    #[test]
+    fn assign_slot_gives_unique_slots_until_full() {
+        let mut a = AreaDetails::new(None, Area::Cornucopia);
+        let mut slots = std::collections::HashSet::new();
+        for i in 0..7 {
+            let s = a.assign_slot(&format!("t{i}"));
+            assert!(slots.insert(s), "duplicate slot {:?} on tribute t{i}", s);
+        }
+        assert_eq!(slots.len(), 7);
+    }
+
+    #[test]
+    fn assign_slot_overflows_to_center_when_full() {
+        let mut a = AreaDetails::new(None, Area::Cornucopia);
+        for i in 0..7 {
+            a.assign_slot(&format!("t{i}"));
+        }
+        let overflow = a.assign_slot("t7");
+        assert_eq!(overflow, SUB_SLOTS[0]);
+    }
+
+    #[test]
+    fn release_slot_frees_slot_for_reassignment() {
+        let mut a = AreaDetails::new(None, Area::Cornucopia);
+        let original = a.assign_slot("t1");
+        let released = a.release_slot("t1");
+        assert_eq!(released, Some(original));
+        assert!(a.tribute_slots.is_empty());
+        let again = a.assign_slot("t2");
+        assert_eq!(again, original);
     }
 }

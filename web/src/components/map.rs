@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 use game::areas::AreaDetails;
-use game::areas::hex::default_layout;
+use game::areas::hex::{SUB_SIZE_RATIO, SUB_SLOTS, default_layout};
 
 const HEX_SIZE: f64 = 90.0;
 const PADDING: f64 = 16.0;
@@ -71,6 +71,28 @@ pub fn Map(areas: Vec<AreaDetails>) -> Element {
                                 class: "fill-stone-200 data-[open=false]:fill-red-500 theme3:fill-stone-400 stroke-stone-700",
                                 points: "{points}",
                                 stroke_width: "2",
+                            }
+                            // Sub-tile grid: 7 smaller hexes per area for
+                            // tribute positioning (presentation-only).
+                            for (sub_i, slot) in SUB_SLOTS.iter().enumerate() {
+                                {
+                                    let sub_size = HEX_SIZE * SUB_SIZE_RATIO;
+                                    let (sx_off, sy_off) = slot.to_pixel(sub_size);
+                                    let sx = cx + sx_off;
+                                    let sy = cy + sy_off;
+                                    let sub_points = hex_corners(sx, sy, sub_size);
+                                    let sub_id = format!("{area_id}-sub-{sub_i}");
+                                    rsx! {
+                                        polygon {
+                                            key: "{sub_id}",
+                                            id: "{sub_id}",
+                                            class: "fill-transparent stroke-stone-500/40 pointer-events-none",
+                                            points: "{sub_points}",
+                                            stroke_width: "1",
+                                            stroke_dasharray: "2 2",
+                                        }
+                                    }
+                                }
                             }
                             text {
                                 x: "{cx}",

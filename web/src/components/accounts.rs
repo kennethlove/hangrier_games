@@ -163,7 +163,8 @@ fn LoginForm() -> Element {
                 class: "flex flex-col gap-2",
                 id: "register-form",
                 method: "POST",
-                onsubmit: move |_| {
+                onsubmit: move |evt: FormEvent| {
+                    evt.prevent_default();
                     username_error_signal.set(String::default());
                     password_error_signal.set(String::default());
 
@@ -298,7 +299,8 @@ fn RegisterForm() -> Element {
                 class: "flex flex-col gap-2",
                 id: "register-form",
                 method: "POST",
-                onsubmit: move |_| {
+                onsubmit: move |evt: FormEvent| {
+                    evt.prevent_default();
                     username_error_signal.set(String::default());
                     password_error_signal.set(String::default());
 
@@ -453,7 +455,8 @@ fn LogoutButton() -> Element {
     rsx! {
         form {
             class: "flex flex-col gap-4 mt-4",
-            onsubmit: move |_| {
+            onsubmit: move |evt: FormEvent| {
+                evt.prevent_default();
                 let prior_refresh = storage.get().refresh_token.clone();
                 let mut state = storage.get();
                 state.username = None;

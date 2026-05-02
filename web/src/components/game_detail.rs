@@ -126,6 +126,17 @@ pub fn GamePage(identifier: String) -> Element {
             token: token.clone(),
         },
     ));
+    // Also ensure the GamesListQ storage exists in the root context so that
+    // NextStepM::on_settled's QueriesStorage::<GamesListQ>::invalidate_all()
+    // call doesn't panic when the user navigates straight to a game page
+    // without ever visiting the home list (games would otherwise vanish from
+    // the UI until a new game was created and the list rendered).
+    let _games_list_q = use_query(Query::new(
+        (),
+        crate::components::games_list::GamesListQ {
+            token: token.clone(),
+        },
+    ));
 
     let mut last_seen = use_signal(|| 0usize);
     use_effect(move || {

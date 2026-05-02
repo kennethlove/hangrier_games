@@ -1,4 +1,5 @@
 pub mod events;
+pub mod hex;
 
 use crate::areas::events::AreaEvent;
 use crate::items::OwnsItems;
@@ -27,20 +28,24 @@ use uuid::Uuid;
 pub enum Area {
     #[default]
     Cornucopia,
-    North,
-    East,
-    South,
-    West,
+    Sector1,
+    Sector2,
+    Sector3,
+    Sector4,
+    Sector5,
+    Sector6,
 }
 
 impl Display for Area {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Area::Cornucopia => f.write_str("Cornucopia"),
-            Area::North => f.write_str("North"),
-            Area::East => f.write_str("East"),
-            Area::South => f.write_str("South"),
-            Area::West => f.write_str("West"),
+            Area::Sector1 => f.write_str("Sector 1"),
+            Area::Sector2 => f.write_str("Sector 2"),
+            Area::Sector3 => f.write_str("Sector 3"),
+            Area::Sector4 => f.write_str("Sector 4"),
+            Area::Sector5 => f.write_str("Sector 5"),
+            Area::Sector6 => f.write_str("Sector 6"),
         }
     }
 }
@@ -57,23 +62,37 @@ impl FromStr for Area {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "cornucopia" => Ok(Area::Cornucopia),
-            "north" => Ok(Area::North),
-            "east" => Ok(Area::East),
-            "south" => Ok(Area::South),
-            "west" => Ok(Area::West),
+            "sector 1" | "sector1" => Ok(Area::Sector1),
+            "sector 2" | "sector2" => Ok(Area::Sector2),
+            "sector 3" | "sector3" => Ok(Area::Sector3),
+            "sector 4" | "sector4" => Ok(Area::Sector4),
+            "sector 5" | "sector5" => Ok(Area::Sector5),
+            "sector 6" | "sector6" => Ok(Area::Sector6),
             _ => Err(format!("Invalid area: {}", s)),
         }
     }
 }
 
 impl Area {
+    /// Topological neighbors derived from the v1 hex layout: Cornucopia
+    /// touches all six sectors, each sector touches Cornucopia plus its
+    /// two adjacent sectors (clockwise/counter-clockwise wrap 1..6).
     pub fn neighbors(&self) -> Vec<Area> {
         match self {
-            Area::North => vec![Area::Cornucopia, Area::East, Area::West],
-            Area::East => vec![Area::Cornucopia, Area::North, Area::South],
-            Area::South => vec![Area::Cornucopia, Area::East, Area::West],
-            Area::West => vec![Area::Cornucopia, Area::North, Area::South],
-            Area::Cornucopia => vec![Area::North, Area::East, Area::South, Area::West],
+            Area::Cornucopia => vec![
+                Area::Sector1,
+                Area::Sector2,
+                Area::Sector3,
+                Area::Sector4,
+                Area::Sector5,
+                Area::Sector6,
+            ],
+            Area::Sector1 => vec![Area::Cornucopia, Area::Sector6, Area::Sector2],
+            Area::Sector2 => vec![Area::Cornucopia, Area::Sector1, Area::Sector3],
+            Area::Sector3 => vec![Area::Cornucopia, Area::Sector2, Area::Sector4],
+            Area::Sector4 => vec![Area::Cornucopia, Area::Sector3, Area::Sector5],
+            Area::Sector5 => vec![Area::Cornucopia, Area::Sector4, Area::Sector6],
+            Area::Sector6 => vec![Area::Cornucopia, Area::Sector5, Area::Sector1],
         }
     }
 }
@@ -198,16 +217,19 @@ mod tests {
     #[test]
     fn iter() {
         let areas: Vec<Area> = Area::iter().collect();
-        assert_eq!(areas.len(), 5);
+        assert_eq!(areas.len(), 7);
         assert_eq!(areas[0], Area::Cornucopia);
-        assert_eq!(areas[1], Area::North);
-        assert_eq!(areas[2], Area::East);
-        assert_eq!(areas[3], Area::South);
+        assert_eq!(areas[1], Area::Sector1);
+        assert_eq!(areas[2], Area::Sector2);
+        assert_eq!(areas[3], Area::Sector3);
+        assert_eq!(areas[4], Area::Sector4);
+        assert_eq!(areas[5], Area::Sector5);
+        assert_eq!(areas[6], Area::Sector6);
     }
 
     #[test]
     fn add_item() {
-        let mut area_details = AreaDetails::new(None, Area::South);
+        let mut area_details = AreaDetails::new(None, Area::Sector4);
         let item = Item::new_random_weapon();
         area_details.add_item(item.clone());
         assert!(area_details.items.contains(&item));
@@ -215,7 +237,7 @@ mod tests {
 
     #[test]
     fn remove_item() {
-        let mut area_details = AreaDetails::new(None, Area::South);
+        let mut area_details = AreaDetails::new(None, Area::Sector4);
         let item = Item::new_random_weapon();
         area_details.add_item(item.clone());
         assert!(area_details.items.contains(&item));
@@ -225,7 +247,7 @@ mod tests {
 
     #[test]
     fn add_event() {
-        let mut area_details = AreaDetails::new(None, Area::North);
+        let mut area_details = AreaDetails::new(None, Area::Sector1);
         let event = AreaEvent::Wildfire;
         area_details.events.push(event.clone());
         assert!(area_details.events.contains(&event));
@@ -233,7 +255,7 @@ mod tests {
 
     #[test]
     fn process_events_closes_area() {
-        let mut area_details = AreaDetails::new(None, Area::North);
+        let mut area_details = AreaDetails::new(None, Area::Sector1);
         assert!(area_details.is_open());
         let event = AreaEvent::Wildfire;
         area_details.events.push(event.clone());

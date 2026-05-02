@@ -13,7 +13,7 @@ fn test_wildfire_in_forest_kills_tributes() {
     // Create area with Forest terrain
     let area_details = AreaDetails::new_with_terrain(
         Some("Forest Area".to_string()),
-        Area::North,
+        Area::Sector1,
         TerrainType::new(BaseTerrain::Forest, vec![]).unwrap(),
     );
     game.areas.push(area_details);
@@ -57,7 +57,7 @@ fn test_wildfire_in_desert_minor_impact() {
     // Create area with Desert terrain
     let area_details = AreaDetails::new_with_terrain(
         Some("Desert Area".to_string()),
-        Area::South,
+        Area::Sector4,
         TerrainType::new(BaseTerrain::Desert, vec![]).unwrap(),
     );
     game.areas.push(area_details);
@@ -66,7 +66,7 @@ fn test_wildfire_in_desert_minor_impact() {
 
     // Create tribute
     let mut tribute = Tribute::random();
-    tribute.area = Area::South;
+    tribute.area = Area::Sector4;
     tribute.attributes.health = 50;
     tribute.terrain_affinity = vec![];
     tribute.statistics.game = game.identifier.clone();

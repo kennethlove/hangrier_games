@@ -212,7 +212,11 @@ mod tests {
     #[tokio::test]
     async fn travels_success(tribute: Tribute) {
         let open_area = AreaDetails::new(Some("Forest".to_string()), Cornucopia);
-        let result = tribute.travels(&[East, South, North, West], None, &mut Vec::new());
+        let result = tribute.travels(
+            &[Sector1, Sector2, Sector3, Sector4, Sector5, Sector6],
+            None,
+            &mut Vec::new(),
+        );
         assert_eq!(result, TravelResult::Success(open_area.area.unwrap()));
     }
 
@@ -227,10 +231,10 @@ mod tests {
     #[rstest]
     #[tokio::test]
     async fn travels_fail_already_there(mut tribute: Tribute) {
-        tribute.area = North;
+        tribute.area = Sector1;
         let result = tribute.travels(
-            &[Cornucopia, East, West, South],
-            Some(North),
+            &[Cornucopia, Sector2, Sector5, Sector4],
+            Some(Sector1),
             &mut Vec::new(),
         );
         assert_eq!(result, TravelResult::Failure);
@@ -240,7 +244,11 @@ mod tests {
     #[tokio::test]
     async fn travels_fail_low_movement_no_suggestion(mut tribute: Tribute) {
         tribute.attributes.movement = 5;
-        let result = tribute.travels(&[Cornucopia, East, West, North], None, &mut Vec::new());
+        let result = tribute.travels(
+            &[Cornucopia, Sector2, Sector5, Sector1],
+            None,
+            &mut Vec::new(),
+        );
         assert_eq!(result, TravelResult::Failure);
     }
 
@@ -249,8 +257,8 @@ mod tests {
     async fn travels_fail_low_movement_suggestion(mut tribute: Tribute) {
         tribute.attributes.movement = 5;
         let result = tribute.travels(
-            &[Cornucopia, East, West, North],
-            Some(North),
+            &[Cornucopia, Sector2, Sector5, Sector1],
+            Some(Sector1),
             &mut Vec::new(),
         );
         assert_eq!(result, TravelResult::Failure);
@@ -259,10 +267,10 @@ mod tests {
     #[rstest]
     #[tokio::test]
     async fn travels_success_low_movement_suggestion(mut tribute: Tribute) {
-        tribute.area = North;
+        tribute.area = Sector1;
         tribute.attributes.movement = 5;
         let open_area = AreaDetails::new(Some("Forest".to_string()), Cornucopia);
-        let result = tribute.travels(&[East, South], Some(Cornucopia), &mut Vec::new());
+        let result = tribute.travels(&[Sector2, Sector4], Some(Cornucopia), &mut Vec::new());
         assert_eq!(result, TravelResult::Success(open_area.area.unwrap()));
     }
 }

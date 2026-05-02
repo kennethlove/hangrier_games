@@ -20,3 +20,6 @@ web/src/env.rs
 
 # Jujutsu
 .jj/
+
+# Superpowers (local agent state)
+.superpowers/

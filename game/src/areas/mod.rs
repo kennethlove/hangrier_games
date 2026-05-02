@@ -14,20 +14,7 @@ use std::str::FromStr;
 use strum_macros::EnumIter;
 use uuid::Uuid;
 
-#[derive(
-    Copy,
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    EnumIter,
-    Hash,
-    Deserialize,
-    Serialize,
-    Ord,
-    PartialOrd,
-    Default,
-)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, EnumIter, Hash, Ord, PartialOrd, Default)]
 pub enum Area {
     #[default]
     Cornucopia,
@@ -37,6 +24,26 @@ pub enum Area {
     Sector4,
     Sector5,
     Sector6,
+}
+
+// Custom Serialize/Deserialize using Display/FromStr so the on-disk
+// representation ("Sector 1" — written by `area.to_string()` in
+// `api/src/games.rs::create_game_area`) round-trips cleanly. The
+// derived impls would emit/expect the bare variant identifier
+// (`"Sector1"`, no space) and reject the spaced form, breaking the
+// `/api/games/:id/areas` endpoint and the `<Map>` component.
+// See bead hangrier_games-2pce.
+impl Serialize for Area {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for Area {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(d)?;
+        Area::from_str(&s).map_err(serde::de::Error::custom)
+    }
 }
 
 impl Display for Area {
@@ -351,5 +358,27 @@ mod tests {
         assert!(a.tribute_slots.is_empty());
         let again = a.assign_slot("t2");
         assert_eq!(again, original);
+    }
+
+    /// Regression for hangrier_games-2pce: `Area`'s serde representation
+    /// must use the human-readable `Display` form ("Sector 1" with a
+    /// space) so it round-trips cleanly through SurrealDB rows written
+    /// by `api/src/games.rs::create_game_area` (which stores
+    /// `area.to_string()`).
+    #[test]
+    fn area_serde_roundtrip_uses_display_form() {
+        for variant in Area::iter() {
+            let json = serde_json::to_string(&variant).unwrap();
+            // Display form: "Cornucopia", "Sector 1", ..., "Sector 6"
+            assert_eq!(json, format!("\"{}\"", variant));
+            let back: Area = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, variant);
+        }
+        // Tolerant of the no-space form too (FromStr accepts both).
+        let no_space: Area = serde_json::from_str("\"Sector1\"").unwrap();
+        assert_eq!(no_space, Area::Sector1);
+        // And case-insensitive (FromStr lowercases).
+        let lower: Area = serde_json::from_str("\"cornucopia\"").unwrap();
+        assert_eq!(lower, Area::Cornucopia);
     }
 }

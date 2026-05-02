@@ -192,7 +192,7 @@ pub fn GamePage(identifier: String) -> Element {
     }
 }
 
-fn format_game_event(event: &GameEvent) -> String {
+pub(crate) fn format_game_event(event: &GameEvent) -> String {
     match event {
         GameEvent::GameStarted { day: _ } => "Tributes arrive in the arena.".to_string(),
         GameEvent::GameFinished { winner } => {
@@ -214,6 +214,83 @@ fn format_game_event(event: &GameEvent) -> String {
             format!("{} vs {}: {}", attacker, defender, outcome)
         }
         GameEvent::Message { content, .. } => content.clone(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use shared::GameEvent;
+
+    #[test]
+    fn game_started_uses_arrival_flavor() {
+        let s = format_game_event(&GameEvent::GameStarted { day: 1 });
+        assert_eq!(s, "Tributes arrive in the arena.");
+    }
+
+    #[test]
+    fn game_finished_with_winner() {
+        let s = format_game_event(&GameEvent::GameFinished {
+            winner: Some("Katniss".to_string()),
+        });
+        assert_eq!(s, "Game finished! Winner: Katniss");
+    }
+
+    #[test]
+    fn game_finished_no_winner() {
+        let s = format_game_event(&GameEvent::GameFinished { winner: None });
+        assert_eq!(s, "Game finished!");
+    }
+
+    #[test]
+    fn day_and_night_phases() {
+        assert_eq!(
+            format_game_event(&GameEvent::DayStarted { day: 3 }),
+            "Day 3 started"
+        );
+        assert_eq!(
+            format_game_event(&GameEvent::NightStarted { day: 3 }),
+            "Night 3 started"
+        );
+    }
+
+    #[test]
+    fn tribute_died_includes_cause() {
+        let s = format_game_event(&GameEvent::TributeDied {
+            tribute_id: "t1".to_string(),
+            name: "Rue".to_string(),
+            cause: "spear".to_string(),
+        });
+        assert_eq!(s, "Rue died: spear");
+    }
+
+    #[test]
+    fn area_and_combat_format() {
+        assert_eq!(
+            format_game_event(&GameEvent::AreaEvent {
+                area: "north".to_string(),
+                event: "fire".to_string(),
+            }),
+            "fire in north"
+        );
+        assert_eq!(
+            format_game_event(&GameEvent::Combat {
+                attacker: "A".to_string(),
+                defender: "B".to_string(),
+                outcome: "win".to_string(),
+            }),
+            "A vs B: win"
+        );
+    }
+
+    #[test]
+    fn message_passes_content_through() {
+        let s = format_game_event(&GameEvent::Message {
+            source: "narrator".to_string(),
+            content: "hello".to_string(),
+            game_day: 1,
+        });
+        assert_eq!(s, "hello");
     }
 }
 

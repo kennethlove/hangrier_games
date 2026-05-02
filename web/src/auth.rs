@@ -110,3 +110,47 @@ fn clear_session(storage: &mut UsePersistent<AppState>) {
     s.username = None;
     storage.set(s);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use base64::Engine as _;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
+    /// Build an unsigned JWT-shaped string with a given `exp` claim.
+    /// `decode_only` does not verify signatures, so a placeholder is fine.
+    fn make_jwt(exp: i64) -> String {
+        let header = URL_SAFE_NO_PAD.encode(br#"{"alg":"HS256","typ":"JWT"}"#);
+        let payload =
+            URL_SAFE_NO_PAD.encode(format!(r#"{{"exp":{},"sub":"test"}}"#, exp).as_bytes());
+        format!("{}.{}.sig", header, payload)
+    }
+
+    #[test]
+    fn future_exp_is_positive() {
+        let exp = chrono::Utc::now().timestamp() + 600;
+        let remaining = token_seconds_remaining(&make_jwt(exp)).unwrap();
+        assert!(remaining > 590 && remaining <= 600, "got {remaining}");
+    }
+
+    #[test]
+    fn past_exp_is_negative() {
+        let exp = chrono::Utc::now().timestamp() - 60;
+        let remaining = token_seconds_remaining(&make_jwt(exp)).unwrap();
+        assert!(remaining < 0, "got {remaining}");
+    }
+
+    #[test]
+    fn garbage_returns_none() {
+        assert!(token_seconds_remaining("not.a.jwt").is_none());
+        assert!(token_seconds_remaining("").is_none());
+    }
+
+    #[test]
+    fn missing_exp_returns_none() {
+        let header = URL_SAFE_NO_PAD.encode(br#"{"alg":"HS256","typ":"JWT"}"#);
+        let payload = URL_SAFE_NO_PAD.encode(br#"{"sub":"test"}"#);
+        let jwt = format!("{}.{}.sig", header, payload);
+        assert!(token_seconds_remaining(&jwt).is_none());
+    }
+}

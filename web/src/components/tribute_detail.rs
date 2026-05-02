@@ -88,7 +88,7 @@ impl QueryCapability for TributeLogQ {
 /// stance traits get warm/cool tones, social traits map to trust/danger
 /// signals, mental/physical traits get neutral-ish accents. Keep contrast
 /// readable across all three themes (dark amber, dark green, light stone).
-fn trait_chip_classes(t: &Trait) -> &'static str {
+pub(crate) fn trait_chip_classes(t: &Trait) -> &'static str {
     match t {
         // Social: trust signals
         Trait::Loyal => "bg-green-700/40 text-green-100 border border-green-500/60",
@@ -479,5 +479,51 @@ fn TributeAllies(game_identifier: String, ally_ids: Vec<uuid::Uuid>) -> Element 
             }
         },
         _ => rsx! {},
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn loyal_uses_green() {
+        let c = trait_chip_classes(&Trait::Loyal);
+        assert!(c.contains("green-700"), "got {c}");
+        assert!(c.contains("border"), "got {c}");
+    }
+
+    #[test]
+    fn aggressive_uses_orange() {
+        let c = trait_chip_classes(&Trait::Aggressive);
+        assert!(c.contains("orange-700"), "got {c}");
+    }
+
+    #[test]
+    fn every_trait_has_classes() {
+        // Defensive: missing variants would fail to compile, but make sure
+        // we never return an empty string by accident.
+        for t in [
+            Trait::Loyal,
+            Trait::Friendly,
+            Trait::Treacherous,
+            Trait::Paranoid,
+            Trait::LoneWolf,
+            Trait::Aggressive,
+            Trait::Reckless,
+            Trait::Defensive,
+            Trait::Cautious,
+            Trait::Cunning,
+            Trait::Dim,
+            Trait::Resilient,
+            Trait::Fragile,
+            Trait::Tough,
+            Trait::Asthmatic,
+            Trait::Nearsighted,
+        ] {
+            let c = trait_chip_classes(&t);
+            assert!(!c.is_empty(), "empty for {:?}", t);
+            assert!(c.contains("border"), "no border for {:?}", t);
+        }
     }
 }

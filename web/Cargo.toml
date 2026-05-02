@@ -24,6 +24,9 @@ web-sys = { version = "0.3.97", features = ["console"] }
 [build-dependencies]
 dotenvy = "0.15.7"
 
+[dev-dependencies]
+base64 = "0.22"
+
 [features]
 default = ["web"]
 web = ["dioxus/web"]

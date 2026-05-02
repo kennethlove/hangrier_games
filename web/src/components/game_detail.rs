@@ -194,7 +194,7 @@ pub fn GamePage(identifier: String) -> Element {
 
 fn format_game_event(event: &GameEvent) -> String {
     match event {
-        GameEvent::GameStarted { day } => format!("Game started - Day {}", day),
+        GameEvent::GameStarted { day: _ } => "Tributes arrive in the arena.".to_string(),
         GameEvent::GameFinished { winner } => {
             if let Some(winner_name) = winner {
                 format!("Game finished! Winner: {}", winner_name)

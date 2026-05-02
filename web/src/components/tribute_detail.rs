@@ -116,7 +116,7 @@ fn trait_chip_classes(t: &Trait) -> &'static str {
 #[component]
 pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.expect("No JWT found");
+    let token = storage.get().jwt.unwrap_or_default();
 
     let tribute_query = use_query(Query::new(
         (game_identifier.clone(), tribute_identifier.clone()),
@@ -306,7 +306,7 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
 #[component]
 fn TributeLog(game_identifier: String, identifier: String) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.expect("No JWT found");
+    let token = storage.get().jwt.unwrap_or_default();
 
     let log_query = use_query(Query::new(
         (game_identifier.clone(), identifier.clone()),
@@ -408,7 +408,7 @@ fn TributeAllies(game_identifier: String, ally_ids: Vec<uuid::Uuid>) -> Element 
     }
 
     let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.expect("No JWT found");
+    let token = storage.get().jwt.unwrap_or_default();
 
     let roster_query = use_query(Query::new(game_identifier.clone(), GameTributesQ { token }));
     let reader = roster_query.read();

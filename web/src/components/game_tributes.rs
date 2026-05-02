@@ -54,7 +54,7 @@ impl QueryCapability for GameTributesQ {
 #[component]
 pub fn GameTributes(game: DisplayGame) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.expect("No JWT found");
+    let token = storage.get().jwt.unwrap_or_default();
 
     let identifier = game.identifier.clone();
 
@@ -139,7 +139,7 @@ pub fn GameTributeListMember(
     game_status: GameStatus,
 ) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
-    let _token = storage.get().jwt.expect("No JWT found");
+    let _token = storage.get().jwt.unwrap_or_default();
 
     let fist_item = Item::new_weapon("basic fist");
 

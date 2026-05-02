@@ -10,7 +10,7 @@ use crate::components::period_grid::PeriodGrid;
 use crate::components::recap_card::RecapCard;
 use crate::components::timeline::PeriodFilters;
 use crate::env::APP_API_HOST;
-use crate::hooks::use_timeline_summary::TimelineSummaryQ;
+use crate::hooks::use_timeline_summary::use_timeline_summary;
 use crate::hooks::{ConnectionState, use_game_websocket};
 use crate::routes::Routes;
 use crate::storage::{AppState, use_persistent};
@@ -108,8 +108,6 @@ impl MutationCapability for NextStepM {
         if result.is_ok() {
             QueriesStorage::<DisplayGameQ>::invalidate_all().await;
             QueriesStorage::<GamesListQ>::invalidate_all().await;
-            QueriesStorage::<TimelineSummaryQ>::invalidate_all().await;
-            QueriesStorage::<crate::components::game_period_page::DayLogQ>::invalidate_all().await;
         }
     }
 }
@@ -117,6 +115,17 @@ impl MutationCapability for NextStepM {
 #[component]
 pub fn GamePage(identifier: String) -> Element {
     let (ws_events, ws_connection) = use_game_websocket(identifier.clone());
+
+    // Ensure storages exist for queries we want to invalidate from this page.
+    let storage = use_persistent("hangry-games", AppState::default);
+    let token = storage.get().jwt.unwrap_or_default();
+    let summary_q = use_timeline_summary(identifier.clone(), token.clone());
+    let game_q = use_query(Query::new(
+        identifier.clone(),
+        DisplayGameQ {
+            token: token.clone(),
+        },
+    ));
 
     let mut last_seen = use_signal(|| 0usize);
     use_effect(move || {
@@ -135,10 +144,8 @@ pub fn GamePage(identifier: String) -> Element {
         drop(evs);
         last_seen.set(len);
         if bump_phase {
-            spawn(async {
-                QueriesStorage::<TimelineSummaryQ>::invalidate_all().await;
-                QueriesStorage::<DisplayGameQ>::invalidate_all().await;
-            });
+            summary_q.invalidate();
+            game_q.invalidate();
         }
     });
 

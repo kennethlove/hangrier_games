@@ -134,7 +134,7 @@ pub fn EditTributeForm() -> Element {
     let game_identifier_for_upload = game_identifier.clone();
 
     let save = move |e: Event<FormData>| {
-        let token = storage.get().jwt.expect("No JWT found");
+        let token = storage.get().jwt.unwrap_or_default();
         let game_identifier = game_identifier.clone();
         let tribute_details = edit_tribute_signal
             .read()
@@ -168,7 +168,7 @@ pub fn EditTributeForm() -> Element {
     };
 
     let upload_avatar = move |e: Event<FormData>| {
-        let token = storage.get().jwt.expect("No JWT found");
+        let token = storage.get().jwt.unwrap_or_default();
         let game_id = game_identifier_for_upload.clone();
         let tribute_id = identifier.clone();
 

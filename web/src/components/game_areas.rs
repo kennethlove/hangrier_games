@@ -41,7 +41,7 @@ impl QueryCapability for GameAreasQ {
 #[component]
 pub fn GameAreaList(game: DisplayGame) -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.expect("No JWT found");
+    let token = storage.get().jwt.unwrap_or_default();
 
     let identifier = game.identifier.clone();
 

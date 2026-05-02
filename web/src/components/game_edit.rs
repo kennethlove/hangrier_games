@@ -112,7 +112,7 @@ pub fn EditGameForm() -> Element {
 
     let save = move |e: Event<FormData>| {
         let identifier = identifier.clone();
-        let token = storage.get().jwt.expect("No JWT found");
+        let token = storage.get().jwt.unwrap_or_default();
 
         let name = match e.data().get_first("name") {
             Some(FormValue::Text(s)) => s,

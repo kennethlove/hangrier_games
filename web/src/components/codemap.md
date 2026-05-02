@@ -438,7 +438,7 @@ div { class: "peer-focus:visible peer-focus:opacity-100" }
 ### 5. Token Extraction Pattern
 ```rust
 let storage = use_persistent("hangry-games", AppState::default);
-let token = storage.get().jwt.expect("No JWT found");
+let token = storage.get().jwt.unwrap_or_default();
 ```
 
 ---

@@ -3,7 +3,8 @@ use crate::{AppError, AppState};
 use axum::Json;
 use axum::Router;
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderValue, StatusCode, header::LOCATION};
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, put};
 use chrono::{DateTime, Utc};
 use game::areas::{Area, AreaDetails};
@@ -168,7 +169,7 @@ async fn create_game_area_edge(
 pub async fn create_game(
     state: State<AppState>,
     Json(payload): Json<CreateGame>,
-) -> Result<Json<Game>, AppError> {
+) -> Result<Response, AppError> {
     // Validate input
     payload
         .validate()
@@ -242,7 +243,11 @@ pub async fn create_game(
         )));
     }
 
-    Ok(Json(created_game))
+    let location = HeaderValue::from_str(&format!("/api/games/{}", game_identifier))
+        .map_err(|e| AppError::InternalServerError(format!("Invalid Location header: {}", e)))?;
+    let mut response = (StatusCode::CREATED, Json(created_game)).into_response();
+    response.headers_mut().insert(LOCATION, location);
+    Ok(response)
 }
 
 pub async fn create_area(

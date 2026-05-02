@@ -71,7 +71,7 @@ pub fn CreateGameButton() -> Element {
 
     let onclick = move |_| {
         loading_signal.set(LoadingState::Loading);
-        let token = storage.get().jwt.expect("No JWT found");
+        let token = storage.get().jwt.unwrap_or_default();
         spawn(async move {
             let _ = mutate.mutate_async((None, token)).await;
             loading_signal.set(LoadingState::Loaded);
@@ -95,7 +95,7 @@ pub fn CreateGameForm() -> Element {
     let mut loading_signal = use_context::<Signal<LoadingState>>();
 
     let onsubmit = move |_| {
-        let token = storage.get().jwt.expect("No JWT found");
+        let token = storage.get().jwt.unwrap_or_default();
         let name = game_name_signal.peek().clone();
         if name.is_empty() {
             return;

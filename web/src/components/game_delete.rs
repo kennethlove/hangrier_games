@@ -85,7 +85,7 @@ pub fn DeleteGameModal() -> Element {
 
     let delete = move |_| {
         if let Some(dg) = delete_game_info.clone() {
-            let token = storage.get().jwt.expect("No JWT found");
+            let token = storage.get().jwt.unwrap_or_default();
             spawn(async move {
                 let reader = mutate.mutate_async((dg.clone(), token)).await;
                 let state = reader.state();

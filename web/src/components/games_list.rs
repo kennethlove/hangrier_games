@@ -59,7 +59,7 @@ fn NoGames() -> Element {
 #[component]
 pub fn GamesList() -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.expect("No JWT found");
+    let token = storage.get().jwt.unwrap_or_default();
     let games_query = use_query(Query::new((), GamesListQ { token }));
 
     let reader = games_query.read();

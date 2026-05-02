@@ -112,6 +112,9 @@ pub struct EnvironmentContext<'a> {
     pub area_details: &'a mut AreaDetails,
     pub closed_areas: &'a [Area],
     pub available_destinations: Vec<crate::areas::DestinationInfo>,
+    /// Current game day (1-indexed). Used to gate day-1-only behavior such
+    /// as suppressing sponsor gifts in the opening cycle.
+    pub current_day: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -374,8 +377,11 @@ impl Tribute {
             self.turns_since_last_betrayal = 0;
         }
 
-        // Any generous patrons this round?
-        if let Some(gift) = self.receive_patron_gift(&mut *rng) {
+        // Any generous patrons this round? Sponsors don't intervene on day 1
+        // — tributes have to earn patron interest before the first gifts arrive.
+        if environment_details.current_day > 1
+            && let Some(gift) = self.receive_patron_gift(&mut *rng)
+        {
             let line = GameOutput::SponsorGift(self.name.as_str(), &gift).to_string();
             let item_ref = ItemRef {
                 identifier: gift.identifier.clone(),

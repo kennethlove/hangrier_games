@@ -987,6 +987,7 @@ impl Game {
                 area_details,
                 closed_areas: &closed_areas,
                 available_destinations,
+                current_day: self.day.unwrap_or(1),
             };
 
             // Get nearby tributes using the pre-computed map

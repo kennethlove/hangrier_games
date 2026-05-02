@@ -980,6 +980,11 @@ impl Game {
                 })
                 .collect();
 
+            // Snapshot all areas before taking the mutable borrow on this
+            // tribute's area. The snapshot feeds multi-hop pathfinding which
+            // needs to reason about the full topology, not just neighbors.
+            let all_areas_snapshot: Vec<crate::areas::AreaDetails> = self.areas.clone();
+
             let area_details = &mut self.areas[area_index];
 
             let mut environment_details = EnvironmentContext {
@@ -987,6 +992,7 @@ impl Game {
                 area_details,
                 closed_areas: &closed_areas,
                 available_destinations,
+                all_areas: &all_areas_snapshot,
                 current_day: self.day.unwrap_or(1),
             };
 

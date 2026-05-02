@@ -112,6 +112,9 @@ pub struct EnvironmentContext<'a> {
     pub area_details: &'a mut AreaDetails,
     pub closed_areas: &'a [Area],
     pub available_destinations: Vec<crate::areas::DestinationInfo>,
+    /// All known areas (read-only snapshot). Used by multi-hop
+    /// pathfinding so the planner can reason about non-neighbor goals.
+    pub all_areas: &'a [AreaDetails],
     /// Current game day (1-indexed). Used to gate day-1-only behavior such
     /// as suppressing sponsor gifts in the opening cycle.
     pub current_day: u32,
@@ -423,6 +426,8 @@ impl Tribute {
             self,
             number_of_nearby_tributes,
             &environment_details.available_destinations,
+            environment_details.all_areas,
+            environment_details.closed_areas,
             rng,
         );
 

@@ -1,5 +1,6 @@
 pub mod events;
 pub mod hex;
+pub mod path;
 
 use crate::areas::events::AreaEvent;
 use crate::areas::hex::{SUB_SLOTS, SubAxial};

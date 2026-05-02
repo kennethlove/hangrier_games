@@ -113,11 +113,21 @@ pub struct Item {
     pub identifier: String,
     pub name: String,
     pub item_type: ItemType,
+    // Legacy `item` rows written before games.rs:1099's CONTENT-bind fix
+    // omitted `rarity` entirely. Without a default, `Vec<Item>`
+    // deserialization fails, which cascades up to make `/games/:id/areas`
+    // (and other endpoints that fetch items) return an error and renders
+    // as "Something went wrong" in the UI.
+    #[serde(default = "default_rarity")]
     pub rarity: ItemRarity,
     pub current_durability: u32,
     pub max_durability: u32,
     pub attribute: Attribute,
     pub effect: i32,
+}
+
+fn default_rarity() -> ItemRarity {
+    ItemRarity::Common
 }
 
 impl Display for Item {
@@ -842,5 +852,24 @@ mod tests {
         let outcome = item.wear(100);
         assert_eq!(outcome, WearOutcome::Broken);
         assert_eq!(item.current_durability, 0);
+    }
+
+    /// Legacy `item` rows persisted before the games.rs:1099 CONTENT-bind
+    /// fix omitted `rarity` entirely. Without `#[serde(default)]`, those
+    /// rows fail to deserialize and break every endpoint that fetches
+    /// items (e.g. /games/:id/areas → "Something went wrong").
+    #[test]
+    fn item_deserializes_when_rarity_field_missing() {
+        let json = r#"{
+            "identifier": "x",
+            "name": "Old item",
+            "item_type": "Weapon",
+            "current_durability": 1,
+            "max_durability": 1,
+            "attribute": "Strength",
+            "effect": 1
+        }"#;
+        let item: Item = serde_json::from_str(json).expect("legacy item must deserialize");
+        assert_eq!(item.rarity, ItemRarity::Common);
     }
 }

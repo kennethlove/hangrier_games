@@ -81,7 +81,10 @@ fn area_event_survival_narration_reaches_game_messages() {
         MessageSource::Area(name) => assert_eq!(name, "Cornucopia"),
         other => panic!("expected MessageSource::Area, got {other:?}"),
     }
-    assert_eq!(area_sourced[0].subject, "area:Cornucopia");
+    assert_eq!(
+        area_sourced[0].subject,
+        format!("{}:area:Cornucopia", game.identifier)
+    );
 
     // Per-tribute survival narration: at least one MessageSource::Tribute(_)
     // entry per tribute, identifiers must match our two tributes.

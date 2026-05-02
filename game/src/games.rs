@@ -295,13 +295,24 @@ impl Game {
         tick: u32,
     ) {
         let game_day = self.day.unwrap_or(0);
+        // Always prefix subject with the game identifier so that the
+        // API's per-game log queries (`WHERE string::starts_with(subject,
+        // $game_id)`) match every emitted message regardless of source
+        // type (Game / Area / Tribute). Without this prefix, area and
+        // tribute messages would be invisible to the day-page and
+        // timeline-summary endpoints.
+        let scoped_subject = if subject.starts_with(&format!("{}:", self.identifier)) {
+            subject
+        } else {
+            format!("{}:{}", self.identifier, subject)
+        };
         let msg = crate::messages::GameMessage::new(
             source,
             game_day,
             self.current_phase,
             tick,
             self.emit_index,
-            subject,
+            scoped_subject,
             content,
             payload,
         );
@@ -1596,8 +1607,57 @@ mod tests {
                 msg.source,
                 crate::messages::MessageSource::Area(area_name.clone())
             );
-            assert_eq!(msg.subject, format!("area:{}", area_name));
+            assert_eq!(
+                msg.subject,
+                format!("{}:area:{}", game.identifier, area_name)
+            );
         }
+    }
+
+    /// Regression for hangrier_games-i7rq: every emitted message's
+    /// subject must start with the game identifier so the API's
+    /// per-game log queries (`WHERE string::starts_with(subject,
+    /// $game_id)`) match. Without this, day pages and timeline summary
+    /// were always empty.
+    #[test]
+    fn message_subjects_are_prefixed_with_game_id() {
+        let mut game = Game::new("Subject Prefix Test");
+        game.log(
+            crate::messages::MessageSource::Game(game.identifier.clone()),
+            format!("game:{}", game.identifier),
+            "hello".to_string(),
+        );
+        game.log(
+            crate::messages::MessageSource::Area("Cornucopia".to_string()),
+            "area:Cornucopia".to_string(),
+            "boom".to_string(),
+        );
+        game.log(
+            crate::messages::MessageSource::Tribute("trib-id".to_string()),
+            "tribute:trib-id".to_string(),
+            "ouch".to_string(),
+        );
+        let prefix = format!("{}:", game.identifier);
+        for msg in &game.messages {
+            assert!(
+                msg.subject.starts_with(&prefix),
+                "subject {:?} missing game-id prefix {:?}",
+                msg.subject,
+                prefix
+            );
+        }
+        // Idempotent: calling log twice should not double-prefix.
+        let count_before = game.messages.len();
+        let already_prefixed = format!("{}:area:Other", game.identifier);
+        game.log(
+            crate::messages::MessageSource::Area("Other".to_string()),
+            already_prefixed.clone(),
+            "ok".to_string(),
+        );
+        assert_eq!(
+            game.messages[count_before].subject, already_prefixed,
+            "subject already prefixed should not be double-prefixed"
+        );
     }
 
     #[test]

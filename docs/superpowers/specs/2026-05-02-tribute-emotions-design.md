@@ -247,17 +247,88 @@ impl Trait {
 }
 ```
 
-## Frontend Presentation (v1, Minimal)
+## Frontend Presentation
 
-The web frontend renders the derived label as a small status pill:
+The emotion UI is designed against the spectator skin (see `2026-05-02-spectator-skin-layout-design.md` and `2026-05-02-spectator-skin-visuals-design.md`). It surfaces in three places: the tribute card (Roster panel), the event log line (Action panel), and the inspect drilldown.
 
-- **Pill placement:** next to the tribute's name on both `TributeCard` and the tribute detail header.
-- **Visible only when label != Steady.** Unlabeled tributes show no pill (intentional — the labeled few stand out).
-- **Color convention:** label color follows its dominant axis (e.g., red for Enraged, gray for Broken, yellow for Hopeful, green for Resolute). Final palette decided during implementation.
-- **No axis bars in v1.** The four numeric axes are not surfaced in the UI; only the derived label. Axis bars / debug view filed as future work.
-- **Live updates** flow via the existing query refetch / websocket plumbing — no special handling beyond rendering the new label value.
+### Tribute card — bottom state strip
 
-Tooltip on hover (showing underlying axis values for debugging or curiosity) is optional for v1 — decide during implementation.
+Each tribute card has two zones:
+
+- **Top (identity zone)** — district color stripe + sigil + number + tribute name + alive/dead state + alliance membership.
+- **Bottom (state strip)** — the emotion surface.
+
+The state strip uses a **strict four-element vocabulary**, reading left-to-right:
+
+1. **Leading dot** *(always present)* — small colored dot encoding the **derived label's category** (calm / wary / hostile / despairing / enraged or final taxonomy). Categorical color lives only in this dot, contained so it does not compete with the district color in the identity zone.
+2. **Label pill** *(always present)* — the derived label as text inside a chrome-neutral pill. The pill carries no background color of its own; the leading dot is the only color carrier for emotion category.
+3. **Override icon** *(conditional)* — when an override state is active, a single icon appears: medallion-framed substrate icon (per the visuals spec's iconography system), rendered in **heraldic red** (oxblood) regardless of override type. The icon glyph carries the *kind* of override; the color carries "override active." If multiple overrides are simultaneously active, **only the highest-priority override is shown**, using the same threshold-priority list that derives the label.
+4. **Extreme-axis marker** *(conditional)* — when any axis is at a defined extreme (e.g. morale < 10, aggression > 90, trust < 10, composure < 10), a small **directional glyph** (↓ or ↑) labeled with the axis appears. Only **one marker is shown** — the most-extreme axis if multiple qualify.
+
+Calm tribute = dot + word. Escalating tribute = dot + word + icon + glyph. Maximum visual density per card is bounded; the strip never exceeds these four elements.
+
+### Event log line (Action panel)
+
+Emotion-changing events surface in the event log via a **leading category dot** at the left edge of the line, mirroring the card's leading dot color. The dot encodes the emotion category that the event resulted in (or the dominant category change).
+
+The prose itself is unmodified — no inline icons in the body of the line. This keeps the event log readable as prose and avoids icon clutter when many emotion changes happen in sequence.
+
+This composes cleanly with the **district sequential-grouping rule** from the visuals spec: when emotion-event lines for the same district group under one banner, the banner carries the district color and individual lines carry their per-line emotion-category dots. Two color systems, two roles, no conflict.
+
+If the leading dot proves too subtle in practice, the fallback is to add an inline override icon next to the state name within the prose. Filed as an open implementation question.
+
+### Alliance bond (not on the card)
+
+The per-alliance bond value is **not surfaced on individual tribute cards**. It is treated as an alliance-level concept rather than a tribute-level state, on the grounds that:
+
+- Card real estate is already at maximum density with the four-element state strip.
+- Bond is a slow-moving relational value, less moment-to-moment-actionable than the label/override/axis signals.
+- Bond is genuinely a property of *who is allied with whom how strongly* — an alliance attribute, not a per-tribute attribute.
+
+Alliance bond appears instead on:
+
+- **Alliance summary chips** — aggregate bond strength (average across members) shown as a small bar or dot pattern.
+- **Alliance inspect view** — full per-pair bond detail (which members feel how strongly bonded with which others).
+
+Per-pair bond detail is reserved for the inspect surface; the at-a-glance broadcast view shows aggregate.
+
+### Inspect drilldown (Roster panel menu → Inspect)
+
+The Roster's per-panel inspect view (per the layout spec) opens a dense data view scoped to tributes. For emotion this includes:
+
+- All four axis values per tribute, with current numeric values and recent trajectory.
+- All active overrides (not just the highest-priority one), with remaining duration / decay rate.
+- Per-alliance bond values for every alliance the tribute is in.
+- Recent emotion-changing events that drove the current state.
+
+The inspect view is the place all "I want the full picture" questions get answered. The card and event-log surfaces stay calm by design.
+
+### Live updates
+
+Live updates flow via the existing query refetch / websocket plumbing. Emotion changes appear:
+
+- On cards as state-strip element transitions (override icon appears/disappears, axis marker appears/disappears, label pill text changes).
+- On event-log lines as new entries with their leading category dot.
+- On alliance chips as aggregate bond shifts.
+- In the inspect view in real time when open.
+
+No special handling beyond rendering the new state.
+
+### Accessibility
+
+Per the visuals spec accessibility rules:
+
+- Color is never the sole signal. The leading dot is paired with the label pill text; the override icon is paired with hoverable / inspectable text describing the override; the axis marker is paired with the axis name (e.g. ↓Morale, not just ↓).
+- Override icons follow the substrate icon normalization: stroke weight, palette token, medallion frame are consistent.
+- Reduced-motion mode collapses any state-strip transition animations to instant swaps.
+
+### Open implementation questions
+
+- Final taxonomy of label categories and their dot colors (calm/wary/hostile/despairing/enraged or other groupings).
+- Exact axis-extreme thresholds per axis.
+- Exact form of the directional axis glyph (single arrow, arrow + axis name letter, etc.).
+- Whether the leading dot in event-log lines proves sufficient or whether to escalate to inline override icons.
+- Whether alliance-chip bond aggregate shows as a bar, dot pattern, or numeric value.
 
 ## Integration Points
 

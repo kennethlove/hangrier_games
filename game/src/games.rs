@@ -1444,8 +1444,8 @@ mod tests {
     #[test]
     fn test_random_open_area() {
         let mut game = Game::new("Test Game");
-        let area1 = AreaDetails::new(Some("Lake".to_string()), Area::North);
-        let area2 = AreaDetails::new(Some("Forest".to_string()), Area::South);
+        let area1 = AreaDetails::new(Some("Lake".to_string()), Area::Sector1);
+        let area2 = AreaDetails::new(Some("Forest".to_string()), Area::Sector4);
         game.areas.push(area1);
         game.areas.push(area2.clone());
         assert!(game.random_area().is_some());
@@ -1525,7 +1525,7 @@ mod tests {
     #[test]
     fn test_prepare_cycle() {
         let mut game = Game::new("Test Game");
-        let area = AreaDetails::new(Some("Lake".to_string()), Area::North);
+        let area = AreaDetails::new(Some("Lake".to_string()), Area::Sector1);
         let mut rng = rand::rng();
         let event = AreaEvent::random(&mut rng);
         game.day = Some(1);
@@ -1597,8 +1597,8 @@ mod tests {
     #[test]
     fn test_ensure_open_area() {
         let mut game = Game::new("Test Game");
-        let area1 = AreaDetails::new(Some("Lake".to_string()), Area::North);
-        let area2 = AreaDetails::new(Some("Forest".to_string()), Area::South);
+        let area1 = AreaDetails::new(Some("Lake".to_string()), Area::Sector1);
+        let area2 = AreaDetails::new(Some("Forest".to_string()), Area::Sector4);
         game.areas.push(area1);
         game.areas.push(area2);
 
@@ -1621,8 +1621,8 @@ mod tests {
     #[test]
     fn test_constrain_areas() {
         let mut game = Game::new("Test Game");
-        let area1 = AreaDetails::new(Some("Lake".to_string()), Area::North);
-        let area2 = AreaDetails::new(Some("Forest".to_string()), Area::South);
+        let area1 = AreaDetails::new(Some("Lake".to_string()), Area::Sector1);
+        let area2 = AreaDetails::new(Some("Forest".to_string()), Area::Sector4);
         game.areas.push(area1);
         game.areas.push(area2);
 
@@ -1679,8 +1679,8 @@ mod tests {
     #[test]
     fn test_open_and_closed_areas() {
         let mut game = Game::new("Test Game");
-        let area1 = AreaDetails::new(Some("Lake".to_string()), Area::North);
-        let area2 = AreaDetails::new(Some("Forest".to_string()), Area::South);
+        let area1 = AreaDetails::new(Some("Lake".to_string()), Area::Sector1);
+        let area2 = AreaDetails::new(Some("Forest".to_string()), Area::Sector4);
         game.areas.push(area1);
         game.areas.push(area2);
 
@@ -1982,17 +1982,17 @@ mod tests {
         other.traits = vec![Trait::Tough];
         loner.turns_since_last_betrayal = TREACHEROUS_BETRAYAL_INTERVAL;
         // Different areas so other is not a same-area ally.
-        loner.area = Area::North;
-        other.area = Area::South;
+        loner.area = Area::Sector1;
+        other.area = Area::Sector4;
         loner.district = 5;
         other.district = 6;
         let lid = loner.id;
 
         let mut game = create_test_game_with_tributes(vec![loner.clone(), other.clone()]);
         game.areas
-            .push(AreaDetails::new(Some("Hill".to_string()), Area::North));
+            .push(AreaDetails::new(Some("Hill".to_string()), Area::Sector1));
         game.areas
-            .push(AreaDetails::new(Some("Lake".to_string()), Area::South));
+            .push(AreaDetails::new(Some("Lake".to_string()), Area::Sector4));
         let closed_areas = game
             .areas
             .iter()

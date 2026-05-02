@@ -23,17 +23,17 @@ fn areas_with_terrain() -> Vec<AreaDetails> {
     vec![
         AreaDetails::new_with_terrain(
             Some("Forest Area".to_string()),
-            Area::North,
+            Area::Sector1,
             TerrainType::new(BaseTerrain::Forest, vec![]).unwrap(),
         ),
         AreaDetails::new_with_terrain(
             Some("Desert Area".to_string()),
-            Area::South,
+            Area::Sector4,
             TerrainType::new(BaseTerrain::Desert, vec![]).unwrap(),
         ),
         AreaDetails::new_with_terrain(
             Some("Grasslands Area".to_string()),
-            Area::East,
+            Area::Sector2,
             TerrainType::new(BaseTerrain::Grasslands, vec![]).unwrap(),
         ),
     ]
@@ -50,7 +50,7 @@ fn test_destination_scoring_favors_affinity_terrain(
 
     assert!(chosen.is_some());
     let chosen_area = chosen.unwrap();
-    assert_eq!(chosen_area, Area::North); // Forest area should be chosen
+    assert_eq!(chosen_area, Area::Sector1); // Forest area should be chosen
 }
 
 /// Test that harsh terrain receives penalty in scoring
@@ -63,20 +63,20 @@ fn test_harsh_terrain_penalty_applied() {
         // Grasslands (Mild harshness) - should score higher
         AreaDetails::new_with_terrain(
             Some("Safe Grasslands".to_string()),
-            Area::North,
+            Area::Sector1,
             TerrainType::new(BaseTerrain::Grasslands, vec![]).unwrap(),
         ),
         // Desert (Harsh) - should score lower
         AreaDetails::new_with_terrain(
             Some("Harsh Desert".to_string()),
-            Area::South,
+            Area::Sector4,
             TerrainType::new(BaseTerrain::Desert, vec![]).unwrap(),
         ),
     ];
 
     let chosen = brain.choose_destination(&areas, &tribute);
     assert!(chosen.is_some());
-    assert_eq!(chosen.unwrap(), Area::North); // Grasslands should be preferred
+    assert_eq!(chosen.unwrap(), Area::Sector1); // Grasslands should be preferred
 }
 
 /// Test that concealed terrain boosts hiding preference
@@ -128,19 +128,19 @@ fn test_desperate_tributes_flee_to_affinity_terrain() {
     let areas = vec![
         AreaDetails::new_with_terrain(
             Some("Safe Grasslands".to_string()),
-            Area::North,
+            Area::Sector1,
             TerrainType::new(BaseTerrain::Grasslands, vec![]).unwrap(),
         ),
         AreaDetails::new_with_terrain(
             Some("Dangerous Mountains".to_string()),
-            Area::South,
+            Area::Sector4,
             TerrainType::new(BaseTerrain::Mountains, vec![]).unwrap(),
         ),
     ];
 
     let chosen = brain.choose_destination(&areas, &tribute);
     assert!(chosen.is_some());
-    assert_eq!(chosen.unwrap(), Area::North); // Should flee to affinity terrain
+    assert_eq!(chosen.unwrap(), Area::Sector1); // Should flee to affinity terrain
 }
 
 /// Test that concealed visibility gives bonus to hiding spots
@@ -153,13 +153,13 @@ fn test_concealed_visibility_bonus() {
         // Jungle is Concealed - good for hiding
         AreaDetails::new_with_terrain(
             Some("Dense Jungle".to_string()),
-            Area::North,
+            Area::Sector1,
             TerrainType::new(BaseTerrain::Jungle, vec![]).unwrap(),
         ),
         // Desert is Exposed - bad for hiding
         AreaDetails::new_with_terrain(
             Some("Open Desert".to_string()),
-            Area::South,
+            Area::Sector4,
             TerrainType::new(BaseTerrain::Desert, vec![]).unwrap(),
         ),
     ];
@@ -167,7 +167,7 @@ fn test_concealed_visibility_bonus() {
     let chosen = brain.choose_destination(&areas, &tribute);
     assert!(chosen.is_some());
     // Concealed terrain should score higher
-    assert_eq!(chosen.unwrap(), Area::North);
+    assert_eq!(chosen.unwrap(), Area::Sector1);
 }
 
 /// Test that areas with items get scoring bonus
@@ -178,14 +178,14 @@ fn test_areas_with_items_bonus() {
 
     let mut area_with_items = AreaDetails::new_with_terrain(
         Some("Supply Area".to_string()),
-        Area::North,
+        Area::Sector1,
         TerrainType::new(BaseTerrain::Clearing, vec![]).unwrap(),
     );
     area_with_items.items.push(Item::new_random_weapon());
 
     let area_without_items = AreaDetails::new_with_terrain(
         Some("Empty Area".to_string()),
-        Area::South,
+        Area::Sector4,
         TerrainType::new(BaseTerrain::Clearing, vec![]).unwrap(),
     );
 
@@ -193,7 +193,7 @@ fn test_areas_with_items_bonus() {
 
     let chosen = brain.choose_destination(&areas, &tribute);
     assert!(chosen.is_some());
-    assert_eq!(chosen.unwrap(), Area::North); // Should prefer area with items
+    assert_eq!(chosen.unwrap(), Area::Sector1); // Should prefer area with items
 }
 
 /// Test scoring with multiple factors combined
@@ -206,14 +206,14 @@ fn test_combined_scoring_factors() {
 
     let mut perfect_area = AreaDetails::new_with_terrain(
         Some("Ideal Ruins".to_string()),
-        Area::North,
+        Area::Sector1,
         TerrainType::new(BaseTerrain::UrbanRuins, vec![]).unwrap(), // Affinity + Concealed
     );
     perfect_area.items.push(Item::new_random_weapon()); // Has items
 
     let poor_area = AreaDetails::new_with_terrain(
         Some("Harsh Tundra".to_string()),
-        Area::South,
+        Area::Sector4,
         TerrainType::new(BaseTerrain::Tundra, vec![]).unwrap(), // Harsh + Exposed
     );
 
@@ -221,7 +221,7 @@ fn test_combined_scoring_factors() {
 
     let chosen = brain.choose_destination(&areas, &tribute);
     assert!(chosen.is_some());
-    assert_eq!(chosen.unwrap(), Area::North); // Should strongly prefer perfect area
+    assert_eq!(chosen.unwrap(), Area::Sector1); // Should strongly prefer perfect area
 }
 
 /// Test that desperate modifier significantly boosts affinity terrain
@@ -235,13 +235,13 @@ fn test_desperate_modifier_strength() {
     // Even with items in the non-affinity area, desperate tribute should prefer affinity
     let affinity_area = AreaDetails::new_with_terrain(
         Some("Safe Ruins".to_string()),
-        Area::North,
+        Area::Sector1,
         TerrainType::new(BaseTerrain::UrbanRuins, vec![]).unwrap(),
     );
 
     let mut tempting_area = AreaDetails::new_with_terrain(
         Some("Supply Grasslands".to_string()),
-        Area::South,
+        Area::Sector4,
         TerrainType::new(BaseTerrain::Grasslands, vec![]).unwrap(),
     );
     tempting_area.items.push(Item::new_random_weapon());
@@ -252,5 +252,5 @@ fn test_desperate_modifier_strength() {
     let chosen = brain.choose_destination(&areas, &tribute);
     assert!(chosen.is_some());
     // Desperate (3.0x) boost should overcome item bonuses
-    assert_eq!(chosen.unwrap(), Area::North);
+    assert_eq!(chosen.unwrap(), Area::Sector1);
 }

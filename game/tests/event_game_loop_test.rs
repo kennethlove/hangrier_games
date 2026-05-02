@@ -15,7 +15,7 @@ fn test_event_survival_integration_with_game_loop() {
     // Create area with Forest terrain (catastrophic for wildfire)
     let mut area_details = AreaDetails::new_with_terrain(
         Some("Forest Area".to_string()),
-        Area::North,
+        Area::Sector1,
         TerrainType::new(BaseTerrain::Forest, vec![]).unwrap(),
     );
 
@@ -26,7 +26,7 @@ fn test_event_survival_integration_with_game_loop() {
     // Create tributes in forest with vulnerable health
     for i in 0..5 {
         let mut tribute = Tribute::new(format!("Tribute{}", i), Some((i % 12) + 1), None);
-        tribute.area = Area::North;
+        tribute.area = Area::Sector1;
         tribute.attributes.health = 50; // Vulnerable
         tribute.terrain_affinity = vec![]; // No protection
         tribute.statistics.game = game.identifier.clone();
@@ -41,7 +41,7 @@ fn test_event_survival_integration_with_game_loop() {
 
     // Process event survival checks
     let mut rng = SmallRng::seed_from_u64(123);
-    game.process_event_for_area(&Area::North, &AreaEvent::Wildfire, &mut rng)
+    game.process_event_for_area(&Area::Sector1, &AreaEvent::Wildfire, &mut rng)
         .unwrap();
 
     // Check that some tributes died (probabilistic, but should happen)
@@ -83,12 +83,12 @@ fn test_trigger_cycle_events_calls_process_event() {
     // Create multiple areas with different terrains
     let forest_area = AreaDetails::new_with_terrain(
         Some("Forest".to_string()),
-        Area::North,
+        Area::Sector1,
         TerrainType::new(BaseTerrain::Forest, vec![]).unwrap(),
     );
     let desert_area = AreaDetails::new_with_terrain(
         Some("Desert".to_string()),
-        Area::South,
+        Area::Sector4,
         TerrainType::new(BaseTerrain::Desert, vec![]).unwrap(),
     );
 
@@ -98,7 +98,7 @@ fn test_trigger_cycle_events_calls_process_event() {
     // Create tributes in each area
     for i in 0..6 {
         let mut tribute = Tribute::new(format!("Tribute{}", i), Some((i % 12) + 1), None);
-        tribute.area = if i < 3 { Area::North } else { Area::South };
+        tribute.area = if i < 3 { Area::Sector1 } else { Area::Sector4 };
         tribute.attributes.health = 50;
         tribute.terrain_affinity = vec![];
         tribute.statistics.game = game.identifier.clone();
@@ -120,9 +120,9 @@ fn test_trigger_cycle_events_calls_process_event() {
 
     // Process events (what trigger_cycle_events now does internally)
     let mut rng = SmallRng::seed_from_u64(99);
-    game.process_event_for_area(&Area::North, &AreaEvent::Wildfire, &mut rng)
+    game.process_event_for_area(&Area::Sector1, &AreaEvent::Wildfire, &mut rng)
         .unwrap();
-    game.process_event_for_area(&Area::South, &AreaEvent::Sandstorm, &mut rng)
+    game.process_event_for_area(&Area::Sector4, &AreaEvent::Sandstorm, &mut rng)
         .unwrap();
 
     let final_alive = game.living_tributes().len();
@@ -160,21 +160,21 @@ fn test_terrain_affinity_improves_survival() {
 
         let mut area = AreaDetails::new_with_terrain(
             Some("Forest".to_string()),
-            Area::North,
+            Area::Sector1,
             TerrainType::new(BaseTerrain::Forest, vec![]).unwrap(),
         );
         area.events.push(AreaEvent::Flood);
         game_with.areas.push(area);
 
         let mut tribute = Tribute::new("Affinity Tribute".to_string(), Some(1), None);
-        tribute.area = Area::North;
+        tribute.area = Area::Sector1;
         tribute.attributes.health = 50;
         tribute.terrain_affinity = vec![BaseTerrain::Forest]; // HAS affinity
         tribute.statistics.game = game_with.identifier.clone();
         game_with.tributes.push(tribute);
 
         game_with
-            .process_event_for_area(&Area::North, &AreaEvent::Flood, &mut rng_with)
+            .process_event_for_area(&Area::Sector1, &AreaEvent::Flood, &mut rng_with)
             .unwrap();
 
         if game_with.tributes[0].attributes.health == 0 {
@@ -187,21 +187,21 @@ fn test_terrain_affinity_improves_survival() {
 
         let mut area2 = AreaDetails::new_with_terrain(
             Some("Forest".to_string()),
-            Area::North,
+            Area::Sector1,
             TerrainType::new(BaseTerrain::Forest, vec![]).unwrap(),
         );
         area2.events.push(AreaEvent::Flood);
         game_without.areas.push(area2);
 
         let mut tribute2 = Tribute::new("No Affinity Tribute".to_string(), Some(1), None);
-        tribute2.area = Area::North;
+        tribute2.area = Area::Sector1;
         tribute2.attributes.health = 50;
         tribute2.terrain_affinity = vec![]; // NO affinity
         tribute2.statistics.game = game_without.identifier.clone();
         game_without.tributes.push(tribute2);
 
         game_without
-            .process_event_for_area(&Area::North, &AreaEvent::Flood, &mut rng_without)
+            .process_event_for_area(&Area::Sector1, &AreaEvent::Flood, &mut rng_without)
             .unwrap();
 
         if game_without.tributes[0].attributes.health == 0 {

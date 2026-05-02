@@ -14,10 +14,10 @@ fn test_game_loop_generates_terrain_appropriate_events() {
 
     // Create areas with different terrains
     let terrains = vec![
-        (Area::North, BaseTerrain::Forest, "Forest"),
-        (Area::South, BaseTerrain::Desert, "Desert"),
-        (Area::East, BaseTerrain::Mountains, "Mountains"),
-        (Area::West, BaseTerrain::Wetlands, "Wetlands"),
+        (Area::Sector1, BaseTerrain::Forest, "Forest"),
+        (Area::Sector4, BaseTerrain::Desert, "Desert"),
+        (Area::Sector2, BaseTerrain::Mountains, "Mountains"),
+        (Area::Sector5, BaseTerrain::Wetlands, "Wetlands"),
     ];
 
     for (area, terrain, name) in terrains {
@@ -66,7 +66,7 @@ fn test_game_loop_generates_terrain_appropriate_events() {
     // Verify terrain-appropriate events are most common
 
     // Forest should get mostly wildfires
-    let forest_events = event_counts.get("North").unwrap();
+    let forest_events = event_counts.get("Sector 1").unwrap();
     let forest_wildfire = forest_events.get("wildfire").unwrap_or(&0);
     assert!(
         *forest_wildfire > 20,
@@ -75,7 +75,7 @@ fn test_game_loop_generates_terrain_appropriate_events() {
     );
 
     // Desert should get mostly sandstorms or heatwaves
-    let desert_events = event_counts.get("South").unwrap();
+    let desert_events = event_counts.get("Sector 4").unwrap();
     let desert_sandstorm = desert_events.get("sandstorm").unwrap_or(&0);
     let desert_heatwave = desert_events.get("heatwave").unwrap_or(&0);
     assert!(
@@ -86,7 +86,7 @@ fn test_game_loop_generates_terrain_appropriate_events() {
     );
 
     // Mountains should get mostly avalanches or rockslides
-    let mountain_events = event_counts.get("East").unwrap();
+    let mountain_events = event_counts.get("Sector 2").unwrap();
     let mountain_avalanche = mountain_events.get("avalanche").unwrap_or(&0);
     let mountain_rockslide = mountain_events.get("rockslide").unwrap_or(&0);
     assert!(
@@ -97,7 +97,7 @@ fn test_game_loop_generates_terrain_appropriate_events() {
     );
 
     // Wetlands should get mostly floods
-    let wetland_events = event_counts.get("West").unwrap();
+    let wetland_events = event_counts.get("Sector 5").unwrap();
     let wetland_flood = wetland_events.get("flood").unwrap_or(&0);
     assert!(
         *wetland_flood > 30,

@@ -7,10 +7,12 @@ use web::components::Map;
 fn all_areas() -> Vec<AreaDetails> {
     vec![
         AreaDetails::new(None, Area::Cornucopia),
-        AreaDetails::new(None, Area::North),
-        AreaDetails::new(None, Area::South),
-        AreaDetails::new(None, Area::East),
-        AreaDetails::new(None, Area::West),
+        AreaDetails::new(None, Area::Sector1),
+        AreaDetails::new(None, Area::Sector2),
+        AreaDetails::new(None, Area::Sector3),
+        AreaDetails::new(None, Area::Sector4),
+        AreaDetails::new(None, Area::Sector5),
+        AreaDetails::new(None, Area::Sector6),
     ]
 }
 
@@ -23,10 +25,9 @@ fn MapHarness(props: MapProps) -> Element {
     rsx! { Map { areas: props.areas.clone() } }
 }
 
-/// Map renders the static SVG without panicking when given the standard
-/// 5-area arena.
+/// Map renders without panicking when given the standard 7-area arena.
 #[test]
-fn test_map_renders_with_all_five_areas() {
+fn test_map_renders_with_all_seven_areas() {
     let mut dom = VirtualDom::new_with_props(MapHarness, MapProps { areas: all_areas() });
     let _edits = dom.rebuild_to_vec();
 }

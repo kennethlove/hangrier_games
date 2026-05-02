@@ -22,7 +22,7 @@ fn movement_and_turn_phase_events_reach_game_messages() {
     // Two areas so movement is actually possible.
     for (name, area) in [
         ("Cornucopia", Area::Cornucopia),
-        ("North Field", Area::North),
+        ("North Field", Area::Sector1),
     ] {
         let details = AreaDetails::new_with_terrain(
             Some(name.to_string()),

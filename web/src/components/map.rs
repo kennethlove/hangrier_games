@@ -1,48 +1,91 @@
 use dioxus::prelude::*;
 use game::areas::AreaDetails;
-use std::collections::HashMap;
+use game::areas::hex::default_layout;
+
+const HEX_SIZE: f64 = 90.0;
+const PADDING: f64 = 16.0;
+
+fn hex_corners(cx: f64, cy: f64, size: f64) -> String {
+    // Pointy-top: corners at 30, 90, 150, 210, 270, 330 degrees.
+    let mut pts = String::new();
+    for i in 0..6 {
+        let angle_deg = 60.0 * (i as f64) + 30.0;
+        let a = angle_deg.to_radians();
+        let x = cx + size * a.cos();
+        let y = cy + size * a.sin();
+        if i > 0 {
+            pts.push(' ');
+        }
+        pts.push_str(&format!("{x:.2},{y:.2}"));
+    }
+    pts
+}
 
 #[component]
 pub fn Map(areas: Vec<AreaDetails>) -> Element {
-    let map_areas: HashMap<String, bool> = areas
-        .clone()
-        .into_iter()
-        .map(|area| {
-            (
-                area.clone().area.unwrap().to_string().to_lowercase(),
-                area.is_open(),
-            )
-        })
-        .collect();
+    let layout = default_layout();
+
+    // Compute viewBox bounds.
+    let mut min_x = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    for (_a, ax) in layout.iter() {
+        let (x, y) = ax.to_pixel(HEX_SIZE);
+        min_x = min_x.min(x - HEX_SIZE);
+        max_x = max_x.max(x + HEX_SIZE);
+        min_y = min_y.min(y - HEX_SIZE);
+        max_y = max_y.max(y + HEX_SIZE);
+    }
+    let vb_x = min_x - PADDING;
+    let vb_y = min_y - PADDING;
+    let vb_w = (max_x - min_x) + 2.0 * PADDING;
+    let vb_h = (max_y - min_y) + 2.0 * PADDING;
+    let view_box = format!("{vb_x:.2} {vb_y:.2} {vb_w:.2} {vb_h:.2}");
 
     rsx! {
         svg {
-            view_box: "0 0 806 806",
-            path {
-                id: "cornucopia",
-                "data-open": map_areas["cornucopia"],
-                class: "fill-stone-200 data-[open=false]:fill-red-500 theme3:fill-stone-400",
-                d: "m 402.95508,220.7032 c 100.448,0 182,81.551 182,182 0,100.448 -81.552,182 -182,182 -100.449,0 -182,-81.552 -182,-182 0,-100.449 81.551,-182 182,-182 z" }
-            path {
-                id: "north",
-                "data-open": map_areas["north"],
-                class: "fill-stone-200 data-[open=false]:fill-red-500 theme3:fill-stone-400",
-                d: "M 679.75202,109.23829 532.26179,256.90236 c -34.26561,-30.11954 -79.13428,-48.44727 -128.21289,-48.44727 -49.16061,0 -94.09928,18.38777 -128.38672,48.59766 L 128.00007,109.56642 C 202.62746,39.348491 301.2721,1.1157135e-6 404.0489,1.1157135e-6 506.66643,1.1157135e-6 605.16579,39.225021 679.75202,109.23829 Z" }
-            path {
-                id: "south",
-                "data-open": map_areas["south"],
-                class: "fill-stone-200 data-[open=false]:fill-red-500 theme3:fill-stone-400",
-                d: "M 128.00007,695.81446 275.4903,548.15039 c 34.26561,30.11954 79.13428,48.44727 128.21289,48.44727 49.16061,0 94.09928,-18.38777 128.38672,-48.59766 l 147.66211,147.48633 c -74.62739,70.21793 -173.27203,109.56642 -276.04883,109.56642 -102.61753,0 -201.11689,-39.22502 -275.70312,-109.23829 z" }
-            path {
-                id: "west",
-                "data-open": map_areas["west"],
-                class: "fill-stone-200 data-[open=false]:fill-red-500 theme3:fill-stone-400",
-                d: "m 109.23828,127.00008 147.66407,147.49023 c -30.11954,34.26561 -48.44727,79.13428 -48.44727,128.21289 0,49.16061 18.38777,94.09928 48.59766,128.38672 L 109.56641,678.75203 C 39.348483,604.12464 1.9239319e-6,505.48 -7.6068148e-8,402.7032 1.9239319e-6,300.08567 39.225014,201.58631 109.23828,127.00008 Z" }
-            path {
-                id: "east",
-                "data-open": map_areas["east"],
-                class: "fill-stone-200 data-[open=false]:fill-red-500 theme3:fill-stone-400",
-                d: "M 696.81446,678.75203 549.15039,531.2618 c 30.11954,-34.26561 48.44727,-79.13428 48.44727,-128.21289 0,-49.16061 -18.38777,-94.09928 -48.59766,-128.38672 L 696.48633,127.00008 c 70.21793,74.62739 109.56641,173.27203 109.56641,276.04883 0,102.61753 -39.22501,201.11689 -109.23828,275.70312 z" }
+            view_box: "{view_box}",
+            for (i, (area, ax)) in layout.iter().enumerate() {
+                {
+                    let (cx, cy) = ax.to_pixel(HEX_SIZE);
+                    let area_name = area.to_string();
+                    let is_open = areas
+                        .iter()
+                        .find(|ad| ad.area == Some(*area))
+                        .map(|ad| ad.is_open())
+                        .unwrap_or(true);
+                    let points = hex_corners(cx, cy, HEX_SIZE);
+                    let area_id = area_name.to_lowercase().replace(' ', "-");
+                    let label = format!("{}", i);
+                    let on_click = move |_| {
+                        tracing::info!("hex tile clicked: {}", area_name);
+                    };
+                    rsx! {
+                        g {
+                            key: "{area_id}",
+                            onclick: on_click,
+                            polygon {
+                                id: "{area_id}",
+                                "data-open": "{is_open}",
+                                class: "fill-stone-200 data-[open=false]:fill-red-500 theme3:fill-stone-400 stroke-stone-700",
+                                points: "{points}",
+                                stroke_width: "2",
+                            }
+                            text {
+                                x: "{cx}",
+                                y: "{cy}",
+                                text_anchor: "middle",
+                                dominant_baseline: "central",
+                                class: "fill-stone-900 select-none pointer-events-none",
+                                font_size: "32",
+                                font_weight: "bold",
+                                "{label}"
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

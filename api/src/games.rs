@@ -104,6 +104,7 @@ async fn create_game_area(area: Area, db: &Surreal<Any>) -> Result<GameArea, App
         .bind(("body", body))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create area: {}", e)))?;
+    crate::verify_record_persisted(db, &area_id, "create_game_area").await?;
 
     Ok(game_area)
 }
@@ -206,10 +207,11 @@ pub async fn create_game(
     state
         .db
         .query("UPSERT $rid CONTENT $body")
-        .bind(("rid", game_rid))
+        .bind(("rid", game_rid.clone()))
         .bind(("body", body))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create game: {}", e)))?;
+    crate::verify_record_persisted(&state.db, &game_rid, "create_game").await?;
 
     let created_game = game;
 
@@ -314,6 +316,7 @@ pub async fn add_item_to_area(
             e
         )));
     }
+    crate::verify_record_persisted(db, &new_item_id, "add_item_to_area").await?;
 
     // Insert an area-item relationship via a raw RELATE query. RELATE always
     // returns an array, so the SDK's typed insert::<Vec<_>>().relation() path

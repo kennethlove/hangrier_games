@@ -121,7 +121,7 @@ pub fn use_game_websocket(game_id: String) -> (Signal<Vec<GameEvent>>, Signal<Co
 }
 
 /// Convert an `http(s)://host[/path]` API host into a `ws(s)://host/ws` URL.
-fn build_ws_url(api_host: &str, _game_id: &str) -> String {
+pub(crate) fn build_ws_url(api_host: &str, _game_id: &str) -> String {
     let base = api_host.trim_end_matches('/');
     let ws_base = if let Some(rest) = base.strip_prefix("https://") {
         format!("wss://{}", rest)
@@ -132,4 +132,48 @@ fn build_ws_url(api_host: &str, _game_id: &str) -> String {
         base.to_string()
     };
     format!("{}/ws", ws_base)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn http_to_ws() {
+        assert_eq!(
+            build_ws_url("http://localhost:3000", "g"),
+            "ws://localhost:3000/ws"
+        );
+    }
+
+    #[test]
+    fn https_to_wss() {
+        assert_eq!(
+            build_ws_url("https://api.example.com", "g"),
+            "wss://api.example.com/ws"
+        );
+    }
+
+    #[test]
+    fn trailing_slash_trimmed() {
+        assert_eq!(
+            build_ws_url("http://localhost:3000/", "g"),
+            "ws://localhost:3000/ws"
+        );
+    }
+
+    #[test]
+    fn passthrough_ws_scheme() {
+        assert_eq!(
+            build_ws_url("ws://localhost:3000", "g"),
+            "ws://localhost:3000/ws"
+        );
+        assert_eq!(build_ws_url("wss://x.example", "g"), "wss://x.example/ws");
+    }
+
+    #[test]
+    fn unknown_scheme_passthrough() {
+        // No http/https prefix and no ws prefix: caller's string is taken as-is.
+        assert_eq!(build_ws_url("localhost:3000", "g"), "localhost:3000/ws");
+    }
 }

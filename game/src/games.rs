@@ -2260,8 +2260,11 @@ mod tests {
             .push(AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia));
         let closed_areas: Vec<Area> = vec![];
 
+        // Alliance formation is now a deliberate Action::ProposeAlliance
+        // (5%-15% per turn for eligible tributes); sweep many seeds so we
+        // deterministically observe at least one AllianceFormed message.
         let mut hit: Option<crate::messages::GameMessage> = None;
-        for seed in [313u64, 419, 547, 23, 89, 211, 7, 11] {
+        for seed in 0u64..400 {
             let mut g = game_with_area.clone();
             let mut rng = SmallRng::seed_from_u64(seed);
             let _ = g.run_tribute_cycle(
@@ -2370,8 +2373,11 @@ mod tests {
             .push(AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia));
         let closed_areas: Vec<Area> = vec![];
 
+        // Alliance formation is now a deliberate Action::ProposeAlliance
+        // (5%-15% per turn for eligible tributes); sweep many seeds so we
+        // deterministically observe at least one AllianceFormed message.
         let mut hit: Option<crate::messages::GameMessage> = None;
-        for seed in [313u64, 419, 547, 23, 89, 211, 7, 11] {
+        for seed in 0u64..400 {
             let mut g = game_with_area.clone();
             let mut rng = SmallRng::seed_from_u64(seed);
             let _ = g.run_tribute_cycle(

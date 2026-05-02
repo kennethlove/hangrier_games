@@ -3,7 +3,7 @@ use dioxus::prelude::*;
 use game::tributes::statuses::TributeStatus;
 
 /// Maps tribute status to icon names
-fn icon_name_for_status(status: &TributeStatus) -> String {
+pub(crate) fn icon_name_for_status(status: &TributeStatus) -> String {
     match status {
         TributeStatus::Broken => "broken_bone",
         TributeStatus::Buried => "falling_rocks",
@@ -36,5 +36,48 @@ pub fn TributeStatusIcon(status: TributeStatus, css_class: String) -> Element {
             SvgIcon { name: icon_name, class: css_class },
             span { class: "sr-only", "{status}"},
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn known_statuses_map_to_icons() {
+        assert_eq!(icon_name_for_status(&TributeStatus::Healthy), "hearts");
+        assert_eq!(icon_name_for_status(&TributeStatus::Dead), "dead");
+        assert_eq!(icon_name_for_status(&TributeStatus::Drowned), "drowning");
+        assert_eq!(icon_name_for_status(&TributeStatus::Sick), "vomiting");
+        assert_eq!(
+            icon_name_for_status(&TributeStatus::Buried),
+            "falling_rocks"
+        );
+        assert_eq!(icon_name_for_status(&TributeStatus::Wounded), "wounded");
+        assert_eq!(
+            icon_name_for_status(&TributeStatus::RecentlyDead),
+            "recently_dead"
+        );
+        assert_eq!(icon_name_for_status(&TributeStatus::Burned), "burned");
+        assert_eq!(icon_name_for_status(&TributeStatus::Frozen), "frozen_body");
+        assert_eq!(
+            icon_name_for_status(&TributeStatus::Overheated),
+            "heat_haze"
+        );
+        assert_eq!(icon_name_for_status(&TributeStatus::Broken), "broken_bone");
+        assert_eq!(icon_name_for_status(&TributeStatus::Infected), "infection");
+        assert_eq!(
+            icon_name_for_status(&TributeStatus::Poisoned),
+            "poison_bottle"
+        );
+        assert_eq!(icon_name_for_status(&TributeStatus::Starving), "starving");
+        assert_eq!(
+            icon_name_for_status(&TributeStatus::Electrocuted),
+            "electrocuted"
+        );
+        assert_eq!(
+            icon_name_for_status(&TributeStatus::Dehydrated),
+            "dehydrated"
+        );
     }
 }

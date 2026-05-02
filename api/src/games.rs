@@ -175,9 +175,12 @@ pub async fn create_game(
         .validate()
         .map_err(|e| AppError::ValidationError(format!("{}", e)))?;
 
-    // Generate server-controlled fields
+    // Generate server-controlled fields. Game::default() runs WPGen to
+    // produce a three-word "clever" name; use it as the fallback when
+    // the client didn't supply one (e.g. Quickstart).
+    let default_game = Game::default();
     let game_identifier = Uuid::new_v4().to_string();
-    let game_name = payload.name.unwrap_or_else(|| "Unnamed Game".to_string());
+    let game_name = payload.name.unwrap_or(default_game.name);
 
     // Construct Game with server-controlled fields
     let game = Game {

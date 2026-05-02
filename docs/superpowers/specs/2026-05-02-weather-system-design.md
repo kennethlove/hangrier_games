@@ -280,6 +280,17 @@ The `compute_hazard_weights` function and its underlying table.
 
 Add a `weather` field to whatever `DisplayArea` (or equivalent area DTO) the frontend consumes. New addition is non-breaking; existing API consumers ignore unknown fields.
 
+## Frontend Presentation (v1, Minimal)
+
+The web frontend renders current weather per area as an icon with a tooltip:
+
+- **Icon placement:** in the area card / area detail header, next to terrain or area name.
+- **Icon set:** one glyph per `Weather` variant (☀ Clear, ☁ Overcast, 🌫 Fog, 🌦 LightRain, 🌧 HeavyRain, ⛈ Storm, 🌨 LightSnow, ❄ HeavySnow, 🌪 Sandstorm). Final glyphs (emoji vs. inline SVG) decided during implementation; consistency with the existing icon system in `web/src/components/` takes priority.
+- **Tooltip on hover** shows the weather name, a one-line description, and the visible per-tribute consequences ("Heavy rain — exposed tributes lose 1 health/phase, visibility −3").
+- **No animated icons in v1.** Static glyph only; animated weather icons filed as future work.
+- **No forecast.** Per the design, only current weather is visible (re-confirmed here for the frontend).
+- **`WeatherChanged` events** render as event cards in the Timeline (handled by the progressive-display spec); the area icon updates via the standard query refetch / websocket plumbing.
+
 ## Integration Points
 
 - **Game loop (`process_turn_phase` and surrounding cycle code)** — at each phase boundary, for each area: roll weather transition → roll hazard → apply modifiers / emit events.

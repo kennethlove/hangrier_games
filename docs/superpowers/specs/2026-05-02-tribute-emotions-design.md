@@ -247,6 +247,18 @@ impl Trait {
 }
 ```
 
+## Frontend Presentation (v1, Minimal)
+
+The web frontend renders the derived label as a small status pill:
+
+- **Pill placement:** next to the tribute's name on both `TributeCard` and the tribute detail header.
+- **Visible only when label != Steady.** Unlabeled tributes show no pill (intentional — the labeled few stand out).
+- **Color convention:** label color follows its dominant axis (e.g., red for Enraged, gray for Broken, yellow for Hopeful, green for Resolute). Final palette decided during implementation.
+- **No axis bars in v1.** The four numeric axes are not surfaced in the UI; only the derived label. Axis bars / debug view filed as future work.
+- **Live updates** flow via the existing query refetch / websocket plumbing — no special handling beyond rendering the new label value.
+
+Tooltip on hover (showing underlying axis values for debugging or curiosity) is optional for v1 — decide during implementation.
+
 ## Integration Points
 
 - **`Brain::act()`** — add override-state checks at the top; replace constant thresholds with axis-derived expressions in existing branches.

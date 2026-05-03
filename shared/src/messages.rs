@@ -315,7 +315,13 @@ pub fn summarize_periods(messages: &[GameMessage], current: (u32, Phase)) -> Vec
         let key = (m.game_day, phase_ord(m.phase));
         let entry = bucket.entry(key).or_insert((0, 0));
         entry.1 += 1;
-        if matches!(m.payload, MessagePayload::TributeKilled { .. }) {
+        if matches!(m.payload, MessagePayload::TributeKilled { .. })
+            || matches!(
+                &m.payload,
+                MessagePayload::Combat(engagement)
+                    if engagement.outcome == CombatOutcome::Killed
+            )
+        {
             entry.0 += 1;
         }
     }
@@ -662,6 +668,31 @@ mod tests {
                 is_current: true
             }
         );
+    }
+
+    #[test]
+    fn summarize_counts_combat_kills_as_deaths() {
+        let combat_kill = MessagePayload::Combat(CombatEngagement {
+            attacker: t("a"),
+            target: t("b"),
+            outcome: CombatOutcome::Killed,
+            detail_lines: vec![],
+        });
+        let combat_wound = MessagePayload::Combat(CombatEngagement {
+            attacker: t("a"),
+            target: t("b"),
+            outcome: CombatOutcome::Wounded,
+            detail_lines: vec![],
+        });
+        let msgs = vec![
+            make_msg(1, Phase::Day, combat_kill.clone()),
+            make_msg(1, Phase::Day, combat_wound),
+            make_msg(1, Phase::Day, combat_kill),
+        ];
+        let result = summarize_periods(&msgs, (1, Phase::Day));
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].deaths, 2);
+        assert_eq!(result[0].event_count, 3);
     }
 
     #[test]

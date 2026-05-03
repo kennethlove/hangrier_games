@@ -239,6 +239,160 @@ pub struct TimelineProps {
 - `web/src/components/game_period_page.rs` — host the Replay button alongside the existing day-log render; on click, switch to `TimelineMode::Reveal`.
 - `web/src/hooks/use_game_websocket.rs` — currently caps at `MAX_EVENTS = 200` ring buffer; verify this cap is high enough for the Live ● badge backlog use case, or expose a "since cursor" subscription if needed.
 
+## Frontend Presentation
+
+The progressive timeline UI is designed against the spectator skin (see `2026-05-02-spectator-skin-layout-design.md` and `2026-05-02-spectator-skin-visuals-design.md`). It owns the entire **Action panel** of the broadcast composition.
+
+### Refined user-facing playback model
+
+The original three-mode enum (Static / Reveal / Live) is collapsed at the user-facing level into a simpler **playback / navigation** model. The enum remains as the underlying state machine; the UI presents three states to the user:
+
+- **Live (current).** Auto-advancing in sync with the WebSocket stream. Live ● badge on. User is at the present moment.
+- **Live (catching-up).** Auto-advancing through buffered/historical events at dwell rate. Live badge off. User is watching the show but is currently behind the present.
+- **Paused.** User has clicked a specific event in the ticker or scrubbed; auto-advance is stopped. Live badge off. Click "play" to resume from the current selection.
+
+The user can:
+
+- Pause anywhere by clicking an event in the ticker or scrubbing.
+- Resume from any point by clicking "play" — playback continues forward from the current selection at dwell rate.
+- Jump to the live edge with a "Jump to Live" button — instantly seeks to the present and switches to Live (current).
+- Adjust playback speed (per the original spec's speed multiplier).
+
+**Default state on page load: Live with dwell** — the user is watching a broadcast already in progress.
+
+Internally, this maps to the existing `TimelineMode` enum as: `Static` → "Paused (auto-advance off)"; `Reveal` → "Live (catching-up)"; `Live` → "Live (current)". The data model is unchanged; the UX vocabulary is unified.
+
+### Action panel layout — three regions
+
+The Action panel divides vertically into three regions, top to bottom:
+
+1. **Now-playing hero card** — the broadcast graphic insert showing the currently-playing or currently-selected event in full.
+2. **Transport region** — playback controls, scrubber, phase chips, live indicator.
+3. **History ticker** — chronological condensed log of all completed events, growing downward.
+
+### Region 1: Now-playing hero card
+
+**Geometry:** inset framed card with subtle chrome border and gold-leaf-style materiality (per the visuals spec). Sits flush below the panel header, separated from the transport below by a thin chrome divider. The card *is* a broadcast graphic insert — explicitly framed, not bleeding into the surrounding panel.
+
+**Content layout (default C-template):** the card uses a single flexible template that handles 95% of event types:
+
+- **Chyron banner (top):** event-type icon + category label + location + timestamp. Banner edge accent color follows the event's palette role (heraldic red for combat/death, chrome gold for weather/Capitol, emotion category color for emotion shifts, etc.). The banner is the stable broadcast frame — when announcer prose is missing, the banner alone communicates the event clearly.
+- **Body:** announcer prose (LLM-generated commentary) in the body face, with inline mentions of tributes rendered as **district-colored chips** (color + sigil + number per the accessibility triad).
+- **Footer (optional):** structured fields for severity / consequence when relevant, in the body face.
+
+**Named exceptions** to the C-template (each gets a bespoke variant):
+
+- **Combat "vs" card.** Two-tribute combat events render as a head-to-head broadcast graphic. Symmetric layout — left tribute / VS / right tribute — each side showing district color stripe + sigil + number + name + avatar. Outcome strip below shows what happened (damage, injury, kill). Combats involving more than two tributes (brawls) fall back to the C-template; vs is reserved for head-to-head.
+- **End-of-day cannon card.** At the end of each day's phase sequence, after the last regular event, a special card lists all that day's deaths, mimicking the cannons. Vertical list; one row per death; each row shows the dying tribute's full triad (color + sigil + number + name + avatar) with a cannon-shot icon (substrate icon, heraldic red, medallion frame) at the leading edge. Banner reads "Day N · Cannons." If no deaths occurred that day, the cannon card is **suppressed entirely** (no empty card). Cannon card is a **dwell anchor** — gets its own minimum dwell duration regardless of length-based rules, so the user always has time to read the daily death roll. (Add to per-card-type minimums table.)
+- **End-of-Games card.** When the game concludes, the now-playing card transitions to a final card and stays there indefinitely. Two variants:
+  - **Victor variant:** banner reading "End of Games — Day N"; the surviving tribute's full triad + avatar at large size in a Capitol-broadcast winner-graphic treatment. Optional final stats below (kills, days survived).
+  - **No-survivors variant:** sober chyron reading "No survivors. The Games are over." No tribute featured. Heraldic red accents.
+  Transport disables play (nothing to play forward to); scrubber still allows navigation through the full game's history. Live indicator goes dark — there is no live edge anymore.
+
+Other event types (alliance changes, weather, sponsor gifts, gamemaker events, emotion shifts, environmental hazards) all use the C-template. Additional special cards may be added per future bead, not pre-designed.
+
+**Card behavior in playback states:**
+
+- **Live (current) / Live (catching-up):** card holds each event for its dwell duration (per the existing length-based-with-floor pacing model), then transitions out as the next event takes over. Brief 200–400ms slide/fade transition.
+- **Paused:** card displays the user's selected event (from ticker click or scrubber position) without auto-advance. No dwell timer is running.
+
+`prefers-reduced-motion: reduce` collapses card transitions to instant swaps.
+
+**Card live indicator:** when the displayed event is the live current one (Live (current) state), a "● Live" badge appears in the chyron. Purely indicative; navigation lives on the scrubber.
+
+### Region 2: Transport region
+
+The transport sits between the now-playing card and the history ticker. **Two-row layout:**
+
+**Top row (full panel width):** scrubber + phase chips overlaid.
+
+- **Scrubber:** density-fill horizontal slider. The scrubber's track carries a low-saturation fill keyed to events-per-phase, so the user can see at a glance where the action was concentrated (e.g. "Day 3 Night was insanely busy"). Click-to-seek; drag-to-scrub. Keyboard: arrow keys for fine-grained step.
+- **Phase chips overlaid on the scrubber:**
+  - Day boundaries — heavier markers, day number labeled.
+  - Phase boundaries — lighter markers, phase named (Dawn / Morning / Day / Dusk / Night).
+  - Current phase — highlighted in chrome gold (the "now" marker).
+  - **Cannon markers** — heraldic-red cannon-shot icons at end-of-day positions where deaths occurred. Lets the user spot "deaths happened that day" at a glance and jump there.
+  - Phase chips are **clickable jump targets**: clicking a chip seeks the scrubber to that phase's start and pauses (so the user can play forward from there).
+
+**Bottom row:** transport buttons + speed selector + Jump-to-Live indicator.
+
+- **Prev / Play–Pause / Next.** Single play-pause toggle button reflects current state (playing → pause icon; paused → play icon). Keyboard: spacebar. Prev/next jump to adjacent events while paused; auto-pause if currently playing.
+- **Speed multiplier.** Selector for 0.5× / 1× / 2× / 4× playback speed. Persists per-device.
+- **Live indicator (right edge):**
+  - When in **Live (current)**: shows "● Live" badge in chrome gold (or heraldic red — implementing instance picks).
+  - When in **Live (catching-up)** or **Paused**: shows a "Jump to Live" button. Clicking it instantly seeks to the present and switches to Live (current).
+
+### Region 3: History ticker
+
+Chronological condensed log, growing downward. **Newest event at the bottom (closest to transport); oldest at the top (scrolls out via overflow as ticker grows).** Reading order is "old → new" top to bottom, like a transcript.
+
+**Line density: single-line condensed.** Each event is one line:
+
+- Leading category dot (left edge, color per the event's palette role — emotion category, weather/environmental, combat/heraldic-red, gamemaker/chrome-gold, etc.).
+- Substrate icon for the event type, immediately after the leading dot.
+- Body text in the body face: condensed event description with inline district chips (color + sigil + number) for any tributes mentioned, per the accessibility triad.
+
+**No prose in the ticker line by default.** The now-playing card is the prose-and-detail surface; the ticker is the scan-and-jump surface. Clicking any ticker line loads that event into the now-playing card and pauses playback there — that is where the user gets full content.
+
+**Optional expand chevron** at the right edge of each line: inline-expand to reveal the prose snippet without disrupting playback. Same chevron collapses. Low-priority feature; ship without if implementation is tight.
+
+**District sequential grouping:** consecutive lines for the same district collapse under a single district banner (color + sigil + number) with the individual lines underneath unstyled with respect to district color (per the visuals spec rule).
+
+**Line state variants:**
+
+- **Default:** as above.
+- **Currently-selected (paused on this event):** line is highlighted in chrome gold with a subtle raised material treatment (per the materiality guardrails — chrome only, not panel body).
+- **Currently-playing (Live mode dwelling on this event):** line is highlighted *and* receives a subtle progress indicator — a chrome-gold edge fill that completes over the event's dwell duration. Visual link between the now-playing card and the ticker; user can see where they are in history while watching the card, and the dwell pacing is legible (the bar filling intuitively shows when the next event will play). When dwell completes, the fill completes, the highlight fades, and the next event in the ticker becomes the currently-playing line.
+
+**Auto-scroll behavior:** auto-scroll only when the user is at the bottom (within ~100px). If the user has scrolled up to read history, the ticker stays put; a "↓ N new events" badge appears at the bottom indicating new content. Clicking the badge or scrolling back to bottom resumes auto-scroll. Standard chat-app pattern.
+
+**Empty state (no events yet):** ticker shows **"The Hangry Games will start shortly!"** in the body face, muted-foreground, optionally with a subtle Panem seal watermark behind it (polish detail). No empty void.
+
+**WebSocket disconnect / reconnect:** the live indicator surfaces connection state — "● Live" → "● Reconnecting…" (heraldic red, briefly) → "● Live" on success, or "○ Offline" with reconnect button on failure. Ticker continues to allow scrubbing through accumulated history while disconnected. Specifics depend on `use_game_websocket` connection-state surfacing — filed as an open implementation question.
+
+### Cross-region coordination
+
+- **Now-playing card ↔ ticker line:** the currently-playing or currently-selected ticker line and the now-playing card always show the same event. State changes (dwell complete, user click, scrubber seek) update both surfaces atomically.
+- **Scrubber ↔ ticker:** the scrubber's playhead position corresponds to the currently-playing ticker line. Scrubbing moves both the playhead and the ticker highlight.
+- **Live indicators:** card chyron badge and scrubber-edge indicator are independent renderings of the same state (Live (current) vs not). They never disagree.
+
+### Reciprocal highlighting with other panels
+
+Per the cross-panel coordination established in the weather UI section: events involving specific tributes participate in the Map ↔ Roster reciprocal highlighting. Hovering a tribute chip in the now-playing card or in a ticker line highlights that tribute in both Map (avatar ring) and Roster (card highlight). The Action panel is a participant in the broader "control room" cross-panel linking, not isolated.
+
+### Accessibility
+
+Per the visuals spec rules:
+
+- All event surfaces (card, ticker lines) carry color + icon + text; color is never the sole signal.
+- District chips always include sigil + number alongside color.
+- Cannon icons are paired with text ("Day N · Cannons" banner).
+- Live ● badge is paired with the word "Live."
+- "Jump to Live" button has a clear text label.
+- All transport controls have keyboard equivalents (spacebar for play/pause, arrow keys for prev/next/scrub).
+- Reduced-motion collapses card transitions, ticker progress bars, and any subtle animations to instant.
+- Screen-reader announcements for new events arriving in Live mode are surfaced via ARIA live regions on the ticker (configurable; filed as open implementation question — too-chatty announcements can be fatiguing).
+
+### Open implementation questions
+
+- Exact dwell anchor minimum duration for cannon cards.
+- Exact dwell anchor handling for End-of-Games cards (probably "infinite" — never times out).
+- Color choice for "● Live" badge (chrome gold vs heraldic red).
+- Whether the inline expand chevron on ticker lines ships in v1.
+- Exact density of the scrubber fill (linear events-per-phase, logarithmic, or something more sophisticated).
+- WebSocket disconnect/reconnect visual details, depending on `use_game_websocket` API.
+- ARIA live region behavior for screen reader announcements (configurable verbosity).
+- Whether the scrubber phase chips show all phases at all viewport widths or condense at narrow widths.
+- Whether the speed selector is a button group or a dropdown.
+
+### Out of scope (filed or to be filed as beads)
+
+- Per-event-type bespoke cards beyond combat-vs, cannon, and end-of-Games.
+- Save/share replay state (already filed: `hangrier_games-t4v`).
+- Per-card-type entrance animations (already filed: `hangrier_games-sk3`).
+- Audio cues for reveal pacing (already filed: `hangrier_games-1dd`).
+- Picture-in-picture / pop-out Action panel (covered by general pop-out bead: `hangrier_games-r6lu`).
+
 ## Integration Points
 
 - **Existing websocket plumbing.** `use_game_websocket` already streams `GameEvent`s into a `Signal<Vec<GameEvent>>`. Live mode subscribes to this signal directly; reveal-mode dwelling sits on top.

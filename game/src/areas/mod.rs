@@ -1,6 +1,10 @@
 pub mod events;
 pub mod hex;
 pub mod path;
+pub mod weather;
+pub mod shelter;
+pub mod forage;
+pub mod water;
 
 use crate::areas::events::AreaEvent;
 use crate::areas::hex::{SUB_SLOTS, SubAxial};

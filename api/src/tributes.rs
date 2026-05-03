@@ -44,11 +44,14 @@ pub async fn create_tribute(
     district: u32,
 ) -> Result<Tribute, AppError> {
     let game_id = RecordId::from(("game", game_identifier.to_owned()));
-    let tribute_count = db
+    let mut tribute_count_resp = db
         .query("RETURN count(SELECT id FROM playing_in WHERE out.identifier=$game)")
         .bind(("game", game_identifier.to_owned()))
-        .await;
-    let tribute_count: Option<u32> = tribute_count.unwrap().take(0).unwrap();
+        .await
+        .map_err(|e| AppError::InternalServerError(format!("Failed to count tributes: {}", e)))?;
+    let tribute_count: Option<u32> = tribute_count_resp.take(0).map_err(|e| {
+        AppError::InternalServerError(format!("Failed to parse tribute count: {}", e))
+    })?;
     if tribute_count >= Some(24) {
         return Err(AppError::GameFull("Game is full".to_string()));
     }

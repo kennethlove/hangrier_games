@@ -4,6 +4,7 @@ use crate::components::games_list::GamesListQ;
 use crate::components::{Input, ThemedButton};
 use crate::env::APP_API_HOST;
 use crate::http::WithCredentials;
+use crate::routes::Routes;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::games::Game;
@@ -35,6 +36,10 @@ impl MutationCapability for CreateGameM {
         match response.send().await {
             Ok(response) => {
                 let status = response.status();
+                if status == reqwest::StatusCode::UNAUTHORIZED {
+                    tracing::warn!("create_game unauthorized");
+                    return Err(MutationError::Unauthorized);
+                }
                 if !status.is_success() {
                     let body = response.text().await.unwrap_or_default();
                     tracing::error!("create_game failed: status={} body={}", status, body);
@@ -66,19 +71,45 @@ impl MutationCapability for CreateGameM {
 pub fn CreateGameButton() -> Element {
     let mutate = use_mutation(Mutation::new(CreateGameM));
     let mut loading_signal = use_context::<Signal<LoadingState>>();
+    let mut error_signal = use_signal(String::default);
+    let navigator = use_navigator();
 
     let onclick = move |_| {
         loading_signal.set(LoadingState::Loading);
+        error_signal.set(String::default());
         spawn(async move {
-            let _ = mutate.mutate_async(None).await;
+            let reader = mutate.mutate_async(None).await;
+            match &*reader.state() {
+                MutationStateData::Settled {
+                    res: Err(MutationError::Unauthorized),
+                    ..
+                } => {
+                    navigator.replace(Routes::AccountsPage {});
+                }
+                MutationStateData::Settled { res: Err(_), .. } => {
+                    error_signal
+                        .set("Could not create game. Try again or check the server.".to_string());
+                }
+                _ => {}
+            }
             loading_signal.set(LoadingState::Loaded);
         });
     };
 
     rsx! {
-        ThemedButton {
-            onclick,
-            "Quickstart"
+        div {
+            class: "flex flex-col gap-1",
+            ThemedButton {
+                onclick,
+                "Quickstart"
+            }
+            if !error_signal.read().is_empty() {
+                p {
+                    class: "text-sm text-red-500",
+                    role: "alert",
+                    "{error_signal.read()}"
+                }
+            }
         }
     }
 }
@@ -88,6 +119,8 @@ pub fn CreateGameForm() -> Element {
     let mut game_name_signal: Signal<String> = use_signal(String::default);
     let mutate = use_mutation(Mutation::new(CreateGameM));
     let mut loading_signal = use_context::<Signal<LoadingState>>();
+    let mut error_signal = use_signal(String::default);
+    let navigator = use_navigator();
 
     let onsubmit = move |_| {
         let name = game_name_signal.peek().clone();
@@ -95,38 +128,61 @@ pub fn CreateGameForm() -> Element {
             return;
         }
         loading_signal.set(LoadingState::Loading);
+        error_signal.set(String::default());
 
         spawn(async move {
             let reader = mutate.mutate_async(Some(name)).await;
-            if reader.state().is_ok() {
-                game_name_signal.set(String::default());
+            match &*reader.state() {
+                MutationStateData::Settled { res: Ok(_), .. } => {
+                    game_name_signal.set(String::default());
+                }
+                MutationStateData::Settled {
+                    res: Err(MutationError::Unauthorized),
+                    ..
+                } => {
+                    navigator.replace(Routes::AccountsPage {});
+                }
+                MutationStateData::Settled { res: Err(_), .. } => {
+                    error_signal.set("Could not create game.".to_string());
+                }
+                _ => {}
             }
             loading_signal.set(LoadingState::Loaded);
         });
     };
 
     rsx! {
-        form {
-            class: "flex flex-row justify-center gap-2",
-            onsubmit,
-            label {
-                r#for: "game-name",
-                class: "sr-only",
-                "Game name"
-            }
-            Input {
-                id: "game-name",
-                name: "game-name",
-                r#type: "text",
-                placeholder: "Game name",
-                value: game_name_signal.read().clone(),
-                oninput: move |e: Event<FormData>| {
-                    game_name_signal.set(e.value().clone());
+        div {
+            class: "flex flex-col gap-1",
+            form {
+                class: "flex flex-row justify-center gap-2",
+                onsubmit,
+                label {
+                    r#for: "game-name",
+                    class: "sr-only",
+                    "Game name"
+                }
+                Input {
+                    id: "game-name",
+                    name: "game-name",
+                    r#type: "text",
+                    placeholder: "Game name",
+                    value: game_name_signal.read().clone(),
+                    oninput: move |e: Event<FormData>| {
+                        game_name_signal.set(e.value().clone());
+                    }
+                }
+                ThemedButton {
+                    r#type: "submit",
+                    "Create game"
                 }
             }
-            ThemedButton {
-                r#type: "submit",
-                "Create game"
+            if !error_signal.read().is_empty() {
+                p {
+                    class: "text-sm text-red-500 text-center",
+                    role: "alert",
+                    "{error_signal.read()}"
+                }
             }
         }
     }

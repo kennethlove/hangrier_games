@@ -77,6 +77,11 @@ async fn create_token_pair(
 }
 
 async fn session(state: State<AppState>) -> Result<Json<String>, AppError> {
+    // `RETURN <string>$session` reads connection-level session state. Hold
+    // `auth_lock` so a concurrent signup/signin/JWT-authenticate call can't
+    // mutate the shared `Surreal<Any>` session mid-query. See
+    // bd hangrier_games-c853 / PR #181 for the original race.
+    let _auth_guard = state.auth_lock.lock().await;
     let res: Option<String> = state
         .db
         .query("RETURN <string>$session")
@@ -99,7 +104,17 @@ async fn user_create(
     let username = payload.username;
     let password = payload.password;
 
-    match state
+    // `db.signup` mutates the shared `Surreal<Any>` connection's session
+    // (sets `$auth` to the new user). Hold `auth_lock` for the entire
+    // signup -> refresh-token-create sequence so a concurrent
+    // `/api/games` request can't observe the swapped session and miss
+    // its own private games via `fn::get_list_games`. The lock is
+    // released after the refresh token is stored; the next JWT-authed
+    // request re-sets `$auth` via `surreal_jwt`. Don't `invalidate()`
+    // — that would also clear the root auth set in main.rs.
+    // See bd hangrier_games-c853 / PR #181.
+    let _auth_guard = state.auth_lock.lock().await;
+    let result = state
         .db
         .signup(Record {
             access: "user",
@@ -110,8 +125,8 @@ async fn user_create(
                 password: password.clone(),
             },
         })
-        .await
-    {
+        .await;
+    match result {
         Ok(auth_result) => {
             let jwt = auth_result.into_insecure_token();
 
@@ -152,7 +167,11 @@ async fn user_authenticate(
     let username = payload.username;
     let password = payload.password;
 
-    match state
+    // Same race protection as `user_create`. Hold `auth_lock` for the
+    // entire signin -> refresh-token-create sequence so concurrent
+    // /api/games queries can't observe the swapped `$auth`.
+    let _auth_guard = state.auth_lock.lock().await;
+    let result = state
         .db
         .signin(Record {
             access: "user",
@@ -163,8 +182,8 @@ async fn user_authenticate(
                 password: password.clone(),
             },
         })
-        .await
-    {
+        .await;
+    match result {
         Ok(auth_result) => {
             let jwt = auth_result.into_insecure_token();
 

@@ -760,7 +760,10 @@ mod tests {
 
     #[fixture]
     fn small_rng() -> SmallRng {
-        SmallRng::from_rng(&mut rand::rng())
+        // Use a fixed seed so brain decision tests are deterministic.
+        // Otherwise low-probability branches (e.g. wants_to_propose_alliance
+        // at ~5%) cause occasional CI flakes.
+        SmallRng::seed_from_u64(0xA11CE5EED)
     }
 
     #[rstest]

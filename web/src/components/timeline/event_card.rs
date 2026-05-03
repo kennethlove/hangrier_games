@@ -39,8 +39,14 @@ pub fn EventCard(props: EventCardProps) -> Element {
                 } else { rsx! {} }
             }
             MessageKind::Alliance => rsx! { AllianceCard { message: props.message.clone() } },
-            MessageKind::Movement => rsx! { MovementCard { message: props.message.clone() } },
-            MessageKind::Item => rsx! { ItemCard { message: props.message.clone() } },
+            MessageKind::Movement => rsx! { MovementCard {
+                game_identifier: props.game_identifier.clone(),
+                message: props.message.clone(),
+            } },
+            MessageKind::Item => rsx! { ItemCard {
+                game_identifier: props.game_identifier.clone(),
+                message: props.message.clone(),
+            } },
             MessageKind::State => rsx! { StateCard { message: props.message.clone() } },
         }
     }

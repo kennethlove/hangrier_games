@@ -1443,4 +1443,68 @@ mod tests {
             assert_eq!(w.mid_action_penalty, None);
         }
     }
+
+    /// Parity: wear lines rendered from `CombatBeat.wear` via
+    /// `CombatBeatExt::to_log_lines` must match the wear lines that
+    /// `attack_contest` flattens into `CombatEngagement.detail_lines`.
+    /// This locks `CombatBeat.wear` as the single source of truth for wear
+    /// narration once consumers migrate off `detail_lines`.
+    #[test]
+    fn combat_beat_wear_matches_engagement_detail_wear_lines() {
+        use crate::tributes::combat_beat::CombatBeatExt;
+        // Both attacker weapon and target shield are brittle so we exercise
+        // the full wear (Worn or Broken) emission paths in one swing.
+        for seed in 0..32u64 {
+            let mut attacker = Tribute::new(format!("Atk{seed}"), None, None);
+            attacker.attributes.strength = 10;
+            attacker.add_item(brittle_weapon(5));
+            let mut target = Tribute::new(format!("Tgt{seed}"), None, None);
+            target.attributes.defense = 5;
+            target.add_item(brittle_shield(4));
+
+            let mut events: Vec<TaggedEvent> = Vec::new();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let _ = attacker.attacks(&mut target, &mut rng, &mut events);
+
+            // Find the engagement (skip seeds that didn't produce one, e.g.
+            // pure fumble paths emit a standalone TributeWounded instead and
+            // never write detail_lines for the legacy timeline to consume).
+            let Some(detail_lines) = events.iter().find_map(|e| match &e.payload {
+                MessagePayload::Combat(eng) => Some(eng.detail_lines.clone()),
+                _ => None,
+            }) else {
+                continue;
+            };
+            let beat = events
+                .iter()
+                .find_map(|e| match &e.payload {
+                    MessagePayload::CombatSwing(b) => Some(b),
+                    _ => None,
+                })
+                .expect("expected one CombatSwing per attacks() call");
+
+            // Wear-related substrings we want to track.
+            let is_wear_line = |s: &str| {
+                s.contains("starting to wear out")
+                    || s.contains("breaks")
+                    || s.contains("shatters mid-swing")
+                    || s.contains("shatters mid-block")
+            };
+
+            let beat_wear_lines: Vec<String> = beat
+                .to_log_lines()
+                .into_iter()
+                .filter(|s| is_wear_line(s))
+                .collect();
+            let detail_wear_lines: Vec<String> = detail_lines
+                .into_iter()
+                .filter(|s| is_wear_line(s))
+                .collect();
+
+            assert_eq!(
+                beat_wear_lines, detail_wear_lines,
+                "seed {seed}: wear lines from CombatBeat must match detail_lines"
+            );
+        }
+    }
 }

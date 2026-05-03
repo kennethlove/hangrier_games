@@ -1,6 +1,6 @@
 use crate::routes::Routes;
 use dioxus::prelude::*;
-use shared::messages::{AreaRef, GameMessage, MessagePayload, MessageSource};
+use shared::messages::{AreaRef, GameMessage, MessagePayload};
 
 #[derive(Props, PartialEq, Clone)]
 pub struct MovementCardProps {
@@ -24,12 +24,6 @@ fn AreaLink(game_identifier: String, area: AreaRef) -> Element {
 
 #[component]
 pub fn MovementCard(props: MovementCardProps) -> Element {
-    // Cycle announcements ("Night 4 falls...", "End of day 3.") flow
-    // through Game::log() which synthesises a fallback `AreaEvent`
-    // payload with `area.name = <game uuid>` and an empty
-    // `description`. Render the human-readable `content` (and drop the
-    // compass flair) for those instead of the raw uuid prefix.
-    let is_game_announcement = matches!(props.message.source, MessageSource::Game(_));
     let gid = props.game_identifier.clone();
     let body = match &props.message.payload {
         MessagePayload::TributeMoved { tribute, from, to } => rsx! {
@@ -49,7 +43,7 @@ pub fn MovementCard(props: MovementCardProps) -> Element {
         MessagePayload::AreaEvent {
             area, description, ..
         } => {
-            if is_game_announcement || description.trim().is_empty() {
+            if description.trim().is_empty() {
                 rsx! { "{props.message.content}" }
             } else {
                 rsx! {
@@ -60,11 +54,10 @@ pub fn MovementCard(props: MovementCardProps) -> Element {
         }
         _ => rsx! { "{props.message.content}" },
     };
-    let prefix = if is_game_announcement { "" } else { "🧭 " };
     rsx! {
         article { class: "rounded border-l-4 border-sky-500 bg-sky-50 theme2:bg-sky-950 p-3",
             header { class: "font-semibold",
-                "{prefix}"
+                "🧭 "
                 {body}
             }
         }

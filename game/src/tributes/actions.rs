@@ -32,6 +32,21 @@ pub enum Action {
     /// roll (`game::tributes::alliances::try_form_alliance`); either way the
     /// turn is consumed. See spec §6.1.
     ProposeAlliance,
+
+    /// Spend the turn looking for shelter in the current area. Brain
+    /// override decides when to surface this. Resolution lives in the
+    /// action handler (out of scope for this task).
+    SeekShelter,
+    /// Spend the turn foraging for food in the current area.
+    Forage,
+    /// Spend the turn drinking from a terrain water source in the current
+    /// area (no item consumed).
+    DrinkFromTerrain,
+    /// Spend the turn eating a Food item from inventory. `None` lets the
+    /// action handler pick the best Food item; `Some(item)` selects it.
+    Eat(Option<Item>),
+    /// Spend the turn drinking a Water item from inventory.
+    DrinkItem(Option<Item>),
 }
 
 impl Display for Action {
@@ -45,6 +60,11 @@ impl Display for Action {
             Action::Hide => write!(f, "hide"),
             Action::TakeItem => write!(f, "take item"),
             Action::ProposeAlliance => write!(f, "propose alliance"),
+            Action::SeekShelter => write!(f, "seek shelter"),
+            Action::Forage => write!(f, "forage"),
+            Action::DrinkFromTerrain => write!(f, "drink from terrain"),
+            Action::Eat(_) => write!(f, "eat"),
+            Action::DrinkItem(_) => write!(f, "drink item"),
         }
     }
 }
@@ -62,6 +82,11 @@ impl FromStr for Action {
             "hide" => Ok(Action::Hide),
             "take item" => Ok(Action::TakeItem),
             "propose alliance" => Ok(Action::ProposeAlliance),
+            "seek shelter" => Ok(Action::SeekShelter),
+            "forage" => Ok(Action::Forage),
+            "drink from terrain" => Ok(Action::DrinkFromTerrain),
+            "eat" => Ok(Action::Eat(None)),
+            "drink item" => Ok(Action::DrinkItem(None)),
             _ => Err(()),
         }
     }
@@ -130,5 +155,48 @@ mod tests {
                 target: None
             }
         );
+    }
+}
+
+#[cfg(test)]
+mod survival_action_tests {
+    use super::*;
+
+    #[test]
+    fn survival_actions_round_trip_serde() {
+        for a in [
+            Action::SeekShelter,
+            Action::Forage,
+            Action::DrinkFromTerrain,
+            Action::Eat(None),
+            Action::DrinkItem(None),
+        ] {
+            let json = serde_json::to_string(&a).unwrap();
+            let back: Action = serde_json::from_str(&json).unwrap();
+            assert_eq!(format!("{:?}", a), format!("{:?}", back));
+        }
+    }
+
+    #[test]
+    fn survival_actions_display_and_fromstr() {
+        assert_eq!(Action::SeekShelter.to_string(), "seek shelter");
+        assert_eq!(Action::Forage.to_string(), "forage");
+        assert_eq!(Action::DrinkFromTerrain.to_string(), "drink from terrain");
+        assert_eq!(Action::Eat(None).to_string(), "eat");
+        assert_eq!(Action::DrinkItem(None).to_string(), "drink item");
+        assert!(matches!(
+            "seek shelter".parse::<Action>(),
+            Ok(Action::SeekShelter)
+        ));
+        assert!(matches!("forage".parse::<Action>(), Ok(Action::Forage)));
+        assert!(matches!(
+            "drink from terrain".parse::<Action>(),
+            Ok(Action::DrinkFromTerrain)
+        ));
+        assert!(matches!("eat".parse::<Action>(), Ok(Action::Eat(None))));
+        assert!(matches!(
+            "drink item".parse::<Action>(),
+            Ok(Action::DrinkItem(None))
+        ));
     }
 }

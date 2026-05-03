@@ -693,6 +693,13 @@ impl Tribute {
                         });
                 }
             }
+            // Survival actions: full handling is wired in Task 12. For now
+            // they're recognized but produce no events here.
+            Action::SeekShelter
+            | Action::Forage
+            | Action::DrinkFromTerrain
+            | Action::Eat(_)
+            | Action::DrinkItem(_) => {}
         }
     }
 
@@ -847,6 +854,12 @@ pub fn calculate_stamina_cost(
         Action::UseItem(_) => 10.0,
         // Proposing an alliance is a low-cost social action.
         Action::ProposeAlliance => 5.0,
+        // Survival actions: foraging/seeking shelter cost some stamina;
+        // eating and drinking are essentially free overhead.
+        Action::SeekShelter => 10.0,
+        Action::Forage => 15.0,
+        Action::DrinkFromTerrain => 5.0,
+        Action::Eat(_) | Action::DrinkItem(_) => 0.0,
     };
 
     // If base cost is 0, no need to calculate multipliers

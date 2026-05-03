@@ -48,7 +48,11 @@ fn test_destination_scoring_favors_affinity_terrain(
     areas_with_terrain: Vec<AreaDetails>,
 ) {
     let brain = Brain::default();
-    let chosen = brain.choose_destination(&areas_with_terrain, &tribute_with_forest_affinity);
+    let chosen = brain.choose_destination(
+        &areas_with_terrain,
+        &tribute_with_forest_affinity,
+        &std::collections::HashMap::new(),
+    );
 
     assert!(chosen.is_some());
     let chosen_area = chosen.unwrap();
@@ -76,7 +80,7 @@ fn test_harsh_terrain_penalty_applied() {
         ),
     ];
 
-    let chosen = brain.choose_destination(&areas, &tribute);
+    let chosen = brain.choose_destination(&areas, &tribute, &std::collections::HashMap::new());
     assert!(chosen.is_some());
     assert_eq!(chosen.unwrap(), Area::Sector1); // Grasslands should be preferred
 }
@@ -140,7 +144,7 @@ fn test_desperate_tributes_flee_to_affinity_terrain() {
         ),
     ];
 
-    let chosen = brain.choose_destination(&areas, &tribute);
+    let chosen = brain.choose_destination(&areas, &tribute, &std::collections::HashMap::new());
     assert!(chosen.is_some());
     assert_eq!(chosen.unwrap(), Area::Sector1); // Should flee to affinity terrain
 }
@@ -166,7 +170,7 @@ fn test_concealed_visibility_bonus() {
         ),
     ];
 
-    let chosen = brain.choose_destination(&areas, &tribute);
+    let chosen = brain.choose_destination(&areas, &tribute, &std::collections::HashMap::new());
     assert!(chosen.is_some());
     // Concealed terrain should score higher
     assert_eq!(chosen.unwrap(), Area::Sector1);
@@ -193,7 +197,7 @@ fn test_areas_with_items_bonus() {
 
     let areas = vec![area_with_items, area_without_items];
 
-    let chosen = brain.choose_destination(&areas, &tribute);
+    let chosen = brain.choose_destination(&areas, &tribute, &std::collections::HashMap::new());
     assert!(chosen.is_some());
     assert_eq!(chosen.unwrap(), Area::Sector1); // Should prefer area with items
 }
@@ -221,7 +225,7 @@ fn test_combined_scoring_factors() {
 
     let areas = vec![perfect_area, poor_area];
 
-    let chosen = brain.choose_destination(&areas, &tribute);
+    let chosen = brain.choose_destination(&areas, &tribute, &std::collections::HashMap::new());
     assert!(chosen.is_some());
     assert_eq!(chosen.unwrap(), Area::Sector1); // Should strongly prefer perfect area
 }
@@ -251,7 +255,7 @@ fn test_desperate_modifier_strength() {
 
     let areas = vec![affinity_area, tempting_area];
 
-    let chosen = brain.choose_destination(&areas, &tribute);
+    let chosen = brain.choose_destination(&areas, &tribute, &std::collections::HashMap::new());
     assert!(chosen.is_some());
     // Desperate (3.0x) boost should overcome item bonuses
     assert_eq!(chosen.unwrap(), Area::Sector1);

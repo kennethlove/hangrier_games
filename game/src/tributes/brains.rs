@@ -7,8 +7,17 @@ use crate::tributes::traits::{REFUSERS, ThresholdDelta, Trait, geometric_mean_af
 use rand::Rng;
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 const LOW_ENEMY_LIMIT: u32 = 6;
+
+/// Score penalty applied per enemy in a destination area, used by
+/// `Brain::choose_destination` to disperse crowded tributes.
+const CROWD_PENALTY_PER_ENEMY: i32 = 8;
+
+/// Cap on the cumulative crowd penalty so a single mob doesn't drown out
+/// affinity / harshness signals entirely.
+const CROWD_PENALTY_MAX: i32 = 32;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum PsychoticBreakType {
@@ -213,6 +222,7 @@ impl Brain {
     /// hop along that path. When `all_areas` is empty (legacy callers,
     /// brains-only unit tests) the brain falls back to neighbor-only
     /// destination selection from `available_destinations`.
+    #[allow(clippy::too_many_arguments)]
     pub fn act(
         &self,
         tribute: &Tribute,
@@ -220,6 +230,7 @@ impl Brain {
         available_destinations: &[crate::areas::DestinationInfo],
         all_areas: &[AreaDetails],
         closed_areas: &[Area],
+        enemy_density: &HashMap<Area, u32>,
         rng: &mut impl Rng,
     ) -> Action {
         if !tribute.is_alive() {
@@ -299,38 +310,18 @@ impl Brain {
                 // and return the first hop. Falls through to neighbor-
                 // only legacy behavior when `all_areas` is empty.
                 if !all_areas.is_empty()
-                    && let Some(best_goal) = self.choose_destination(all_areas, tribute)
+                    && let Some(best_goal) =
+                        self.choose_destination(all_areas, tribute, enemy_density)
                 {
-                    // Anti-clustering: if every area scores the same
-                    // (e.g. all Clearing, no affinity), `choose_destination`
-                    // returns the first area, which on the smart-path is
-                    // typically the tribute's current area — leading every
-                    // crowded tribute to Rest forever and combat to never
-                    // engage. When the chosen "best" is just where we are
-                    // and the area is crowded, force a hop to the cheapest
-                    // reachable open neighbor instead.
-                    let crowded = nearby_tributes >= LOW_ENEMY_LIMIT;
-                    if best_goal == tribute.area && !crowded {
+                    // With per-area enemy density baked into the score (see
+                    // `choose_destination`), a non-current empty area now
+                    // naturally outscores the crowded current one, so the
+                    // legacy escape-hatch is gone. If the best area is still
+                    // the current one, the tribute simply rests.
+                    if best_goal == tribute.area {
                         return Action::Rest;
                     }
-                    let goal = if best_goal == tribute.area && crowded {
-                        // Pick a cheap open neighbor we can actually afford
-                        // to walk to. Falls through to plan_path below using
-                        // that neighbor as the goal.
-                        available_destinations
-                            .iter()
-                            .filter(|d| d.area != tribute.area)
-                            .filter(|d| !closed_areas.contains(&d.area))
-                            .filter(|d| tribute.stamina >= d.stamina_cost)
-                            .min_by_key(|d| d.stamina_cost)
-                            .map(|d| d.area)
-                            .unwrap_or(best_goal)
-                    } else {
-                        best_goal
-                    };
-                    if goal == tribute.area {
-                        return Action::Rest;
-                    }
+                    let goal = best_goal;
                     if let Some((path, _cost)) = crate::areas::path::plan_path(
                         all_areas,
                         closed_areas,
@@ -373,7 +364,9 @@ impl Brain {
                     .collect();
 
                 // Choose best destination using terrain scoring
-                if let Some(best_area) = self.choose_destination(&area_details, tribute) {
+                if let Some(best_area) =
+                    self.choose_destination(&area_details, tribute, enemy_density)
+                {
                     // Also check if tribute has enough stamina
                     if let Some(dest_info) =
                         available_destinations.iter().find(|d| d.area == best_area)
@@ -398,7 +391,12 @@ impl Brain {
     /// - +5 if terrain visibility is Concealed (good for hiding)
     /// - +3 if area has items
     /// - +60 (3.0x * 20) if tribute health < 30 and area has affinity terrain (desperate behavior)
-    pub fn choose_destination(&self, areas: &[AreaDetails], tribute: &Tribute) -> Option<Area> {
+    pub fn choose_destination(
+        &self,
+        areas: &[AreaDetails],
+        tribute: &Tribute,
+        enemy_density: &HashMap<Area, u32>,
+    ) -> Option<Area> {
         if areas.is_empty() {
             return None;
         }
@@ -410,6 +408,23 @@ impl Brain {
 
         for area_details in areas {
             let mut score = 0i32;
+
+            // Crowd penalty: subtract a per-enemy amount from this area's
+            // score, excluding the tribute itself. This naturally produces
+            // dispersion (a non-current empty area outscores the crowded
+            // current one) without a call-site special case.
+            if let Some(area) = area_details.area {
+                let raw = enemy_density.get(&area).copied().unwrap_or(0);
+                let others = if area == tribute.area {
+                    raw.saturating_sub(1)
+                } else {
+                    raw
+                };
+                let penalty = (others as i32)
+                    .saturating_mul(CROWD_PENALTY_PER_ENEMY)
+                    .min(CROWD_PENALTY_MAX);
+                score -= penalty;
+            }
 
             // Affinity bonus: +20 if terrain matches tribute's affinity
             let has_affinity = tribute
@@ -835,9 +850,15 @@ mod tests {
     #[rstest]
     fn decide_on_action_default(tribute: Tribute, mut small_rng: SmallRng) {
         // If there are no enemies nearby, the tribute should move
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 0, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            0,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Move(None));
     }
 
@@ -845,9 +866,15 @@ mod tests {
     fn decide_on_action_low_health(mut tribute: Tribute, mut small_rng: SmallRng) {
         // If the tribute has low health, they should rest
         tribute.attributes.health = 10;
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 2, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            2,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Move(None));
     }
 
@@ -855,9 +882,15 @@ mod tests {
     fn decide_on_action_no_health(mut tribute: Tribute, mut small_rng: SmallRng) {
         // If the tribute has no health, they should do nothing
         tribute.attributes.health = 0;
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 2, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            2,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::None);
     }
 
@@ -865,9 +898,15 @@ mod tests {
     fn decide_on_action_no_movement_alone(mut tribute: Tribute, mut small_rng: SmallRng) {
         // If the tribute has no movement and is alone, they should rest
         tribute.attributes.movement = 0;
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 0, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            0,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Rest);
     }
 
@@ -879,18 +918,30 @@ mod tests {
         // If the tribute has no movement and is not alone, they should hide
         tribute.attributes.movement = 1;
         tribute.attributes.health = 10;
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 5, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            5,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Hide);
     }
 
     #[rstest]
     fn decide_on_action_enemies(tribute: Tribute, mut small_rng: SmallRng) {
         // If there are enemies nearby, the tribute should attack
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 2, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            2,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Attack);
     }
 
@@ -899,18 +950,30 @@ mod tests {
         // If there are enemies nearby, but the tribute is low on health
         // the tribute should hide
         tribute.attributes.health = 20;
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 2, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            2,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Move(None));
     }
 
     #[rstest]
     fn decide_on_action_preferred_action(mut tribute: Tribute, mut small_rng: SmallRng) {
         tribute.brain.set_preferred_action(Action::Rest, 1.0);
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 0, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            0,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Rest);
     }
 
@@ -929,18 +992,30 @@ mod tests {
     fn prefer_to_use_item_if_available(mut tribute: Tribute, mut small_rng: SmallRng) {
         let item = Item::new_random_consumable();
         tribute.items.push(item.clone());
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 0, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            0,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::UseItem(None));
     }
 
     #[rstest]
     fn prefer_to_hide_at_mid_health_and_visible(mut tribute: Tribute, mut small_rng: SmallRng) {
         tribute.attributes.health = 25;
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 0, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            0,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Hide);
     }
 
@@ -948,18 +1023,30 @@ mod tests {
     fn prefer_to_move_at_mid_health_and_low_sanity(mut tribute: Tribute, mut small_rng: SmallRng) {
         tribute.attributes.health = 25;
         tribute.attributes.sanity = 15;
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 0, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            0,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Move(None));
     }
 
     #[rstest]
     fn decide_on_action_alone_healthy_no_movement(mut tribute: Tribute, mut small_rng: SmallRng) {
         tribute.attributes.movement = 0;
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 0, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            0,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Rest);
     }
 
@@ -971,9 +1058,15 @@ mod tests {
         tribute.attributes.health = 10;
         tribute.attributes.movement = 0;
         tribute.attributes.sanity = 15;
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 3, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            3,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Attack);
     }
 
@@ -984,9 +1077,15 @@ mod tests {
     ) {
         tribute.attributes.health = 15;
         tribute.attributes.sanity = 10;
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 3, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            3,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Attack);
     }
 
@@ -997,9 +1096,15 @@ mod tests {
     ) {
         tribute.attributes.is_hidden = true;
         tribute.attributes.health = 10;
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 3, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            3,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::None);
     }
 
@@ -1010,9 +1115,15 @@ mod tests {
     ) {
         tribute.attributes.health = 25;
         tribute.attributes.sanity = 15;
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 3, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            3,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Attack);
     }
 
@@ -1023,9 +1134,15 @@ mod tests {
     ) {
         tribute.attributes.intelligence = 50;
         tribute.attributes.sanity = 50;
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 6, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            6,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Move(None));
     }
 
@@ -1036,9 +1153,15 @@ mod tests {
     ) {
         tribute.attributes.intelligence = 20;
         tribute.attributes.sanity = 20;
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 6, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            6,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Hide);
     }
 
@@ -1051,9 +1174,15 @@ mod tests {
         // threshold (~91 for Balanced after variance) for the Attack branch.
         tribute.attributes.intelligence = 5;
         tribute.attributes.sanity = 0;
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 6, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            6,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Attack);
     }
 
@@ -1133,9 +1262,15 @@ mod tests {
         let mut tribute = Tribute::default();
         tribute.brain.psychotic_break = Some(PsychoticBreakType::Berserk);
 
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 2, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            2,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Attack);
     }
 
@@ -1144,9 +1279,15 @@ mod tests {
         let mut tribute = Tribute::default();
         tribute.brain.psychotic_break = Some(PsychoticBreakType::Paranoid);
 
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 2, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            2,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::Hide);
     }
 
@@ -1155,9 +1296,15 @@ mod tests {
         let mut tribute = Tribute::default();
         tribute.brain.psychotic_break = Some(PsychoticBreakType::Catatonic);
 
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 0, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            0,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         assert_eq!(action, Action::None);
     }
 
@@ -1167,9 +1314,15 @@ mod tests {
         tribute.brain.psychotic_break = Some(PsychoticBreakType::SelfDestructive);
         tribute.attributes.health = 5; // Very low health - normally would rest/hide
 
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 2, &[], &[], &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            2,
+            &[],
+            &[],
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
         // Self-destructive ignores health and attacks
         assert_eq!(action, Action::Attack);
     }
@@ -1264,9 +1417,15 @@ mod tests {
             mk(Area::Sector6, BaseTerrain::Clearing),
         ];
 
-        let action = tribute
-            .brain
-            .act(&tribute.clone(), 0, &[], &all_areas, &[], &mut small_rng);
+        let action = tribute.brain.act(
+            &tribute.clone(),
+            0,
+            &[],
+            &all_areas,
+            &[],
+            &HashMap::new(),
+            &mut small_rng,
+        );
 
         match action {
             Action::Move(Some(first_hop)) => {
@@ -1281,6 +1440,70 @@ mod tests {
             }
             other => panic!("expected Move(Some(_)), got {other:?}"),
         }
+    }
+
+    /// hangrier_games-4wnj — When two areas score identically on terrain
+    /// signals but one is empty and the other holds enemies, the crowd
+    /// penalty in `choose_destination` must steer the tribute toward the
+    /// empty one. Excludes the tribute itself from its own area's count.
+    #[rstest]
+    fn choose_destination_avoids_crowded_areas(tribute: Tribute) {
+        use crate::areas::Area;
+
+        let mk = |a: Area| {
+            AreaDetails::new_with_terrain(
+                Some(format!("{a:?}")),
+                a,
+                TerrainType::new(BaseTerrain::Clearing, vec![]).unwrap(),
+            )
+        };
+        let areas = vec![mk(Area::Sector1), mk(Area::Sector2)];
+
+        let mut density = HashMap::new();
+        density.insert(Area::Sector1, 4); // crowded
+        density.insert(Area::Sector2, 0); // empty
+
+        let chosen = tribute
+            .brain
+            .choose_destination(&areas, &tribute, &density)
+            .expect("expected a destination");
+        assert_eq!(
+            chosen,
+            Area::Sector2,
+            "should pick empty Sector2 over crowded Sector1"
+        );
+    }
+
+    /// The tribute's own area excludes itself from the crowd penalty so a
+    /// solo tribute does not penalize staying put. Equal "others" counts
+    /// (0 vs 0) tie-break to scoring order, but the home area must not
+    /// score *worse* than an equally-empty foreign one.
+    #[rstest]
+    fn choose_destination_excludes_self_from_own_area_density(tribute: Tribute) {
+        use crate::areas::Area;
+
+        let mut t = tribute;
+        t.area = Area::Sector1;
+
+        let mk = |a: Area| {
+            AreaDetails::new_with_terrain(
+                Some(format!("{a:?}")),
+                a,
+                TerrainType::new(BaseTerrain::Clearing, vec![]).unwrap(),
+            )
+        };
+        let areas = vec![mk(Area::Sector1), mk(Area::Sector2)];
+
+        let mut density = HashMap::new();
+        density.insert(Area::Sector1, 1); // just the tribute itself
+        density.insert(Area::Sector2, 0);
+
+        let chosen = t
+            .brain
+            .choose_destination(&areas, &t, &density)
+            .expect("expected a destination");
+        // Tie on "others" (0 vs 0): scoring order picks the first area.
+        assert_eq!(chosen, Area::Sector1);
     }
 }
 

@@ -246,7 +246,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "/uploads",
             tower_http::services::ServeDir::new(&storage_path),
         )
-        .route("/ws", axum::routing::get(api::websocket::websocket_handler))
+        .route(
+            "/ws",
+            axum::routing::get(api::websocket::websocket_handler).layer(
+                middleware::from_fn_with_state(app_state.clone(), surreal_jwt),
+            ),
+        )
         .route(
             "/",
             axum::routing::get(move || async { Json(env!("CARGO_PKG_VERSION")) }),
@@ -298,14 +303,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn surreal_jwt(State(state): State<AppState>, request: Request, next: Next) -> Response {
-    let token = match request
-        .headers()
-        .get(AUTHORIZATION)
-        .and_then(|h| h.to_str().ok())
-        .and_then(|h| h.strip_prefix("Bearer "))
-    {
-        Some(token) => token,
-        None => return StatusCode::UNAUTHORIZED.into_response(),
+    // Prefer the HttpOnly `hg_session` cookie (browsers attach it on every
+    // same-site request, including the WebSocket upgrade). Fall back to
+    // `Authorization: Bearer …` so non-browser clients (tests, scripts) still
+    // work.
+    let token = api::cookies::read_cookie(request.headers(), api::cookies::SESSION_COOKIE)
+        .map(|s| s.to_owned())
+        .or_else(|| {
+            request
+                .headers()
+                .get(AUTHORIZATION)
+                .and_then(|h| h.to_str().ok())
+                .and_then(|h| h.strip_prefix("Bearer "))
+                .map(|s| s.to_owned())
+        });
+    let token = match token {
+        Some(t) if !t.is_empty() => t,
+        _ => return StatusCode::UNAUTHORIZED.into_response(),
     };
 
     let token_parts: Vec<&str> = token.split('.').collect();
@@ -324,7 +338,7 @@ async fn surreal_jwt(State(state): State<AppState>, request: Request, next: Next
         return StatusCode::UNAUTHORIZED.into_response();
     }
 
-    let jwt = Jwt::from(token);
+    let jwt = Jwt::from(token.as_str());
     // Hold `auth_lock` across both `authenticate` AND the downstream
     // handler so no other authenticated request can mutate the shared
     // SurrealDB connection's session mid-query. Without this, concurrent

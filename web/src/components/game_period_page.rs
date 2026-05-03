@@ -9,16 +9,14 @@ use crate::components::filter_chips::FilterChips;
 use crate::components::timeline::{PeriodFilters, Timeline};
 use crate::env::APP_API_HOST;
 use crate::hooks::use_timeline_summary::use_timeline_summary;
-use crate::storage::{AppState, use_persistent};
+use crate::http::WithCredentials;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use reqwest::StatusCode;
 use shared::messages::{GameMessage, Phase};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub(crate) struct DayLogQ {
-    pub token: String,
-}
+pub(crate) struct DayLogQ;
 
 impl QueryCapability for DayLogQ {
     type Ok = Vec<GameMessage>;
@@ -30,7 +28,7 @@ impl QueryCapability for DayLogQ {
         let url = format!("{APP_API_HOST}/api/games/{id}/log/{day}");
         let resp = reqwest::Client::new()
             .get(&url)
-            .bearer_auth(&self.token)
+            .with_credentials()
             .send()
             .await;
         match resp {
@@ -53,10 +51,7 @@ pub fn GamePeriodPage(identifier: String, day: u32, phase: Phase) -> Element {
     let filters: Signal<PeriodFilters> = use_context();
     let filter = filters.read().filter_for(&identifier);
 
-    let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.unwrap_or_default();
-
-    let summary_q = use_timeline_summary(identifier.clone(), token.clone());
+    let summary_q = use_timeline_summary(identifier.clone());
 
     let valid = {
         let reader = summary_q.read();
@@ -79,12 +74,7 @@ pub fn GamePeriodPage(identifier: String, day: u32, phase: Phase) -> Element {
         };
     }
 
-    let log_q = use_query(Query::new(
-        (identifier.clone(), day),
-        DayLogQ {
-            token: token.clone(),
-        },
-    ));
+    let log_q = use_query(Query::new((identifier.clone(), day), DayLogQ));
     let reader = log_q.read();
     let state = reader.state();
 

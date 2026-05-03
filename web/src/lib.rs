@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-pub mod auth;
 mod cache;
 pub mod components;
 pub(crate) mod env;
 pub mod hooks;
+pub mod http;
 mod routes;
 mod storage;
 

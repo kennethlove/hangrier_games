@@ -4,8 +4,8 @@ use crate::components::icons::eye_closed::EyeClosedIcon;
 use crate::components::icons::eye_open::EyeOpenIcon;
 use crate::components::{Button, CreateGameButton, CreateGameForm, DeleteGameModal, GameDelete};
 use crate::env::APP_API_HOST;
+use crate::http::WithCredentials;
 use crate::routes::Routes;
-use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -18,9 +18,7 @@ pub struct PaginatedGamesResponse {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub(crate) struct GamesListQ {
-    pub token: String,
-}
+pub(crate) struct GamesListQ;
 
 impl QueryCapability for GamesListQ {
     type Ok = PaginatedGamesResponse;
@@ -34,7 +32,7 @@ impl QueryCapability for GamesListQ {
                 reqwest::Method::GET,
                 format!("{}/api/games?limit=20&offset=0", APP_API_HOST),
             )
-            .bearer_auth(&self.token);
+            .with_credentials();
 
         match request.send().await {
             Ok(response) => match response.json::<PaginatedGamesResponse>().await {
@@ -58,9 +56,7 @@ fn NoGames() -> Element {
 
 #[component]
 pub fn GamesList() -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.unwrap_or_default();
-    let games_query = use_query(Query::new((), GamesListQ { token }));
+    let games_query = use_query(Query::new((), GamesListQ));
 
     let reader = games_query.read();
     let body = match &*reader.state() {

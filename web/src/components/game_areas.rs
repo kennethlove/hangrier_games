@@ -4,16 +4,14 @@ use crate::components::icons::lock_open::LockOpenIcon;
 use crate::components::item_icon::ItemIcon;
 use crate::components::map::Map;
 use crate::env::APP_API_HOST;
-use crate::storage::{AppState, use_persistent};
+use crate::http::WithCredentials;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::areas::AreaDetails;
 use shared::DisplayGame;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub(crate) struct GameAreasQ {
-    pub token: String,
-}
+pub(crate) struct GameAreasQ;
 
 impl QueryCapability for GameAreasQ {
     type Ok = Vec<AreaDetails>;
@@ -27,7 +25,7 @@ impl QueryCapability for GameAreasQ {
                 reqwest::Method::GET,
                 format!("{}/api/games/{}/areas", APP_API_HOST, identifier),
             )
-            .bearer_auth(&self.token);
+            .with_credentials();
         match request.send().await {
             Ok(response) => match response.json::<Vec<AreaDetails>>().await {
                 Ok(areas) => Ok(areas),
@@ -40,12 +38,9 @@ impl QueryCapability for GameAreasQ {
 
 #[component]
 pub fn GameAreaList(game: DisplayGame) -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.unwrap_or_default();
-
     let identifier = game.identifier.clone();
 
-    let area_query = use_query(Query::new(identifier.clone(), GameAreasQ { token }));
+    let area_query = use_query(Query::new(identifier.clone(), GameAreasQ));
     let reader = area_query.read();
     let state = reader.state();
 

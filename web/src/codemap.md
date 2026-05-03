@@ -24,7 +24,7 @@ The `web/src/` directory implements the **Dioxus WebAssembly frontend** for Hang
 4. **Components** (`components/`): UI components using RSX (JSX-like syntax)
 5. **State Management**: Three-tier system:
    - **Context providers**: Global signals (theme, loading state, modal triggers)
-   - **Persistent storage**: LocalStorage hook (`use_persistent`) for JWT, theme, username
+   - **Persistent storage**: LocalStorage hook (`use_persistent`) for theme + username (auth lives in HttpOnly cookies set by API)
    - **Query client**: dioxus-query for API data fetching/caching/mutations
 
 ### Key Patterns
@@ -48,7 +48,7 @@ The `web/src/` directory implements the **Dioxus WebAssembly frontend** for Hang
 **Persistent Storage**:
 - `use_persistent("key", default)` hook wraps `Signal<T>` with LocalStorage sync
 - Auto-saves on `.set()`, auto-loads on init
-- Used for JWT auth token, username, theme preference
+- Used for username (display only) and theme preference; the JWT session lives in an HttpOnly `hg_session` cookie
 
 ### Build System
 
@@ -70,14 +70,14 @@ The `web/src/` directory implements the **Dioxus WebAssembly frontend** for Hang
 
 1. **Component mounts** → calls `use_get_query([QueryKey::SomeKey], fetch_fn)`
 2. **Query client checks cache** → if miss/stale, calls `fetch_fn`
-3. **Fetch function** → makes HTTP request to API (with JWT auth), returns `QueryResult<QueryValue, QueryError>`
+3. **Fetch function** → makes HTTP request to API with `WithCredentials` (browser attaches `hg_session` cookie), returns `QueryResult<QueryValue, QueryError>`
 4. **Component re-renders** → pattern matches on `QueryState::Loading | Settled(Ok/Err)` to render UI
 5. **Cache updated** → subsequent reads from same key hit cache
 
 ### Data Write Flow (Mutations)
 
 1. **User action** (e.g., "Create Game" button) → calls `mutation.action(data)`
-2. **Mutation function** → makes HTTP POST/PATCH/DELETE to API (with JWT auth)
+2. **Mutation function** → makes HTTP POST/PATCH/DELETE to API (cookies attached via `with_credentials()`)
 3. **Response handled** → returns `MutationResult<MutationValue, MutationError>`
 4. **On success** → component invalidates related queries (e.g., `query_client.invalidate_query([QueryKey::AllGames])`)
 5. **Query refetch** → cache cleared, components re-fetch fresh data
@@ -85,10 +85,10 @@ The `web/src/` directory implements the **Dioxus WebAssembly frontend** for Hang
 ### Auth Flow
 
 1. **User logs in** → `authenticate_user` mutation hits `/api/users/authenticate`
-2. **JWT received** → stored via `use_persistent("hangry-games", AppState::default)`
-3. **LocalStorage sync** → JWT persists across page reloads
-4. **API calls** → JWT passed as Bearer token in `Authorization` header
-5. **Logout** → clear JWT from storage, redirect to `/account`
+2. **API sets cookies** → `hg_session` (HttpOnly, 1h) + `hg_refresh` (HttpOnly, 7d, Path=/api/auth)
+3. **Username persisted** locally for nav rendering only; cookies are invisible to JS
+4. **API calls** → browser attaches `hg_session` automatically when request uses `with_credentials()`
+5. **Logout** → POST `/api/auth/logout` with credentials; API clears both cookies, web clears `username`
 
 ### Theme Switching
 
@@ -127,7 +127,7 @@ The `web/src/` directory implements the **Dioxus WebAssembly frontend** for Hang
 - `POST /api/users/authenticate` → login
 - `GET /api/version` → server version
 
-**Auth**: All requests (except `/api/users/*`) require JWT Bearer token from `AppState.jwt`
+**Auth**: All protected requests carry the `hg_session` cookie automatically (set when calling `.with_credentials()`); `Authorization: Bearer` is still accepted for non-browser clients
 
 ### Shared Types (`shared` crate)
 
@@ -153,7 +153,7 @@ The `web/src/` directory implements the **Dioxus WebAssembly frontend** for Hang
 
 ### Browser APIs (via `gloo-storage`)
 
-- **LocalStorage**: Persist JWT, theme, username across sessions
+- **LocalStorage**: Persist theme + username (display) across sessions; auth tokens live in HttpOnly cookies
 - **Wrappers**: `use_persistent` hook abstracts `LocalStorage::get/set`
 
 ### Asset Pipeline
@@ -224,7 +224,6 @@ src/
 
 **Utilities**:
 - `chrono` 0.4.41 (dates/times)
-- `jwt-rustcrypto` 0.2.1 (JWT decoding)
 - `dioxus-logger` 0.6.2 (logging)
 
 **Build**:

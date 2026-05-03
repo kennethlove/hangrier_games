@@ -1,4 +1,3 @@
-use crate::auth::maybe_refresh_token;
 use crate::components::icons::mockingjay::Mockingjay;
 use crate::components::icons::mockingjay_arrow::MockingjayArrow;
 use crate::components::icons::mockingjay_flight::MockingjayFlight;
@@ -11,15 +10,6 @@ pub fn Navbar() -> Element {
     let mut storage = use_persistent("hangry-games", AppState::default);
     let mut theme_signal: Signal<Colorscheme> = use_context();
     use_context_provider(|| Signal::new(crate::components::timeline::PeriodFilters::default()));
-
-    // Best-effort token rotation: if the access token is near expiry and we
-    // have a refresh token, swap to a fresh pair before any protected route
-    // render reads `storage.get().jwt`. Failures clear the session in place.
-    if storage.get().jwt.is_some() {
-        use_future(move || async move {
-            let _ = maybe_refresh_token(&mut storage).await;
-        });
-    }
 
     let link_theme = r#"
     theme1:hover:bg-amber-500
@@ -125,7 +115,7 @@ pub fn Navbar() -> Element {
                             "Home"
                         }
                     }
-                    if storage.get().jwt.is_some() {
+                    if storage.get().username.is_some() {
                         li {
                             class: "px-2",
                             Link {

@@ -3,7 +3,7 @@ use crate::cache::MutationError;
 use crate::components::games_list::GamesListQ;
 use crate::components::{Input, ThemedButton};
 use crate::env::APP_API_HOST;
-use crate::storage::{AppState, use_persistent};
+use crate::http::WithCredentials;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::games::Game;
@@ -15,11 +15,10 @@ pub(crate) struct CreateGameM;
 impl MutationCapability for CreateGameM {
     type Ok = Game;
     type Err = MutationError;
-    type Keys = (Option<String>, String);
+    type Keys = Option<String>;
 
     async fn run(&self, args: &Self::Keys) -> Result<Game, MutationError> {
-        let name = args.0.clone();
-        let token = args.1.clone();
+        let name = args.clone();
         let client = reqwest::Client::new();
         let json_body = CreateGame {
             name,
@@ -30,7 +29,7 @@ impl MutationCapability for CreateGameM {
 
         let response = client
             .request(reqwest::Method::POST, format!("{}/api/games", APP_API_HOST))
-            .bearer_auth(token)
+            .with_credentials()
             .json(&json_body);
 
         match response.send().await {
@@ -65,15 +64,13 @@ impl MutationCapability for CreateGameM {
 
 #[component]
 pub fn CreateGameButton() -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
     let mutate = use_mutation(Mutation::new(CreateGameM));
     let mut loading_signal = use_context::<Signal<LoadingState>>();
 
     let onclick = move |_| {
         loading_signal.set(LoadingState::Loading);
-        let token = storage.get().jwt.unwrap_or_default();
         spawn(async move {
-            let _ = mutate.mutate_async((None, token)).await;
+            let _ = mutate.mutate_async(None).await;
             loading_signal.set(LoadingState::Loaded);
         });
     };
@@ -88,14 +85,11 @@ pub fn CreateGameButton() -> Element {
 
 #[component]
 pub fn CreateGameForm() -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-
     let mut game_name_signal: Signal<String> = use_signal(String::default);
     let mutate = use_mutation(Mutation::new(CreateGameM));
     let mut loading_signal = use_context::<Signal<LoadingState>>();
 
     let onsubmit = move |_| {
-        let token = storage.get().jwt.unwrap_or_default();
         let name = game_name_signal.peek().clone();
         if name.is_empty() {
             return;
@@ -103,7 +97,7 @@ pub fn CreateGameForm() -> Element {
         loading_signal.set(LoadingState::Loading);
 
         spawn(async move {
-            let reader = mutate.mutate_async((Some(name), token)).await;
+            let reader = mutate.mutate_async(Some(name)).await;
             if reader.state().is_ok() {
                 game_name_signal.set(String::default());
             }

@@ -1,6 +1,7 @@
 use crate::cache::MutationError;
 use crate::components::{Input, ThemedButton};
 use crate::env::APP_API_HOST;
+use crate::http::WithCredentials;
 use crate::routes::Routes;
 use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
@@ -25,6 +26,7 @@ impl MutationCapability for RegisterUserM {
 
         match client
             .post(format!("{}/api/users", APP_API_HOST))
+            .with_credentials()
             .json(&json_body)
             .send()
             .await
@@ -71,6 +73,7 @@ impl MutationCapability for LoginUserM {
 
         match client
             .post(format!("{}/api/users/authenticate", APP_API_HOST))
+            .with_credentials()
             .json(&json_body)
             .send()
             .await
@@ -102,7 +105,7 @@ pub fn AccountsPage() -> Element {
     let storage = use_persistent("hangry-games", AppState::default);
 
     rsx! {
-        if storage.get().jwt.is_some() {
+        if storage.get().username.is_some() {
             LogoutButton {}
         } else {
             div {
@@ -189,7 +192,7 @@ fn LoginForm() -> Element {
                             let reader = mutate.mutate_async(user).await;
                             let state = reader.state();
                             match &*state {
-                                MutationStateData::Settled { res: Ok(user), .. } => {
+                                MutationStateData::Settled { res: Ok(_user), .. } => {
                                     disabled_signal.set(false);
                                     username_signal.set(String::default());
                                     password_signal.set(String::default());
@@ -197,8 +200,6 @@ fn LoginForm() -> Element {
                                     username_error_signal.set(String::default());
 
                                     let mut state = storage.get();
-                                    state.jwt = Some(user.jwt.clone());
-                                    state.refresh_token = user.refresh_token.clone();
                                     state.username = Some(username.clone());
                                     storage.set(state);
 
@@ -343,7 +344,7 @@ fn RegisterForm() -> Element {
                             let reader = mutate.mutate_async(user).await;
                             let state = reader.state();
                             match &*state {
-                                MutationStateData::Settled { res: Ok(user), .. } => {
+                                MutationStateData::Settled { res: Ok(_user), .. } => {
                                     disabled_signal.set(false);
                                     username_signal.set(String::default());
                                     password_signal.set(String::default());
@@ -352,8 +353,6 @@ fn RegisterForm() -> Element {
                                     username_error_signal.set(String::default());
 
                                     let mut state = storage.get();
-                                    state.jwt = Some(user.jwt.clone());
-                                    state.refresh_token = user.refresh_token.clone();
                                     state.username = Some(username.clone());
                                     storage.set(state);
 
@@ -457,22 +456,17 @@ fn LogoutButton() -> Element {
             class: "flex flex-col gap-4 mt-4",
             onsubmit: move |evt: FormEvent| {
                 evt.prevent_default();
-                let prior_refresh = storage.get().refresh_token.clone();
                 let mut state = storage.get();
                 state.username = None;
-                state.jwt = None;
-                state.refresh_token = None;
                 storage.set(state);
 
-                if let Some(token) = prior_refresh {
-                    spawn(async move {
-                        let _ = reqwest::Client::new()
-                            .post(format!("{}/api/auth/logout", APP_API_HOST))
-                            .json(&serde_json::json!({ "refresh_token": token }))
-                            .send()
-                            .await;
-                    });
-                }
+                spawn(async move {
+                    let _ = reqwest::Client::new()
+                        .post(format!("{}/api/auth/logout", APP_API_HOST))
+                        .with_credentials()
+                        .send()
+                        .await;
+                });
 
                 navigator.replace(Routes::Home {});
             },

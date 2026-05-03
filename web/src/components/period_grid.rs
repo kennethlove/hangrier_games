@@ -7,7 +7,6 @@ use crate::cache::QueryError;
 use crate::components::period_card::PeriodCard;
 use crate::components::period_grid_empty::{EmptyKind, PeriodGridEmpty};
 use crate::hooks::use_timeline_summary;
-use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 
@@ -18,9 +17,7 @@ pub struct PeriodGridProps {
 
 #[component]
 pub fn PeriodGrid(props: PeriodGridProps) -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.unwrap_or_default();
-    let query = use_timeline_summary(props.game_identifier.clone(), token);
+    let query = use_timeline_summary(props.game_identifier.clone());
     let reader = query.read();
     let state = reader.state();
     match &*state {

@@ -5,8 +5,8 @@ use crate::components::info_detail::InfoDetail;
 use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_status_icon::TributeStatusIcon;
 use crate::env::APP_API_HOST;
+use crate::http::WithCredentials;
 use crate::routes::Routes;
-use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::messages::GameMessage;
@@ -15,9 +15,7 @@ use game::tributes::traits::Trait;
 use game::tributes::{Attributes, Tribute};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub(crate) struct TributeQ {
-    pub token: String,
-}
+pub(crate) struct TributeQ;
 
 impl QueryCapability for TributeQ {
     type Ok = Box<Tribute>;
@@ -35,7 +33,7 @@ impl QueryCapability for TributeQ {
                     APP_API_HOST, game_identifier, tribute_identifier
                 ),
             )
-            .bearer_auth(&self.token);
+            .with_credentials();
         match request.send().await {
             Ok(response) => {
                 if response.status().is_success() {
@@ -53,9 +51,7 @@ impl QueryCapability for TributeQ {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub(crate) struct TributeLogQ {
-    pub token: String,
-}
+pub(crate) struct TributeLogQ;
 
 impl QueryCapability for TributeLogQ {
     type Ok = Vec<GameMessage>;
@@ -73,7 +69,7 @@ impl QueryCapability for TributeLogQ {
                     APP_API_HOST, game_identifier, identifier
                 ),
             )
-            .bearer_auth(&self.token);
+            .with_credentials();
         match request.send().await {
             Ok(response) => match response.json::<Vec<GameMessage>>().await {
                 Ok(logs) => Ok(logs),
@@ -115,12 +111,9 @@ pub(crate) fn trait_chip_classes(t: &Trait) -> &'static str {
 
 #[component]
 pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.unwrap_or_default();
-
     let tribute_query = use_query(Query::new(
         (game_identifier.clone(), tribute_identifier.clone()),
-        TributeQ { token },
+        TributeQ,
     ));
     let reader = tribute_query.read();
     let state = reader.state();
@@ -305,12 +298,9 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
 
 #[component]
 fn TributeLog(game_identifier: String, identifier: String) -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.unwrap_or_default();
-
     let log_query = use_query(Query::new(
         (game_identifier.clone(), identifier.clone()),
-        TributeLogQ { token },
+        TributeLogQ,
     ));
     let reader = log_query.read();
     let state = reader.state();
@@ -407,10 +397,7 @@ fn TributeAllies(game_identifier: String, ally_ids: Vec<uuid::Uuid>) -> Element 
         };
     }
 
-    let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.unwrap_or_default();
-
-    let roster_query = use_query(Query::new(game_identifier.clone(), GameTributesQ { token }));
+    let roster_query = use_query(Query::new(game_identifier.clone(), GameTributesQ));
     let reader = roster_query.read();
     let state = reader.state();
 

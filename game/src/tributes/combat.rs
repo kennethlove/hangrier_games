@@ -85,7 +85,7 @@ impl Tribute {
             self.takes_physical_damage(damage);
             // Capture violence-stress events as standalone (self-harm is not an engagement).
             let mut stress_events: Vec<TaggedEvent> = Vec::new();
-            self.apply_violence_stress(&mut stress_events);
+            let stress_damage = self.apply_violence_stress(&mut stress_events);
             events.extend(stress_events);
 
             return if self.attributes.health > 0 {
@@ -98,7 +98,11 @@ impl Tribute {
                         hp_lost: damage,
                     },
                 ));
-                let beat = new_beat(self, target, SwingOutcome::SelfAttackWound { damage });
+                let mut beat = new_beat(self, target, SwingOutcome::SelfAttackWound { damage });
+                beat.stress.stress_damage = stress_damage;
+                if stress_damage > 0 {
+                    beat.stress.stressed = Some(tref(self));
+                }
                 events.push(TaggedEvent::new(
                     String::new(),
                     MessagePayload::CombatSwing(beat),
@@ -114,7 +118,11 @@ impl Tribute {
                         cause: "suicide".into(),
                     },
                 ));
-                let beat = new_beat(self, target, SwingOutcome::Suicide { damage });
+                let mut beat = new_beat(self, target, SwingOutcome::Suicide { damage });
+                beat.stress.stress_damage = stress_damage;
+                if stress_damage > 0 {
+                    beat.stress.stressed = Some(tref(self));
+                }
                 events.push(TaggedEvent::new(
                     String::new(),
                     MessagePayload::CombatSwing(beat),
@@ -152,15 +160,27 @@ impl Tribute {
         let contest = attack_contest(self, target, rng, &mut sub_events);
         let result = contest.result;
         let wear_records = contest.wear;
-        let mk_beat = |outcome: SwingOutcome| CombatBeat {
-            attacker: attacker_ref_at_start.clone(),
-            target: target_ref_at_start.clone(),
-            weapon: weapon_at_start.clone(),
-            shield: shield_at_start.clone(),
-            wear: wear_records.clone(),
-            outcome,
-            stress: StressReport::default(),
-        };
+        // Stress applied to the swing's winner via apply_violence_stress; set
+        // by each branch below before mk_beat is invoked. Initialised to 0
+        // because Miss / fumble paths never apply stress.
+        #[allow(unused_assignments)]
+        let mut stress_damage: u32 = 0;
+        // Tracks which combatant absorbed the stress so the horrified line
+        // renders with the correct name. None = no horrified line.
+        let mut stressed: Option<TributeRef> = None;
+        let mk_beat =
+            |outcome: SwingOutcome, stress_damage: u32, stressed: Option<TributeRef>| CombatBeat {
+                attacker: attacker_ref_at_start.clone(),
+                target: target_ref_at_start.clone(),
+                weapon: weapon_at_start.clone(),
+                shield: shield_at_start.clone(),
+                wear: wear_records.clone(),
+                outcome,
+                stress: StressReport {
+                    stress_damage,
+                    stressed,
+                },
+            };
         for ev in sub_events.drain(..) {
             detail_lines.push(ev.content);
         }
@@ -172,13 +192,16 @@ impl Tribute {
                     GameOutput::TributeCriticalHit(tribute_name.as_str(), target_name.as_str())
                         .to_string(),
                 );
-                apply_combat_results(
+                stress_damage = apply_combat_results(
                     self,
                     target,
                     self.attributes.strength * 3, // triple damage
                     GameOutput::TributeAttackWin(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                 );
+                if stress_damage > 0 {
+                    stressed = Some(tref(self));
+                }
                 for ev in sub_events.drain(..) {
                     detail_lines.push(ev.content);
                 }
@@ -207,7 +230,7 @@ impl Tribute {
                             cause: "critical_fumble".into(),
                         },
                     ));
-                    let beat = mk_beat(SwingOutcome::FumbleDeath { self_damage: 5 });
+                    let beat = mk_beat(SwingOutcome::FumbleDeath { self_damage: 5 }, 0, None);
                     events.push(TaggedEvent::new(
                         String::new(),
                         MessagePayload::CombatSwing(beat),
@@ -223,7 +246,7 @@ impl Tribute {
                         hp_lost: 5,
                     },
                 ));
-                let beat = mk_beat(SwingOutcome::FumbleSurvive { self_damage: 5 });
+                let beat = mk_beat(SwingOutcome::FumbleSurvive { self_damage: 5 }, 0, None);
                 events.push(TaggedEvent::new(
                     String::new(),
                     MessagePayload::CombatSwing(beat),
@@ -236,61 +259,76 @@ impl Tribute {
                     GameOutput::TributePerfectBlock(target_name.as_str(), tribute_name.as_str())
                         .to_string(),
                 );
-                apply_combat_results(
+                stress_damage = apply_combat_results(
                     target,
                     self,
                     target.attributes.strength * 2, // double damage counter
                     GameOutput::TributeAttackLose(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                 );
+                if stress_damage > 0 {
+                    stressed = Some(tref(target));
+                }
                 for ev in sub_events.drain(..) {
                     detail_lines.push(ev.content);
                 }
             }
             AttackResult::AttackerWins => {
-                apply_combat_results(
+                stress_damage = apply_combat_results(
                     self,
                     target,
                     self.attributes.strength,
                     GameOutput::TributeAttackWin(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                 );
+                if stress_damage > 0 {
+                    stressed = Some(tref(self));
+                }
                 for ev in sub_events.drain(..) {
                     detail_lines.push(ev.content);
                 }
             }
             AttackResult::AttackerWinsDecisively => {
-                apply_combat_results(
+                stress_damage = apply_combat_results(
                     self,
                     target,
                     self.attributes.strength * 2, // double damage
                     GameOutput::TributeAttackWinExtra(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                 );
+                if stress_damage > 0 {
+                    stressed = Some(tref(self));
+                }
                 for ev in sub_events.drain(..) {
                     detail_lines.push(ev.content);
                 }
             }
             AttackResult::DefenderWins => {
-                apply_combat_results(
+                stress_damage = apply_combat_results(
                     target,
                     self,
                     target.attributes.strength,
                     GameOutput::TributeAttackLose(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                 );
+                if stress_damage > 0 {
+                    stressed = Some(tref(target));
+                }
                 for ev in sub_events.drain(..) {
                     detail_lines.push(ev.content);
                 }
             }
             AttackResult::DefenderWinsDecisively => {
-                apply_combat_results(
+                stress_damage = apply_combat_results(
                     target,
                     self,
                     target.attributes.strength * 2, // double damage
                     GameOutput::TributeAttackLoseExtra(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                 );
+                if stress_damage > 0 {
+                    stressed = Some(tref(target));
+                }
                 for ev in sub_events.drain(..) {
                     detail_lines.push(ev.content);
                 }
@@ -315,7 +353,7 @@ impl Tribute {
                         detail_lines,
                     }),
                 ));
-                let beat = mk_beat(SwingOutcome::Miss);
+                let beat = mk_beat(SwingOutcome::Miss, 0, None);
                 events.push(TaggedEvent::new(
                     String::new(),
                     MessagePayload::CombatSwing(beat),
@@ -415,7 +453,7 @@ impl Tribute {
             // Miss already returned above.
             (AttackOutcome::Miss(_, _), _) => SwingOutcome::Miss,
         };
-        let beat = mk_beat(swing_outcome);
+        let beat = mk_beat(swing_outcome, stress_damage, stressed);
         events.push(TaggedEvent::new(
             String::new(),
             MessagePayload::CombatSwing(beat),
@@ -424,8 +462,13 @@ impl Tribute {
         attack_outcome
     }
 
-    /// Apply violence stress to tribute based on their combat history
-    pub(crate) fn apply_violence_stress(&mut self, events: &mut Vec<TaggedEvent>) {
+    /// Apply violence stress to tribute based on their combat history.
+    ///
+    /// Returns the amount of mental damage applied (0 if below threshold).
+    /// Callers thread this value into `CombatBeat.stress.stress_damage` so
+    /// the typed swing payload can reproduce the trailing horrified line
+    /// rendered in `CombatEngagement.detail_lines`.
+    pub(crate) fn apply_violence_stress(&mut self, events: &mut Vec<TaggedEvent>) -> u32 {
         let stress_damage = calculate_violence_stress(
             self.statistics.kills,
             self.statistics.wins,
@@ -443,6 +486,7 @@ impl Tribute {
             ));
             self.takes_mental_damage(stress_damage);
         }
+        stress_damage
     }
 }
 
@@ -728,17 +772,21 @@ pub fn attack_contest(
 
 /// Apply the results of a combat encounter.
 /// Adjust statistics and log the result.
+///
+/// Returns the stress damage applied to the winner via
+/// `apply_violence_stress` so the caller can populate
+/// `CombatBeat.stress.stress_damage` for the swing payload.
 pub(crate) fn apply_combat_results(
     winner: &mut Tribute,
     loser: &mut Tribute,
     damage_to_loser: u32,
     log_event: GameOutput,
     events: &mut Vec<TaggedEvent>,
-) {
+) -> u32 {
     loser.takes_physical_damage(damage_to_loser);
     loser.statistics.defeats += 1;
     winner.statistics.wins += 1;
-    winner.apply_violence_stress(events);
+    let stress_damage = winner.apply_violence_stress(events);
     let content = log_event.to_string();
     events.push(TaggedEvent::new(
         content,
@@ -748,6 +796,7 @@ pub(crate) fn apply_combat_results(
             hp_lost: damage_to_loser,
         },
     ));
+    stress_damage
 }
 
 /// Update statistics for a pair of tributes based on the attack result
@@ -1504,6 +1553,91 @@ mod tests {
             assert_eq!(
                 beat_wear_lines, detail_wear_lines,
                 "seed {seed}: wear lines from CombatBeat must match detail_lines"
+            );
+        }
+    }
+
+    /// A swing that wins (and therefore triggers `apply_violence_stress`) on
+    /// a tribute already credited with prior wins must record the resulting
+    /// stress on the swing's `CombatBeat.stress.stress_damage`.
+    #[test]
+    fn combat_swing_records_stress_damage() {
+        // Arrange: attacker has prior wins+kills so violence-stress is non-zero.
+        let mut attacker = Tribute::new("Atk".into(), None, None);
+        attacker.attributes.strength = 50;
+        attacker.statistics.wins = 5;
+        attacker.statistics.kills = 5;
+
+        let mut target = Tribute::new("Tgt".into(), None, None);
+        target.attributes.defense = 0;
+        target.attributes.health = 1;
+
+        let mut events: Vec<TaggedEvent> = Vec::new();
+        let mut rng = SmallRng::seed_from_u64(1);
+        let _ = attacker.attacks(&mut target, &mut rng, &mut events);
+
+        let beat = events
+            .iter()
+            .find_map(|e| match &e.payload {
+                MessagePayload::CombatSwing(b) => Some(b),
+                _ => None,
+            })
+            .expect("expected one CombatSwing emission");
+        assert!(
+            beat.stress.stress_damage > 0,
+            "expected non-zero stress on the beat; got {}",
+            beat.stress.stress_damage
+        );
+    }
+
+    /// Parity: the optional trailing horrified line that
+    /// `CombatBeatExt::to_log_lines` renders from `stress.stress_damage`
+    /// must match the horrified line that `apply_violence_stress` flattened
+    /// into `CombatEngagement.detail_lines`.
+    #[test]
+    fn combat_beat_stress_matches_engagement_horrified_line() {
+        use crate::tributes::combat_beat::CombatBeatExt;
+        for seed in 0..32u64 {
+            let mut attacker = Tribute::new(format!("Atk{seed}"), None, None);
+            attacker.attributes.strength = 50;
+            attacker.statistics.wins = 5;
+            attacker.statistics.kills = 5;
+
+            let mut target = Tribute::new(format!("Tgt{seed}"), None, None);
+            target.attributes.defense = 0;
+            target.attributes.health = 100;
+
+            let mut events: Vec<TaggedEvent> = Vec::new();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let _ = attacker.attacks(&mut target, &mut rng, &mut events);
+
+            let Some(detail_lines) = events.iter().find_map(|e| match &e.payload {
+                MessagePayload::Combat(eng) => Some(eng.detail_lines.clone()),
+                _ => None,
+            }) else {
+                continue;
+            };
+            let beat = events
+                .iter()
+                .find_map(|e| match &e.payload {
+                    MessagePayload::CombatSwing(b) => Some(b),
+                    _ => None,
+                })
+                .expect("expected one CombatSwing per attacks() call");
+
+            let beat_horrified: Vec<String> = beat
+                .to_log_lines()
+                .into_iter()
+                .filter(|s| s.contains("horrified"))
+                .collect();
+            let detail_horrified: Vec<String> = detail_lines
+                .into_iter()
+                .filter(|s| s.contains("horrified"))
+                .collect();
+
+            assert_eq!(
+                beat_horrified, detail_horrified,
+                "seed {seed}: horrified lines from CombatBeat must match detail_lines"
             );
         }
     }

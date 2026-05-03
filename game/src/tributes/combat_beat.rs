@@ -114,7 +114,16 @@ impl CombatBeatExt for CombatBeat {
 
         // 3. Optional trailing horrified line.
         if self.stress.stress_damage > 0 {
-            out.push(GameOutput::TributeHorrified(a, self.stress.stress_damage).to_string());
+            // Prefer the stressed tribute's name when threaded through; fall
+            // back to the attacker for legacy/default beats so older snapshots
+            // (e.g. tests that build beats without `stressed`) still render.
+            let name = self
+                .stress
+                .stressed
+                .as_ref()
+                .map(|t| t.name.as_str())
+                .unwrap_or(a);
+            out.push(GameOutput::TributeHorrified(name, self.stress.stress_damage).to_string());
         }
 
         out

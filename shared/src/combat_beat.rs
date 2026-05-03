@@ -60,11 +60,15 @@ pub enum SwingOutcome {
     Suicide { damage: u32 },
 }
 
-/// Stress damage applied to attacker after the swing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+/// Stress damage applied to one of the swing's combatants after resolution.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct StressReport {
     /// Mental damage applied via `apply_violence_stress`. 0 means no horrified line.
     pub stress_damage: u32,
+    /// Who took the stress (the swing's winner). `None` when `stress_damage`
+    /// is 0; `Some` whenever a horrified line should render.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stressed: Option<TributeRef>,
 }
 
 /// Full record of one swing.

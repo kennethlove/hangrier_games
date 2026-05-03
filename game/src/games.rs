@@ -121,6 +121,11 @@ pub struct Game {
     /// every phase boundary alongside `tick_counter`.
     #[serde(skip, default)]
     pub emit_index: u32,
+
+    /// Tunable combat & stamina knobs. See spec
+    /// `2026-05-03-stamina-combat-resource-design.md`.
+    #[serde(default)]
+    pub combat_tuning: crate::tributes::combat_tuning::CombatTuning,
 }
 
 fn default_phase() -> crate::messages::Phase {
@@ -158,6 +163,7 @@ impl Default for Game {
             tick_counter: TickCounter::default(),
             current_phase: crate::messages::Phase::Day,
             emit_index: 0,
+            combat_tuning: crate::tributes::combat_tuning::CombatTuning::default(),
         }
     }
 }
@@ -1547,6 +1553,7 @@ mod tests {
             tick_counter: TickCounter::default(),
             current_phase: crate::messages::Phase::Day,
             emit_index: 0,
+            combat_tuning: crate::tributes::combat_tuning::CombatTuning::default(),
         }
     }
 

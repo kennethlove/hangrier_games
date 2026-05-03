@@ -3,6 +3,7 @@ pub mod alliances;
 pub mod brains;
 pub mod combat;
 pub mod combat_beat;
+pub mod combat_tuning;
 pub mod events;
 pub mod inventory;
 pub mod lifecycle;

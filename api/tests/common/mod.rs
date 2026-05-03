@@ -87,6 +87,7 @@ impl TestDb {
             broadcaster: Arc::new(GameBroadcaster::default()),
             namespace: self.namespace.clone(),
             database: self.database.clone(),
+            auth_lock: Arc::new(tokio::sync::Mutex::new(())),
         }
     }
 

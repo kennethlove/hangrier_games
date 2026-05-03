@@ -25,6 +25,15 @@ pub struct AppState {
     pub broadcaster: Arc<websocket::GameBroadcaster>,
     pub namespace: String,
     pub database: String,
+    /// Serializes JWT authentication + downstream request handling on the
+    /// shared SurrealDB connection. `Surreal::authenticate` mutates
+    /// connection-level session state, so concurrent requests would
+    /// interleave and queries could observe a different user's `$auth`
+    /// (causing the user's own private games to vanish from
+    /// `fn::get_list_games` and similar). The lock is held across the
+    /// entire authenticated request so the auth context cannot change
+    /// until the response is built. See bd hangrier_games-c853.
+    pub auth_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 #[derive(Debug, Error)]

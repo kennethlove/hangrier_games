@@ -220,6 +220,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         broadcaster,
         namespace: surreal_namespace,
         database: surreal_database,
+        auth_lock: std::sync::Arc::new(tokio::sync::Mutex::new(())),
     };
 
     // Start cleanup scheduler for refresh tokens
@@ -324,6 +325,13 @@ async fn surreal_jwt(State(state): State<AppState>, request: Request, next: Next
     }
 
     let jwt = Jwt::from(token);
+    // Hold `auth_lock` across both `authenticate` AND the downstream
+    // handler so no other authenticated request can mutate the shared
+    // SurrealDB connection's session mid-query. Without this, concurrent
+    // requests interleave and `$auth.id` evaluates against the wrong
+    // user, hiding the caller's own private games from
+    // `fn::get_list_games`. See bd hangrier_games-c853.
+    let _auth_guard = state.auth_lock.lock().await;
     match state.db.authenticate(jwt).await {
         Ok(_) => next.run(request).await,
         Err(_) => StatusCode::UNAUTHORIZED.into_response(),

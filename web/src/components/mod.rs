@@ -58,5 +58,7 @@ mod tribute_detail;
 pub use tribute_detail::TributeDetail;
 mod server_version;
 mod tribute_edit;
+mod tribute_filter_chips;
+pub use tribute_filter_chips::TributeFilterChips;
 mod tribute_status_icon;
 pub use tribute_status_icon::TributeStatusIcon;

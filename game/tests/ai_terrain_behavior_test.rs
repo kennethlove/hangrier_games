@@ -8,7 +8,9 @@ use rstest::{fixture, rstest};
 
 #[fixture]
 fn small_rng() -> SmallRng {
-    SmallRng::from_rng(&mut rand::rng())
+    // Deterministic seed: behavioral tests assert on a narrow set of
+    // valid actions, so the RNG must be reproducible across CI runs.
+    SmallRng::seed_from_u64(0xA17EBA11)
 }
 
 #[fixture]

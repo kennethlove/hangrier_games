@@ -5,6 +5,7 @@
 //! phase, and renders [`FilterChips`] + [`Timeline`].
 
 use crate::cache::QueryError;
+use crate::components::TributeFilterChips;
 use crate::components::filter_chips::FilterChips;
 use crate::components::timeline::{PeriodFilters, Timeline};
 use crate::env::APP_API_HOST;
@@ -50,6 +51,7 @@ impl QueryCapability for DayLogQ {
 pub fn GamePeriodPage(identifier: String, day: u32, phase: Phase) -> Element {
     let filters: Signal<PeriodFilters> = use_context();
     let filter = filters.read().filter_for(&identifier);
+    let tribute_filter = filters.read().tribute_filter(&identifier);
 
     let summary_q = use_timeline_summary(identifier.clone());
 
@@ -82,6 +84,7 @@ pub fn GamePeriodPage(identifier: String, day: u32, phase: Phase) -> Element {
         div { class: "space-y-4",
             h1 { class: "text-2xl font-semibold", "Day {day} — {phase}" }
             FilterChips { game_identifier: identifier.clone() }
+            TributeFilterChips { game_identifier: identifier.clone() }
             match &*state {
                 QueryStateData::Settled { res: Ok(msgs), .. } => {
                     let filtered: Vec<GameMessage> = msgs
@@ -94,6 +97,7 @@ pub fn GamePeriodPage(identifier: String, day: u32, phase: Phase) -> Element {
                             game_identifier: identifier.clone(),
                             messages: filtered,
                             filter,
+                            tribute_filter: tribute_filter.clone(),
                         }
                     }
                 }

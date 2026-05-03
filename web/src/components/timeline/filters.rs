@@ -27,6 +27,64 @@ impl FilterMode {
     pub fn is_all(&self) -> bool {
         matches!(self, FilterMode::All)
     }
+
+    /// Serialize to a stable, URL-safe slug list (e.g. `"combat,death"`) for
+    /// the `?filter=` query param. `FilterMode::All` (or any empty subset)
+    /// returns the empty string so the param can be elided in URLs.
+    pub fn to_query_value(&self) -> String {
+        match self {
+            FilterMode::All => String::new(),
+            FilterMode::Subset(set) => {
+                let mut slugs: Vec<&'static str> =
+                    set.iter().filter_map(|k| message_kind_slug(*k)).collect();
+                slugs.sort_unstable();
+                slugs.join(",")
+            }
+        }
+    }
+
+    /// Parse a `?filter=` query value back into a `FilterMode`. Empty string,
+    /// `"all"`, or only-unknown slugs all collapse to `FilterMode::All`.
+    pub fn from_query_value(raw: &str) -> Self {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("all") {
+            return FilterMode::All;
+        }
+        let set: HashSet<MessageKind> = trimmed
+            .split(',')
+            .filter_map(|s| message_kind_from_slug(s.trim()))
+            .collect();
+        if set.is_empty() {
+            FilterMode::All
+        } else {
+            FilterMode::Subset(set)
+        }
+    }
+}
+
+/// Stable URL slug for a `MessageKind` variant. `State` and `CombatSwing`
+/// are intentionally excluded: `State` always passes the filter regardless
+/// of selection, and `CombatSwing` rides with `Combat` (see `matches`).
+fn message_kind_slug(kind: MessageKind) -> Option<&'static str> {
+    Some(match kind {
+        MessageKind::Death => "death",
+        MessageKind::Combat => "combat",
+        MessageKind::Alliance => "alliance",
+        MessageKind::Movement => "movement",
+        MessageKind::Item => "item",
+        MessageKind::CombatSwing | MessageKind::State => return None,
+    })
+}
+
+fn message_kind_from_slug(slug: &str) -> Option<MessageKind> {
+    Some(match slug {
+        "death" => MessageKind::Death,
+        "combat" => MessageKind::Combat,
+        "alliance" => MessageKind::Alliance,
+        "movement" => MessageKind::Movement,
+        "item" => MessageKind::Item,
+        _ => return None,
+    })
 }
 
 #[derive(Clone, PartialEq, Default, Debug)]
@@ -151,5 +209,43 @@ mod tests {
     #[test]
     fn all_mode_matches_combat_swing() {
         assert!(FilterMode::All.matches(MessageKind::CombatSwing));
+    }
+
+    #[test]
+    fn query_value_roundtrips_subset() {
+        let mut s = HashSet::new();
+        s.insert(MessageKind::Combat);
+        s.insert(MessageKind::Death);
+        let mode = FilterMode::Subset(s);
+        // Sorted for stability: combat,death.
+        assert_eq!(mode.to_query_value(), "combat,death");
+        let parsed = FilterMode::from_query_value(&mode.to_query_value());
+        match parsed {
+            FilterMode::Subset(s) => {
+                assert!(s.contains(&MessageKind::Combat));
+                assert!(s.contains(&MessageKind::Death));
+                assert_eq!(s.len(), 2);
+            }
+            FilterMode::All => panic!("expected Subset"),
+        }
+    }
+
+    #[test]
+    fn query_value_all_is_empty_and_parses_back_to_all() {
+        assert_eq!(FilterMode::All.to_query_value(), "");
+        assert!(FilterMode::from_query_value("").is_all());
+        assert!(FilterMode::from_query_value("all").is_all());
+        // Unknown slugs collapse to All.
+        assert!(FilterMode::from_query_value("nonsense,bogus").is_all());
+    }
+
+    #[test]
+    fn query_value_skips_state_and_combat_swing() {
+        let mut s = HashSet::new();
+        s.insert(MessageKind::Combat);
+        s.insert(MessageKind::CombatSwing);
+        s.insert(MessageKind::State);
+        let mode = FilterMode::Subset(s);
+        assert_eq!(mode.to_query_value(), "combat");
     }
 }

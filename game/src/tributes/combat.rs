@@ -592,6 +592,17 @@ pub fn attack_contest(
     let base_attack_roll: i32 = rng.random_range(1..=20); // Base roll
     let mut attack_roll = base_attack_roll;
     attack_roll += attacker.attributes.strength as i32; // Add strength
+    {
+        use crate::tributes::stamina_band::stamina_band;
+        use shared::messages::StaminaBand;
+        let band = stamina_band(attacker.stamina, attacker.max_stamina, tuning);
+        let penalty = match band {
+            StaminaBand::Fresh => 0,
+            StaminaBand::Winded => tuning.winded_roll_penalty,
+            StaminaBand::Exhausted => tuning.exhausted_roll_penalty,
+        };
+        attack_roll += penalty;
+    }
 
     let mut wear: Vec<WearReport> = Vec::new();
 
@@ -678,6 +689,17 @@ pub fn attack_contest(
     let base_defense_roll: i32 = rng.random_range(1..=20); // Base roll
     let mut defense_roll = base_defense_roll;
     defense_roll += target.attributes.defense as i32; // Add defense
+    {
+        use crate::tributes::stamina_band::stamina_band;
+        use shared::messages::StaminaBand;
+        let band = stamina_band(target.stamina, target.max_stamina, tuning);
+        let penalty = match band {
+            StaminaBand::Fresh => 0,
+            StaminaBand::Winded => tuning.winded_roll_penalty,
+            StaminaBand::Exhausted => tuning.exhausted_roll_penalty,
+        };
+        defense_roll += penalty;
+    }
 
     // If the defender has a shield, use it
     let shield_outcome = if let Some(shield) = target.equipped_shield_mut() {
@@ -1103,6 +1125,36 @@ mod tests {
         let _ = attacker.attacks(&mut target, &mut small_rng, &mut Vec::new(), &tuning);
         assert_eq!(attacker.stamina, 0);
         assert_eq!(target.stamina, 0);
+    }
+
+    #[rstest]
+    fn attacker_winded_takes_attack_roll_penalty() {
+        // With identical seed, a Winded attacker should produce a different
+        // outcome from a Fresh attacker because of the band penalty alone.
+        let tuning = CombatTuning::default();
+        let mut a_fresh = Tribute::new("AF".to_string(), None, None);
+        a_fresh.stamina = 100;
+        a_fresh.max_stamina = 100;
+        let mut a_winded = Tribute::new("AW".to_string(), None, None);
+        a_winded.stamina = 70; // post-cost: 45 → Winded
+        a_winded.max_stamina = 100;
+        let mut t1 = Tribute::new("T1".to_string(), None, None);
+        t1.stamina = 100;
+        t1.max_stamina = 100;
+        let mut t2 = Tribute::new("T2".to_string(), None, None);
+        t2.stamina = 100;
+        t2.max_stamina = 100;
+
+        let mut rng_a = SmallRng::seed_from_u64(42);
+        let mut rng_b = SmallRng::seed_from_u64(42);
+        let out_a = a_fresh.attacks(&mut t1, &mut rng_a, &mut Vec::new(), &tuning);
+        let out_b = a_winded.attacks(&mut t2, &mut rng_b, &mut Vec::new(), &tuning);
+
+        // Different bands → different outcomes from same seed (or at minimum,
+        // different post-state). Use Tribute hp loss as the witness.
+        assert_ne!(t1.attributes.health, t2.attributes.health);
+        // Silence unused warnings.
+        let _ = (out_a, out_b);
     }
 
     #[rstest]

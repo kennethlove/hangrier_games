@@ -43,6 +43,8 @@ mod loading_modal;
 pub use loading_modal::LoadingModal;
 mod map;
 pub use map::Map;
+mod map_affordance_overlay;
+pub use map_affordance_overlay::MapAffordanceOverlay;
 pub mod modal;
 pub use modal::Modal;
 mod navbar;

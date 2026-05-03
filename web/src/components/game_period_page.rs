@@ -7,10 +7,11 @@
 use crate::cache::QueryError;
 use crate::components::TributeFilterChips;
 use crate::components::filter_chips::FilterChips;
-use crate::components::timeline::{PeriodFilters, Timeline};
+use crate::components::timeline::{FilterMode, PeriodFilters, Timeline};
 use crate::env::APP_API_HOST;
 use crate::hooks::use_timeline_summary::use_timeline_summary;
 use crate::http::WithCredentials;
+use crate::routes::Routes;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use reqwest::StatusCode;
@@ -48,10 +49,57 @@ impl QueryCapability for DayLogQ {
 }
 
 #[component]
-pub fn GamePeriodPage(identifier: String, day: u32, phase: Phase) -> Element {
-    let filters: Signal<PeriodFilters> = use_context();
-    let filter = filters.read().filter_for(&identifier);
+pub fn GamePeriodPage(
+    identifier: String,
+    day: u32,
+    phase: Phase,
+    filter: String,
+    tribute: String,
+) -> Element {
+    let mut filters: Signal<PeriodFilters> = use_context();
+
+    // One-shot URL → context seeding. If the URL carries `?filter=`/`?tribute=`,
+    // it wins over any persisted gloo-storage state on first render so that
+    // shared links land on exactly the slice they describe (hangrier_games-nil).
+    let seed_id = identifier.clone();
+    let seed_filter = filter.clone();
+    let seed_tribute = tribute.clone();
+    use_hook(move || {
+        let mut f = filters.write();
+        f.hydrate(&seed_id);
+        if !seed_filter.is_empty() {
+            f.set_filter(&seed_id, FilterMode::from_query_value(&seed_filter));
+        }
+        if !seed_tribute.is_empty() {
+            f.set_tribute_filter(&seed_id, Some(seed_tribute));
+        }
+    });
+
+    let filter_mode = filters.read().filter_for(&identifier);
     let tribute_filter = filters.read().tribute_filter(&identifier);
+
+    // context → URL: whenever the filter or tribute selection changes, replace
+    // the current history entry so the URL always reflects the visible slice.
+    {
+        let nav_id = identifier.clone();
+        let nav_filter = filter_mode.to_query_value();
+        let nav_tribute = tribute_filter.clone().unwrap_or_default();
+        let url_filter = filter.clone();
+        let url_tribute = tribute.clone();
+        let navigator = use_navigator();
+        use_effect(move || {
+            if nav_filter == url_filter && nav_tribute == url_tribute {
+                return;
+            }
+            navigator.replace(Routes::GamePeriodPage {
+                identifier: nav_id.clone(),
+                day,
+                phase,
+                filter: nav_filter.clone(),
+                tribute: nav_tribute.clone(),
+            });
+        });
+    }
 
     let summary_q = use_timeline_summary(identifier.clone());
 
@@ -96,7 +144,7 @@ pub fn GamePeriodPage(identifier: String, day: u32, phase: Phase) -> Element {
                         Timeline {
                             game_identifier: identifier.clone(),
                             messages: filtered,
-                            filter,
+                            filter: filter_mode.clone(),
                             tribute_filter: tribute_filter.clone(),
                         }
                     }

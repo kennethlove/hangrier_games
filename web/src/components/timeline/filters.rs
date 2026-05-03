@@ -13,7 +13,15 @@ impl FilterMode {
     pub fn matches(&self, kind: MessageKind) -> bool {
         match self {
             FilterMode::All => true,
-            FilterMode::Subset(set) => set.contains(&kind) || kind == MessageKind::State,
+            FilterMode::Subset(set) => {
+                // CombatSwing rides with Combat: the Combat chip toggles both
+                // so the engagement card and the typed swing card stay paired
+                // until consumers migrate off `CombatEngagement.detail_lines`.
+                if kind == MessageKind::CombatSwing {
+                    return set.contains(&MessageKind::Combat);
+                }
+                set.contains(&kind) || kind == MessageKind::State
+            }
         }
     }
     pub fn is_all(&self) -> bool {
@@ -112,5 +120,36 @@ impl From<SerializableFilter> for FilterMode {
         } else {
             FilterMode::All
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// CombatSwing rides with the Combat chip so the engagement card and
+    /// the typed swing card stay paired in the timeline.
+    #[test]
+    fn combat_chip_toggles_combat_swing_too() {
+        let mut set = HashSet::new();
+        set.insert(MessageKind::Combat);
+        let mode = FilterMode::Subset(set);
+        assert!(mode.matches(MessageKind::Combat));
+        assert!(mode.matches(MessageKind::CombatSwing));
+        assert!(!mode.matches(MessageKind::Death));
+    }
+
+    #[test]
+    fn combat_swing_hidden_when_combat_unselected() {
+        let mut set = HashSet::new();
+        set.insert(MessageKind::Death);
+        let mode = FilterMode::Subset(set);
+        assert!(!mode.matches(MessageKind::Combat));
+        assert!(!mode.matches(MessageKind::CombatSwing));
+    }
+
+    #[test]
+    fn all_mode_matches_combat_swing() {
+        assert!(FilterMode::All.matches(MessageKind::CombatSwing));
     }
 }

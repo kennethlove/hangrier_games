@@ -280,16 +280,174 @@ The `compute_hazard_weights` function and its underlying table.
 
 Add a `weather` field to whatever `DisplayArea` (or equivalent area DTO) the frontend consumes. New addition is non-breaking; existing API consumers ignore unknown fields.
 
-## Frontend Presentation (v1, Minimal)
+## Frontend Presentation
 
-The web frontend renders current weather per area as an icon with a tooltip:
+The weather UI lives at two scales: the **Map panel proper** (primary spatial reference) and the **HUD mini-map** (compressed echo). Both are designed against the spectator skin (see `2026-05-02-spectator-skin-layout-design.md` and `2026-05-02-spectator-skin-visuals-design.md`).
 
-- **Icon placement:** in the area card / area detail header, next to terrain or area name.
-- **Icon set:** one glyph per `Weather` variant (☀ Clear, ☁ Overcast, 🌫 Fog, 🌦 LightRain, 🌧 HeavyRain, ⛈ Storm, 🌨 LightSnow, ❄ HeavySnow, 🌪 Sandstorm). Final glyphs (emoji vs. inline SVG) decided during implementation; consistency with the existing icon system in `web/src/components/` takes priority.
-- **Tooltip on hover** shows the weather name, a one-line description, and the visible per-tribute consequences ("Heavy rain — exposed tributes lose 1 health/phase, visibility −3").
-- **No animated icons in v1.** Static glyph only; animated weather icons filed as future work.
-- **No forecast.** Per the design, only current weather is visible (re-confirmed here for the frontend).
-- **`WeatherChanged` events** render as event cards in the Timeline (handled by the progressive-display spec); the area icon updates via the standard query refetch / websocket plumbing.
+### Map panel substrate
+
+The Map panel renders the arena as a **schematic node graph of hexagons**. Each hex is one area; edges between hexes represent area adjacency. No imposed grid, no pseudo-geographic illustration — the substrate honors the underlying area-graph data model and reads as a Gamemaker's situation board.
+
+Why hexagons:
+- Geometric kinship with the medallion frame system from the visuals spec's iconography.
+- Clean Art Deco geometric construction.
+- Six neighbors per node maps cleanly to the area adjacency graph.
+
+The implementing instance picks the auto-layout strategy (force-directed, hand-tuned per arena, or hybrid) and the hex sizing rules.
+
+### Tribute avatars on hexes
+
+Each hex hosts a **honeycomb cluster** of tribute avatars representing the tributes currently in that area.
+
+**Avatar definition (v1):** geometric token. A small hexagonal token containing:
+- Tribute initials in chrome gold (numeric/display face).
+- District color as the token background or border.
+- District sigil tucked in a corner (per the accessibility triad).
+
+**Avatar slot is swappable.** The avatar component is designed as a slot that can be replaced later by:
+- Procedural / AI-generated portraits.
+- User-uploaded illustrative avatars.
+
+When portraits land, the surrounding cluster, hex, and overlay code is unchanged. Filed as future beads.
+
+**Cluster behavior:**
+- Honeycomb arrangement inside the hex, up to **6 visible avatars**.
+- 7th-or-greater tributes collapse the last slot into a **"+N"** chrome-gold neutral token (no district color, since composition is mixed) showing "+N" in the numeric face.
+- Click "+N" to expand into a popover or jump to the area's inspect view.
+
+**Tribute marker mode** (the "Tributes" overlay): avatars dominate; weather/event signals are de-emphasized to corner glyphs only, no interior tint.
+
+### Reciprocal Map ↔ Roster highlighting
+
+Hovering or focusing a Map avatar puts a chrome-gold ring around it AND scrolls/highlights the corresponding card in the Roster panel. The reverse also holds: hovering a Roster card highlights the avatar on the Map. The HUD ticker death entries get the same treatment when applicable.
+
+Each avatar carries an HTML `title` attribute with the tribute's name as an accessibility/fallback tooltip.
+
+### Three-layer hex rendering (weather, hazard, gamemaker event)
+
+A hex can simultaneously render up to three signals from the weather spec's three-layer architecture. Each layer uses a distinct palette role and frame variant from the visuals spec, making them unambiguous at a glance:
+
+| Layer | Color (palette role) | Frame variant | Position |
+| --- | --- | --- | --- |
+| **Weather (current variant)** | Chrome gold or muted-foreground (environmental, never district color) | Medallion | One corner |
+| **Natural hazard (active)** | Heraldic red (oxblood, dangerous-by-definition) | Medallion with emphasis (thicker border, optional subtle pulse) | Opposite corner |
+| **Gamemaker event (active)** | Chrome gold (Capitol-authored, "the show speaking") | Stepped border (distinct from weather's medallion) | Third corner or stacking rule |
+
+The frame distinction (medallion vs stepped) carries the *Capitol-authored vs environmental* semantic, reinforcing the visuals spec's iconography system.
+
+### Weather rendering on a hex
+
+Weather has two visual encodings on a hex:
+
+1. **Always-present corner glyph.** A substrate icon (per the B+ pipeline in the visuals spec) for the current weather variant, medallion-framed, in chrome gold or muted-foreground. Glyph carries unambiguous variant identity. Hoverable / focusable for the variant name + temperature + active hazards.
+
+2. **Conditional interior tint.** When the **"Weather" overlay is the active Map overlay**, the hex interior carries a low-saturation wash keyed to the variant (muted blue for rain variants, white-grey for snow, ochre for sandstorm, neutral for clear/overcast, semi-transparent grey for fog). The tint is suppressed in other overlay modes so it doesn't drown avatars.
+
+This composite respects the visuals spec's accessibility rule (color is never the sole signal — glyph + label always present) and resolves the substrate-vs-overlay tension cleanly via overlay-mode conditioning.
+
+### Weather variant glyph mapping
+
+The substrate icon system carries one glyph per variant:
+
+- Clear, Overcast, Fog, LightRain, HeavyRain, Storm, LightSnow, HeavySnow, Sandstorm.
+
+Glyphs are normalized through the substrate icon pipeline (single stroke weight, palette tokens, snapped to grid, named by role — `icon-weather-clear`, `icon-weather-storm`, etc.). They are never hardcoded as emoji.
+
+### Transition motion on weather change
+
+When weather changes (LightRain → HeavyRain, HeavySnow → Storm, etc.), the affected hex animates a brief **1–2s transition**:
+- Corner glyph swaps (cross-fade or slide).
+- Interior tint shifts to the new variant's tint (if weather overlay is active).
+
+This fits the visuals spec's "minimal and purposeful" motion budget — weather changes are events worth noticing. `prefers-reduced-motion: reduce` collapses the transition to an instant swap.
+
+### Hazard glyphs
+
+Active hazards (flood, wildfire, etc., per the hazard system section above) render as a heraldic-red medallion-with-emphasis glyph in the opposite corner from weather. The medallion's emphasis treatment (thicker border, optional subtle pulse) signals "this is dangerous, not just informational."
+
+Hazards are per-area, transition-aware, and may have multiple simultaneous instances. Multi-hazard rendering rule:
+
+- **Single hazard:** glyph in the dedicated hazard corner.
+- **Multiple hazards:** highest-priority hazard takes the corner; secondary hazards are surfaced via the hex's hover/inspect (no on-hex visual stacking — would compete with avatars).
+
+### Gamemaker event glyphs
+
+Active gamemaker events render as a chrome-gold stepped-frame glyph in a third hex corner (or, if a fourth corner is unavailable due to layout, replacing weather's corner — gamemaker-event presence implies "the show is talking about this area," which trumps ambient weather attention). The stepped frame distinguishes the layer at a glance from medallion-framed weather/hazards.
+
+Multi-event rule mirrors hazards: highest-priority event takes the slot; full list in hover/inspect.
+
+### Map panel header — overlay toggle
+
+The Map panel's header context strip carries an inline segmented control / tab group:
+
+- **Tributes** *(default on first load)*
+- **Weather**
+- **Events**
+- **All**
+
+The active overlay is highlighted; switching is one click. Overlay mode is persisted per-device per-panel alongside other panel state (per the layout spec). The panel menu hosts everything else (zoom, inspect drilldown).
+
+Overlay behavior summary:
+
+| Overlay | Avatars | Weather glyph | Weather tint | Hazard glyph | GM event glyph | Event density |
+| --- | --- | --- | --- | --- | --- | --- |
+| Tributes | Honeycomb | Corner glyph only | Suppressed | Corner glyph | Corner glyph | None |
+| Weather | De-emphasized | Corner glyph | Visible | Corner glyph | Corner glyph | None |
+| Events | De-emphasized | Corner glyph | Suppressed | Corner glyph | Corner glyph | Heatmap on hex fill |
+| All | Honeycomb | Corner glyph | Visible | Corner glyph | Corner glyph | Heatmap accent |
+
+"De-emphasized" avatars become small district-color dots in the cluster region rather than full tokens — area population is still visible but doesn't compete with the active overlay.
+
+### HUD mini-map
+
+The HUD's expanded info bar carries a mini-map (per the layout spec). At mini-map scale, hexes are too small for honeycomb avatars or per-hex glyphs. Compressed rules:
+
+- **Hexes are tiny** — single color fill only.
+- **Weather overlay:** hexes filled with the variant tint. Hover/tap a hex shows a tooltip with variant name + temperature + active hazards.
+- **Events overlay:** hex fill intensity encodes recent-event density (heatmap), with last-event icon on the highest-density hex if space permits.
+- **Both:** events as fill intensity, weather as a thin border tint per hex.
+- **Tribute count badge:** small numeric badge (count only, per the mini-map count-only decision) in hex center if any tributes present. Always visible regardless of overlay.
+
+The mini-map is intentionally lossy. Its job is "is anything *interesting* happening anywhere I should look at the main Map?" If yes, the user expands the panel or jumps to the main Map.
+
+### `WeatherChanged` events in the Action panel
+
+`WeatherChanged` and hazard-onset / hazard-end events render as event log lines in the Action panel (per `2026-05-02-progressive-display-design.md`). They use:
+
+- **Leading category dot:** chrome gold (environmental) or heraldic red (hazardous), matching the layer.
+- **Substrate weather/hazard icon** inline if the event is the dominant content (e.g. "A storm rolled into the Forest"). Otherwise plain prose.
+
+Sequential grouping per the visuals spec: multiple weather events for the same area within a short window can collapse under a single area-banner.
+
+### Accessibility
+
+Per the visuals spec rules:
+
+- Weather glyphs are paired with hoverable / focusable text labels (variant name, temperature, hazards). Color and tint are never sole signals.
+- Hazard glyphs are paired with the hazard name; heraldic red signals danger but never alone.
+- Gamemaker event glyphs are paired with descriptive text.
+- Avatar tokens carry initials + sigil + district number per the standard triad.
+- All hex hover/focus states have keyboard-navigable equivalents (tab order across hexes; arrow-key navigation between adjacent hexes is desirable).
+- Reduced-motion collapses weather transitions to instant.
+
+### Open implementation questions
+
+- Auto-layout strategy for the hex node graph (force-directed vs hand-tuned per arena vs hybrid).
+- Hex size at each breakpoint and the avatar honeycomb sizes inside.
+- Exact tint colors per weather variant (must satisfy WCAG contrast against avatars overlaid on top).
+- Whether to render the avatar slot as SVG inline or as a Dioxus component with conditional content.
+- Heatmap intensity scale for the Events overlay (linear vs logarithmic).
+- Whether Map ↔ Roster reciprocal highlighting uses scroll-into-view, a flash effect, or both.
+- Whether keyboard navigation between hexes follows the graph (next-neighbor) or a flat reading order.
+
+### Out of scope (filed or to be filed as beads)
+
+- Stylized pseudo-geographic substrate (replaces hex node graph as the visual base when arena-specific illustrations exist).
+- Tribute portrait avatars (procedural, AI-generated).
+- User-uploaded tribute avatars (auth, storage, moderation implications).
+- Animated weather glyphs (beyond transition swaps).
+- Forecasting UI.
+- Multi-arena map navigation (if multiple arenas per game ever lands).
 
 ## Integration Points
 

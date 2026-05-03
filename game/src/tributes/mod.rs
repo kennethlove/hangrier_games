@@ -8,6 +8,7 @@ pub mod events;
 pub mod inventory;
 pub mod lifecycle;
 pub mod movement;
+pub mod stamina_band;
 pub mod statuses;
 pub mod survival;
 pub mod traits;

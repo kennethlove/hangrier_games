@@ -127,6 +127,18 @@ pub enum MessageKind {
     State,
 }
 
+/// Visible fatigue band derived from a tribute's stamina/max_stamina ratio.
+/// Lives in `shared/` because it is wire-visible via
+/// `MessagePayload::StaminaBandChanged`. Mirror of the `HungerBand`/`ThirstBand`
+/// pattern (those live in `game::tributes::survival` because they are not
+/// directly serialised on the wire — band-changed events use `String`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum StaminaBand {
+    Fresh,
+    Winded,
+    Exhausted,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum MessagePayload {

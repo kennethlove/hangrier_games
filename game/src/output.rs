@@ -70,6 +70,10 @@ pub enum GameOutput<'a> {
     WeaponWear(&'a str, &'a str),
     ShieldBreak(&'a str, &'a str),
     ShieldWear(&'a str, &'a str),
+    /// Tribute name, weapon name, penalty (1..=4 absolute value).
+    WeaponShattersMidSwing(&'a str, &'a str, u32),
+    /// Tribute name, shield name, penalty (1..=4 absolute value).
+    ShieldShattersMidBlock(&'a str, &'a str, u32),
     SponsorGift(&'a str, &'a Item),
     AreaEvent(&'a str, &'a str),
     AreaClose(&'a str),
@@ -333,6 +337,20 @@ impl<'a> Display for GameOutput<'a> {
             }
             GameOutput::ShieldWear(tribute, shield) => {
                 write!(f, "🛡️ {}'s {} is showing signs of wear", tribute, shield)
+            }
+            GameOutput::WeaponShattersMidSwing(tribute, weapon, penalty) => {
+                write!(
+                    f,
+                    "🗡️ {}'s {} shatters mid-swing! (-{} attack)",
+                    tribute, weapon, penalty
+                )
+            }
+            GameOutput::ShieldShattersMidBlock(tribute, shield, penalty) => {
+                write!(
+                    f,
+                    "🛡️ {}'s {} shatters mid-block! (-{} defense)",
+                    tribute, shield, penalty
+                )
             }
             GameOutput::SponsorGift(tribute, item) => {
                 let object = indefinite(&item.name);

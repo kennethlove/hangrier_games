@@ -1,0 +1,10 @@
+---
+source: game/src/tributes/combat_beat.rs
+expression: lines
+---
+- 🗡️ Alice breaks their Iron Sword
+- "🗡️ Alice's Iron Sword shatters mid-swing! (-3 attack)"
+- 💥 Alice lands a CRITICAL HIT on Bob!
+- "🔪 Alice attacks Bob, and wins!"
+- 🤕 Alice wounds Bob
+- "😱 Alice is horrified by the violence, loses 4 sanity."

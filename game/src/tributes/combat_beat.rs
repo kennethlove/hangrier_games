@@ -433,5 +433,128 @@ mod tests {
             };
             b
         });
+
+        // --- Gap-coverage snapshots (hangrier_games-b84) ---
+
+        // `Pristine` wear must produce no extra lines (no-op branch).
+        snap!(wound_with_pristine_weapon_and_shield, {
+            let mut b = base_beat(SwingOutcome::Wound { damage: 5 });
+            b.wear.push(WearReport {
+                owner: t("Alice"),
+                item: sword(),
+                outcome: WearOutcomeReport::Pristine,
+                forfeited_effect: None,
+                mid_action_penalty: None,
+            });
+            b.wear.push(WearReport {
+                owner: t("Bob"),
+                item: shield(),
+                outcome: WearOutcomeReport::Pristine,
+                forfeited_effect: None,
+                mid_action_penalty: None,
+            });
+            b
+        });
+
+        // Both weapon and shield worn (not broken) in one beat.
+        snap!(wound_with_both_worn, {
+            let mut b = base_beat(SwingOutcome::Wound { damage: 6 });
+            b.wear.push(WearReport {
+                owner: t("Alice"),
+                item: sword(),
+                outcome: WearOutcomeReport::Worn,
+                forfeited_effect: None,
+                mid_action_penalty: None,
+            });
+            b.wear.push(WearReport {
+                owner: t("Bob"),
+                item: shield(),
+                outcome: WearOutcomeReport::Worn,
+                forfeited_effect: None,
+                mid_action_penalty: None,
+            });
+            b
+        });
+
+        // Stress with no `stressed` set falls back to the attacker name.
+        snap!(wound_with_stress_fallback_to_attacker, {
+            let mut b = base_beat(SwingOutcome::Wound { damage: 4 });
+            b.stress = StressReport {
+                stress_damage: 6,
+                stressed: None,
+            };
+            b
+        });
+
+        // Critical hit + weapon break with penalty + attacker stress.
+        snap!(critical_hit_with_weapon_break_and_stress, {
+            let mut b = base_beat(SwingOutcome::CriticalHitWound { damage: 18 });
+            b.wear.push(WearReport {
+                owner: t("Alice"),
+                item: sword(),
+                outcome: WearOutcomeReport::Broken,
+                forfeited_effect: Some(6),
+                mid_action_penalty: Some(3),
+            });
+            b.stress = StressReport {
+                stress_damage: 4,
+                stressed: Some(t("Alice")),
+            };
+            b
+        });
+
+        // BlockWound (counter) + shield break + penalty + defender stress.
+        snap!(block_wound_with_shield_break_and_stress, {
+            let mut b = base_beat(SwingOutcome::BlockWound { damage: 7 });
+            b.wear.push(WearReport {
+                owner: t("Bob"),
+                item: shield(),
+                outcome: WearOutcomeReport::Broken,
+                forfeited_effect: Some(4),
+                mid_action_penalty: Some(2),
+            });
+            b.stress = StressReport {
+                stress_damage: 5,
+                stressed: Some(t("Bob")),
+            };
+            b
+        });
+
+        // AttackerDied (PerfectBlock kill) with defender stress.
+        snap!(attacker_died_with_defender_stress, {
+            let mut b = base_beat(SwingOutcome::AttackerDied { damage: 10 });
+            b.stress = StressReport {
+                stress_damage: 9,
+                stressed: Some(t("Bob")),
+            };
+            b
+        });
+
+        // FumbleDeath + weapon break (rare but emittable: the swing breaks the
+        // weapon then the fumble kills the attacker).
+        snap!(fumble_death_with_weapon_break, {
+            let mut b = base_beat(SwingOutcome::FumbleDeath { self_damage: 8 });
+            b.wear.push(WearReport {
+                owner: t("Alice"),
+                item: sword(),
+                outcome: WearOutcomeReport::Broken,
+                forfeited_effect: Some(5),
+                mid_action_penalty: Some(2),
+            });
+            b
+        });
+
+        // SelfAttackWound with weapon worn (self-targeted swing still wears gear).
+        snap!(self_attack_wound_with_weapon_worn, {
+            let mut b = base_beat(SwingOutcome::SelfAttackWound { damage: 3 });
+            b.wear.push(WearReport {
+                owner: t("Alice"),
+                item: sword(),
+                outcome: WearOutcomeReport::Worn,
+                forfeited_effect: None,
+                mid_action_penalty: None,
+            });
+            b
+        });
     }
 }

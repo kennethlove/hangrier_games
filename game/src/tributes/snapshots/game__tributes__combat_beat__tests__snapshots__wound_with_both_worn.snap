@@ -1,0 +1,8 @@
+---
+source: game/src/tributes/combat_beat.rs
+expression: lines
+---
+- "🗡️ Alice's Iron Sword is showing signs of wear"
+- "🛡️ Bob's Iron Buckler is showing signs of wear"
+- "🔪 Alice attacks Bob, and wins!"
+- 🤕 Alice wounds Bob

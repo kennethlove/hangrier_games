@@ -1,0 +1,7 @@
+---
+source: game/src/tributes/combat_beat.rs
+expression: lines
+---
+- "🤣 Bob attacks Alice, but loses!"
+- ☠️ Alice is killed by Bob
+- "😱 Bob is horrified by the violence, loses 9 sanity."

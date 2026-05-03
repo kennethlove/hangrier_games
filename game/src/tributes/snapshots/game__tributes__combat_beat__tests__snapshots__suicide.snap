@@ -1,0 +1,7 @@
+---
+source: game/src/tributes/combat_beat.rs
+expression: lines
+---
+- 🤦 Alice tries to attack themself!
+- "🔪 Alice attacks Alice, and wins!"
+- 🪒 Alice attempts suicide.

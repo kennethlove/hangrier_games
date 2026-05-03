@@ -1,0 +1,10 @@
+---
+source: game/src/tributes/combat_beat.rs
+expression: lines
+---
+- 🗡️ Alice breaks their Iron Sword
+- "🗡️ Alice's Iron Sword shatters mid-swing! (-2 attack)"
+- 🛡️ Bob breaks their Iron Buckler
+- "🛡️ Bob's Iron Buckler shatters mid-block! (-1 defense)"
+- "🔪 Alice attacks Bob, and wins!"
+- 🤕 Alice wounds Bob

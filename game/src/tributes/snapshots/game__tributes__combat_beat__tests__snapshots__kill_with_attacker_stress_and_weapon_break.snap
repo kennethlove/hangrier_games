@@ -1,0 +1,9 @@
+---
+source: game/src/tributes/combat_beat.rs
+expression: lines
+---
+- 🗡️ Alice breaks their Iron Sword
+- "🗡️ Alice's Iron Sword shatters mid-swing! (-2 attack)"
+- "🔪 Alice attacks Bob, and wins!"
+- ☠️ Alice successfully kills Bob
+- "😱 Alice is horrified by the violence, loses 12 sanity."

@@ -1,0 +1,7 @@
+---
+source: game/src/tributes/combat_beat.rs
+expression: lines
+---
+- 💥 Alice lands a CRITICAL HIT on Bob!
+- "🔪 Alice attacks Bob, and wins!"
+- 🤕 Alice wounds Bob

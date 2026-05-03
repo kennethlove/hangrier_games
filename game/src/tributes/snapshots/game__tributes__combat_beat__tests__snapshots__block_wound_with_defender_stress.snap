@@ -1,0 +1,8 @@
+---
+source: game/src/tributes/combat_beat.rs
+expression: lines
+---
+- "🛡️ Bob perfectly blocks Alice's attack and counters!"
+- "🤣 Bob attacks Alice, but loses!"
+- 🤕 Alice wounds Bob
+- "😱 Bob is horrified by the violence, loses 5 sanity."

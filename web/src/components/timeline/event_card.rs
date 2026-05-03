@@ -48,6 +48,7 @@ pub fn EventCard(props: EventCardProps) -> Element {
                 message: props.message.clone(),
             } },
             MessageKind::State => rsx! { StateCard { message: props.message.clone() } },
+            MessageKind::CombatSwing => rsx! {},
         }
     }
 }

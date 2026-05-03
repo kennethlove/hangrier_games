@@ -3,6 +3,7 @@ use std::fmt::{Debug, Display};
 use std::str::FromStr;
 use validator::{Validate, ValidationError};
 
+pub mod combat_beat;
 pub mod messages;
 
 use crate::messages::TributeRef;

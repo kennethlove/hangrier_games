@@ -407,6 +407,10 @@ pub enum GameEvent {
         tribute_id: Uuid,
         tribute_name: String,
     },
+    /// One combat swing carrying the full typed beat.
+    CombatSwing {
+        beat: crate::tributes::combat_beat::CombatBeat,
+    },
 }
 
 impl Display for GameEvent {
@@ -932,6 +936,11 @@ impl Display for GameEvent {
                     "{} is shaken by their ally's death and breaks the bond.",
                     tribute_name
                 )
+            }
+            GameEvent::CombatSwing { beat } => {
+                use crate::tributes::combat_beat::CombatBeatExt;
+                let lines = beat.to_log_lines();
+                write!(f, "{}", lines.join(" "))
             }
         }
     }

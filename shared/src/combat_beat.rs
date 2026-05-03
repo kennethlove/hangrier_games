@@ -23,6 +23,12 @@ pub struct WearReport {
     pub owner: TributeRef,
     pub item: ItemRef,
     pub outcome: WearOutcomeReport,
+    /// Bonus this item *would* have contributed if it hadn't broken
+    /// during this contest. `None` when the item didn't break.
+    pub forfeited_effect: Option<i32>,
+    /// Random penalty applied because the item snapped mid-action.
+    /// `Some(1..=4)` when the break penalty fired, `None` otherwise.
+    pub mid_action_penalty: Option<i32>,
 }
 
 /// High-level outcome of one swing.
@@ -81,12 +87,32 @@ pub struct CombatBeat {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messages::ItemRef;
 
     fn t(name: &str) -> TributeRef {
         TributeRef {
             identifier: "id".into(),
             name: name.into(),
         }
+    }
+
+    #[test]
+    fn wear_report_roundtrips_with_break_penalty_fields() {
+        let report = WearReport {
+            owner: t("A"),
+            item: ItemRef {
+                identifier: "sword-1".into(),
+                name: "Iron Sword".into(),
+            },
+            outcome: WearOutcomeReport::Broken,
+            forfeited_effect: Some(3),
+            mid_action_penalty: Some(2),
+        };
+        let json = serde_json::to_string(&report).unwrap();
+        let back: WearReport = serde_json::from_str(&json).unwrap();
+        assert_eq!(report, back);
+        assert_eq!(back.forfeited_effect, Some(3));
+        assert_eq!(back.mid_action_penalty, Some(2));
     }
 
     #[test]

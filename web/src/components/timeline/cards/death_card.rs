@@ -36,7 +36,14 @@ pub fn DeathCard(props: DeathCardProps) -> Element {
                     }
                 }
             }
-            p { class: "text-xs text-gray-600", "{props.cause}" }
+            p { class: "text-xs {cause_class(&props.cause)}", "{props.cause}" }
         }
+    }
+}
+
+fn cause_class(cause: &str) -> &'static str {
+    match cause {
+        "starvation" | "dehydration" => "text-amber-600 theme2:text-amber-300 italic",
+        _ => "text-gray-600",
     }
 }

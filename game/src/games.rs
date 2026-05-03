@@ -977,6 +977,8 @@ impl Game {
             .map(|(area, tributes)| (*area, tributes.len() as u32))
             .collect();
 
+        let combat_tuning_snapshot = self.combat_tuning.clone();
+
         // Collected (actor_identifier, actor_name, content, payload, optional GameEvent)
         // tuples from all tributes this cycle. Drained into `self.messages` after
         // the mutable borrow of `self.tributes` ends.
@@ -1173,6 +1175,7 @@ impl Game {
                 all_areas: &all_areas_snapshot,
                 enemy_density: &enemy_density,
                 current_day: self.day.unwrap_or(1),
+                combat_tuning: &combat_tuning_snapshot,
             };
 
             // Get nearby tributes using the pre-computed map

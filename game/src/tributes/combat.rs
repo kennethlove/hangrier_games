@@ -17,14 +17,6 @@ use shared::combat_beat::{CombatBeat, StressReport, SwingOutcome};
 use shared::messages::ItemRef;
 use std::cmp::Ordering;
 
-/// Constants for combat calculations
-const DECISIVE_WIN_MULTIPLIER: f64 = 1.5;
-const BASE_STRESS_NO_ENGAGEMENTS: f64 = 20.0;
-const STRESS_SANITY_NORMALIZATION: f64 = 100.0;
-const STRESS_FINAL_DIVISOR: f64 = 2.0;
-const KILL_STRESS_CONTRIBUTION: f64 = 50.0;
-const NON_KILL_WIN_STRESS_CONTRIBUTION: f64 = 20.0;
-
 /// Build a `TributeRef` from a tribute.
 fn tref(t: &Tribute) -> TributeRef {
     TributeRef {
@@ -76,6 +68,7 @@ impl Tribute {
         target: &mut Tribute,
         rng: &mut impl Rng,
         events: &mut Vec<TaggedEvent>,
+        tuning: &crate::tributes::combat_tuning::CombatTuning,
     ) -> AttackOutcome {
         // Is the tribute attempting suicide?
         if self == target {
@@ -85,7 +78,7 @@ impl Tribute {
             self.takes_physical_damage(damage);
             // Capture violence-stress events as standalone (self-harm is not an engagement).
             let mut stress_events: Vec<TaggedEvent> = Vec::new();
-            let stress_damage = self.apply_violence_stress(&mut stress_events);
+            let stress_damage = self.apply_violence_stress(&mut stress_events, tuning);
             events.extend(stress_events);
 
             return if self.attributes.health > 0 {
@@ -157,7 +150,7 @@ impl Tribute {
         let mut sub_events: Vec<TaggedEvent> = Vec::new();
 
         // `self` is the attacker
-        let contest = attack_contest(self, target, rng, &mut sub_events);
+        let contest = attack_contest(self, target, rng, &mut sub_events, tuning);
         let result = contest.result;
         let wear_records = contest.wear;
         // Stress applied to the swing's winner via apply_violence_stress; set
@@ -198,6 +191,7 @@ impl Tribute {
                     self.attributes.strength * 3, // triple damage
                     GameOutput::TributeAttackWin(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
+                    tuning,
                 );
                 if stress_damage > 0 {
                     stressed = Some(tref(self));
@@ -265,6 +259,7 @@ impl Tribute {
                     target.attributes.strength * 2, // double damage counter
                     GameOutput::TributeAttackLose(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
+                    tuning,
                 );
                 if stress_damage > 0 {
                     stressed = Some(tref(target));
@@ -280,6 +275,7 @@ impl Tribute {
                     self.attributes.strength,
                     GameOutput::TributeAttackWin(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
+                    tuning,
                 );
                 if stress_damage > 0 {
                     stressed = Some(tref(self));
@@ -295,6 +291,7 @@ impl Tribute {
                     self.attributes.strength * 2, // double damage
                     GameOutput::TributeAttackWinExtra(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
+                    tuning,
                 );
                 if stress_damage > 0 {
                     stressed = Some(tref(self));
@@ -310,6 +307,7 @@ impl Tribute {
                     target.attributes.strength,
                     GameOutput::TributeAttackLose(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
+                    tuning,
                 );
                 if stress_damage > 0 {
                     stressed = Some(tref(target));
@@ -325,6 +323,7 @@ impl Tribute {
                     target.attributes.strength * 2, // double damage
                     GameOutput::TributeAttackLoseExtra(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
+                    tuning,
                 );
                 if stress_damage > 0 {
                     stressed = Some(tref(target));
@@ -468,11 +467,16 @@ impl Tribute {
     /// Callers thread this value into `CombatBeat.stress.stress_damage` so
     /// the typed swing payload can reproduce the trailing horrified line
     /// rendered in `CombatEngagement.detail_lines`.
-    pub(crate) fn apply_violence_stress(&mut self, events: &mut Vec<TaggedEvent>) -> u32 {
+    pub(crate) fn apply_violence_stress(
+        &mut self,
+        events: &mut Vec<TaggedEvent>,
+        tuning: &crate::tributes::combat_tuning::CombatTuning,
+    ) -> u32 {
         let stress_damage = calculate_violence_stress(
             self.statistics.kills,
             self.statistics.wins,
             self.attributes.sanity,
+            tuning,
         );
 
         if stress_damage > 0 {
@@ -491,13 +495,18 @@ impl Tribute {
 }
 
 /// Calculate stress from violent encounters
-fn calculate_violence_stress(kills: u32, wins: u32, current_sanity: u32) -> u32 {
+fn calculate_violence_stress(
+    kills: u32,
+    wins: u32,
+    current_sanity: u32,
+    tuning: &crate::tributes::combat_tuning::CombatTuning,
+) -> u32 {
     let non_kill_wins = wins.saturating_sub(kills);
 
     let calculated_stress_f64 = if wins > 0 {
         // Calculate the stress potential based on kills and non-kill wins
-        let raw_stress_potential = (kills as f64 * KILL_STRESS_CONTRIBUTION)
-            + (non_kill_wins as f64 * NON_KILL_WIN_STRESS_CONTRIBUTION);
+        let raw_stress_potential = (kills as f64 * tuning.kill_stress_contribution)
+            + (non_kill_wins as f64 * tuning.non_kill_win_stress_contribution);
 
         // Desensitize: the more total wins (violent encounters), the more this raw potential
         // is "spread out" or reduced. This gives an average stressfulness per encounter.
@@ -505,11 +514,12 @@ fn calculate_violence_stress(kills: u32, wins: u32, current_sanity: u32) -> u32 
 
         // Scale by the tribute's current sanity percentage and apply a final divisor.
         // Lower sanity means less new stress from these types of events.
-        desensitized_stress_per_encounter * (current_sanity as f64 / STRESS_SANITY_NORMALIZATION)
-            / STRESS_FINAL_DIVISOR
+        desensitized_stress_per_encounter
+            * (current_sanity as f64 / tuning.stress_sanity_normalization)
+            / tuning.stress_final_divisor
     } else {
         // No wins (and therefore no kills), apply a base stress.
-        BASE_STRESS_NO_ENGAGEMENTS
+        tuning.base_stress_no_engagements
     };
 
     let rounded_stress = calculated_stress_f64.round();
@@ -547,6 +557,7 @@ pub fn attack_contest(
     target: &mut Tribute,
     rng: &mut impl Rng,
     events: &mut Vec<TaggedEvent>,
+    tuning: &crate::tributes::combat_tuning::CombatTuning,
 ) -> AttackContestOutcome {
     use shared::combat_beat::{WearOutcomeReport, WearReport};
     // Get attack roll and strength modifier
@@ -729,7 +740,7 @@ pub fn attack_contest(
                 Ordering::Less => {
                     // If the defender wins
                     let difference =
-                        defense_roll as f64 - (attack_roll as f64 * DECISIVE_WIN_MULTIPLIER);
+                        defense_roll as f64 - (attack_roll as f64 * tuning.decisive_win_multiplier);
                     if difference > 0.0 {
                         // Defender wins significantly
                         AttackResult::DefenderWinsDecisively
@@ -741,7 +752,7 @@ pub fn attack_contest(
                 Ordering::Greater => {
                     // If the attacker wins
                     let difference =
-                        attack_roll as f64 - (defense_roll as f64 * DECISIVE_WIN_MULTIPLIER);
+                        attack_roll as f64 - (defense_roll as f64 * tuning.decisive_win_multiplier);
 
                     if difference > 0.0 {
                         // Attacker wins significantly
@@ -782,11 +793,12 @@ pub(crate) fn apply_combat_results(
     damage_to_loser: u32,
     log_event: GameOutput,
     events: &mut Vec<TaggedEvent>,
+    tuning: &crate::tributes::combat_tuning::CombatTuning,
 ) -> u32 {
     loser.takes_physical_damage(damage_to_loser);
     loser.statistics.defeats += 1;
     winner.statistics.wins += 1;
-    let stress_damage = winner.apply_violence_stress(events);
+    let stress_damage = winner.apply_violence_stress(events, tuning);
     let content = log_event.to_string();
     events.push(TaggedEvent::new(
         content,
@@ -836,6 +848,7 @@ pub fn update_stats(attacker: &mut Tribute, defender: &mut Tribute, result: Atta
 mod tests {
     use super::*;
     use crate::tributes::Tribute;
+    use crate::tributes::combat_tuning::CombatTuning;
     use core::convert::Infallible;
     use rand::SeedableRng;
     use rand::TryRng;
@@ -855,8 +868,14 @@ mod tests {
         attacker.attributes.strength = 10;
         target.attributes.defense = 5;
 
-        let result =
-            attack_contest(&mut attacker, &mut target, &mut small_rng, &mut Vec::new()).result;
+        let result = attack_contest(
+            &mut attacker,
+            &mut target,
+            &mut small_rng,
+            &mut Vec::new(),
+            &CombatTuning::default(),
+        )
+        .result;
         assert_eq!(result, AttackResult::AttackerWins);
     }
 
@@ -868,8 +887,14 @@ mod tests {
         attacker.attributes.strength = 15;
         target.attributes.defense = 0;
 
-        let result =
-            attack_contest(&mut attacker, &mut target, &mut small_rng, &mut Vec::new()).result;
+        let result = attack_contest(
+            &mut attacker,
+            &mut target,
+            &mut small_rng,
+            &mut Vec::new(),
+            &CombatTuning::default(),
+        )
+        .result;
         assert_eq!(result, AttackResult::AttackerWinsDecisively);
     }
 
@@ -881,8 +906,14 @@ mod tests {
         attacker.attributes.strength = 15;
         target.attributes.defense = 20;
 
-        let result =
-            attack_contest(&mut attacker, &mut target, &mut small_rng, &mut Vec::new()).result;
+        let result = attack_contest(
+            &mut attacker,
+            &mut target,
+            &mut small_rng,
+            &mut Vec::new(),
+            &CombatTuning::default(),
+        )
+        .result;
         assert_eq!(result, AttackResult::DefenderWins);
     }
 
@@ -894,8 +925,14 @@ mod tests {
         attacker.attributes.strength = 1;
         target.attributes.defense = 20;
 
-        let result =
-            attack_contest(&mut attacker, &mut target, &mut small_rng, &mut Vec::new()).result;
+        let result = attack_contest(
+            &mut attacker,
+            &mut target,
+            &mut small_rng,
+            &mut Vec::new(),
+            &CombatTuning::default(),
+        )
+        .result;
         assert_eq!(result, AttackResult::DefenderWinsDecisively);
     }
 
@@ -907,8 +944,14 @@ mod tests {
         attacker.attributes.strength = 21; // Magic number to make the final scores even
         target.attributes.defense = 20;
 
-        let result =
-            attack_contest(&mut attacker, &mut target, &mut small_rng, &mut Vec::new()).result;
+        let result = attack_contest(
+            &mut attacker,
+            &mut target,
+            &mut small_rng,
+            &mut Vec::new(),
+            &CombatTuning::default(),
+        )
+        .result;
         assert_eq!(result, AttackResult::Miss);
     }
 
@@ -919,7 +962,12 @@ mod tests {
         let sanity = 50;
         let mut target = attacker.clone();
 
-        let outcome = attacker.attacks(&mut target, &mut small_rng, &mut Vec::new());
+        let outcome = attacker.attacks(
+            &mut target,
+            &mut small_rng,
+            &mut Vec::new(),
+            &CombatTuning::default(),
+        );
         assert_eq!(outcome, AttackOutcome::Wound(attacker.clone(), target));
         assert!(attacker.attributes.sanity < sanity);
     }
@@ -930,7 +978,12 @@ mod tests {
         attacker.attributes.strength = 100;
         let mut target = attacker.clone();
 
-        let outcome = attacker.attacks(&mut target, &mut small_rng, &mut Vec::new());
+        let outcome = attacker.attacks(
+            &mut target,
+            &mut small_rng,
+            &mut Vec::new(),
+            &CombatTuning::default(),
+        );
         assert_eq!(outcome, AttackOutcome::Kill(attacker, target));
     }
 
@@ -943,7 +996,12 @@ mod tests {
         attacker.attributes.strength = 25;
         target.attributes.defense = 20;
 
-        let result = attacker.attacks(&mut target, &mut small_rng, &mut Vec::new());
+        let result = attacker.attacks(
+            &mut target,
+            &mut small_rng,
+            &mut Vec::new(),
+            &CombatTuning::default(),
+        );
         assert_eq!(
             result,
             AttackOutcome::Wound(attacker.clone(), target.clone())
@@ -962,7 +1020,12 @@ mod tests {
         target.attributes.defense = 0;
         target.attributes.health = 10;
 
-        let result = attacker.attacks(&mut target, &mut small_rng, &mut Vec::new());
+        let result = attacker.attacks(
+            &mut target,
+            &mut small_rng,
+            &mut Vec::new(),
+            &CombatTuning::default(),
+        );
         assert!(matches!(result, AttackOutcome::Kill(_, _)));
         assert_eq!(target.attributes.health, 0);
         assert_eq!(attacker.statistics.wins, 1);
@@ -977,7 +1040,12 @@ mod tests {
         attacker.attributes.strength = 21; // Magic number to make them draw
         target.attributes.defense = 20;
 
-        let result = attacker.attacks(&mut target, &mut small_rng, &mut Vec::new());
+        let result = attacker.attacks(
+            &mut target,
+            &mut small_rng,
+            &mut Vec::new(),
+            &CombatTuning::default(),
+        );
         assert_eq!(result, AttackOutcome::Miss(attacker, target));
     }
 
@@ -1009,8 +1077,14 @@ mod tests {
         attacker.attributes.strength = 10;
         target.attributes.health = 100;
 
-        let result =
-            attack_contest(&mut attacker, &mut target, &mut crit_rng, &mut Vec::new()).result;
+        let result = attack_contest(
+            &mut attacker,
+            &mut target,
+            &mut crit_rng,
+            &mut Vec::new(),
+            &CombatTuning::default(),
+        )
+        .result;
         assert_eq!(result, AttackResult::CriticalHit);
     }
 
@@ -1038,8 +1112,14 @@ mod tests {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         let mut target = Tribute::new("Peeta".to_string(), None, None);
 
-        let result =
-            attack_contest(&mut attacker, &mut target, &mut fumble_rng, &mut Vec::new()).result;
+        let result = attack_contest(
+            &mut attacker,
+            &mut target,
+            &mut fumble_rng,
+            &mut Vec::new(),
+            &CombatTuning::default(),
+        )
+        .result;
         assert_eq!(result, AttackResult::CriticalFumble);
     }
 
@@ -1079,8 +1159,14 @@ mod tests {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         let mut target = Tribute::new("Peeta".to_string(), None, None);
 
-        let result =
-            attack_contest(&mut attacker, &mut target, &mut block_rng, &mut Vec::new()).result;
+        let result = attack_contest(
+            &mut attacker,
+            &mut target,
+            &mut block_rng,
+            &mut Vec::new(),
+            &CombatTuning::default(),
+        )
+        .result;
         assert_eq!(result, AttackResult::PerfectBlock);
     }
 
@@ -1101,6 +1187,7 @@ mod tests {
             damage, // Triple damage
             GameOutput::TributeAttackWin("Katniss", "Peeta"),
             &mut Vec::new(),
+            &CombatTuning::default(),
         );
 
         // Verify triple damage was applied
@@ -1142,7 +1229,13 @@ mod tests {
         attacker.items.push(weapon);
 
         for _ in 0..3 {
-            attack_contest(&mut attacker, &mut target, &mut small_rng, &mut Vec::new());
+            attack_contest(
+                &mut attacker,
+                &mut target,
+                &mut small_rng,
+                &mut Vec::new(),
+                &CombatTuning::default(),
+            );
         }
 
         let stored = attacker
@@ -1172,7 +1265,12 @@ mod tests {
         // Use a deterministic RNG; with strength=100 vs defense=0 the
         // attacker reliably wins or crit-hits and the 1hp target dies.
         let mut rng = SmallRng::seed_from_u64(1);
-        let _ = attacker.attacks(&mut target, &mut rng, &mut Vec::new());
+        let _ = attacker.attacks(
+            &mut target,
+            &mut rng,
+            &mut Vec::new(),
+            &CombatTuning::default(),
+        );
 
         assert_eq!(
             target.attributes.health, 0,
@@ -1208,7 +1306,12 @@ mod tests {
         let target_id = target.id;
 
         let mut rng = SmallRng::seed_from_u64(2);
-        let _ = attacker.attacks(&mut target, &mut rng, &mut Vec::new());
+        let _ = attacker.attacks(
+            &mut target,
+            &mut rng,
+            &mut Vec::new(),
+            &CombatTuning::default(),
+        );
 
         if attacker.attributes.health == 0 {
             assert_eq!(
@@ -1240,7 +1343,12 @@ mod tests {
         target.attributes.health = 10;
 
         let mut events: Vec<TaggedEvent> = Vec::new();
-        attacker.attacks(&mut target, &mut small_rng, &mut events);
+        attacker.attacks(
+            &mut target,
+            &mut small_rng,
+            &mut events,
+            &CombatTuning::default(),
+        );
 
         let combat_events: Vec<_> = events
             .iter()
@@ -1277,7 +1385,7 @@ mod tests {
             let mut attacker = Tribute::new(format!("A{seed}"), None, None);
             let mut target = Tribute::new(format!("T{seed}"), None, None);
             let mut rng = SmallRng::seed_from_u64(seed);
-            let _ = attacker.attacks(&mut target, &mut rng, &mut events);
+            let _ = attacker.attacks(&mut target, &mut rng, &mut events, &CombatTuning::default());
 
             let swings: Vec<_> = events
                 .iter()
@@ -1304,7 +1412,12 @@ mod tests {
         let mut tribute = Tribute::new("Solo".to_string(), None, None);
         let mut clone = tribute.clone();
         let mut events: Vec<TaggedEvent> = Vec::new();
-        let _ = tribute.attacks(&mut clone, &mut small_rng, &mut events);
+        let _ = tribute.attacks(
+            &mut clone,
+            &mut small_rng,
+            &mut events,
+            &CombatTuning::default(),
+        );
         let swings: usize = events
             .iter()
             .filter(|e| matches!(e.payload, MessagePayload::CombatSwing(_)))
@@ -1349,7 +1462,7 @@ mod tests {
 
         let mut events: Vec<TaggedEvent> = Vec::new();
         let mut rng = SmallRng::seed_from_u64(42);
-        let _ = attacker.attacks(&mut target, &mut rng, &mut events);
+        let _ = attacker.attacks(&mut target, &mut rng, &mut events, &CombatTuning::default());
 
         let beat = events
             .iter()
@@ -1389,7 +1502,7 @@ mod tests {
 
         let mut events: Vec<TaggedEvent> = Vec::new();
         let mut rng = SmallRng::seed_from_u64(7);
-        let _ = attacker.attacks(&mut target, &mut rng, &mut events);
+        let _ = attacker.attacks(&mut target, &mut rng, &mut events, &CombatTuning::default());
 
         let beat = events
             .iter()
@@ -1429,7 +1542,7 @@ mod tests {
 
             let mut events: Vec<TaggedEvent> = Vec::new();
             let mut rng = SmallRng::seed_from_u64(seed);
-            let _ = attacker.attacks(&mut target, &mut rng, &mut events);
+            let _ = attacker.attacks(&mut target, &mut rng, &mut events, &CombatTuning::default());
 
             let beat = match events.iter().find_map(|e| match &e.payload {
                 MessagePayload::CombatSwing(b) => Some(b),
@@ -1478,7 +1591,7 @@ mod tests {
 
         let mut events: Vec<TaggedEvent> = Vec::new();
         let mut rng = SmallRng::seed_from_u64(123);
-        let _ = attacker.attacks(&mut target, &mut rng, &mut events);
+        let _ = attacker.attacks(&mut target, &mut rng, &mut events, &CombatTuning::default());
 
         let beat = events
             .iter()
@@ -1513,7 +1626,7 @@ mod tests {
 
             let mut events: Vec<TaggedEvent> = Vec::new();
             let mut rng = SmallRng::seed_from_u64(seed);
-            let _ = attacker.attacks(&mut target, &mut rng, &mut events);
+            let _ = attacker.attacks(&mut target, &mut rng, &mut events, &CombatTuning::default());
 
             // Find the engagement (skip seeds that didn't produce one, e.g.
             // pure fumble paths emit a standalone TributeWounded instead and
@@ -1574,7 +1687,7 @@ mod tests {
 
         let mut events: Vec<TaggedEvent> = Vec::new();
         let mut rng = SmallRng::seed_from_u64(1);
-        let _ = attacker.attacks(&mut target, &mut rng, &mut events);
+        let _ = attacker.attacks(&mut target, &mut rng, &mut events, &CombatTuning::default());
 
         let beat = events
             .iter()
@@ -1609,7 +1722,7 @@ mod tests {
 
             let mut events: Vec<TaggedEvent> = Vec::new();
             let mut rng = SmallRng::seed_from_u64(seed);
-            let _ = attacker.attacks(&mut target, &mut rng, &mut events);
+            let _ = attacker.attacks(&mut target, &mut rng, &mut events, &CombatTuning::default());
 
             let Some(detail_lines) = events.iter().find_map(|e| match &e.payload {
                 MessagePayload::Combat(eng) => Some(eng.detail_lines.clone()),

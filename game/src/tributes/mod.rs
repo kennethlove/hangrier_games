@@ -125,6 +125,10 @@ pub struct EnvironmentContext<'a> {
     /// Current game day (1-indexed). Used to gate day-1-only behavior such
     /// as suppressing sponsor gifts in the opening cycle.
     pub current_day: u32,
+    /// Combat & stamina tuning knobs threaded through `Action::Attack` so
+    /// `Tribute::attacks` and `attack_contest` can read constants from a
+    /// single owned source instead of file-level `const`s.
+    pub combat_tuning: &'a crate::tributes::combat_tuning::CombatTuning,
 }
 
 #[derive(Clone, Debug)]
@@ -558,7 +562,8 @@ impl Tribute {
                     events,
                 );
                 if let Some(mut target) = target {
-                    let outcome = self.attacks(&mut target, rng, events);
+                    let outcome =
+                        self.attacks(&mut target, rng, events, environment_details.combat_tuning);
                     match outcome {
                         AttackOutcome::Kill(_, mut target) => {
                             self.statistics.kills += 1;

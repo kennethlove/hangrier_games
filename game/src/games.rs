@@ -203,6 +203,7 @@ impl Game {
     }
 
     /// Returns the tributes that are recently dead, i.e., died in the current round.
+    #[cfg_attr(not(test), allow(dead_code))]
     fn recently_dead_tributes(&self) -> Vec<Tribute> {
         self.tributes
             .iter()
@@ -461,19 +462,11 @@ impl Game {
         let game_id = self.identifier.clone();
         let current_day = self.day.unwrap_or(1);
 
-        // Announce tribute deaths from this cycle.
-        let dead: Vec<(String, String)> = self
-            .recently_dead_tributes()
-            .into_iter()
-            .map(|t| (t.identifier.clone(), t.name.clone()))
-            .collect();
-        for (id, name) in dead {
-            self.log(
-                crate::messages::MessageSource::Tribute(id),
-                format!("game:{}", game_id),
-                format!("{} has fallen.", name),
-            );
-        }
+        // Death announcements are now emitted at the kill site as typed
+        // `MessagePayload::TributeKilled` (combat: `Combat(Killed)`; env /
+        // status: `TributeKilled`). Re-announcing "X has fallen" here
+        // duplicated those events with a `SanityBreak` fallback payload
+        // which mis-classified them in the timeline.
 
         let phase = if day { "day" } else { "night" };
         self.log(
@@ -544,8 +537,17 @@ impl Game {
         // Process each tribute's survival check
         for tribute_idx in tribute_indices {
             // Outcome messages we'll log after the tribute borrow is released.
-            let mut pending_messages: Vec<(crate::messages::MessageSource, String, String)> =
-                Vec::new();
+            // Each entry carries an optional typed payload so death lines
+            // become `MessagePayload::TributeKilled` (and render as
+            // DeathCard / count toward timeline death tallies) instead of
+            // falling through to the legacy `SanityBreak` fallback.
+            type PendingMsg = (
+                crate::messages::MessageSource,
+                String,
+                String,
+                Option<crate::messages::MessagePayload>,
+            );
+            let mut pending_messages: Vec<PendingMsg> = Vec::new();
 
             {
                 let tribute = &mut self.tributes[tribute_idx];
@@ -594,6 +596,14 @@ impl Game {
                 // Apply results
                 if !result.survived {
                     tribute.attributes.health = 0;
+                    let cause = most_severe_event.to_string();
+                    tribute.statistics.killed_by = Some(cause.clone());
+                    // Mark as RecentlyDead so the end-of-cycle announcement
+                    // and the alliance-cascade pipeline both pick this death
+                    // up. Without this, env-killed tributes were silently
+                    // promoted to Dead at the next cycle and never triggered
+                    // "has fallen" or DeathRecorded.
+                    tribute.status = crate::tributes::statuses::TributeStatus::RecentlyDead;
 
                     let content = if result.instant_death {
                         format!(
@@ -606,7 +616,15 @@ impl Game {
                             tribute.name, most_severe_event, roll_detail
                         )
                     };
-                    pending_messages.push((source, subject, content));
+                    let payload = crate::messages::MessagePayload::TributeKilled {
+                        victim: crate::messages::TributeRef {
+                            identifier: tribute.identifier.clone(),
+                            name: tribute.name.clone(),
+                        },
+                        killer: None,
+                        cause,
+                    };
+                    pending_messages.push((source, subject, content, Some(payload)));
                 } else {
                     // Always announce the survival itself so the narrative captures
                     // who weathered the event, even when no rewards land.
@@ -617,6 +635,7 @@ impl Game {
                             "{} survives the {} {}",
                             tribute.name, most_severe_event, roll_detail
                         ),
+                        None,
                     ));
 
                     // Survivor - apply rewards if any
@@ -629,6 +648,7 @@ impl Game {
                                 "{} recovers {} stamina from the {}",
                                 tribute.name, result.stamina_restored, most_severe_event
                             ),
+                            None,
                         ));
                     }
 
@@ -644,6 +664,7 @@ impl Game {
                                 "{} recovers {} sanity from the {}",
                                 tribute.name, result.sanity_restored, most_severe_event
                             ),
+                            None,
                         ));
                     }
 
@@ -658,13 +679,19 @@ impl Game {
                                 "{} finds a {} after surviving the {}",
                                 tribute.name, item_name, most_severe_event
                             ),
+                            None,
                         ));
                     }
                 }
             }
 
-            for (source, subject, content) in pending_messages {
-                self.log(source, subject, content);
+            // Each env-event message is its own action group, so advance
+            // the per-phase tick before pushing so they sort after the
+            // area announcement and any prior tribute actions.
+            for (source, subject, content, payload) in pending_messages {
+                let tick = self.tick_counter.next();
+                let payload = payload.unwrap_or_else(|| Self::fallback_payload(&source));
+                self.push_message(source, subject, content, payload, tick);
             }
         }
         Ok(())
@@ -1582,8 +1609,10 @@ mod tests {
         let mut game = create_test_game_with_tributes(vec![tribute1.clone(), tribute2.clone()]);
         game.day = Some(1);
         let _ = game.announce_cycle_end(true);
-        // One death message + one cycle-end summary.
-        assert_eq!(game.messages.len(), 2);
+        // Death announcements moved to the kill site as typed
+        // `MessagePayload::TributeKilled`. Only the cycle-end summary
+        // remains here.
+        assert_eq!(game.messages.len(), 1);
     }
 
     #[test]

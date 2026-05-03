@@ -6,6 +6,7 @@ use validator::{Validate, ValidationError};
 pub mod combat_beat;
 pub mod messages;
 
+use crate::combat_beat::CombatBeat;
 use crate::messages::TributeRef;
 
 /// WebSocket message protocol for real-time game updates
@@ -42,12 +43,8 @@ pub enum GameEvent {
     },
     /// Area event occurred
     AreaEvent { area: String, event: String },
-    /// Combat occurred
-    Combat {
-        attacker: String,
-        defender: String,
-        outcome: String,
-    },
+    /// Combat swing occurred
+    Combat { beat: Box<CombatBeat> },
     /// Generic message (tribute action, announcement, etc.)
     Message {
         source: String,

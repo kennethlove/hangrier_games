@@ -201,12 +201,11 @@ pub(crate) fn format_game_event(event: &GameEvent) -> String {
         GameEvent::NightStarted { day } => format!("Night {} started", day),
         GameEvent::TributeDied { name, cause, .. } => format!("{} died: {}", name, cause),
         GameEvent::AreaEvent { area, event } => format!("{} in {}", event, area),
-        GameEvent::Combat {
-            attacker,
-            defender,
-            outcome,
-        } => {
-            format!("{} vs {}: {}", attacker, defender, outcome)
+        GameEvent::Combat { beat } => {
+            format!(
+                "{} vs {}: {:?}",
+                beat.attacker.name, beat.target.name, beat.outcome
+            )
         }
         GameEvent::Message { content, .. } => content.clone(),
     }
@@ -270,11 +269,23 @@ mod tests {
         );
         assert_eq!(
             format_game_event(&GameEvent::Combat {
-                attacker: "A".to_string(),
-                defender: "B".to_string(),
-                outcome: "win".to_string(),
+                beat: Box::new(shared::combat_beat::CombatBeat {
+                    attacker: shared::messages::TributeRef {
+                        identifier: "a".into(),
+                        name: "A".into(),
+                    },
+                    target: shared::messages::TributeRef {
+                        identifier: "b".into(),
+                        name: "B".into(),
+                    },
+                    weapon: None,
+                    shield: None,
+                    wear: vec![],
+                    outcome: shared::combat_beat::SwingOutcome::Miss,
+                    stress: shared::combat_beat::StressReport::default(),
+                }),
             }),
-            "A vs B: win"
+            "A vs B: Miss"
         );
     }
 

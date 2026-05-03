@@ -1251,7 +1251,7 @@ async fn game_day_logs(
         .query(
             r#"SELECT * FROM message
         WHERE string::starts_with(subject, $identifier) AND
-        game_day = $day ORDER BY timestamp;"#,
+        game_day = $day ORDER BY phase, emit_index;"#,
         )
         .bind(("identifier", game_identifier))
         .bind(("day", day))

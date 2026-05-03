@@ -820,13 +820,22 @@ mod survival_event_tests {
     use super::*;
 
     fn tref() -> TributeRef {
-        TributeRef { identifier: "t1".into(), name: "Cato".into() }
+        TributeRef {
+            identifier: "t1".into(),
+            name: "Cato".into(),
+        }
     }
     fn aref() -> AreaRef {
-        AreaRef { identifier: "a1".into(), name: "Forest".into() }
+        AreaRef {
+            identifier: "a1".into(),
+            name: "Forest".into(),
+        }
     }
     fn iref() -> ItemRef {
-        ItemRef { identifier: "i1".into(), name: "Berries".into() }
+        ItemRef {
+            identifier: "i1".into(),
+            name: "Berries".into(),
+        }
     }
 
     #[test]

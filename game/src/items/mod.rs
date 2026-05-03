@@ -408,11 +408,19 @@ impl ItemType {
     }
 
     pub fn food_value(&self) -> Option<u8> {
-        if let ItemType::Food(n) = self { Some(*n) } else { None }
+        if let ItemType::Food(n) = self {
+            Some(*n)
+        } else {
+            None
+        }
     }
 
     pub fn water_value(&self) -> Option<u8> {
-        if let ItemType::Water(n) = self { Some(*n) } else { None }
+        if let ItemType::Water(n) = self {
+            Some(*n)
+        } else {
+            None
+        }
     }
 }
 
@@ -432,13 +440,19 @@ impl FromStr for ItemType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let lower = s.to_lowercase();
-        if let Some(inner) = lower.strip_prefix("food(").and_then(|x| x.strip_suffix(')')) {
+        if let Some(inner) = lower
+            .strip_prefix("food(")
+            .and_then(|x| x.strip_suffix(')'))
+        {
             return inner
                 .parse::<u8>()
                 .map(ItemType::Food)
                 .map_err(|e| e.to_string());
         }
-        if let Some(inner) = lower.strip_prefix("water(").and_then(|x| x.strip_suffix(')')) {
+        if let Some(inner) = lower
+            .strip_prefix("water(")
+            .and_then(|x| x.strip_suffix(')'))
+        {
             return inner
                 .parse::<u8>()
                 .map(ItemType::Water)

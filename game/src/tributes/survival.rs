@@ -69,16 +69,20 @@ pub fn tick_survival(tribute: &mut Tribute, weather: &Weather, sheltered: bool) 
     // Stamina lives on Tribute, not Attributes; project the current stamina
     // onto a 0..=100 scale relative to max_stamina so the same thresholds
     // can be compared.
-    let stamina_scaled: u32 = if tribute.max_stamina == 0 {
-        0
-    } else {
-        (tribute.stamina.saturating_mul(100)) / tribute.max_stamina
-    };
+    let stamina_scaled: u32 = tribute
+        .stamina
+        .saturating_mul(100)
+        .checked_div(tribute.max_stamina)
+        .unwrap_or(0);
 
     let hunger_delta: u8 = if strength <= LOW_ATTR_THRESHOLD {
         // Tick every other phase: use the parity of the existing counter as
         // a deterministic skip mechanism. First tick is skipped.
-        if tribute.hunger % 2 == 0 { 0 } else { 1 }
+        if tribute.hunger.is_multiple_of(2) {
+            0
+        } else {
+            1
+        }
     } else if strength >= HIGH_ATTR_THRESHOLD {
         2
     } else {
@@ -86,20 +90,34 @@ pub fn tick_survival(tribute: &mut Tribute, weather: &Weather, sheltered: bool) 
     };
 
     let thirst_delta: u8 = if stamina_scaled <= LOW_ATTR_THRESHOLD {
-        if tribute.thirst % 2 == 0 { 0 } else { 1 }
+        if tribute.thirst.is_multiple_of(2) {
+            0
+        } else {
+            1
+        }
     } else if stamina_scaled >= HIGH_ATTR_THRESHOLD {
         2
     } else {
         1
     };
 
-    let weather_hunger_bonus: u8 =
-        if !sheltered && matches!(weather, Weather::Blizzard) { 1 } else { 0 };
-    let weather_thirst_bonus: u8 =
-        if !sheltered && matches!(weather, Weather::Heatwave) { 1 } else { 0 };
+    let weather_hunger_bonus: u8 = if !sheltered && matches!(weather, Weather::Blizzard) {
+        1
+    } else {
+        0
+    };
+    let weather_thirst_bonus: u8 = if !sheltered && matches!(weather, Weather::Heatwave) {
+        1
+    } else {
+        0
+    };
 
-    tribute.hunger = tribute.hunger.saturating_add(hunger_delta + weather_hunger_bonus);
-    tribute.thirst = tribute.thirst.saturating_add(thirst_delta + weather_thirst_bonus);
+    tribute.hunger = tribute
+        .hunger
+        .saturating_add(hunger_delta + weather_hunger_bonus);
+    tribute.thirst = tribute
+        .thirst
+        .saturating_add(thirst_delta + weather_thirst_bonus);
 }
 
 /// Applies escalating starvation HP drain. Returns HP lost this phase

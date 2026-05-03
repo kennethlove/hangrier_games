@@ -1193,7 +1193,6 @@ mod tests {
         assert_eq!(loaded.dehydration_drain_step, 0);
     }
 
-
     #[rstest]
     fn tribute_drain_alliance_events_returns_and_clears_buffer() {
         use crate::tributes::alliances::AllianceEvent;

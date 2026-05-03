@@ -255,6 +255,25 @@ pub enum MessagePayload {
         item: ItemRef,
         debt_recovered: u8,
     },
+
+    // Lifecycle / cycle-boundary announcements (formerly an AreaEvent fallback
+    // synthesised by Game::log() for MessageSource::Game; see
+    // hangrier_games-xamw).
+    /// Emitted at the very start of a day or night phase.
+    CycleStart {
+        day: u32,
+        phase: Phase,
+    },
+    /// Emitted at the very end of a day or night phase.
+    CycleEnd {
+        day: u32,
+        phase: Phase,
+    },
+    /// Emitted when the game ends. `winner` is `Some` for the lone-survivor
+    /// case and `None` for "no survivors".
+    GameEnded {
+        winner: Option<TributeRef>,
+    },
 }
 
 impl MessagePayload {
@@ -275,6 +294,7 @@ impl MessagePayload {
             ItemFound { .. } | ItemUsed { .. } | ItemDropped { .. } | SponsorGift { .. } => {
                 MessageKind::Item
             }
+            CycleStart { .. } | CycleEnd { .. } | GameEnded { .. } => MessageKind::State,
             TributeWounded { .. }
             | TributeRested { .. }
             | TributeStarved { .. }
@@ -325,6 +345,8 @@ impl MessagePayload {
             | Ate { tribute, .. } => r(tribute),
             SponsorGift { recipient, .. } => r(recipient),
             AreaClosed { .. } | AreaEvent { .. } => false,
+            CycleStart { .. } | CycleEnd { .. } => false,
+            GameEnded { winner } => winner.as_ref().is_some_and(r),
         }
     }
 }

@@ -1,6 +1,7 @@
 pub mod alliance_card;
 pub mod combat_card;
 pub mod combat_swing_card;
+pub mod cycle_card;
 pub mod death_card;
 pub mod item_card;
 pub mod movement_card;

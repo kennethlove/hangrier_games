@@ -270,14 +270,7 @@ impl Game {
                 kind: AreaEventKind::Other,
                 description: String::new(),
             },
-            MessageSource::Game(id) => MessagePayload::AreaEvent {
-                area: AreaRef {
-                    identifier: id.clone(),
-                    name: id.clone(),
-                },
-                kind: AreaEventKind::Other,
-                description: String::new(),
-            },
+            MessageSource::Game(_) => MessagePayload::GameEnded { winner: None },
         }
     }
 
@@ -394,17 +387,32 @@ impl Game {
 
     fn check_for_winner(&mut self) -> Result<(), GameError> {
         if let Some(winner) = self.winner() {
-            self.log(
-                crate::messages::MessageSource::Game(self.identifier.clone()),
-                format!("game:{}", self.identifier),
+            let game_id = self.identifier.clone();
+            let payload = crate::messages::MessagePayload::GameEnded {
+                winner: Some(crate::messages::TributeRef {
+                    identifier: winner.identifier.clone(),
+                    name: winner.name.clone(),
+                }),
+            };
+            let tick = self.tick_counter.boundary();
+            self.push_message(
+                crate::messages::MessageSource::Game(game_id.clone()),
+                format!("game:{}", game_id),
                 format!("{} has won the game!", winner.name),
+                payload,
+                tick,
             );
             self.end();
         } else if self.living_tributes_count() == 0 {
-            self.log(
-                crate::messages::MessageSource::Game(self.identifier.clone()),
-                format!("game:{}", self.identifier),
+            let game_id = self.identifier.clone();
+            let payload = crate::messages::MessagePayload::GameEnded { winner: None };
+            let tick = self.tick_counter.boundary();
+            self.push_message(
+                crate::messages::MessageSource::Game(game_id.clone()),
+                format!("game:{}", game_id),
                 "The game has ended with no survivors.".to_string(),
+                payload,
+                tick,
             );
             self.end();
         }
@@ -431,28 +439,37 @@ impl Game {
         let current_day = self.day.unwrap_or(1);
         let game_id = self.identifier.clone();
         let subject = format!("game:{}", game_id);
+        let phase = if day {
+            crate::messages::Phase::Day
+        } else {
+            crate::messages::Phase::Night
+        };
 
-        if day {
-            let content = match current_day {
+        let content = if day {
+            match current_day {
                 1 => format!("Day {}: The games have begun!", current_day),
                 3 => format!(
                     "Day {}: Sponsors take note of the remaining tributes.",
                     current_day
                 ),
                 _ => format!("Day {} dawns over the arena.", current_day),
-            };
-            self.log(
-                crate::messages::MessageSource::Game(game_id),
-                subject,
-                content,
-            );
+            }
         } else {
-            self.log(
-                crate::messages::MessageSource::Game(game_id),
-                subject,
-                format!("Night {} falls. The arena grows dark.", current_day),
-            );
-        }
+            format!("Night {} falls. The arena grows dark.", current_day)
+        };
+
+        let payload = crate::messages::MessagePayload::CycleStart {
+            day: current_day,
+            phase,
+        };
+        let tick = self.tick_counter.boundary();
+        self.push_message(
+            crate::messages::MessageSource::Game(game_id),
+            subject,
+            content,
+            payload,
+            tick,
+        );
 
         Ok(())
     }
@@ -468,11 +485,23 @@ impl Game {
         // duplicated those events with a `SanityBreak` fallback payload
         // which mis-classified them in the timeline.
 
-        let phase = if day { "day" } else { "night" };
-        self.log(
+        let phase_str = if day { "day" } else { "night" };
+        let phase = if day {
+            crate::messages::Phase::Day
+        } else {
+            crate::messages::Phase::Night
+        };
+        let payload = crate::messages::MessagePayload::CycleEnd {
+            day: current_day,
+            phase,
+        };
+        let tick = self.tick_counter.boundary();
+        self.push_message(
             crate::messages::MessageSource::Game(game_id.clone()),
             format!("game:{}", game_id),
-            format!("End of {} {}.", phase, current_day),
+            format!("End of {} {}.", phase_str, current_day),
+            payload,
+            tick,
         );
         Ok(())
     }

@@ -8,6 +8,7 @@ pub mod inventory;
 pub mod lifecycle;
 pub mod movement;
 pub mod statuses;
+pub mod survival;
 pub mod traits;
 
 // Re-export key items from sub-modules
@@ -217,6 +218,22 @@ pub struct Tribute {
     /// Transient; never persisted.
     #[serde(default, skip)]
     pub recently_killed_by: Option<Uuid>,
+    /// Survival debt counter; 0 = Sated. See `survival::hunger_band`.
+    #[serde(default)]
+    pub hunger: u8,
+    /// Survival debt counter; 0 = Sated. See `survival::thirst_band`.
+    #[serde(default)]
+    pub thirst: u8,
+    /// Phase index until which the tribute is considered sheltered.
+    /// `None` = exposed.
+    #[serde(default)]
+    pub sheltered_until: Option<u32>,
+    /// Escalating step counter for HP drain while Starving.
+    #[serde(default)]
+    pub starvation_drain_step: u8,
+    /// Escalating step counter for HP drain while Dehydrated.
+    #[serde(default)]
+    pub dehydration_drain_step: u8,
 }
 
 impl Default for Tribute {
@@ -269,6 +286,11 @@ impl Tribute {
             pending_trust_shock: false,
             alliance_events: Vec::new(),
             recently_killed_by: None,
+            hunger: 0,
+            thirst: 0,
+            sheltered_until: None,
+            starvation_drain_step: 0,
+            dehydration_drain_step: 0,
         }
     }
 
@@ -1120,6 +1142,44 @@ mod tests {
         let tribute = Tribute::new("Cinna".to_string(), Some(1), None);
         assert!(!tribute.pending_trust_shock);
     }
+
+    #[test]
+    fn tribute_default_survival_fields_are_zero_and_none() {
+        let t = Tribute::new("Test".to_string(), None, None);
+        assert_eq!(t.hunger, 0, "hunger starts at 0 (Sated)");
+        assert_eq!(t.thirst, 0, "thirst starts at 0 (Sated)");
+        assert_eq!(t.sheltered_until, None, "starts exposed");
+        assert_eq!(t.starvation_drain_step, 0);
+        assert_eq!(t.dehydration_drain_step, 0);
+    }
+
+    #[test]
+    fn tribute_legacy_json_loads_with_defaults() {
+        // JSON missing the new survival fields entirely (simulates a saved
+        // game from before this feature landed). serde(default) must
+        // populate them.
+        let mut t = Tribute::new("Legacy".to_string(), Some(1), None);
+        t.hunger = 0;
+        t.thirst = 0;
+        t.sheltered_until = None;
+        t.starvation_drain_step = 0;
+        t.dehydration_drain_step = 0;
+        let mut json: serde_json::Value = serde_json::to_value(&t).unwrap();
+        // strip the survival fields to mimic a pre-feature save
+        let obj = json.as_object_mut().unwrap();
+        obj.remove("hunger");
+        obj.remove("thirst");
+        obj.remove("sheltered_until");
+        obj.remove("starvation_drain_step");
+        obj.remove("dehydration_drain_step");
+        let loaded: Tribute = serde_json::from_value(json).expect("legacy load must succeed");
+        assert_eq!(loaded.hunger, 0);
+        assert_eq!(loaded.thirst, 0);
+        assert_eq!(loaded.sheltered_until, None);
+        assert_eq!(loaded.starvation_drain_step, 0);
+        assert_eq!(loaded.dehydration_drain_step, 0);
+    }
+
 
     #[rstest]
     fn tribute_drain_alliance_events_returns_and_clears_buffer() {

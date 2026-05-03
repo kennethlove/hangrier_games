@@ -3,6 +3,7 @@ use crate::components::icons::loading::LoadingIcon;
 use crate::components::icons::map_pin::MapPinIcon;
 use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_edit::TributeEdit;
+use crate::components::tribute_state_strip::TributeStateStrip;
 use crate::components::tribute_status_icon::TributeStatusIcon;
 use crate::env::APP_API_HOST;
 use crate::http::WithCredentials;
@@ -98,11 +99,13 @@ pub fn GameTributes(game: DisplayGame) -> Element {
                                     tribute: chunk.first().unwrap().clone(),
                                     game_identifier: identifier.clone(),
                                     game_status: game.status.clone(),
+                                    current_phase: game.day.map(|d| d * 2),
                                 }
                                 GameTributeListMember {
                                     tribute: chunk.last().unwrap().clone(),
                                     game_identifier: identifier.clone(),
                                     game_status: game.status.clone(),
+                                    current_phase: game.day.map(|d| d * 2),
                                 }
                             }
                         }
@@ -132,6 +135,7 @@ pub fn GameTributeListMember(
     tribute: Tribute,
     game_identifier: String,
     game_status: GameStatus,
+    current_phase: Option<u32>,
 ) -> Element {
     let fist_item = Item::new_weapon("basic fist");
 
@@ -250,6 +254,10 @@ pub fn GameTributeListMember(
                             class: "",
                             "{tribute.status.to_string()}"
                         }
+                    }
+                    TributeStateStrip {
+                        tribute: tribute.clone(),
+                        current_phase: current_phase,
                     }
                     div {
                         class: r#"

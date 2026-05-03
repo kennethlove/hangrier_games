@@ -987,6 +987,102 @@ impl Game {
                 tribute.events.push(TributeEvent::random());
             }
 
+            // Survival tick (spec §6, §7). Each living tribute, once per
+            // phase: tick hunger/thirst, apply escalating drain, emit any
+            // band-change events, and route 0-HP starvation/dehydration
+            // deaths through TributeKilled with the appropriate cause.
+            // Loot drop is handled centrally by clean_up_recent_deaths
+            // after the cycle ends.
+            {
+                use crate::areas::weather::current_weather;
+                use crate::messages::{MessagePayload, TributeRef};
+                use crate::tributes::survival::{
+                    apply_dehydration_drain, apply_starvation_drain, hunger_band, thirst_band,
+                    tick_survival,
+                };
+                use shared::messages::{CAUSE_DEHYDRATION, CAUSE_STARVATION};
+
+                let weather = current_weather();
+                let phase_index: u32 = self.day.unwrap_or(1) * 2 + u32::from(!day);
+                let sheltered = tribute
+                    .sheltered_until
+                    .is_some_and(|until| until > phase_index);
+
+                let prior_hunger = hunger_band(tribute.hunger);
+                let prior_thirst = thirst_band(tribute.thirst);
+
+                tick_survival(tribute, &weather, sheltered);
+                let hp_lost_starv = apply_starvation_drain(tribute);
+                let hp_lost_dehy = apply_dehydration_drain(tribute);
+
+                let new_hunger = hunger_band(tribute.hunger);
+                let new_thirst = thirst_band(tribute.thirst);
+                let tref = TributeRef {
+                    identifier: tribute.identifier.clone(),
+                    name: tribute.name.clone(),
+                };
+
+                if new_hunger != prior_hunger {
+                    let line = format!(
+                        "{} hunger: {:?} -> {:?}",
+                        tribute.name, prior_hunger, new_hunger
+                    );
+                    collected_events.push((
+                        tribute.identifier.clone(),
+                        tribute.name.clone(),
+                        line,
+                        Some(MessagePayload::HungerBandChanged {
+                            tribute: tref.clone(),
+                            from: format!("{:?}", prior_hunger),
+                            to: format!("{:?}", new_hunger),
+                        }),
+                        None,
+                    ));
+                }
+                if new_thirst != prior_thirst {
+                    let line = format!(
+                        "{} thirst: {:?} -> {:?}",
+                        tribute.name, prior_thirst, new_thirst
+                    );
+                    collected_events.push((
+                        tribute.identifier.clone(),
+                        tribute.name.clone(),
+                        line,
+                        Some(MessagePayload::ThirstBandChanged {
+                            tribute: tref.clone(),
+                            from: format!("{:?}", prior_thirst),
+                            to: format!("{:?}", new_thirst),
+                        }),
+                        None,
+                    ));
+                }
+
+                // Death routing for survival-induced 0 HP. Dehydration takes
+                // precedence over starvation when both landed in the same
+                // tick.
+                if tribute.attributes.health == 0 && (hp_lost_starv > 0 || hp_lost_dehy > 0) {
+                    let cause = if hp_lost_dehy > 0 {
+                        CAUSE_DEHYDRATION
+                    } else {
+                        CAUSE_STARVATION
+                    };
+                    let line = format!("{} succumbs to {}.", tribute.name, cause);
+                    collected_events.push((
+                        tribute.identifier.clone(),
+                        tribute.name.clone(),
+                        line,
+                        Some(MessagePayload::TributeKilled {
+                            victim: tref,
+                            killer: None,
+                            cause: cause.to_string(),
+                        }),
+                        None,
+                    ));
+                    tribute.status = TributeStatus::RecentlyDead;
+                    continue;
+                }
+            }
+
             let area_index = match area_details_map.get(&tribute.area) {
                 Some(&idx) => idx,
                 None => continue,
@@ -2628,5 +2724,50 @@ mod tests {
             later_b_move.is_none(),
             "no TributeMoved for B should appear after B's TributeKilled in the same period"
         );
+    }
+
+    // ---- Survival tick wiring (spec §6, §7) ------------------------------
+
+    #[test]
+    fn survival_tick_increments_hunger_and_thirst_per_phase() {
+        let mut a = Tribute::new("A".to_string(), Some(1), None);
+        let mut b = Tribute::new("B".to_string(), Some(2), None);
+        // Mid-range attributes so the survival tick lands the +1/+1 base
+        // path (not the low-strength every-other-phase or high-strength
+        // double-tick branches). Stamina at half its max keeps thirst on
+        // the +1 path too.
+        for t in [&mut a, &mut b] {
+            t.attributes.strength = 30;
+            t.stamina = t.max_stamina / 2;
+        }
+        let mut game = create_test_game_with_tributes(vec![a, b]);
+        game.day = Some(1);
+        // Run a single day cycle; survival tick fires once per living tribute.
+        let _ = game.run_day_night_cycle(true);
+        for t in &game.tributes {
+            assert_eq!(t.hunger, 1, "{} hunger should be 1 after one tick", t.name);
+            assert_eq!(t.thirst, 1, "{} thirst should be 1 after one tick", t.name);
+        }
+    }
+
+    #[test]
+    fn survival_tick_routes_dehydration_death_through_tribute_killed() {
+        use crate::messages::MessagePayload;
+        use shared::messages::CAUSE_DEHYDRATION;
+        let mut a = Tribute::new("Doomed".to_string(), Some(1), None);
+        // Already at the dehydrated band with 1 HP and a high
+        // dehydration drain step so the next tick definitely lands fatal
+        // damage (≥ 1 HP at extreme band).
+        a.thirst = 4;
+        a.dehydration_drain_step = 5;
+        a.attributes.health = 1;
+        let mut game = create_test_game_with_tributes(vec![a]);
+        game.day = Some(1);
+        let _ = game.run_day_night_cycle(true);
+        let killed = game.messages.iter().any(|m| {
+            matches!(&m.payload,
+                MessagePayload::TributeKilled { cause, .. } if cause == CAUSE_DEHYDRATION)
+        });
+        assert!(killed, "expected a TributeKilled with cause=dehydration");
     }
 }

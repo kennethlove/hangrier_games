@@ -64,6 +64,14 @@ pub static GAMES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
             get(game_detail).delete(game_delete).put(game_update),
         )
         .route("/{game_identifier}/areas", get(game_areas))
+        .route(
+            "/{game_identifier}/areas/{area_identifier}",
+            get(area_detail),
+        )
+        .route(
+            "/{game_identifier}/items/{item_identifier}",
+            get(item_detail),
+        )
         .route("/{game_identifier}/display", get(game_display))
         .route("/{game_identifier}/log/{day}", get(game_day_logs))
         .route(
@@ -549,6 +557,76 @@ SELECT (
             "Failed to fetch areas: {}",
             e
         ))),
+    }
+}
+
+/// Fetch a single area belonging to a specific game, including its items.
+/// Returns 404 if the area is not bound to the game.
+pub async fn area_detail(
+    Path((game_identifier, area_identifier)): Path<(Uuid, Uuid)>,
+    state: State<AppState>,
+) -> Result<Json<AreaDetails>, AppError> {
+    let mut response = state
+        .db
+        .query(
+            r#"
+SELECT (
+    SELECT *, ->items->item[*] AS items
+    FROM ->areas->area
+    WHERE identifier = $area_identifier
+) AS areas FROM game WHERE identifier = $game_identifier;
+"#,
+        )
+        .bind(("game_identifier", game_identifier.to_string()))
+        .bind(("area_identifier", area_identifier.to_string()))
+        .await
+        .map_err(|e| AppError::InternalServerError(format!("Failed to fetch area: {}", e)))?;
+
+    let areas: Vec<Vec<AreaDetails>> = response
+        .take("areas")
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take area: {}", e)))?;
+    match areas
+        .into_iter()
+        .next()
+        .and_then(|inner| inner.into_iter().next())
+    {
+        Some(area) => Ok(Json(area)),
+        None => Err(AppError::NotFound("Area not found".to_string())),
+    }
+}
+
+/// Fetch a single item by identifier scoped to a game. The item must either
+/// be sitting in one of the game's areas (`game->areas->area->items->item`)
+/// or owned by one of the game's tributes
+/// (`game<-playing_in<-tribute->owns->item`). Returns 404 otherwise.
+pub async fn item_detail(
+    Path((game_identifier, item_identifier)): Path<(Uuid, Uuid)>,
+    state: State<AppState>,
+) -> Result<Json<Item>, AppError> {
+    let mut response = state
+        .db
+        .query(
+            r#"
+LET $game = (SELECT * FROM ONLY game WHERE identifier = $game_identifier LIMIT 1);
+LET $area_items = $game.->areas->area->items->item;
+LET $tribute_items = $game<-playing_in<-tribute->owns->item;
+LET $candidates = array::union($area_items, $tribute_items);
+SELECT * FROM $candidates WHERE identifier = $item_identifier LIMIT 1;
+"#,
+        )
+        .bind(("game_identifier", game_identifier.to_string()))
+        .bind(("item_identifier", item_identifier.to_string()))
+        .await
+        .map_err(|e| AppError::InternalServerError(format!("Failed to fetch item: {}", e)))?;
+
+    // The four LET statements occupy result indexes 0..=3; the SELECT lives at
+    // index 4.
+    let items: Vec<Item> = response
+        .take(4)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take item: {}", e)))?;
+    match items.into_iter().next() {
+        Some(item) => Ok(Json(item)),
+        None => Err(AppError::NotFound("Item not found".to_string())),
     }
 }
 

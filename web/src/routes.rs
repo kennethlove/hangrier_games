@@ -1,6 +1,6 @@
 use crate::components::{
-    Accounts, AccountsPage, Credits, GamePage, GamePeriodPage, Games, GamesList, Home, IconsPage,
-    Navbar, TributeDetail,
+    Accounts, AccountsPage, AreaDetail, Credits, GamePage, GamePeriodPage, Games, GamesList, Home,
+    IconsPage, ItemDetail, Navbar, TributeDetail,
 };
 use dioxus::prelude::*;
 
@@ -29,6 +29,10 @@ pub enum Routes {
                 GamePeriodPage { identifier: String, day: u32, phase: shared::messages::Phase },
                 #[route("/:game_identifier/tributes/:tribute_identifier")]
                 TributeDetail { game_identifier: String, tribute_identifier: String },
+                #[route("/:game_identifier/areas/:area_identifier")]
+                AreaDetail { game_identifier: String, area_identifier: String },
+                #[route("/:game_identifier/items/:item_identifier")]
+                ItemDetail { game_identifier: String, item_identifier: String },
             #[end_layout]
         #[end_nest]
         #[nest("/account")]

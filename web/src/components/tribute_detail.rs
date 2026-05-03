@@ -106,6 +106,9 @@ pub(crate) fn trait_chip_classes(t: &Trait) -> &'static str {
         Trait::Tough => "bg-amber-700/40 text-amber-100 border border-amber-500/60",
         Trait::Asthmatic => "bg-indigo-700/40 text-indigo-100 border border-indigo-500/60",
         Trait::Nearsighted => "bg-fuchsia-700/40 text-fuchsia-100 border border-fuchsia-500/60",
+        // Survival
+        Trait::Builder => "bg-yellow-700/40 text-yellow-100 border border-yellow-500/60",
+        Trait::ResourcefulForager => "bg-lime-700/40 text-lime-100 border border-lime-500/60",
     }
 }
 

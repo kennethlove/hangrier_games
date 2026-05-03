@@ -212,6 +212,8 @@ impl Item {
                 false => Self::new_random_weapon(),
                 true => Self::new_random_shield(),
             },
+            (ItemType::Food(n), name) => Self::new_food(name, n),
+            (ItemType::Water(n), name) => Self::new_water(name, n),
         }
     }
 
@@ -329,6 +331,40 @@ impl Item {
         Item::new_shield(name.as_str())
     }
 
+    /// Construct a Food item carrying `value` hunger-debt relief. `name` is
+    /// optional; if absent, a generic "ration" name is generated.
+    pub fn new_food(name: Option<&str>, value: u8) -> Item {
+        let display = name.map(|s| s.to_string()).unwrap_or_else(|| {
+            // Tiny deterministic label pool keeps generation cheap and the
+            // payload self-describing without dragging in the full name
+            // generator just yet.
+            format!("ration ({})", value)
+        });
+        Item::new(
+            &display,
+            ItemType::Food(value),
+            ItemRarity::Common,
+            1,
+            Attribute::Health,
+            value as i32,
+        )
+    }
+
+    /// Construct a Water item carrying `value` thirst-debt relief.
+    pub fn new_water(name: Option<&str>, value: u8) -> Item {
+        let display = name
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| format!("waterskin ({})", value));
+        Item::new(
+            &display,
+            ItemType::Water(value),
+            ItemRarity::Common,
+            1,
+            Attribute::Health,
+            value as i32,
+        )
+    }
+
     pub fn is_weapon(&self) -> bool {
         self.item_type == ItemType::Weapon && self.attribute == Attribute::Strength
     }
@@ -346,14 +382,44 @@ impl Item {
 pub enum ItemType {
     Consumable,
     Weapon,
+    Food(u8),
+    Water(u8),
 }
 
 impl ItemType {
     pub fn random() -> ItemType {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
-        match rng.random_bool(0.5) {
-            true => ItemType::Consumable,
-            false => ItemType::Weapon,
+        // Weighted distribution: weapons and consumables remain dominant;
+        // food and water enter the spawn pool but are rarer (spec).
+        match rng.random_range(0..10) {
+            0..=3 => ItemType::Consumable,
+            4..=6 => ItemType::Weapon,
+            7..=8 => ItemType::Food(rng.random_range(1..=5)),
+            _ => ItemType::Water(rng.random_range(1..=3)),
+        }
+    }
+
+    pub fn is_food(&self) -> bool {
+        matches!(self, ItemType::Food(_))
+    }
+
+    pub fn is_water(&self) -> bool {
+        matches!(self, ItemType::Water(_))
+    }
+
+    pub fn food_value(&self) -> Option<u8> {
+        if let ItemType::Food(n) = self {
+            Some(*n)
+        } else {
+            None
+        }
+    }
+
+    pub fn water_value(&self) -> Option<u8> {
+        if let ItemType::Water(n) = self {
+            Some(*n)
+        } else {
+            None
         }
     }
 }
@@ -363,6 +429,8 @@ impl Display for ItemType {
         match self {
             ItemType::Consumable => write!(f, "consumable"),
             ItemType::Weapon => write!(f, "weapon"),
+            ItemType::Food(n) => write!(f, "food({})", n),
+            ItemType::Water(n) => write!(f, "water({})", n),
         }
     }
 }
@@ -371,7 +439,26 @@ impl FromStr for ItemType {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
+        let lower = s.to_lowercase();
+        if let Some(inner) = lower
+            .strip_prefix("food(")
+            .and_then(|x| x.strip_suffix(')'))
+        {
+            return inner
+                .parse::<u8>()
+                .map(ItemType::Food)
+                .map_err(|e| e.to_string());
+        }
+        if let Some(inner) = lower
+            .strip_prefix("water(")
+            .and_then(|x| x.strip_suffix(')'))
+        {
+            return inner
+                .parse::<u8>()
+                .map(ItemType::Water)
+                .map_err(|e| e.to_string());
+        }
+        match lower.as_str() {
             "consumable" => Ok(ItemType::Consumable),
             "weapon" => Ok(ItemType::Weapon),
             _ => Err("Invalid item type".to_string()),
@@ -457,6 +544,46 @@ impl FromStr for Attribute {
 mod tests {
     use super::*;
     use rstest::*;
+
+    #[test]
+    fn item_type_food_serializes_round_trip() {
+        let it = ItemType::Food(3);
+        let json = serde_json::to_string(&it).unwrap();
+        let back: ItemType = serde_json::from_str(&json).unwrap();
+        assert_eq!(it, back);
+    }
+
+    #[test]
+    fn item_type_water_serializes_round_trip() {
+        let it = ItemType::Water(2);
+        let json = serde_json::to_string(&it).unwrap();
+        let back: ItemType = serde_json::from_str(&json).unwrap();
+        assert_eq!(it, back);
+    }
+
+    #[test]
+    fn item_type_legacy_consumable_string_still_loads() {
+        let back: ItemType = serde_json::from_str("\"Consumable\"").unwrap();
+        assert_eq!(back, ItemType::Consumable);
+    }
+
+    #[test]
+    fn item_type_food_helpers() {
+        assert!(ItemType::Food(3).is_food());
+        assert_eq!(ItemType::Food(3).food_value(), Some(3));
+        assert_eq!(ItemType::Water(2).water_value(), Some(2));
+        assert!(!ItemType::Weapon.is_food());
+        assert_eq!(ItemType::Consumable.food_value(), None);
+    }
+
+    #[test]
+    fn item_type_display_and_fromstr_round_trip() {
+        for v in [ItemType::Food(5), ItemType::Water(2)] {
+            let s = v.to_string();
+            let back: ItemType = s.parse().unwrap();
+            assert_eq!(v, back);
+        }
+    }
 
     #[test]
     fn default_item() {
@@ -577,7 +704,10 @@ mod tests {
     #[test]
     fn random_item_type() {
         let item_type = ItemType::random();
-        assert!([ItemType::Weapon, ItemType::Consumable].contains(&item_type));
+        assert!(matches!(
+            item_type,
+            ItemType::Weapon | ItemType::Consumable | ItemType::Food(_) | ItemType::Water(_)
+        ));
     }
 
     #[test]

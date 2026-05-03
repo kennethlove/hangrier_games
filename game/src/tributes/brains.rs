@@ -470,6 +470,15 @@ impl Brain {
             return Action::None;
         }
 
+        // Survival overrides (spec §6.4) run before the normal weighted
+        // scoring. Active combat (nearby enemies > 0) suppresses them.
+        let weather = crate::areas::weather::current_weather();
+        if let Some(action) =
+            survival_override(tribute, terrain.base, &weather, nearby_tributes > 0)
+        {
+            return action;
+        }
+
         // Check for preferred action first
         if let Some(ref preferred_action) = self.preferred_action
             && rng.random_bool(self.preferred_action_percentage)
@@ -733,6 +742,63 @@ impl Brain {
             _ => Action::Hide,
         }
     }
+}
+
+/// Survival override branch. Returns `Some(action)` to short-circuit the
+/// Brain's normal weighted scoring; returns `None` to fall through.
+///
+/// Order (per spec §6.4):
+/// 1. Dehydrated + at water-source terrain -> `DrinkFromTerrain`.
+/// 2. Dehydrated + Water item in inventory -> `DrinkItem`.
+/// 3. Starving + Food item in inventory -> `Eat`.
+/// 4. Starving + at forageable terrain (and not in combat) -> `Forage`.
+///
+/// Active combat suppresses all overrides (the existing combat handling
+/// preempts decision-making upstream — this is a defensive guard).
+pub fn survival_override(
+    tribute: &Tribute,
+    terrain: BaseTerrain,
+    weather: &crate::areas::weather::Weather,
+    in_combat: bool,
+) -> Option<Action> {
+    use crate::areas::forage::forage_richness;
+    use crate::areas::water::water_source;
+    use crate::tributes::survival::{HungerBand, ThirstBand, hunger_band, thirst_band};
+
+    if in_combat {
+        return None;
+    }
+
+    let dehydrated = thirst_band(tribute.thirst) == ThirstBand::Dehydrated;
+    let starving = hunger_band(tribute.hunger) == HungerBand::Starving;
+
+    if dehydrated && water_source(terrain, weather) > 0 {
+        return Some(Action::DrinkFromTerrain);
+    }
+    if dehydrated
+        && let Some(item) = tribute
+            .items
+            .iter()
+            .find(|i| i.item_type.is_water())
+            .cloned()
+    {
+        return Some(Action::DrinkItem(Some(item)));
+    }
+    if starving {
+        if let Some(item) = tribute
+            .items
+            .iter()
+            .find(|i| i.item_type.is_food())
+            .cloned()
+        {
+            return Some(Action::Eat(Some(item)));
+        }
+        if forage_richness(terrain) > 0 {
+            return Some(Action::Forage);
+        }
+    }
+
+    None
 }
 
 #[cfg(test)]
@@ -1215,5 +1281,65 @@ mod tests {
             }
             other => panic!("expected Move(Some(_)), got {other:?}"),
         }
+    }
+}
+
+#[cfg(test)]
+mod survival_override_tests {
+    use super::*;
+    use crate::areas::weather::Weather;
+    use crate::items::Item;
+    use crate::terrain::BaseTerrain;
+    use crate::tributes::Tribute;
+    use crate::tributes::actions::Action;
+
+    #[test]
+    fn override_dehydrated_at_water_terrain_picks_drink() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        t.thirst = 3;
+        let action = survival_override(&t, BaseTerrain::Wetlands, &Weather::Clear, false);
+        assert_eq!(action, Some(Action::DrinkFromTerrain));
+    }
+
+    #[test]
+    fn override_dehydrated_with_water_item_picks_drink_item() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        t.thirst = 3;
+        t.items.push(Item::new_water(None, 2));
+        let action = survival_override(&t, BaseTerrain::Desert, &Weather::Clear, false);
+        assert!(matches!(action, Some(Action::DrinkItem(_))));
+    }
+
+    #[test]
+    fn override_starving_with_food_picks_eat() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        t.hunger = 5;
+        t.items.push(Item::new_food(None, 3));
+        let action = survival_override(&t, BaseTerrain::Desert, &Weather::Clear, false);
+        assert!(matches!(action, Some(Action::Eat(_))));
+    }
+
+    #[test]
+    fn override_starving_at_forageable_terrain_no_inventory_picks_forage() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        t.hunger = 5;
+        let action = survival_override(&t, BaseTerrain::Wetlands, &Weather::Clear, false);
+        assert_eq!(action, Some(Action::Forage));
+    }
+
+    #[test]
+    fn override_starving_in_combat_returns_none() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        t.hunger = 5;
+        let action = survival_override(&t, BaseTerrain::Wetlands, &Weather::Clear, true);
+        assert_eq!(action, None);
+    }
+
+    #[test]
+    fn override_hungry_not_starving_returns_none() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        t.hunger = 3;
+        let action = survival_override(&t, BaseTerrain::Wetlands, &Weather::Clear, false);
+        assert_eq!(action, None);
     }
 }

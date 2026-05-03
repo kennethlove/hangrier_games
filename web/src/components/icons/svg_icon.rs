@@ -68,6 +68,8 @@ pub fn icon_name_for_item(item: &game::items::Item) -> String {
             Attribute::Strength => "hypodermic_test",
             Attribute::Defense => "spray",
         },
+        ItemType::Food(_) => "trail_mix",
+        ItemType::Water(_) => "fizzing_flask",
         ItemType::Weapon => match item.attribute {
             Attribute::Strength => {
                 let name = item.to_string().to_lowercase();

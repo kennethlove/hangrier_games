@@ -27,6 +27,9 @@ pub enum Trait {
     Asthmatic,
     Nearsighted,
     Tough,
+    // Survival (shelter + hunger/thirst spec)
+    Builder,
+    ResourcefulForager,
 }
 
 impl Trait {
@@ -48,6 +51,8 @@ impl Trait {
             Trait::Asthmatic => "asthmatic",
             Trait::Nearsighted => "nearsighted",
             Trait::Tough => "tough",
+            Trait::Builder => "a builder",
+            Trait::ResourcefulForager => "a resourceful forager",
         }
     }
 
@@ -425,5 +430,30 @@ mod tests {
     fn threshold_delta_zero_traits_is_identity() {
         let total: ThresholdDelta = [].iter().map(|t: &Trait| t.threshold_modifiers()).sum();
         assert_eq!(total, ThresholdDelta::default());
+    }
+
+    #[test]
+    fn survival_traits_round_trip_serde() {
+        for t in [Trait::Builder, Trait::ResourcefulForager] {
+            let json = serde_json::to_string(&t).unwrap();
+            let back: Trait = serde_json::from_str(&json).unwrap();
+            assert_eq!(t, back);
+        }
+    }
+
+    #[test]
+    fn survival_traits_have_labels() {
+        assert_eq!(Trait::Builder.label(), "a builder");
+        assert_eq!(Trait::ResourcefulForager.label(), "a resourceful forager");
+    }
+
+    #[test]
+    fn survival_traits_do_not_conflict_with_each_other_or_self() {
+        assert!(!conflicts_with(Trait::Builder, Trait::ResourcefulForager));
+        assert!(!conflicts_with(Trait::Builder, Trait::Builder));
+        assert!(!conflicts_with(
+            Trait::ResourcefulForager,
+            Trait::ResourcefulForager
+        ));
     }
 }

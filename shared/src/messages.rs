@@ -3,6 +3,11 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
+/// Cause string used in `MessagePayload::TributeKilled` for starvation deaths.
+pub const CAUSE_STARVATION: &str = "starvation";
+/// Cause string used in `MessagePayload::TributeKilled` for dehydration deaths.
+pub const CAUSE_DEHYDRATION: &str = "dehydration";
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", content = "value")]
 pub enum MessageSource {
@@ -98,6 +103,14 @@ pub enum CombatOutcome {
     TargetFled,
     AttackerFled,
     Stalemate,
+}
+
+/// Source of a `Drank` event: either a terrain water source or a Water item.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum DrinkSource {
+    Terrain { area: AreaRef },
+    Item { item: ItemRef },
 }
 
 /// Coarse-grained category for a `GameMessage`. Derived from `MessagePayload`
@@ -208,6 +221,40 @@ pub enum MessagePayload {
     SanityBreak {
         tribute: TributeRef,
     },
+
+    // Survival events (shelter + hunger/thirst spec).
+    HungerBandChanged {
+        tribute: TributeRef,
+        from: String,
+        to: String,
+    },
+    ThirstBandChanged {
+        tribute: TributeRef,
+        from: String,
+        to: String,
+    },
+    ShelterSought {
+        tribute: TributeRef,
+        area: AreaRef,
+        success: bool,
+        roll: u8,
+    },
+    Foraged {
+        tribute: TributeRef,
+        area: AreaRef,
+        success: bool,
+        debt_recovered: u8,
+    },
+    Drank {
+        tribute: TributeRef,
+        source: DrinkSource,
+        debt_recovered: u8,
+    },
+    Ate {
+        tribute: TributeRef,
+        item: ItemRef,
+        debt_recovered: u8,
+    },
 }
 
 impl MessagePayload {
@@ -232,7 +279,13 @@ impl MessagePayload {
             | TributeRested { .. }
             | TributeStarved { .. }
             | TributeDehydrated { .. }
-            | SanityBreak { .. } => MessageKind::State,
+            | SanityBreak { .. }
+            | HungerBandChanged { .. }
+            | ThirstBandChanged { .. }
+            | ShelterSought { .. }
+            | Foraged { .. }
+            | Drank { .. }
+            | Ate { .. } => MessageKind::State,
         }
     }
 
@@ -263,7 +316,13 @@ impl MessagePayload {
             | TributeRested { tribute, .. }
             | TributeStarved { tribute, .. }
             | TributeDehydrated { tribute, .. }
-            | SanityBreak { tribute } => r(tribute),
+            | SanityBreak { tribute }
+            | HungerBandChanged { tribute, .. }
+            | ThirstBandChanged { tribute, .. }
+            | ShelterSought { tribute, .. }
+            | Foraged { tribute, .. }
+            | Drank { tribute, .. }
+            | Ate { tribute, .. } => r(tribute),
             SponsorGift { recipient, .. } => r(recipient),
             AreaClosed { .. } | AreaEvent { .. } => false,
         }
@@ -753,5 +812,111 @@ mod tests {
         assert_eq!(current.len(), 1);
         assert_eq!(current[0].day, 2);
         assert_eq!(current[0].phase, Phase::Night);
+    }
+}
+
+#[cfg(test)]
+mod survival_event_tests {
+    use super::*;
+
+    fn tref() -> TributeRef {
+        TributeRef {
+            identifier: "t1".into(),
+            name: "Cato".into(),
+        }
+    }
+    fn aref() -> AreaRef {
+        AreaRef {
+            identifier: "a1".into(),
+            name: "Forest".into(),
+        }
+    }
+    fn iref() -> ItemRef {
+        ItemRef {
+            identifier: "i1".into(),
+            name: "Berries".into(),
+        }
+    }
+
+    #[test]
+    fn shelter_sought_round_trip() {
+        let p = MessagePayload::ShelterSought {
+            tribute: tref(),
+            area: aref(),
+            success: true,
+            roll: 2,
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        let back: MessagePayload = serde_json::from_str(&json).unwrap();
+        assert_eq!(format!("{:?}", p), format!("{:?}", back));
+        assert_eq!(p.kind(), MessageKind::State);
+    }
+
+    #[test]
+    fn band_change_payloads_round_trip() {
+        let p = MessagePayload::HungerBandChanged {
+            tribute: tref(),
+            from: "Sated".into(),
+            to: "Hungry".into(),
+        };
+        let back: MessagePayload =
+            serde_json::from_str(&serde_json::to_string(&p).unwrap()).unwrap();
+        assert_eq!(format!("{:?}", p), format!("{:?}", back));
+        let p = MessagePayload::ThirstBandChanged {
+            tribute: tref(),
+            from: "Sated".into(),
+            to: "Parched".into(),
+        };
+        let back: MessagePayload =
+            serde_json::from_str(&serde_json::to_string(&p).unwrap()).unwrap();
+        assert_eq!(format!("{:?}", p), format!("{:?}", back));
+    }
+
+    #[test]
+    fn foraged_drank_ate_round_trip_and_kind() {
+        let foraged = MessagePayload::Foraged {
+            tribute: tref(),
+            area: aref(),
+            success: true,
+            debt_recovered: 3,
+        };
+        let drank = MessagePayload::Drank {
+            tribute: tref(),
+            source: DrinkSource::Terrain { area: aref() },
+            debt_recovered: 2,
+        };
+        let drank_item = MessagePayload::Drank {
+            tribute: tref(),
+            source: DrinkSource::Item { item: iref() },
+            debt_recovered: 1,
+        };
+        let ate = MessagePayload::Ate {
+            tribute: tref(),
+            item: iref(),
+            debt_recovered: 4,
+        };
+        for p in [foraged, drank, drank_item, ate] {
+            let back: MessagePayload =
+                serde_json::from_str(&serde_json::to_string(&p).unwrap()).unwrap();
+            assert_eq!(format!("{:?}", p), format!("{:?}", back));
+            assert_eq!(p.kind(), MessageKind::State);
+        }
+    }
+
+    #[test]
+    fn cause_constants_exist() {
+        assert_eq!(CAUSE_STARVATION, "starvation");
+        assert_eq!(CAUSE_DEHYDRATION, "dehydration");
+    }
+
+    #[test]
+    fn survival_payloads_involve_tribute() {
+        let p = MessagePayload::Ate {
+            tribute: tref(),
+            item: iref(),
+            debt_recovered: 1,
+        };
+        assert!(p.involves("t1"));
+        assert!(!p.involves("other"));
     }
 }

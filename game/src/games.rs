@@ -962,6 +962,15 @@ impl Game {
                 .push(tribute);
         }
 
+        // Per-area living-tribute density. Threaded into `EnvironmentContext`
+        // so `Brain::choose_destination` can apply a per-enemy crowd penalty
+        // and disperse crowded areas without a call-site escape hatch
+        // (hangrier_games-4wnj).
+        let enemy_density: HashMap<Area, u32> = tributes_by_area
+            .iter()
+            .map(|(area, tributes)| (*area, tributes.len() as u32))
+            .collect();
+
         // Collected (actor_identifier, actor_name, content, payload, optional GameEvent)
         // tuples from all tributes this cycle. Drained into `self.messages` after
         // the mutable borrow of `self.tributes` ends.
@@ -1156,6 +1165,7 @@ impl Game {
                 closed_areas: &closed_areas,
                 available_destinations,
                 all_areas: &all_areas_snapshot,
+                enemy_density: &enemy_density,
                 current_day: self.day.unwrap_or(1),
             };
 

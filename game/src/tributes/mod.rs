@@ -117,6 +117,10 @@ pub struct EnvironmentContext<'a> {
     /// All known areas (read-only snapshot). Used by multi-hop
     /// pathfinding so the planner can reason about non-neighbor goals.
     pub all_areas: &'a [AreaDetails],
+    /// Per-area count of living tributes. Fed into `Brain::choose_destination`
+    /// as a crowd penalty so movement scoring naturally disperses crowded
+    /// tributes without a call-site escape hatch.
+    pub enemy_density: &'a std::collections::HashMap<Area, u32>,
     /// Current game day (1-indexed). Used to gate day-1-only behavior such
     /// as suppressing sponsor gifts in the opening cycle.
     pub current_day: u32,
@@ -451,6 +455,7 @@ impl Tribute {
             &environment_details.available_destinations,
             environment_details.all_areas,
             environment_details.closed_areas,
+            environment_details.enemy_density,
             rng,
         );
 

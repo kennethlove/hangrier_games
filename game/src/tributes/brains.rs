@@ -494,6 +494,21 @@ impl Brain {
             return action;
         }
 
+        // Stamina override (spec §6.4 — runs after survival, before standard
+        // logic). For v1 we cannot easily plumb the live nearby-tribute list
+        // and the per-phase shelter flag through this signature; pass an
+        // empty threat slice and `sheltered=false`. The Exhausted -> Rest
+        // path still fires (the dominant outcome); the visible-band flee
+        // path is conservative until plumbing lands as a follow-up.
+        if let Some(action) = stamina_override(
+            tribute,
+            &[],
+            false,
+            &crate::tributes::combat_tuning::CombatTuning::default(),
+        ) {
+            return action;
+        }
+
         // Check for preferred action first
         if let Some(ref preferred_action) = self.preferred_action
             && rng.random_bool(self.preferred_action_percentage)
@@ -814,6 +829,50 @@ pub fn survival_override(
     }
 
     None
+}
+
+/// Stamina-band override layer. Returns `Some(Action)` to override the
+/// standard brain when the actor is Exhausted; returns `None` for Fresh and
+/// Winded (Winded is handled at action-scoring time via
+/// `winded_attack_score_penalty`).
+///
+/// Pipeline order (see spec):
+/// 1. Combat preempt
+/// 2. Gamemaker overrides
+/// 3. Hunger/thirst overrides (`survival_override`)
+/// 4. Stamina overrides (this fn)
+/// 5. Standard brain logic
+pub fn stamina_override(
+    tribute: &Tribute,
+    nearby: &[Tribute],
+    sheltered: bool,
+    tuning: &crate::tributes::combat_tuning::CombatTuning,
+) -> Option<Action> {
+    use crate::tributes::stamina_band::stamina_band;
+    use shared::messages::StaminaBand;
+
+    let band = stamina_band(tribute.stamina, tribute.max_stamina, tuning);
+    if band != StaminaBand::Exhausted {
+        return None;
+    }
+
+    // Visible-band flee: any nearby living tribute (other than self) with a
+    // better band is a threat. If we're not already sheltered, flee. The
+    // destination layer fills the destination based on the threat location.
+    if !sheltered {
+        let any_threat = nearby.iter().any(|other| {
+            other.identifier != tribute.identifier && other.attributes.health > 0 && {
+                let other_band = stamina_band(other.stamina, other.max_stamina, tuning);
+                matches!(other_band, StaminaBand::Fresh | StaminaBand::Winded)
+            }
+        });
+        if any_threat {
+            return Some(Action::Move(None));
+        }
+    }
+
+    // Otherwise hold position and recover.
+    Some(Action::Rest)
 }
 
 #[cfg(test)]
@@ -1564,5 +1623,66 @@ mod survival_override_tests {
         t.hunger = 3;
         let action = survival_override(&t, BaseTerrain::Wetlands, &Weather::Clear, false);
         assert_eq!(action, None);
+    }
+
+    mod stamina {
+        use super::*;
+        use crate::tributes::combat_tuning::CombatTuning;
+
+        fn make(name: &str, stamina: u32) -> Tribute {
+            let mut t = Tribute::new(name.to_string(), None, None);
+            t.brain = Brain::default();
+            t.attributes = crate::tributes::Attributes::default();
+            t.stamina = stamina;
+            t.max_stamina = 100;
+            t
+        }
+
+        #[test]
+        fn fresh_returns_none() {
+            let t = make("F", 100);
+            let result = stamina_override(&t, &[], false, &CombatTuning::default());
+            assert_eq!(result, None);
+        }
+
+        #[test]
+        fn winded_returns_none() {
+            let t = make("W", 30);
+            let result = stamina_override(&t, &[], false, &CombatTuning::default());
+            assert_eq!(result, None);
+        }
+
+        #[test]
+        fn exhausted_in_shelter_returns_rest() {
+            let t = make("E", 10);
+            let result = stamina_override(&t, &[], true, &CombatTuning::default());
+            assert_eq!(result, Some(Action::Rest));
+        }
+
+        #[test]
+        fn exhausted_no_shelter_no_threats_rests() {
+            let t = make("E", 10);
+            let result = stamina_override(&t, &[], false, &CombatTuning::default());
+            assert_eq!(result, Some(Action::Rest));
+        }
+
+        #[test]
+        fn exhausted_with_fresh_threat_flees() {
+            let actor = make("E", 10);
+            let threat = make("Hunter", 100);
+            let result = stamina_override(&actor, &[threat], false, &CombatTuning::default());
+            assert!(matches!(result, Some(Action::Move(_))));
+        }
+
+        #[test]
+        fn exhausted_self_does_not_count_as_threat() {
+            // Same identifier as actor → not a threat.
+            let mut actor = make("E", 10);
+            actor.identifier = "self".to_string();
+            let mut clone = make("E", 100);
+            clone.identifier = "self".to_string();
+            let result = stamina_override(&actor, &[clone], false, &CombatTuning::default());
+            assert_eq!(result, Some(Action::Rest));
+        }
     }
 }

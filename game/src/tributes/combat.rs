@@ -140,15 +140,6 @@ impl Tribute {
             .map(iref);
         let attacker_ref_at_start = tref(self);
         let target_ref_at_start = tref(target);
-        let mk_beat = |outcome: SwingOutcome| CombatBeat {
-            attacker: attacker_ref_at_start.clone(),
-            target: target_ref_at_start.clone(),
-            weapon: weapon_at_start.clone(),
-            shield: shield_at_start.clone(),
-            wear: Vec::new(),
-            outcome,
-            stress: StressReport::default(),
-        };
 
         // Local accumulator for prose lines that become this engagement's
         // `detail_lines`. Helpers (`attack_contest`, `apply_combat_results`,
@@ -158,7 +149,18 @@ impl Tribute {
         let mut sub_events: Vec<TaggedEvent> = Vec::new();
 
         // `self` is the attacker
-        let result = attack_contest(self, target, rng, &mut sub_events);
+        let contest = attack_contest(self, target, rng, &mut sub_events);
+        let result = contest.result;
+        let wear_records = contest.wear;
+        let mk_beat = |outcome: SwingOutcome| CombatBeat {
+            attacker: attacker_ref_at_start.clone(),
+            target: target_ref_at_start.clone(),
+            weapon: weapon_at_start.clone(),
+            shield: shield_at_start.clone(),
+            wear: wear_records.clone(),
+            outcome,
+            stress: StressReport::default(),
+        };
         for ev in sub_events.drain(..) {
             detail_lines.push(ev.content);
         }
@@ -484,26 +486,50 @@ fn calculate_violence_stress(kills: u32, wins: u32, current_sanity: u32) -> u32 
 /// Natural 1 on attack = critical fumble (attacker takes damage).
 /// Natural 20 on attack = critical hit (triple damage).
 /// Natural 20 on defense = perfect block (defender counters).
+/// Outcome of a single `attack_contest` invocation.
+///
+/// Carries the high-level `AttackResult` plus enough wear/penalty data for
+/// the caller to assemble a `CombatBeat` without re-snapshotting equipment
+/// state.
+pub struct AttackContestOutcome {
+    pub result: AttackResult,
+    /// Wear records emitted in attack-roll order: weapon (if equipped) then
+    /// shield (if equipped). Items that were `Pristine` are omitted.
+    pub wear: Vec<shared::combat_beat::WearReport>,
+}
+
 pub fn attack_contest(
     attacker: &mut Tribute,
     target: &mut Tribute,
     rng: &mut impl Rng,
     events: &mut Vec<TaggedEvent>,
-) -> AttackResult {
+) -> AttackContestOutcome {
+    use shared::combat_beat::{WearOutcomeReport, WearReport};
     // Get attack roll and strength modifier
     let base_attack_roll: i32 = rng.random_range(1..=20); // Base roll
     let mut attack_roll = base_attack_roll;
     attack_roll += attacker.attributes.strength as i32; // Add strength
 
+    let mut wear: Vec<WearReport> = Vec::new();
+
     // If the attacker has a weapon, use it
     let weapon_outcome = if let Some(weapon) = attacker.equipped_weapon_mut() {
         attack_roll += weapon.effect; // Add weapon damage
         let outcome = weapon.wear(1);
-        Some((weapon.clone(), outcome))
+        // Defer clone: only Worn/Broken paths need the snapshot.
+        match outcome {
+            crate::items::WearOutcome::Pristine => None,
+            _ => Some((weapon.clone(), outcome)),
+        }
     } else {
         None
     };
     if let Some((weapon, outcome)) = weapon_outcome {
+        let attacker_ref = tref(attacker);
+        let item_ref = shared::messages::ItemRef {
+            identifier: weapon.identifier.clone(),
+            name: weapon.name.clone(),
+        };
         match outcome {
             crate::items::WearOutcome::Pristine => {}
             crate::items::WearOutcome::Worn => {
@@ -512,13 +538,17 @@ pub fn attack_contest(
                 events.push(TaggedEvent::new(
                     content,
                     MessagePayload::ItemUsed {
-                        tribute: tref(attacker),
-                        item: shared::messages::ItemRef {
-                            identifier: weapon.identifier.clone(),
-                            name: weapon.name.clone(),
-                        },
+                        tribute: attacker_ref.clone(),
+                        item: item_ref.clone(),
                     },
                 ));
+                wear.push(WearReport {
+                    owner: attacker_ref,
+                    item: item_ref,
+                    outcome: WearOutcomeReport::Worn,
+                    forfeited_effect: None,
+                    mid_action_penalty: None,
+                });
             }
             crate::items::WearOutcome::Broken => {
                 let content = GameOutput::WeaponBreak(attacker.name.as_str(), weapon.name.as_str())
@@ -526,16 +556,37 @@ pub fn attack_contest(
                 events.push(TaggedEvent::new(
                     content,
                     MessagePayload::ItemUsed {
-                        tribute: tref(attacker),
-                        item: shared::messages::ItemRef {
-                            identifier: weapon.identifier.clone(),
-                            name: weapon.name.clone(),
-                        },
+                        tribute: attacker_ref.clone(),
+                        item: item_ref.clone(),
                     },
                 ));
                 if let Err(err) = attacker.remove_item(&weapon) {
                     eprintln!("Failed to remove weapon: {}", err);
                 }
+                // D1 + D2: forfeit the just-applied effect bonus and apply 1d4 penalty.
+                attack_roll -= weapon.effect;
+                let penalty = rng.random_range(1..=4);
+                attack_roll -= penalty;
+                let narration = GameOutput::WeaponShattersMidSwing(
+                    attacker.name.as_str(),
+                    weapon.name.as_str(),
+                    penalty as u32,
+                )
+                .to_string();
+                events.push(TaggedEvent::new(
+                    narration,
+                    MessagePayload::ItemUsed {
+                        tribute: attacker_ref.clone(),
+                        item: item_ref.clone(),
+                    },
+                ));
+                wear.push(WearReport {
+                    owner: attacker_ref,
+                    item: item_ref,
+                    outcome: WearOutcomeReport::Broken,
+                    forfeited_effect: Some(weapon.effect),
+                    mid_action_penalty: Some(penalty),
+                });
             }
         }
     }
@@ -549,11 +600,19 @@ pub fn attack_contest(
     let shield_outcome = if let Some(shield) = target.equipped_shield_mut() {
         defense_roll += shield.effect; // Add shield defense
         let outcome = shield.wear(1);
-        Some((shield.clone(), outcome))
+        match outcome {
+            crate::items::WearOutcome::Pristine => None,
+            _ => Some((shield.clone(), outcome)),
+        }
     } else {
         None
     };
     if let Some((shield, outcome)) = shield_outcome {
+        let target_ref = tref(target);
+        let item_ref = shared::messages::ItemRef {
+            identifier: shield.identifier.clone(),
+            name: shield.name.clone(),
+        };
         match outcome {
             crate::items::WearOutcome::Pristine => {}
             crate::items::WearOutcome::Worn => {
@@ -562,13 +621,17 @@ pub fn attack_contest(
                 events.push(TaggedEvent::new(
                     content,
                     MessagePayload::ItemUsed {
-                        tribute: tref(target),
-                        item: shared::messages::ItemRef {
-                            identifier: shield.identifier.clone(),
-                            name: shield.name.clone(),
-                        },
+                        tribute: target_ref.clone(),
+                        item: item_ref.clone(),
                     },
                 ));
+                wear.push(WearReport {
+                    owner: target_ref,
+                    item: item_ref,
+                    outcome: WearOutcomeReport::Worn,
+                    forfeited_effect: None,
+                    mid_action_penalty: None,
+                });
             }
             crate::items::WearOutcome::Broken => {
                 let content =
@@ -576,22 +639,43 @@ pub fn attack_contest(
                 events.push(TaggedEvent::new(
                     content,
                     MessagePayload::ItemUsed {
-                        tribute: tref(target),
-                        item: shared::messages::ItemRef {
-                            identifier: shield.identifier.clone(),
-                            name: shield.name.clone(),
-                        },
+                        tribute: target_ref.clone(),
+                        item: item_ref.clone(),
                     },
                 ));
                 if let Err(err) = target.remove_item(&shield) {
                     eprintln!("Failed to remove shield: {}", err);
                 }
+                // D3 mirror: forfeit shield effect + apply 1d4 defense penalty.
+                defense_roll -= shield.effect;
+                let penalty = rng.random_range(1..=4);
+                defense_roll -= penalty;
+                let narration = GameOutput::ShieldShattersMidBlock(
+                    target.name.as_str(),
+                    shield.name.as_str(),
+                    penalty as u32,
+                )
+                .to_string();
+                events.push(TaggedEvent::new(
+                    narration,
+                    MessagePayload::ItemUsed {
+                        tribute: target_ref.clone(),
+                        item: item_ref.clone(),
+                    },
+                ));
+                wear.push(WearReport {
+                    owner: target_ref,
+                    item: item_ref,
+                    outcome: WearOutcomeReport::Broken,
+                    forfeited_effect: Some(shield.effect),
+                    mid_action_penalty: Some(penalty),
+                });
             }
         }
     }
 
     // Check for critical outcomes based on natural rolls (before modifiers)
-    match (base_attack_roll, base_defense_roll) {
+    let result = match (base_attack_roll, base_defense_roll) {
         (1, _) => AttackResult::CriticalFumble, // Natural 1 on attack - fumble!
         (20, _) => AttackResult::CriticalHit,   // Natural 20 on attack - crit!
         (_, 20) => AttackResult::PerfectBlock,  // Natural 20 on defense - perfect block!
@@ -624,7 +708,22 @@ pub fn attack_contest(
                 }
             }
         }
+    };
+
+    // D5: CriticalFumble clears attacker-side break-penalty fields on the
+    // recorded wear report. The fumble path's catastrophic self-damage is the
+    // story; piling the snapped-weapon penalty on top is double jeopardy.
+    if matches!(result, AttackResult::CriticalFumble)
+        && let Some(report) = wear.iter_mut().find(|w| {
+            w.outcome == WearOutcomeReport::Broken
+                && w.owner.identifier == tref(attacker).identifier
+        })
+    {
+        report.forfeited_effect = None;
+        report.mid_action_penalty = None;
     }
+
+    AttackContestOutcome { result, wear }
 }
 
 /// Apply the results of a combat encounter.
@@ -707,7 +806,8 @@ mod tests {
         attacker.attributes.strength = 10;
         target.attributes.defense = 5;
 
-        let result = attack_contest(&mut attacker, &mut target, &mut small_rng, &mut Vec::new());
+        let result =
+            attack_contest(&mut attacker, &mut target, &mut small_rng, &mut Vec::new()).result;
         assert_eq!(result, AttackResult::AttackerWins);
     }
 
@@ -719,7 +819,8 @@ mod tests {
         attacker.attributes.strength = 15;
         target.attributes.defense = 0;
 
-        let result = attack_contest(&mut attacker, &mut target, &mut small_rng, &mut Vec::new());
+        let result =
+            attack_contest(&mut attacker, &mut target, &mut small_rng, &mut Vec::new()).result;
         assert_eq!(result, AttackResult::AttackerWinsDecisively);
     }
 
@@ -731,7 +832,8 @@ mod tests {
         attacker.attributes.strength = 15;
         target.attributes.defense = 20;
 
-        let result = attack_contest(&mut attacker, &mut target, &mut small_rng, &mut Vec::new());
+        let result =
+            attack_contest(&mut attacker, &mut target, &mut small_rng, &mut Vec::new()).result;
         assert_eq!(result, AttackResult::DefenderWins);
     }
 
@@ -743,7 +845,8 @@ mod tests {
         attacker.attributes.strength = 1;
         target.attributes.defense = 20;
 
-        let result = attack_contest(&mut attacker, &mut target, &mut small_rng, &mut Vec::new());
+        let result =
+            attack_contest(&mut attacker, &mut target, &mut small_rng, &mut Vec::new()).result;
         assert_eq!(result, AttackResult::DefenderWinsDecisively);
     }
 
@@ -755,7 +858,8 @@ mod tests {
         attacker.attributes.strength = 21; // Magic number to make the final scores even
         target.attributes.defense = 20;
 
-        let result = attack_contest(&mut attacker, &mut target, &mut small_rng, &mut Vec::new());
+        let result =
+            attack_contest(&mut attacker, &mut target, &mut small_rng, &mut Vec::new()).result;
         assert_eq!(result, AttackResult::Miss);
     }
 
@@ -856,7 +960,8 @@ mod tests {
         attacker.attributes.strength = 10;
         target.attributes.health = 100;
 
-        let result = attack_contest(&mut attacker, &mut target, &mut crit_rng, &mut Vec::new());
+        let result =
+            attack_contest(&mut attacker, &mut target, &mut crit_rng, &mut Vec::new()).result;
         assert_eq!(result, AttackResult::CriticalHit);
     }
 
@@ -884,7 +989,8 @@ mod tests {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         let mut target = Tribute::new("Peeta".to_string(), None, None);
 
-        let result = attack_contest(&mut attacker, &mut target, &mut fumble_rng, &mut Vec::new());
+        let result =
+            attack_contest(&mut attacker, &mut target, &mut fumble_rng, &mut Vec::new()).result;
         assert_eq!(result, AttackResult::CriticalFumble);
     }
 
@@ -924,7 +1030,8 @@ mod tests {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         let mut target = Tribute::new("Peeta".to_string(), None, None);
 
-        let result = attack_contest(&mut attacker, &mut target, &mut block_rng, &mut Vec::new());
+        let result =
+            attack_contest(&mut attacker, &mut target, &mut block_rng, &mut Vec::new()).result;
         assert_eq!(result, AttackResult::PerfectBlock);
     }
 
@@ -1154,5 +1261,186 @@ mod tests {
             .filter(|e| matches!(e.payload, MessagePayload::CombatSwing(_)))
             .count();
         assert_eq!(swings, 1, "self-attack must emit exactly one CombatSwing");
+    }
+
+    /// Construct a weapon with the given effect and durability=1 so a single
+    /// `wear(1)` call breaks it.
+    fn brittle_weapon(effect: i32) -> crate::items::Item {
+        crate::items::Item::new(
+            "Glass Sword",
+            crate::items::ItemType::Weapon,
+            crate::items::ItemRarity::Common,
+            1,
+            crate::items::Attribute::Strength,
+            effect,
+        )
+    }
+
+    /// Construct a shield with the given effect and durability=1.
+    fn brittle_shield(effect: i32) -> crate::items::Item {
+        crate::items::Item::new(
+            "Glass Buckler",
+            crate::items::ItemType::Weapon,
+            crate::items::ItemRarity::Common,
+            1,
+            crate::items::Attribute::Defense,
+            effect,
+        )
+    }
+
+    #[test]
+    fn weapon_break_records_forfeit_and_penalty_on_beat() {
+        let mut attacker = Tribute::new("Atk".into(), None, None);
+        attacker.attributes.strength = 10;
+        let weapon = brittle_weapon(5);
+        attacker.add_item(weapon.clone());
+
+        let mut target = Tribute::new("Tgt".into(), None, None);
+        target.attributes.defense = 5;
+
+        let mut events: Vec<TaggedEvent> = Vec::new();
+        let mut rng = SmallRng::seed_from_u64(42);
+        let _ = attacker.attacks(&mut target, &mut rng, &mut events);
+
+        let beat = events
+            .iter()
+            .find_map(|e| match &e.payload {
+                MessagePayload::CombatSwing(b) => Some(b),
+                _ => None,
+            })
+            .expect("expected one CombatSwing emission");
+        let weapon_wear = beat
+            .wear
+            .iter()
+            .find(|w| w.owner.identifier == beat.attacker.identifier)
+            .expect("expected a wear report for the attacker's weapon");
+
+        assert_eq!(
+            weapon_wear.outcome,
+            shared::combat_beat::WearOutcomeReport::Broken
+        );
+        assert_eq!(weapon_wear.forfeited_effect, Some(5));
+        let penalty = weapon_wear.mid_action_penalty.expect("penalty must fire");
+        assert!(
+            (1..=4).contains(&penalty),
+            "penalty must be 1..=4, got {}",
+            penalty
+        );
+    }
+
+    #[test]
+    fn shield_break_records_forfeit_and_penalty_on_beat() {
+        let mut attacker = Tribute::new("Atk".into(), None, None);
+        attacker.attributes.strength = 10;
+
+        let mut target = Tribute::new("Tgt".into(), None, None);
+        target.attributes.defense = 5;
+        let shield = brittle_shield(4);
+        target.add_item(shield.clone());
+
+        let mut events: Vec<TaggedEvent> = Vec::new();
+        let mut rng = SmallRng::seed_from_u64(7);
+        let _ = attacker.attacks(&mut target, &mut rng, &mut events);
+
+        let beat = events
+            .iter()
+            .find_map(|e| match &e.payload {
+                MessagePayload::CombatSwing(b) => Some(b),
+                _ => None,
+            })
+            .expect("expected one CombatSwing emission");
+        let shield_wear = beat
+            .wear
+            .iter()
+            .find(|w| w.owner.identifier == beat.target.identifier)
+            .expect("expected a wear report for the target's shield");
+
+        assert_eq!(
+            shield_wear.outcome,
+            shared::combat_beat::WearOutcomeReport::Broken
+        );
+        assert_eq!(shield_wear.forfeited_effect, Some(4));
+        let penalty = shield_wear.mid_action_penalty.expect("penalty must fire");
+        assert!((1..=4).contains(&penalty), "penalty was {}", penalty);
+    }
+
+    #[test]
+    fn fumble_clears_attacker_break_penalty_on_beat() {
+        // Hunt for a seed where the attacker's swing both fumbles AND breaks
+        // the brittle weapon. Per design D5 the attacker-side break-penalty
+        // fields must be cleared on fumble for clean narration.
+        for seed in 0u64..2_000 {
+            let mut attacker = Tribute::new("Atk".into(), None, None);
+            attacker.attributes.strength = 10;
+            let weapon = brittle_weapon(5);
+            attacker.add_item(weapon.clone());
+
+            let mut target = Tribute::new("Tgt".into(), None, None);
+            target.attributes.defense = 5;
+
+            let mut events: Vec<TaggedEvent> = Vec::new();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let _ = attacker.attacks(&mut target, &mut rng, &mut events);
+
+            let beat = match events.iter().find_map(|e| match &e.payload {
+                MessagePayload::CombatSwing(b) => Some(b),
+                _ => None,
+            }) {
+                Some(b) => b,
+                None => continue,
+            };
+
+            let is_fumble = matches!(
+                beat.outcome,
+                shared::combat_beat::SwingOutcome::FumbleSurvive { .. }
+                    | shared::combat_beat::SwingOutcome::FumbleDeath { .. }
+            );
+            let weapon_wear = beat
+                .wear
+                .iter()
+                .find(|w| w.owner.identifier == beat.attacker.identifier);
+
+            if is_fumble
+                && weapon_wear
+                    .map(|w| w.outcome == shared::combat_beat::WearOutcomeReport::Broken)
+                    .unwrap_or(false)
+            {
+                let w = weapon_wear.unwrap();
+                assert_eq!(
+                    w.forfeited_effect, None,
+                    "D5: fumble must clear forfeited_effect"
+                );
+                assert_eq!(
+                    w.mid_action_penalty, None,
+                    "D5: fumble must clear mid_action_penalty"
+                );
+                return;
+            }
+        }
+        panic!("no seed in 0..2000 produced a fumble + weapon break combo; widen the search");
+    }
+
+    #[test]
+    fn unarmed_unshielded_emits_no_break_penalty() {
+        let mut attacker = Tribute::new("Atk".into(), None, None);
+        attacker.attributes.strength = 10;
+        let mut target = Tribute::new("Tgt".into(), None, None);
+        target.attributes.defense = 5;
+
+        let mut events: Vec<TaggedEvent> = Vec::new();
+        let mut rng = SmallRng::seed_from_u64(123);
+        let _ = attacker.attacks(&mut target, &mut rng, &mut events);
+
+        let beat = events
+            .iter()
+            .find_map(|e| match &e.payload {
+                MessagePayload::CombatSwing(b) => Some(b),
+                _ => None,
+            })
+            .expect("expected one CombatSwing emission");
+        for w in &beat.wear {
+            assert_eq!(w.forfeited_effect, None);
+            assert_eq!(w.mid_action_penalty, None);
+        }
     }
 }

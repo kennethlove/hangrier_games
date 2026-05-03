@@ -37,8 +37,28 @@ impl CombatBeatExt for CombatBeat {
                 WearOutcomeReport::Broken => {
                     if w.owner.identifier == self.attacker.identifier {
                         out.push(GameOutput::WeaponBreak(&w.owner.name, &w.item.name).to_string());
+                        if let Some(penalty) = w.mid_action_penalty {
+                            out.push(
+                                GameOutput::WeaponShattersMidSwing(
+                                    &w.owner.name,
+                                    &w.item.name,
+                                    penalty as u32,
+                                )
+                                .to_string(),
+                            );
+                        }
                     } else {
                         out.push(GameOutput::ShieldBreak(&w.owner.name, &w.item.name).to_string());
+                        if let Some(penalty) = w.mid_action_penalty {
+                            out.push(
+                                GameOutput::ShieldShattersMidBlock(
+                                    &w.owner.name,
+                                    &w.item.name,
+                                    penalty as u32,
+                                )
+                                .to_string(),
+                            );
+                        }
                     }
                 }
             }
@@ -130,6 +150,79 @@ mod tests {
             lines[0].contains("missed") || lines[0].contains("miss"),
             "got: {}",
             lines[0]
+        );
+    }
+
+    #[test]
+    fn weapon_break_with_penalty_renders_shatters_line() {
+        use shared::messages::ItemRef;
+        let attacker = t("Alice");
+        let weapon_ref = ItemRef {
+            identifier: "weapon-1".into(),
+            name: "Iron Sword".into(),
+        };
+        let beat = CombatBeat {
+            attacker: attacker.clone(),
+            target: t("Bob"),
+            weapon: Some(weapon_ref.clone()),
+            shield: None,
+            wear: vec![WearReport {
+                owner: attacker.clone(),
+                item: weapon_ref,
+                outcome: WearOutcomeReport::Broken,
+                forfeited_effect: Some(5),
+                mid_action_penalty: Some(3),
+            }],
+            outcome: SwingOutcome::Miss,
+            stress: StressReport::default(),
+        };
+        let lines = beat.to_log_lines();
+        assert!(
+            lines.iter().any(|l| l.contains("shatters mid-swing")),
+            "expected shatters-mid-swing line; got {:?}",
+            lines
+        );
+        assert!(
+            lines.iter().any(|l| l.contains("-3 attack")),
+            "expected '-3 attack' in shatters line; got {:?}",
+            lines
+        );
+    }
+
+    #[test]
+    fn shield_break_with_penalty_renders_shatters_line() {
+        use shared::messages::ItemRef;
+        let attacker = t("Alice");
+        let target = t("Bob");
+        let shield_ref = ItemRef {
+            identifier: "shield-1".into(),
+            name: "Iron Buckler".into(),
+        };
+        let beat = CombatBeat {
+            attacker: attacker.clone(),
+            target: target.clone(),
+            weapon: None,
+            shield: Some(shield_ref.clone()),
+            wear: vec![WearReport {
+                owner: target,
+                item: shield_ref,
+                outcome: WearOutcomeReport::Broken,
+                forfeited_effect: Some(4),
+                mid_action_penalty: Some(2),
+            }],
+            outcome: SwingOutcome::Miss,
+            stress: StressReport::default(),
+        };
+        let lines = beat.to_log_lines();
+        assert!(
+            lines.iter().any(|l| l.contains("shatters mid-block")),
+            "expected shatters-mid-block line; got {:?}",
+            lines
+        );
+        assert!(
+            lines.iter().any(|l| l.contains("-2 defense")),
+            "expected '-2 defense' in shatters line; got {:?}",
+            lines
         );
     }
 }

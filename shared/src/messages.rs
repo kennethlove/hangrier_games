@@ -227,6 +227,38 @@ impl MessagePayload {
             | SanityBreak { .. } => MessageKind::State,
         }
     }
+
+    /// True if the payload references the tribute (by identifier). Used by
+    /// the per-tribute timeline filter so events involving a given tribute
+    /// — as victim, killer, attacker, ally, mover, item handler, etc. —
+    /// are kept while everything else is dropped.
+    pub fn involves(&self, tribute_identifier: &str) -> bool {
+        use MessagePayload::*;
+        let id = tribute_identifier;
+        let r = |t: &TributeRef| t.identifier == id;
+        match self {
+            TributeKilled { victim, killer, .. } => r(victim) || killer.as_ref().is_some_and(r),
+            TributeWounded {
+                victim, attacker, ..
+            } => r(victim) || attacker.as_ref().is_some_and(r),
+            Combat(engagement) => r(&engagement.attacker) || r(&engagement.target),
+            AllianceFormed { members } | AllianceDissolved { members, .. } => members.iter().any(r),
+            AllianceProposed { proposer, target } => r(proposer) || r(target),
+            BetrayalTriggered { betrayer, victim } => r(betrayer) || r(victim),
+            TrustShockBreak { tribute, partner } => r(tribute) || r(partner),
+            TributeMoved { tribute, .. }
+            | TributeHidden { tribute, .. }
+            | ItemFound { tribute, .. }
+            | ItemUsed { tribute, .. }
+            | ItemDropped { tribute, .. }
+            | TributeRested { tribute, .. }
+            | TributeStarved { tribute, .. }
+            | TributeDehydrated { tribute, .. }
+            | SanityBreak { tribute } => r(tribute),
+            SponsorGift { recipient, .. } => r(recipient),
+            AreaClosed { .. } | AreaEvent { .. } => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

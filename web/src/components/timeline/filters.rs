@@ -25,6 +25,9 @@ impl FilterMode {
 pub struct PeriodFilters {
     pub by_game: HashMap<String, FilterMode>,
     pub generations: HashMap<String, u32>,
+    /// Per-game selected tribute filter (tribute identifier). `None` means
+    /// "show events for all tributes".
+    pub tribute_by_game: HashMap<String, Option<String>>,
 }
 
 impl PeriodFilters {
@@ -39,13 +42,35 @@ impl PeriodFilters {
         let _ = gloo_storage::LocalStorage::set(&key, SerializableFilter::from(&mode));
     }
 
-    pub fn hydrate(&mut self, game_id: &str) {
-        if self.by_game.contains_key(game_id) {
-            return;
+    pub fn tribute_filter(&self, game_id: &str) -> Option<String> {
+        self.tribute_by_game.get(game_id).cloned().flatten()
+    }
+
+    pub fn set_tribute_filter(&mut self, game_id: &str, tribute_id: Option<String>) {
+        self.tribute_by_game
+            .insert(game_id.to_string(), tribute_id.clone());
+        let key = format!("period_tribute_filter:{game_id}");
+        match tribute_id {
+            Some(id) => {
+                let _ = gloo_storage::LocalStorage::set(&key, &id);
+            }
+            None => {
+                gloo_storage::LocalStorage::delete(&key);
+            }
         }
-        let key = format!("period_filters:{game_id}");
-        if let Ok(saved) = gloo_storage::LocalStorage::get::<SerializableFilter>(&key) {
-            self.by_game.insert(game_id.to_string(), saved.into());
+    }
+
+    pub fn hydrate(&mut self, game_id: &str) {
+        if !self.by_game.contains_key(game_id) {
+            let key = format!("period_filters:{game_id}");
+            if let Ok(saved) = gloo_storage::LocalStorage::get::<SerializableFilter>(&key) {
+                self.by_game.insert(game_id.to_string(), saved.into());
+            }
+        }
+        if !self.tribute_by_game.contains_key(game_id) {
+            let key = format!("period_tribute_filter:{game_id}");
+            let saved = gloo_storage::LocalStorage::get::<String>(&key).ok();
+            self.tribute_by_game.insert(game_id.to_string(), saved);
         }
     }
 

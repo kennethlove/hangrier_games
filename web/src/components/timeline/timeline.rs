@@ -8,6 +8,7 @@ pub struct TimelineProps {
     pub game_identifier: String,
     pub messages: Vec<GameMessage>,
     pub filter: FilterMode,
+    pub tribute_filter: Option<String>,
 }
 
 #[component]
@@ -16,6 +17,12 @@ pub fn Timeline(props: TimelineProps) -> Element {
         .messages
         .into_iter()
         .filter(|m| props.filter.matches(m.payload.kind()))
+        .filter(|m| {
+            props
+                .tribute_filter
+                .as_deref()
+                .is_none_or(|id| m.payload.involves(id))
+        })
         .collect();
     // `emit_index` is the monotonic per-phase emission counter, so it is
     // the only correct chronological order. `tick` is a per-action group

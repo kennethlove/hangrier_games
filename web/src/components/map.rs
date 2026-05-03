@@ -1,4 +1,6 @@
+use crate::components::map_affordance_overlay::MapAffordanceOverlay;
 use dioxus::prelude::*;
+use game::areas::Area;
 use game::areas::AreaDetails;
 use game::areas::hex::{SUB_SIZE_RATIO, SUB_SLOTS, default_layout};
 
@@ -24,6 +26,8 @@ fn hex_corners(cx: f64, cy: f64, size: f64) -> String {
 #[component]
 pub fn Map(areas: Vec<AreaDetails>) -> Element {
     let layout = default_layout();
+    let mut selected: Signal<Option<Area>> = use_signal(|| None);
+    let any_selected = selected.read().is_some();
 
     // Compute viewBox bounds.
     let mut min_x = f64::INFINITY;
@@ -58,9 +62,26 @@ pub fn Map(areas: Vec<AreaDetails>) -> Element {
                     let points = hex_corners(cx, cy, HEX_SIZE);
                     let area_id = area_name.to_lowercase().replace(' ', "-");
                     let label = format!("{}", i);
+                    let area_for_click = *area;
                     let on_click = move |_| {
-                        tracing::info!("hex tile clicked: {}", area_name);
+                        selected.with_mut(|s| {
+                            if *s == Some(area_for_click) {
+                                *s = None;
+                            } else {
+                                *s = Some(area_for_click);
+                            }
+                        });
                     };
+                    let is_selected = selected.read().as_ref() == Some(area);
+                    let stroke_class = if is_selected {
+                        "stroke-emerald-400"
+                    } else {
+                        "stroke-stone-700"
+                    };
+                    let area_details_for_overlay = areas
+                        .iter()
+                        .find(|ad| ad.area == Some(*area))
+                        .cloned();
                     rsx! {
                         g {
                             key: "{area_id}",
@@ -68,9 +89,9 @@ pub fn Map(areas: Vec<AreaDetails>) -> Element {
                             polygon {
                                 id: "{area_id}",
                                 "data-open": "{is_open}",
-                                class: "fill-stone-200 data-[open=false]:fill-red-500 theme3:fill-stone-400 stroke-stone-700",
+                                class: "fill-stone-200 data-[open=false]:fill-red-500 theme3:fill-stone-400 {stroke_class}",
                                 points: "{points}",
-                                stroke_width: "2",
+                                stroke_width: if is_selected { "4" } else { "2" },
                             }
                             // Sub-tile grid: 7 smaller hexes per area for
                             // tribute positioning (presentation-only).
@@ -103,6 +124,16 @@ pub fn Map(areas: Vec<AreaDetails>) -> Element {
                                 font_size: "32",
                                 font_weight: "bold",
                                 "{label}"
+                            }
+                            if any_selected {
+                                if let Some(ad) = area_details_for_overlay {
+                                    MapAffordanceOverlay {
+                                        cx: cx,
+                                        cy: cy,
+                                        size: HEX_SIZE,
+                                        area: ad,
+                                    }
+                                }
                             }
                         }
                     }

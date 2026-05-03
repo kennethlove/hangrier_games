@@ -15,7 +15,7 @@ pub enum MessageSource {
 }
 
 /// Day or night phase within a game tick.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Phase {
     Day,

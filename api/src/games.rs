@@ -687,7 +687,16 @@ async fn run_game_cycles(
         .map_err(|e| AppError::InternalServerError(format!("Failed to run day cycle: {}", e)))?;
     game.run_day_night_cycle(false)
         .map_err(|e| AppError::InternalServerError(format!("Failed to run night cycle: {}", e)))?;
+    let day = game.day.unwrap_or(0);
     let _ = save_game(game, db, broadcaster).await?;
+    // Persistence has happened; clients can now refetch the per-period
+    // timeline summary and see the deaths emitted during this cycle. The
+    // frontend's `GamePage` only invalidates `TimelineSummaryQ` on
+    // `GameStarted | DayStarted | NightStarted | GameFinished`, so without
+    // these broadcasts the per-period cards stay stuck on whatever
+    // snapshot was current at page load.
+    crate::websocket::broadcast_day_started(broadcaster, &game.identifier, day);
+    crate::websocket::broadcast_night_started(broadcaster, &game.identifier, day);
     Ok(())
 }
 
@@ -1306,31 +1315,33 @@ async fn timeline_summary(
     Path(game_identifier): Path<Uuid>,
     state: State<AppState>,
 ) -> Result<Json<shared::messages::TimelineSummary>, AppError> {
+    // `Game.current_phase` is `#[serde(skip)]` and there is no
+    // `current_phase` column on the `game` table, so we derive the live
+    // phase from the most recent persisted message for this game. Picking
+    // the newest `(game_day, phase, tick, emit_index)` tuple matches the
+    // engine's per-cycle emission order and stays correct across the
+    // Day -> Night transition without needing a schema migration.
     #[derive(serde::Deserialize)]
-    struct GameDayPhase {
+    struct GameDay {
         day: Option<u32>,
-        current_phase: Option<shared::messages::Phase>,
     }
 
     let game_identifier_str = game_identifier.to_string();
 
     let mut game_resp = state
         .db
-        .query("SELECT day, current_phase FROM game WHERE identifier = $identifier;")
+        .query("SELECT day FROM game WHERE identifier = $identifier;")
         .bind(("identifier", game_identifier_str.clone()))
         .await
         .map_err(|err| AppError::NotFound(format!("Failed to query game: {err:?}")))?;
 
-    let game_rows: Vec<GameDayPhase> = game_resp.take(0).unwrap_or_default();
+    let game_rows: Vec<GameDay> = game_resp.take(0).unwrap_or_default();
     let game_row = game_rows
         .into_iter()
         .next()
         .ok_or_else(|| AppError::NotFound(format!("Game {game_identifier} not found")))?;
 
     let current_day = game_row.day.unwrap_or(0);
-    let current_phase = game_row
-        .current_phase
-        .unwrap_or(shared::messages::Phase::Day);
 
     let mut msg_resp = state
         .db
@@ -1348,6 +1359,16 @@ async fn timeline_summary(
         vec![]
     });
     let messages: Vec<GameMessage> = rows.into_iter().map(GameMessage::from).collect();
+
+    // Derive current phase from the latest message in the current day.
+    // Falls back to Day if no messages exist yet for this day (e.g. the
+    // game has just been started and the day has not run a cycle).
+    let current_phase = messages
+        .iter()
+        .filter(|m| m.game_day == current_day)
+        .max_by_key(|m| (m.phase, m.tick, m.emit_index))
+        .map(|m| m.phase)
+        .unwrap_or(shared::messages::Phase::Day);
 
     let summaries = shared::messages::summarize_periods(&messages, (current_day, current_phase));
     Ok(Json(shared::messages::TimelineSummary {

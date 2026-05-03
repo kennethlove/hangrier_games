@@ -15,6 +15,7 @@ pub(crate) enum QueryError {
 #[derive(PartialEq, Debug, Clone)]
 pub(crate) enum MutationError {
     UnableToCreateGame,
+    Unauthorized,
     Unknown,
     UnableToAdvanceGame,
     UnableToRegisterUser,

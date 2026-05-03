@@ -5,7 +5,7 @@ use crate::components::modal::{Modal, Props as ModalProps};
 use crate::components::tribute_detail::TributeQ;
 use crate::components::{Button, Input};
 use crate::env::APP_API_HOST;
-use crate::storage::{AppState, use_persistent};
+use crate::http::WithCredentials;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use shared::EditTribute;
@@ -16,13 +16,12 @@ pub(crate) struct EditTributeM;
 impl MutationCapability for EditTributeM {
     type Ok = String;
     type Err = MutationError;
-    type Keys = (EditTribute, String, String);
+    type Keys = (EditTribute, String);
 
-    async fn run(&self, args: &(EditTribute, String, String)) -> Result<String, MutationError> {
+    async fn run(&self, args: &(EditTribute, String)) -> Result<String, MutationError> {
         let tribute = args.0.clone();
         let identifier = tribute.identifier.clone();
         let game_identifier = args.1.clone();
-        let token = args.2.clone();
         let client = reqwest::Client::new();
         let url: String = format!(
             "{}/api/games/{}/tributes/{}",
@@ -30,7 +29,7 @@ impl MutationCapability for EditTributeM {
         );
         let response = client
             .put(url)
-            .bearer_auth(token)
+            .with_credentials()
             .json(&tribute)
             .send()
             .await;
@@ -113,8 +112,6 @@ pub fn EditTributeModal() -> Element {
 
 #[component]
 pub fn EditTributeForm() -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-
     let mut edit_tribute_signal: Signal<Option<EditTribute>> = use_context();
     let tribute_details = edit_tribute_signal.read().clone().unwrap_or_default();
     let name = tribute_details.name.clone();
@@ -134,7 +131,6 @@ pub fn EditTributeForm() -> Element {
     let game_identifier_for_upload = game_identifier.clone();
 
     let save = move |e: Event<FormData>| {
-        let token = storage.get().jwt.unwrap_or_default();
         let game_identifier = game_identifier.clone();
         let tribute_details = edit_tribute_signal
             .read()
@@ -157,7 +153,7 @@ pub fn EditTributeForm() -> Element {
             };
             spawn(async move {
                 let reader = mutate
-                    .mutate_async((edit_tribute.clone(), game_identifier.clone(), token))
+                    .mutate_async((edit_tribute.clone(), game_identifier.clone()))
                     .await;
                 let state = reader.state();
                 if matches!(&*state, MutationStateData::Settled { res: Ok(_), .. }) {
@@ -168,7 +164,6 @@ pub fn EditTributeForm() -> Element {
     };
 
     let upload_avatar = move |e: Event<FormData>| {
-        let token = storage.get().jwt.unwrap_or_default();
         let game_id = game_identifier_for_upload.clone();
         let tribute_id = identifier.clone();
 
@@ -197,7 +192,7 @@ pub fn EditTributeForm() -> Element {
 
                 let response = client
                     .post(&url)
-                    .bearer_auth(token)
+                    .with_credentials()
                     .multipart(form)
                     .send()
                     .await;

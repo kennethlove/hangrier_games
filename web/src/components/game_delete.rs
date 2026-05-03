@@ -3,7 +3,7 @@ use crate::components::Button;
 use crate::components::games_list::GamesListQ;
 use crate::components::icons::delete::DeleteIcon;
 use crate::env::APP_API_HOST;
-use crate::storage::{AppState, use_persistent};
+use crate::http::WithCredentials;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use gloo_storage::Storage;
@@ -15,15 +15,14 @@ pub(crate) struct DeleteGameM;
 impl MutationCapability for DeleteGameM {
     type Ok = (String, String);
     type Err = MutationError;
-    type Keys = (DeleteGame, String);
+    type Keys = DeleteGame;
 
-    async fn run(&self, args: &(DeleteGame, String)) -> Result<(String, String), MutationError> {
-        let identifier = args.0.0.clone();
-        let name = args.0.1.clone();
-        let token = args.1.clone();
+    async fn run(&self, args: &DeleteGame) -> Result<(String, String), MutationError> {
+        let identifier = args.0.clone();
+        let name = args.1.clone();
         let client = reqwest::Client::new();
         let url: String = format!("{}/api/games/{}", APP_API_HOST, identifier);
-        let response = client.delete(url).bearer_auth(token).send().await;
+        let response = client.delete(url).with_credentials().send().await;
         match response {
             Ok(r) if r.status().is_success() => Ok((identifier, name)),
             _ => Err(MutationError::Unknown),
@@ -65,8 +64,6 @@ pub fn GameDelete(game_identifier: String, game_name: String, icon_class: String
 
 #[component]
 pub fn DeleteGameModal() -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-
     let mut delete_game_signal: Signal<Option<DeleteGame>> = use_context();
     let delete_game_info = delete_game_signal.read().clone();
     let mutate = use_mutation(Mutation::new(DeleteGameM));
@@ -85,9 +82,8 @@ pub fn DeleteGameModal() -> Element {
 
     let delete = move |_| {
         if let Some(dg) = delete_game_info.clone() {
-            let token = storage.get().jwt.unwrap_or_default();
             spawn(async move {
-                let reader = mutate.mutate_async((dg.clone(), token)).await;
+                let reader = mutate.mutate_async(dg.clone()).await;
                 let state = reader.state();
                 if let MutationStateData::Settled {
                     res: Ok((id, _)), ..

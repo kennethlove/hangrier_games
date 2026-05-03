@@ -5,7 +5,7 @@ use crate::components::icons::edit::EditIcon;
 use crate::components::modal::{Modal, Props as ModalProps};
 use crate::components::{Button, Input};
 use crate::env::APP_API_HOST;
-use crate::storage::{AppState, use_persistent};
+use crate::http::WithCredentials;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use shared::EditGame;
@@ -16,17 +16,16 @@ pub(crate) struct EditGameM;
 impl MutationCapability for EditGameM {
     type Ok = String;
     type Err = MutationError;
-    type Keys = (EditGame, String);
+    type Keys = EditGame;
 
-    async fn run(&self, args: &(EditGame, String)) -> Result<String, MutationError> {
-        let identifier = args.0.identifier.clone();
-        let token = args.1.clone();
+    async fn run(&self, args: &EditGame) -> Result<String, MutationError> {
+        let identifier = args.identifier.clone();
         let client = reqwest::Client::new();
         let url: String = format!("{}/api/games/{}", APP_API_HOST, identifier);
         let response = client
             .put(url)
-            .bearer_auth(token)
-            .json(&args.0.clone())
+            .with_credentials()
+            .json(&args.clone())
             .send()
             .await;
         match response {
@@ -96,8 +95,6 @@ pub fn EditGameModal() -> Element {
 
 #[component]
 pub fn EditGameForm() -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-
     let mut edit_game_signal: Signal<Option<EditGame>> = use_context();
     let game_details = edit_game_signal.read().clone().unwrap_or_default();
     let name = game_details.name.clone();
@@ -112,7 +109,6 @@ pub fn EditGameForm() -> Element {
 
     let save = move |e: Event<FormData>| {
         let identifier = identifier.clone();
-        let token = storage.get().jwt.unwrap_or_default();
 
         let name = match e.data().get_first("name") {
             Some(FormValue::Text(s)) => s,
@@ -130,7 +126,7 @@ pub fn EditGameForm() -> Element {
                 private,
             };
             spawn(async move {
-                let reader = mutate.mutate_async((edit_game.clone(), token)).await;
+                let reader = mutate.mutate_async(edit_game.clone()).await;
                 let state = reader.state();
                 if matches!(&*state, MutationStateData::Settled { res: Ok(_), .. }) {
                     edit_game_signal.set(None);

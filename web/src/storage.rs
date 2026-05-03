@@ -94,9 +94,10 @@ impl FromStr for Colorscheme {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppState {
     pub(crate) colorscheme: Colorscheme,
-    pub(crate) jwt: Option<String>,
-    #[serde(default)]
-    pub(crate) refresh_token: Option<String>,
+    /// Username persisted purely for UI display ("Logout, {username}!")
+    /// and to drive auth-aware nav rendering. The actual session lives in
+    /// the HttpOnly `hg_session` cookie set by the API and is invisible to
+    /// JavaScript / WASM.
     pub(crate) username: Option<String>,
 }
 

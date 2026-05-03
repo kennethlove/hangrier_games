@@ -11,7 +11,6 @@ futures-util = { version = "0.3.32", features = ["sink"] }
 game = { path = "../game" }
 gloo-net = "0.7"
 gloo-storage = "0.4"
-jwt-rustcrypto = "0.2.1"
 serde = { version = "1.0.228", features = ["derive"] }
 shared = { path = "../shared" }
 reqwest = { version = "0.13", features = ["json", "multipart"] }
@@ -23,9 +22,6 @@ web-sys = { version = "0.3.97", features = ["console"] }
 
 [build-dependencies]
 dotenvy = "0.15.7"
-
-[dev-dependencies]
-base64 = "0.22"
 
 [features]
 default = ["web"]

@@ -1,6 +1,9 @@
 use crate::auth::{JWT_SECRET, RefreshToken, TokenResponse, store_refresh_token};
+use crate::cookies::{set_refresh_cookie, set_session_cookie};
 use crate::{AppError, AppState};
 use axum::extract::State;
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
@@ -95,7 +98,7 @@ async fn session(state: State<AppState>) -> Result<Json<String>, AppError> {
 async fn user_create(
     state: State<AppState>,
     Json(payload): Json<RegistrationUser>,
-) -> Result<Json<TokenResponse>, AppError> {
+) -> Result<Response, AppError> {
     // Validate the request
     payload
         .validate()
@@ -135,7 +138,7 @@ async fn user_create(
             let user_id = extract_user_id_from_jwt(&jwt)?;
 
             let token_pair = create_token_pair(&state, jwt, user_id, username).await?;
-            Ok(Json(token_pair))
+            Ok(token_response(token_pair))
         }
         Err(e) => {
             // SurrealDB returns a generic "record access signup query failed" error
@@ -158,7 +161,7 @@ async fn user_create(
 async fn user_authenticate(
     state: State<AppState>,
     Json(payload): Json<RegistrationUser>,
-) -> Result<Json<TokenResponse>, AppError> {
+) -> Result<Response, AppError> {
     // Validate the request - use generic error to not leak validation details
     payload
         .validate()
@@ -192,8 +195,20 @@ async fn user_authenticate(
             let user_id = extract_user_id_from_jwt(&jwt)?;
 
             let token_pair = create_token_pair(&state, jwt, user_id, username).await?;
-            Ok(Json(token_pair))
+            Ok(token_response(token_pair))
         }
         Err(_) => Err(AppError::Unauthorized("Invalid credentials".to_string())),
     }
+}
+
+/// Build the auth response: still returns the token JSON body for non-browser
+/// clients (tests, scripts), but also sets HttpOnly `hg_session` and
+/// `hg_refresh` cookies so browsers don't have to manage tokens themselves.
+fn token_response(pair: TokenResponse) -> Response {
+    let access = pair.access_token.clone();
+    let refresh = pair.refresh_token.clone();
+    let mut response = (StatusCode::OK, Json(pair)).into_response();
+    set_session_cookie(&mut response, &access);
+    set_refresh_cookie(&mut response, &refresh);
+    response
 }

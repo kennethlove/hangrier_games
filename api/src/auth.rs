@@ -1,5 +1,10 @@
+use crate::cookies::{
+    REFRESH_COOKIE, clear_auth_cookies, read_cookie, set_refresh_cookie, set_session_cookie,
+};
 use crate::{AppError, AppState};
 use axum::extract::State;
+use axum::http::{HeaderMap, StatusCode};
+use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::{Json, Router};
 use chrono::Utc;
@@ -31,10 +36,13 @@ pub struct RefreshToken {
     pub created_at: Datetime,
 }
 
-#[derive(Serialize, Deserialize, Debug, Validate)]
+#[derive(Serialize, Deserialize, Debug, Validate, Default)]
 pub struct RefreshTokenRequest {
+    /// Optional in the request body — preferred source is the `hg_refresh`
+    /// HttpOnly cookie. Body is kept for non-browser clients (tests, scripts).
+    #[serde(default)]
     #[validate(length(min = 36, max = 36, message = "Invalid refresh token format"))]
-    pub refresh_token: String,
+    pub refresh_token: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -158,18 +166,29 @@ fn generate_access_token(
     Ok(token)
 }
 
-/// Refresh endpoint: exchange a refresh token for new access + refresh tokens
+/// Refresh endpoint: exchange a refresh token for new access + refresh tokens.
+///
+/// The token is read from the `hg_refresh` HttpOnly cookie (preferred) or,
+/// for non-browser clients, from the JSON body. New tokens are returned in
+/// the JSON body **and** as fresh `Set-Cookie` headers.
 async fn refresh_token(
     State(state): State<AppState>,
-    Json(payload): Json<RefreshTokenRequest>,
-) -> Result<Json<TokenResponse>, AppError> {
-    // Validate the request
-    payload
-        .validate()
-        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+    headers: HeaderMap,
+    body: Option<Json<RefreshTokenRequest>>,
+) -> Result<Response, AppError> {
+    let refresh = read_cookie(&headers, REFRESH_COOKIE)
+        .map(|s| s.to_owned())
+        .or_else(|| body.and_then(|Json(b)| b.refresh_token))
+        .ok_or_else(|| AppError::Unauthorized("Missing refresh token".to_string()))?;
+
+    if refresh.len() != 36 {
+        return Err(AppError::ValidationError(
+            "Invalid refresh token format".to_string(),
+        ));
+    }
 
     // Retrieve the refresh token from the database
-    let token = get_refresh_token(&state, &payload.refresh_token).await?;
+    let token = get_refresh_token(&state, &refresh).await?;
 
     // Validate the token
     if !token.is_valid() {
@@ -179,7 +198,7 @@ async fn refresh_token(
     }
 
     // Revoke the old refresh token (token rotation)
-    revoke_refresh_token(&state, &payload.refresh_token).await?;
+    revoke_refresh_token(&state, &refresh).await?;
 
     // Generate new refresh token
     let new_refresh_token = RefreshToken::new(token.user_id.clone(), token.username.clone());
@@ -193,27 +212,34 @@ async fn refresh_token(
         &state.database,
     )?;
 
-    Ok(Json(TokenResponse {
-        access_token,
-        refresh_token: new_refresh_token.token,
-    }))
+    let pair = TokenResponse {
+        access_token: access_token.clone(),
+        refresh_token: new_refresh_token.token.clone(),
+    };
+    let mut response = (StatusCode::OK, Json(pair)).into_response();
+    set_session_cookie(&mut response, &access_token);
+    set_refresh_cookie(&mut response, &new_refresh_token.token);
+    Ok(response)
 }
 
-/// Logout endpoint: explicitly revoke a refresh token
+/// Logout endpoint: revoke the refresh token (if known) and clear cookies.
 async fn logout(
     State(state): State<AppState>,
-    Json(payload): Json<RefreshTokenRequest>,
-) -> Result<axum::http::StatusCode, AppError> {
-    // Validate the request
-    payload
-        .validate()
-        .map_err(|e| AppError::ValidationError(e.to_string()))?;
+    headers: HeaderMap,
+    body: Option<Json<RefreshTokenRequest>>,
+) -> Result<Response, AppError> {
+    let refresh = read_cookie(&headers, REFRESH_COOKIE)
+        .map(|s| s.to_owned())
+        .or_else(|| body.and_then(|Json(b)| b.refresh_token));
 
-    // Revoke the refresh token
-    revoke_refresh_token(&state, &payload.refresh_token).await?;
+    if let Some(token) = refresh {
+        // Best-effort revoke; clearing the cookie still happens either way.
+        let _ = revoke_refresh_token(&state, &token).await;
+    }
 
-    // Return 204 No Content on success
-    Ok(axum::http::StatusCode::NO_CONTENT)
+    let mut response = StatusCode::NO_CONTENT.into_response();
+    clear_auth_cookies(&mut response);
+    Ok(response)
 }
 
 #[cfg(test)]

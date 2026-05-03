@@ -12,17 +12,15 @@ use crate::components::timeline::PeriodFilters;
 use crate::env::APP_API_HOST;
 use crate::hooks::use_timeline_summary::use_timeline_summary;
 use crate::hooks::{ConnectionState, use_game_websocket};
+use crate::http::WithCredentials;
 use crate::routes::Routes;
-use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use reqwest::StatusCode;
 use shared::{DisplayGame, GameEvent, GameStatus};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub(crate) struct DisplayGameQ {
-    pub token: String,
-}
+pub(crate) struct DisplayGameQ;
 
 impl QueryCapability for DisplayGameQ {
     type Ok = Box<DisplayGame>;
@@ -36,7 +34,7 @@ impl QueryCapability for DisplayGameQ {
                 reqwest::Method::GET,
                 format!("{}/api/games/{}/display", APP_API_HOST, identifier),
             )
-            .bearer_auth(&self.token);
+            .with_credentials();
         match request.send().await {
             Ok(response) => match response.error_for_status() {
                 Ok(response) => match response.json::<DisplayGame>().await {
@@ -85,14 +83,13 @@ impl NextStepResult {
 impl MutationCapability for NextStepM {
     type Ok = NextStepResult;
     type Err = MutationError;
-    type Keys = (String, String);
+    type Keys = String;
 
-    async fn run(&self, args: &(String, String)) -> Result<NextStepResult, MutationError> {
-        let identifier = args.0.clone();
-        let token = args.1.clone();
+    async fn run(&self, args: &String) -> Result<NextStepResult, MutationError> {
+        let identifier = args.clone();
         let client = reqwest::Client::new();
         let url: String = format!("{}/api/games/{}/next", APP_API_HOST, identifier);
-        let request = client.request(reqwest::Method::PUT, url).bearer_auth(token);
+        let request = client.request(reqwest::Method::PUT, url).with_credentials();
         match request.send().await {
             Ok(response) => match response.status() {
                 StatusCode::NO_CONTENT => Ok(NextStepResult::Finished(identifier)),
@@ -116,27 +113,14 @@ impl MutationCapability for NextStepM {
 pub fn GamePage(identifier: String) -> Element {
     let (ws_events, ws_connection) = use_game_websocket(identifier.clone());
 
-    // Ensure storages exist for queries we want to invalidate from this page.
-    let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.unwrap_or_default();
-    let summary_q = use_timeline_summary(identifier.clone(), token.clone());
-    let game_q = use_query(Query::new(
-        identifier.clone(),
-        DisplayGameQ {
-            token: token.clone(),
-        },
-    ));
+    let summary_q = use_timeline_summary(identifier.clone());
+    let game_q = use_query(Query::new(identifier.clone(), DisplayGameQ));
     // Also ensure the GamesListQ storage exists in the root context so that
     // NextStepM::on_settled's QueriesStorage::<GamesListQ>::invalidate_all()
     // call doesn't panic when the user navigates straight to a game page
     // without ever visiting the home list (games would otherwise vanish from
     // the UI until a new game was created and the list rendered).
-    let _games_list_q = use_query(Query::new(
-        (),
-        crate::components::games_list::GamesListQ {
-            token: token.clone(),
-        },
-    ));
+    let _games_list_q = use_query(Query::new((), crate::components::games_list::GamesListQ));
 
     let mut last_seen = use_signal(|| 0usize);
     use_effect(move || {
@@ -307,19 +291,10 @@ mod tests {
 
 #[component]
 fn GameState(identifier: String) -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.unwrap_or_default();
-
     let mut loading_signal = use_context::<Signal<LoadingState>>();
     let mut filters = use_context::<Signal<PeriodFilters>>();
 
-    let token_for_query = token.clone();
-    let game_query = use_query(Query::new(
-        identifier.clone(),
-        DisplayGameQ {
-            token: token_for_query,
-        },
-    ));
+    let game_query = use_query(Query::new(identifier.clone(), DisplayGameQ));
 
     let mutate = use_mutation(Mutation::new(NextStepM));
 
@@ -350,10 +325,9 @@ fn GameState(identifier: String) -> Element {
 
             let next_step_handler = move |_| {
                 let game_id_clone = game_id.clone();
-                let token_clone = token.clone();
                 spawn(async move {
                     loading_signal.set(LoadingState::Loading);
-                    let reader = mutate.mutate_async((game_id_clone, token_clone)).await;
+                    let reader = mutate.mutate_async(game_id_clone).await;
                     let state = reader.state();
                     match &*state {
                         MutationStateData::Settled {
@@ -531,10 +505,7 @@ fn GameState(identifier: String) -> Element {
 
 #[component]
 fn GameStats(identifier: String) -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.unwrap_or_default();
-
-    let game_query = use_query(Query::new(identifier.clone(), DisplayGameQ { token }));
+    let game_query = use_query(Query::new(identifier.clone(), DisplayGameQ));
     let reader = game_query.read();
     let state = reader.state();
 
@@ -652,15 +623,7 @@ fn GameStats(identifier: String) -> Element {
 
 #[component]
 fn GameDetails(identifier: String) -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-    let display_token = storage.get().jwt.unwrap_or_default();
-
-    let display_game_query = use_query(Query::new(
-        identifier.clone(),
-        DisplayGameQ {
-            token: display_token,
-        },
-    ));
+    let display_game_query = use_query(Query::new(identifier.clone(), DisplayGameQ));
     let reader = display_game_query.read();
     let state = reader.state();
 

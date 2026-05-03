@@ -1,13 +1,12 @@
 use crate::cache::QueryError;
 use crate::env::APP_API_HOST;
+use crate::http::WithCredentials;
 use dioxus_query::prelude::*;
 use reqwest::StatusCode;
 use shared::messages::TimelineSummary;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub(crate) struct TimelineSummaryQ {
-    pub token: String,
-}
+pub(crate) struct TimelineSummaryQ;
 
 impl QueryCapability for TimelineSummaryQ {
     type Ok = TimelineSummary;
@@ -18,7 +17,7 @@ impl QueryCapability for TimelineSummaryQ {
         let url = format!("{APP_API_HOST}/api/games/{id}/timeline-summary");
         let resp = reqwest::Client::new()
             .get(&url)
-            .bearer_auth(&self.token)
+            .with_credentials()
             .send()
             .await;
         match resp {
@@ -37,6 +36,6 @@ impl QueryCapability for TimelineSummaryQ {
 }
 
 #[allow(dead_code)]
-pub(crate) fn use_timeline_summary(game_id: String, token: String) -> UseQuery<TimelineSummaryQ> {
-    use_query(Query::new(game_id, TimelineSummaryQ { token }))
+pub(crate) fn use_timeline_summary(game_id: String) -> UseQuery<TimelineSummaryQ> {
+    use_query(Query::new(game_id, TimelineSummaryQ))
 }

@@ -5,8 +5,8 @@ use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_edit::TributeEdit;
 use crate::components::tribute_status_icon::TributeStatusIcon;
 use crate::env::APP_API_HOST;
+use crate::http::WithCredentials;
 use crate::routes::Routes;
-use crate::storage::{AppState, use_persistent};
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::items::Item;
@@ -21,9 +21,7 @@ pub struct PaginatedTributesResponse {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub(crate) struct GameTributesQ {
-    pub token: String,
-}
+pub(crate) struct GameTributesQ;
 
 impl QueryCapability for GameTributesQ {
     type Ok = PaginatedTributesResponse;
@@ -40,7 +38,7 @@ impl QueryCapability for GameTributesQ {
                     APP_API_HOST, game_identifier
                 ),
             )
-            .bearer_auth(&self.token);
+            .with_credentials();
         match request.send().await {
             Ok(response) => match response.json::<PaginatedTributesResponse>().await {
                 Ok(tributes) => Ok(tributes),
@@ -53,12 +51,9 @@ impl QueryCapability for GameTributesQ {
 
 #[component]
 pub fn GameTributes(game: DisplayGame) -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-    let token = storage.get().jwt.unwrap_or_default();
-
     let identifier = game.identifier.clone();
 
-    let tribute_query = use_query(Query::new(identifier.clone(), GameTributesQ { token }));
+    let tribute_query = use_query(Query::new(identifier.clone(), GameTributesQ));
     let reader = tribute_query.read();
     let state = reader.state();
 
@@ -138,9 +133,6 @@ pub fn GameTributeListMember(
     game_identifier: String,
     game_status: GameStatus,
 ) -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
-    let _token = storage.get().jwt.unwrap_or_default();
-
     let fist_item = Item::new_weapon("basic fist");
 
     rsx! {

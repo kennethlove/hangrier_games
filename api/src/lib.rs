@@ -11,6 +11,7 @@ use thiserror::Error;
 
 pub mod auth;
 pub mod cleanup;
+pub mod cookies;
 pub mod games;
 // pub mod messages; // TODO: Module file missing
 pub mod storage;

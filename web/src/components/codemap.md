@@ -266,7 +266,7 @@ App (root)
 
 #### `api/` Crate (Backend)
 - **Integration**: All API calls via `reqwest` to `APP_API_HOST` (env var)
-- **Authentication**: JWT token from localStorage (`storage.get().jwt`)
+- **Authentication**: HttpOnly `hg_session` cookie attached automatically via `WithCredentials` shim
 - **Endpoints**: 15+ REST endpoints (see API Integration table in codemap)
 
 ### With Web Infrastructure
@@ -284,7 +284,7 @@ enum MutationValue { NewGame(Game), GameStarted(String), ... }
 Wraps `dioxus-sdk` localStorage:
 ```rust
 struct AppState {
-    jwt: Option<String>,
+    username: Option<String>,
     colorscheme: Colorscheme,
 }
 use_persistent("hangry-games", AppState::default);
@@ -329,7 +329,7 @@ pub const APP_API_HOST: &str = "http://127.0.0.1:3000";
 
 #### Reqwest
 - **HTTP Client**: All API calls (async/await)
-- **Bearer Auth**: `.bearer_auth(token)` on every request
+- **Cookie Auth**: `.with_credentials()` (from `crate::http::WithCredentials`) on every authed request; browser sends `hg_session` automatically
 
 #### Tailwind CSS
 - **Utility Classes**: Built at compile time (`npm run build:css`)
@@ -435,10 +435,10 @@ label { r#for: "theme-switcher" }
 div { class: "peer-focus:visible peer-focus:opacity-100" }
 ```
 
-### 5. Token Extraction Pattern
+### 5. Authenticated Request Pattern
 ```rust
-let storage = use_persistent("hangry-games", AppState::default);
-let token = storage.get().jwt.unwrap_or_default();
+use crate::http::WithCredentials;
+let req = client.get(url).with_credentials();
 ```
 
 ---

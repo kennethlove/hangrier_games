@@ -35,7 +35,12 @@ fn iref(i: &Item) -> ItemRef {
 
 /// Build a baseline `CombatBeat` (no wear, no stress) for the current swing.
 /// Callers fill in `outcome` and (eventually) `wear` / `stress` per branch.
-fn new_beat(attacker: &Tribute, target: &Tribute, outcome: SwingOutcome) -> CombatBeat {
+fn new_beat(
+    attacker: &Tribute,
+    target: &Tribute,
+    outcome: SwingOutcome,
+    tuning: &crate::tributes::combat_tuning::CombatTuning,
+) -> CombatBeat {
     CombatBeat {
         attacker: tref(attacker),
         target: tref(target),
@@ -52,6 +57,8 @@ fn new_beat(attacker: &Tribute, target: &Tribute, outcome: SwingOutcome) -> Comb
         wear: Vec::new(),
         outcome,
         stress: StressReport::default(),
+        attacker_stamina_cost: tuning.stamina_cost_attacker,
+        target_stamina_cost: tuning.stamina_cost_target,
     }
 }
 
@@ -70,8 +77,20 @@ impl Tribute {
         events: &mut Vec<TaggedEvent>,
         tuning: &crate::tributes::combat_tuning::CombatTuning,
     ) -> AttackOutcome {
+        // Check self-attack BEFORE deducting stamina (stamina mutation would
+        // otherwise break the derived PartialEq equality check below).
+        let is_self_attack = self == target;
+
+        // Per-swing stamina cost: deduct from both combatants up-front.
+        // Saturating semantics ensure neither tribute goes negative.
+        // Action-gating (refusing to swing while exhausted) lands in Task 10.
+        self.stamina = self.stamina.saturating_sub(tuning.stamina_cost_attacker);
+        if !is_self_attack {
+            target.stamina = target.stamina.saturating_sub(tuning.stamina_cost_target);
+        }
+
         // Is the tribute attempting suicide?
-        if self == target {
+        if is_self_attack {
             // Snapshot before mutation.
             let damage = self.attributes.strength;
             // Attack always succeeds
@@ -91,7 +110,13 @@ impl Tribute {
                         hp_lost: damage,
                     },
                 ));
-                let mut beat = new_beat(self, target, SwingOutcome::SelfAttackWound { damage });
+                let mut beat = new_beat(
+                    self,
+                    target,
+                    SwingOutcome::SelfAttackWound { damage },
+                    tuning,
+                );
+                beat.target_stamina_cost = 0;
                 beat.stress.stress_damage = stress_damage;
                 if stress_damage > 0 {
                     beat.stress.stressed = Some(tref(self));
@@ -111,7 +136,8 @@ impl Tribute {
                         cause: "suicide".into(),
                     },
                 ));
-                let mut beat = new_beat(self, target, SwingOutcome::Suicide { damage });
+                let mut beat = new_beat(self, target, SwingOutcome::Suicide { damage }, tuning);
+                beat.target_stamina_cost = 0;
                 beat.stress.stress_damage = stress_damage;
                 if stress_damage > 0 {
                     beat.stress.stressed = Some(tref(self));
@@ -173,6 +199,8 @@ impl Tribute {
                     stress_damage,
                     stressed,
                 },
+                attacker_stamina_cost: tuning.stamina_cost_attacker,
+                target_stamina_cost: tuning.stamina_cost_target,
             };
         for ev in sub_events.drain(..) {
             detail_lines.push(ev.content);
@@ -1047,6 +1075,57 @@ mod tests {
             &CombatTuning::default(),
         );
         assert_eq!(result, AttackOutcome::Miss(attacker, target));
+    }
+
+    #[rstest]
+    fn attacks_deducts_stamina_costs(mut small_rng: SmallRng) {
+        let tuning = CombatTuning::default();
+        let mut attacker = Tribute::new("A".to_string(), None, None);
+        attacker.stamina = 100;
+        attacker.max_stamina = 100;
+        let mut target = Tribute::new("B".to_string(), None, None);
+        target.stamina = 100;
+        target.max_stamina = 100;
+        let _ = attacker.attacks(&mut target, &mut small_rng, &mut Vec::new(), &tuning);
+        assert_eq!(attacker.stamina, 100 - tuning.stamina_cost_attacker);
+        assert_eq!(target.stamina, 100 - tuning.stamina_cost_target);
+    }
+
+    #[rstest]
+    fn attacks_saturates_at_zero_when_below_cost(mut small_rng: SmallRng) {
+        let tuning = CombatTuning::default();
+        let mut attacker = Tribute::new("A".to_string(), None, None);
+        attacker.stamina = 5;
+        attacker.max_stamina = 100;
+        let mut target = Tribute::new("B".to_string(), None, None);
+        target.stamina = 3;
+        target.max_stamina = 100;
+        let _ = attacker.attacks(&mut target, &mut small_rng, &mut Vec::new(), &tuning);
+        assert_eq!(attacker.stamina, 0);
+        assert_eq!(target.stamina, 0);
+    }
+
+    #[rstest]
+    fn combat_beat_carries_stamina_costs(mut small_rng: SmallRng) {
+        let tuning = CombatTuning::default();
+        let mut attacker = Tribute::new("A".to_string(), None, None);
+        attacker.stamina = 100;
+        attacker.max_stamina = 100;
+        let mut target = Tribute::new("B".to_string(), None, None);
+        target.stamina = 100;
+        target.max_stamina = 100;
+        let mut events = Vec::new();
+        let _ = attacker.attacks(&mut target, &mut small_rng, &mut events, &tuning);
+        let beats: Vec<_> = events
+            .iter()
+            .filter_map(|e| match &e.payload {
+                MessagePayload::CombatSwing(b) => Some(b),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(beats.len(), 1);
+        assert_eq!(beats[0].attacker_stamina_cost, tuning.stamina_cost_attacker);
+        assert_eq!(beats[0].target_stamina_cost, tuning.stamina_cost_target);
     }
 
     #[rstest]

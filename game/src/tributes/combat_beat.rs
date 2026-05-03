@@ -152,6 +152,8 @@ mod tests {
             wear: vec![],
             outcome: SwingOutcome::Miss,
             stress: StressReport::default(),
+            attacker_stamina_cost: 0,
+            target_stamina_cost: 0,
         };
         let lines = beat.to_log_lines();
         assert_eq!(lines.len(), 1);
@@ -184,6 +186,8 @@ mod tests {
             }],
             outcome: SwingOutcome::Miss,
             stress: StressReport::default(),
+            attacker_stamina_cost: 0,
+            target_stamina_cost: 0,
         };
         let lines = beat.to_log_lines();
         assert!(
@@ -221,6 +225,8 @@ mod tests {
             }],
             outcome: SwingOutcome::Miss,
             stress: StressReport::default(),
+            attacker_stamina_cost: 0,
+            target_stamina_cost: 0,
         };
         let lines = beat.to_log_lines();
         assert!(
@@ -275,6 +281,8 @@ mod tests {
                 wear: vec![],
                 outcome,
                 stress: StressReport::default(),
+                attacker_stamina_cost: 0,
+                target_stamina_cost: 0,
             }
         }
 

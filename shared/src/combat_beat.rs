@@ -86,6 +86,13 @@ pub struct CombatBeat {
     pub outcome: SwingOutcome,
     /// Stress applied to attacker after the resolution (may be 0).
     pub stress: StressReport,
+    /// Stamina deducted from the attacker for this swing. `#[serde(default)]`
+    /// for back-compat with persisted beats from before stamina-as-resource.
+    #[serde(default)]
+    pub attacker_stamina_cost: u32,
+    /// Stamina deducted from the target for this swing.
+    #[serde(default)]
+    pub target_stamina_cost: u32,
 }
 
 #[cfg(test)]
@@ -129,6 +136,8 @@ mod tests {
             wear: vec![],
             outcome: SwingOutcome::Miss,
             stress: StressReport::default(),
+            attacker_stamina_cost: 0,
+            target_stamina_cost: 0,
         };
         let json = serde_json::to_string(&beat).unwrap();
         let back: CombatBeat = serde_json::from_str(&json).unwrap();

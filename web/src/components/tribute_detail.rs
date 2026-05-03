@@ -4,6 +4,7 @@ use crate::components::icons::uturn::UTurnIcon;
 use crate::components::info_detail::InfoDetail;
 use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_status_icon::TributeStatusIcon;
+use crate::components::tribute_survival_section::TributeSurvivalSection;
 use crate::env::APP_API_HOST;
 use crate::http::WithCredentials;
 use crate::routes::Routes;
@@ -218,6 +219,11 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                             dt { "Outlook" }
                             dd { "TODO" }
                         }
+                    }
+
+                    TributeSurvivalSection {
+                        tribute: (**tribute).clone(),
+                        current_phase: None,
                     }
 
                     InfoDetail {

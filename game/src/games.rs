@@ -1103,6 +1103,51 @@ impl Game {
                     ));
                 }
 
+                // Stamina recovery + band-cross detection. Runs once per
+                // phase per living tribute. For v1 we use Action::None (idle
+                // recovery 5/phase); proper Rest/sheltered scaling lands when
+                // the action chosen by `process_turn_phase` is plumbed back
+                // here. `sheltered` reuses the value computed above for the
+                // hunger/thirst tick.
+                if tribute.attributes.health > 0 {
+                    use crate::tributes::stamina_band::stamina_band;
+
+                    let prior_band = stamina_band(
+                        tribute.stamina,
+                        tribute.max_stamina,
+                        &combat_tuning_snapshot,
+                    );
+                    tribute.recover_stamina(
+                        &crate::tributes::actions::Action::None,
+                        sheltered,
+                        new_hunger,
+                        new_thirst,
+                        &combat_tuning_snapshot,
+                    );
+                    let new_band = stamina_band(
+                        tribute.stamina,
+                        tribute.max_stamina,
+                        &combat_tuning_snapshot,
+                    );
+                    if new_band != prior_band {
+                        let line = format!(
+                            "{} stamina: {:?} -> {:?}",
+                            tribute.name, prior_band, new_band
+                        );
+                        collected_events.push((
+                            tribute.identifier.clone(),
+                            tribute.name.clone(),
+                            line,
+                            Some(MessagePayload::StaminaBandChanged {
+                                tribute: tref.clone(),
+                                from: format!("{:?}", prior_band),
+                                to: format!("{:?}", new_band),
+                            }),
+                            None,
+                        ));
+                    }
+                }
+
                 // Death routing for survival-induced 0 HP. Dehydration takes
                 // precedence over starvation when both landed in the same
                 // tick.

@@ -6,13 +6,15 @@
 //! - Violence stress calculations
 //! - Statistics updates
 
-use crate::items::OwnsItems;
+use crate::items::{Item, OwnsItems};
 use crate::messages::{CombatEngagement, CombatOutcome, MessagePayload, TaggedEvent, TributeRef};
 use crate::output::GameOutput;
 use crate::tributes::Tribute;
 use crate::tributes::actions::{AttackOutcome, AttackResult};
 use rand::RngExt;
 use rand::prelude::*;
+use shared::combat_beat::{CombatBeat, StressReport, SwingOutcome};
+use shared::messages::ItemRef;
 use std::cmp::Ordering;
 
 /// Constants for combat calculations
@@ -28,6 +30,36 @@ fn tref(t: &Tribute) -> TributeRef {
     TributeRef {
         identifier: t.identifier.clone(),
         name: t.name.clone(),
+    }
+}
+
+/// Build an `ItemRef` from an item.
+fn iref(i: &Item) -> ItemRef {
+    ItemRef {
+        identifier: i.identifier.clone(),
+        name: i.name.clone(),
+    }
+}
+
+/// Build a baseline `CombatBeat` (no wear, no stress) for the current swing.
+/// Callers fill in `outcome` and (eventually) `wear` / `stress` per branch.
+fn new_beat(attacker: &Tribute, target: &Tribute, outcome: SwingOutcome) -> CombatBeat {
+    CombatBeat {
+        attacker: tref(attacker),
+        target: tref(target),
+        weapon: attacker
+            .items
+            .iter()
+            .rfind(|i| i.is_weapon() && i.current_durability > 0)
+            .map(iref),
+        shield: target
+            .items
+            .iter()
+            .rfind(|i| i.is_defensive() && i.current_durability > 0)
+            .map(iref),
+        wear: Vec::new(),
+        outcome,
+        stress: StressReport::default(),
     }
 }
 
@@ -47,8 +79,10 @@ impl Tribute {
     ) -> AttackOutcome {
         // Is the tribute attempting suicide?
         if self == target {
+            // Snapshot before mutation.
+            let damage = self.attributes.strength;
             // Attack always succeeds
-            self.takes_physical_damage(self.attributes.strength);
+            self.takes_physical_damage(damage);
             // Capture violence-stress events as standalone (self-harm is not an engagement).
             let mut stress_events: Vec<TaggedEvent> = Vec::new();
             self.apply_violence_stress(&mut stress_events);
@@ -61,8 +95,13 @@ impl Tribute {
                     MessagePayload::TributeWounded {
                         victim: tref(self),
                         attacker: None,
-                        hp_lost: self.attributes.strength,
+                        hp_lost: damage,
                     },
+                ));
+                let beat = new_beat(self, target, SwingOutcome::SelfAttackWound { damage });
+                events.push(TaggedEvent::new(
+                    String::new(),
+                    MessagePayload::CombatSwing(beat),
                 ));
                 AttackOutcome::Wound(self.clone(), target.clone())
             } else {
@@ -75,12 +114,41 @@ impl Tribute {
                         cause: "suicide".into(),
                     },
                 ));
+                let beat = new_beat(self, target, SwingOutcome::Suicide { damage });
+                events.push(TaggedEvent::new(
+                    String::new(),
+                    MessagePayload::CombatSwing(beat),
+                ));
                 AttackOutcome::Kill(self.clone(), target.clone())
             };
         }
 
         let tribute_name = self.name.clone();
         let target_name = target.name.clone();
+
+        // Snapshot equipment refs at swing start so post-mutation values
+        // (e.g. broken items removed from inventory) don't pollute the beat.
+        let weapon_at_start = self
+            .items
+            .iter()
+            .rfind(|i| i.is_weapon() && i.current_durability > 0)
+            .map(iref);
+        let shield_at_start = target
+            .items
+            .iter()
+            .rfind(|i| i.is_defensive() && i.current_durability > 0)
+            .map(iref);
+        let attacker_ref_at_start = tref(self);
+        let target_ref_at_start = tref(target);
+        let mk_beat = |outcome: SwingOutcome| CombatBeat {
+            attacker: attacker_ref_at_start.clone(),
+            target: target_ref_at_start.clone(),
+            weapon: weapon_at_start.clone(),
+            shield: shield_at_start.clone(),
+            wear: Vec::new(),
+            outcome,
+            stress: StressReport::default(),
+        };
 
         // Local accumulator for prose lines that become this engagement's
         // `detail_lines`. Helpers (`attack_contest`, `apply_combat_results`,
@@ -137,6 +205,11 @@ impl Tribute {
                             cause: "critical_fumble".into(),
                         },
                     ));
+                    let beat = mk_beat(SwingOutcome::FumbleDeath { self_damage: 5 });
+                    events.push(TaggedEvent::new(
+                        String::new(),
+                        MessagePayload::CombatSwing(beat),
+                    ));
                     return AttackOutcome::Kill(target.clone(), self.clone());
                 }
 
@@ -147,6 +220,11 @@ impl Tribute {
                         attacker: None,
                         hp_lost: 5,
                     },
+                ));
+                let beat = mk_beat(SwingOutcome::FumbleSurvive { self_damage: 5 });
+                events.push(TaggedEvent::new(
+                    String::new(),
+                    MessagePayload::CombatSwing(beat),
                 ));
                 return AttackOutcome::Wound(self.clone(), target.clone());
             }
@@ -235,9 +313,27 @@ impl Tribute {
                         detail_lines,
                     }),
                 ));
+                let beat = mk_beat(SwingOutcome::Miss);
+                events.push(TaggedEvent::new(
+                    String::new(),
+                    MessagePayload::CombatSwing(beat),
+                ));
 
                 return AttackOutcome::Miss(self.clone(), target.clone());
             }
+        };
+
+        // Capture damage applied this swing for the typed beat. Computed from
+        // the resolved branch so the beat's damage matches what was applied.
+        let swing_damage: u32 = match result {
+            AttackResult::CriticalHit => self.attributes.strength * 3,
+            AttackResult::AttackerWins => self.attributes.strength,
+            AttackResult::AttackerWinsDecisively => self.attributes.strength * 2,
+            AttackResult::PerfectBlock => target.attributes.strength * 2,
+            AttackResult::DefenderWins => target.attributes.strength,
+            AttackResult::DefenderWinsDecisively => target.attributes.strength * 2,
+            // Unreachable: handled above with early returns.
+            AttackResult::CriticalFumble | AttackResult::Miss => 0,
         };
 
         // Determine outcome and finalise. Prefer death over flee/wound.
@@ -291,6 +387,36 @@ impl Tribute {
                 outcome,
                 detail_lines,
             }),
+        ));
+
+        // Map (AttackResult, post-resolution alive state) → typed SwingOutcome.
+        let swing_outcome = match (&attack_outcome, result) {
+            (AttackOutcome::Kill(winner, _loser), _) if winner.id == self.id => {
+                SwingOutcome::Kill {
+                    damage: swing_damage,
+                }
+            }
+            (AttackOutcome::Kill(_, _), _) => SwingOutcome::AttackerDied {
+                damage: swing_damage,
+            },
+            (AttackOutcome::Wound(_, _), AttackResult::CriticalHit) => {
+                SwingOutcome::CriticalHitWound {
+                    damage: swing_damage,
+                }
+            }
+            (AttackOutcome::Wound(_, _), AttackResult::PerfectBlock) => SwingOutcome::BlockWound {
+                damage: swing_damage,
+            },
+            (AttackOutcome::Wound(_, _), _) => SwingOutcome::Wound {
+                damage: swing_damage,
+            },
+            // Miss already returned above.
+            (AttackOutcome::Miss(_, _), _) => SwingOutcome::Miss,
+        };
+        let beat = mk_beat(swing_outcome);
+        events.push(TaggedEvent::new(
+            String::new(),
+            MessagePayload::CombatSwing(beat),
         ));
 
         attack_outcome
@@ -984,5 +1110,49 @@ mod tests {
         } else {
             panic!("expected Combat payload");
         }
+    }
+
+    #[rstest]
+    fn attacks_emits_one_combat_swing_per_call(small_rng: SmallRng) {
+        // Every call to attacks() produces exactly one MessagePayload::CombatSwing,
+        // regardless of which branch (miss / wound / kill / fumble / self-attack).
+        for seed in 0..16u64 {
+            let mut events: Vec<TaggedEvent> = Vec::new();
+            let mut attacker = Tribute::new(format!("A{seed}"), None, None);
+            let mut target = Tribute::new(format!("T{seed}"), None, None);
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let _ = attacker.attacks(&mut target, &mut rng, &mut events);
+
+            let swings: Vec<_> = events
+                .iter()
+                .filter(|e| matches!(e.payload, MessagePayload::CombatSwing(_)))
+                .collect();
+            assert_eq!(
+                swings.len(),
+                1,
+                "seed {seed}: expected exactly one CombatSwing payload, got {}",
+                swings.len()
+            );
+
+            if let MessagePayload::CombatSwing(beat) = &swings[0].payload {
+                assert_eq!(beat.attacker.name, attacker.name);
+                assert_eq!(beat.target.name, target.name);
+            }
+        }
+        // Touch the rstest fixture to silence unused warnings.
+        let _ = small_rng;
+    }
+
+    #[rstest]
+    fn self_attack_emits_one_combat_swing(mut small_rng: SmallRng) {
+        let mut tribute = Tribute::new("Solo".to_string(), None, None);
+        let mut clone = tribute.clone();
+        let mut events: Vec<TaggedEvent> = Vec::new();
+        let _ = tribute.attacks(&mut clone, &mut small_rng, &mut events);
+        let swings: usize = events
+            .iter()
+            .filter(|e| matches!(e.payload, MessagePayload::CombatSwing(_)))
+            .count();
+        assert_eq!(swings, 1, "self-attack must emit exactly one CombatSwing");
     }
 }

@@ -106,6 +106,8 @@ pub enum CombatOutcome {
 pub enum MessageKind {
     Death,
     Combat,
+    /// One swing of physical combat (see `CombatBeat`).
+    CombatSwing,
     Alliance,
     Movement,
     Item,
@@ -127,6 +129,11 @@ pub enum MessagePayload {
     },
 
     Combat(CombatEngagement),
+    /// One physical-combat swing in fully typed form (see `CombatBeat`).
+    /// Emitted alongside the existing `Combat`/`TributeKilled`/`TributeWounded`
+    /// payloads so consumers can render structured swing data without parsing
+    /// `detail_lines` strings.
+    CombatSwing(crate::combat_beat::CombatBeat),
 
     AllianceFormed {
         members: Vec<TributeRef>,
@@ -209,6 +216,7 @@ impl MessagePayload {
         match self {
             TributeKilled { .. } => MessageKind::Death,
             Combat(_) => MessageKind::Combat,
+            CombatSwing(_) => MessageKind::CombatSwing,
             AllianceFormed { .. }
             | AllianceProposed { .. }
             | AllianceDissolved { .. }
@@ -242,6 +250,7 @@ impl MessagePayload {
                 victim, attacker, ..
             } => r(victim) || attacker.as_ref().is_some_and(r),
             Combat(engagement) => r(&engagement.attacker) || r(&engagement.target),
+            CombatSwing(beat) => r(&beat.attacker) || r(&beat.target),
             AllianceFormed { members } | AllianceDissolved { members, .. } => members.iter().any(r),
             AllianceProposed { proposer, target } => r(proposer) || r(target),
             BetrayalTriggered { betrayer, victim } => r(betrayer) || r(victim),
@@ -417,6 +426,7 @@ mod tests {
             MessageKind::Movement,
             MessageKind::Item,
             MessageKind::State,
+            MessageKind::CombatSwing,
         ] {
             let s = serde_json::to_string(&kind).unwrap();
             let back: MessageKind = serde_json::from_str(&s).unwrap();

@@ -301,7 +301,34 @@ impl Brain {
                 if !all_areas.is_empty()
                     && let Some(best_goal) = self.choose_destination(all_areas, tribute)
                 {
-                    if best_goal == tribute.area {
+                    // Anti-clustering: if every area scores the same
+                    // (e.g. all Clearing, no affinity), `choose_destination`
+                    // returns the first area, which on the smart-path is
+                    // typically the tribute's current area — leading every
+                    // crowded tribute to Rest forever and combat to never
+                    // engage. When the chosen "best" is just where we are
+                    // and the area is crowded, force a hop to the cheapest
+                    // reachable open neighbor instead.
+                    let crowded = nearby_tributes >= LOW_ENEMY_LIMIT;
+                    if best_goal == tribute.area && !crowded {
+                        return Action::Rest;
+                    }
+                    let goal = if best_goal == tribute.area && crowded {
+                        // Pick a cheap open neighbor we can actually afford
+                        // to walk to. Falls through to plan_path below using
+                        // that neighbor as the goal.
+                        available_destinations
+                            .iter()
+                            .filter(|d| d.area != tribute.area)
+                            .filter(|d| !closed_areas.contains(&d.area))
+                            .filter(|d| tribute.stamina >= d.stamina_cost)
+                            .min_by_key(|d| d.stamina_cost)
+                            .map(|d| d.area)
+                            .unwrap_or(best_goal)
+                    } else {
+                        best_goal
+                    };
+                    if goal == tribute.area {
                         return Action::Rest;
                     }
                     if let Some((path, _cost)) = crate::areas::path::plan_path(
@@ -309,7 +336,7 @@ impl Brain {
                         closed_areas,
                         tribute,
                         tribute.area,
-                        best_goal,
+                        goal,
                     ) && path.len() >= 2
                     {
                         let first_hop = path[1];

@@ -8,6 +8,7 @@ use surrealdb::RecordId;
 use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
 use thiserror::Error;
+use tracing::error;
 
 pub mod auth;
 pub mod cleanup;
@@ -72,13 +73,25 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
             AppError::NotFound(message) => (StatusCode::NOT_FOUND, message),
-            AppError::InternalServerError(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
+            AppError::InternalServerError(message) => {
+                error!(error = %message, "internal server error");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error".to_string(),
+                )
+            }
             AppError::BadRequest(message) => (StatusCode::BAD_REQUEST, message),
             AppError::Unauthorized(message) => (StatusCode::UNAUTHORIZED, message),
-            AppError::GameFull(message) => (StatusCode::BAD_REQUEST, message),
-            AppError::DbError(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
+            AppError::GameFull(message) => (StatusCode::CONFLICT, message),
+            AppError::DbError(message) => {
+                error!(error = %message, "database error");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error".to_string(),
+                )
+            }
             AppError::Conflict(message) => (StatusCode::CONFLICT, message),
-            AppError::InvalidStatus(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
+            AppError::InvalidStatus(message) => (StatusCode::UNPROCESSABLE_ENTITY, message),
             AppError::ValidationError(message) => (StatusCode::BAD_REQUEST, message),
         };
         (status, Json(json!({ "error": error_message }))).into_response()

@@ -254,6 +254,10 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                     InfoDetail {
                         title: "Attributes",
                         open: false,
+                        TributeStaminaRow {
+                            current: tribute.stamina,
+                            max: tribute.max_stamina,
+                        }
                         TributeAttributes { attributes: tribute.attributes.clone() }
                     }
 
@@ -366,6 +370,44 @@ fn TributeAttributes(attributes: Attributes) -> Element {
             dd { "{attributes.persuasion}"}
             dt { "Luck" }
             dd { "{attributes.luck}"}
+        }
+    }
+}
+
+#[component]
+fn TributeStaminaRow(current: u32, max: u32) -> Element {
+    use shared::messages::StaminaBand;
+    let pct = current
+        .checked_mul(100)
+        .and_then(|n| n.checked_div(max))
+        .unwrap_or(0);
+    let band = if pct > 50 {
+        StaminaBand::Fresh
+    } else if pct > 20 {
+        StaminaBand::Winded
+    } else {
+        StaminaBand::Exhausted
+    };
+    let (color_cls, label) = match band {
+        StaminaBand::Fresh => ("text-emerald-600 theme2:text-emerald-300", "Fresh"),
+        StaminaBand::Winded => ("text-amber-700 theme2:text-amber-300", "Winded"),
+        StaminaBand::Exhausted => (
+            "text-red-600 theme2:text-red-400 font-semibold",
+            "Exhausted",
+        ),
+    };
+    rsx! {
+        dl {
+            class: "grid grid-cols-2 gap-4 mb-2",
+            dt { "Stamina" }
+            dd {
+                span {
+                    class: "inline-flex items-center gap-2 {color_cls}",
+                    "aria-label": "Stamina: {current} of {max}, band {label}",
+                    span { "{current} / {max}" }
+                    span { class: "text-xs uppercase tracking-wide opacity-80", "({label})" }
+                }
+            }
         }
     }
 }

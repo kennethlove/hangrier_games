@@ -1,7 +1,7 @@
 use crate::components::timeline::cards::{
     alliance_card::AllianceCard, combat_card::CombatCard, combat_swing_card::CombatSwingCard,
     cycle_card::CycleCard, death_card::DeathCard, item_card::ItemCard, movement_card::MovementCard,
-    state_card::StateCard, survival_card::SurvivalCard,
+    stamina_card::StaminaCard, state_card::StateCard, survival_card::SurvivalCard,
 };
 use dioxus::prelude::*;
 use shared::messages::{GameMessage, MessageKind, MessagePayload};
@@ -49,6 +49,9 @@ pub fn EventCard(props: EventCardProps) -> Element {
                 message: props.message.clone(),
             } },
             MessageKind::State => match payload {
+                MessagePayload::StaminaBandChanged { .. } => {
+                    rsx! { StaminaCard { message: props.message.clone() } }
+                }
                 MessagePayload::HungerBandChanged { .. }
                 | MessagePayload::ThirstBandChanged { .. }
                 | MessagePayload::ShelterSought { .. }

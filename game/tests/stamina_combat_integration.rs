@@ -3,7 +3,7 @@
 
 use game::games::Game;
 use game::tributes::Tribute;
-use shared::messages::MessagePayload;
+use shared::messages::{MessagePayload, StaminaBand};
 
 #[test]
 fn per_phase_loop_emits_stamina_band_changed_when_band_crosses() {
@@ -23,8 +23,8 @@ fn per_phase_loop_emits_stamina_band_changed_when_band_crosses() {
         matches!(&m.payload,
             MessagePayload::StaminaBandChanged { tribute, from, to }
                 if tribute.identifier == id
-                    && from == "Exhausted"
-                    && to == "Winded"
+                    && *from == StaminaBand::Exhausted
+                    && *to == StaminaBand::Winded
         )
     });
     assert!(

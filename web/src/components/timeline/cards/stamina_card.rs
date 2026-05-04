@@ -3,7 +3,7 @@
 //! See spec `docs/superpowers/specs/2026-05-03-stamina-combat-resource-design.md`.
 
 use dioxus::prelude::*;
-use shared::messages::{GameMessage, MessagePayload};
+use shared::messages::{GameMessage, MessagePayload, StaminaBand};
 
 #[derive(Props, PartialEq, Clone)]
 pub struct StaminaCardProps {
@@ -17,14 +17,11 @@ enum Direction {
     Unknown,
 }
 
-fn transition_direction(from: &str, to: &str) -> Direction {
+fn transition_direction(from: StaminaBand, to: StaminaBand) -> Direction {
+    use StaminaBand::*;
     match (from, to) {
-        ("Fresh", "Winded") | ("Fresh", "Exhausted") | ("Winded", "Exhausted") => {
-            Direction::Worsening
-        }
-        ("Winded", "Fresh") | ("Exhausted", "Fresh") | ("Exhausted", "Winded") => {
-            Direction::Recovery
-        }
+        (Fresh, Winded) | (Fresh, Exhausted) | (Winded, Exhausted) => Direction::Worsening,
+        (Winded, Fresh) | (Exhausted, Fresh) | (Exhausted, Winded) => Direction::Recovery,
         _ => Direction::Unknown,
     }
 }
@@ -35,7 +32,7 @@ pub fn StaminaCard(props: StaminaCardProps) -> Element {
         return rsx! {};
     };
 
-    let direction = transition_direction(from, to);
+    let direction = transition_direction(*from, *to);
     let (border_cls, bg_cls, glyph, phrase) = match (direction, to.as_str()) {
         (Direction::Worsening, "Winded") => (
             "border-amber-400",

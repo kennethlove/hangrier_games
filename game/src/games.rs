@@ -1079,8 +1079,8 @@ impl Game {
                         line,
                         Some(MessagePayload::HungerBandChanged {
                             tribute: tref.clone(),
-                            from: format!("{:?}", prior_hunger),
-                            to: format!("{:?}", new_hunger),
+                            from: prior_hunger,
+                            to: new_hunger,
                         }),
                         None,
                     ));
@@ -1096,8 +1096,8 @@ impl Game {
                         line,
                         Some(MessagePayload::ThirstBandChanged {
                             tribute: tref.clone(),
-                            from: format!("{:?}", prior_thirst),
-                            to: format!("{:?}", new_thirst),
+                            from: prior_thirst,
+                            to: new_thirst,
                         }),
                         None,
                     ));
@@ -1140,8 +1140,8 @@ impl Game {
                             line,
                             Some(MessagePayload::StaminaBandChanged {
                                 tribute: tref.clone(),
-                                from: format!("{:?}", prior_band),
-                                to: format!("{:?}", new_band),
+                                from: prior_band,
+                                to: new_band,
                             }),
                             None,
                         ));

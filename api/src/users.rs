@@ -62,16 +62,20 @@ fn extract_user_id_from_jwt(jwt: &str) -> Result<Thing, AppError> {
     Ok(user_id)
 }
 
-/// Helper function to create both access and refresh tokens
+/// Helper function to create both access and refresh tokens.
+///
+/// Takes the per-request `Surreal<Any>` clone (already authenticated as
+/// the new/returning user via `signup`/`signin`) so the refresh-token
+/// write happens under the user's own `$auth`. See bd hangrier_games-c3ct.
 async fn create_token_pair(
-    state: &AppState,
+    db: &surrealdb::Surreal<surrealdb::engine::any::Any>,
     jwt: String,
     user_id: Thing,
     username: String,
 ) -> Result<TokenResponse, AppError> {
     // Create and store refresh token
     let refresh_token = RefreshToken::new(user_id, username);
-    store_refresh_token(state, &refresh_token).await?;
+    store_refresh_token(db, &refresh_token).await?;
 
     Ok(TokenResponse {
         access_token: jwt,
@@ -80,13 +84,19 @@ async fn create_token_pair(
 }
 
 async fn session(state: State<AppState>) -> Result<Json<String>, AppError> {
-    // `RETURN <string>$session` reads connection-level session state. Hold
-    // `auth_lock` so a concurrent signup/signin/JWT-authenticate call can't
-    // mutate the shared `Surreal<Any>` session mid-query. See
-    // bd hangrier_games-c853 / PR #181 for the original race.
-    let _auth_guard = state.auth_lock.lock().await;
-    let mut response = state
-        .db
+    // `RETURN <string>$session` reads connection-level session state.
+    // Use a local clone of the shared connection (independent session,
+    // same socket — SurrealDB Rust SDK 2.x multi-tenancy) so concurrent
+    // signup/signin/authenticate calls can't race on `$session`. See
+    // bd hangrier_games-c3ct (replaces the previous `auth_lock` guard;
+    // original race was bd hangrier_games-c853 / PR #181).
+    //
+    // NOTE: this endpoint is unauthenticated — the local clone inherits
+    // root auth from `state.db`, so this returns the raw root session
+    // JSON and is only meaningful as a health/info probe. See bd
+    // hangrier_games-p9p0 for moving session under the JWT-protected nest.
+    let user_db = (*state.db).clone();
+    let mut response = user_db
         .query("RETURN <string>$session")
         .await
         .map_err(|e| AppError::DbError(format!("Failed to query session: {e}")))?;
@@ -108,18 +118,20 @@ async fn user_create(
     let username = payload.username;
     let password = payload.password;
 
-    // `db.signup` mutates the shared `Surreal<Any>` connection's session
-    // (sets `$auth` to the new user). Hold `auth_lock` for the entire
-    // signup -> refresh-token-create sequence so a concurrent
-    // `/api/games` request can't observe the swapped session and miss
-    // its own private games via `fn::get_list_games`. The lock is
-    // released after the refresh token is stored; the next JWT-authed
-    // request re-sets `$auth` via `surreal_jwt`. Don't `invalidate()`
-    // — that would also clear the root auth set in main.rs.
-    // See bd hangrier_games-c853 / PR #181.
-    let _auth_guard = state.auth_lock.lock().await;
-    let result = state
-        .db
+    // `db.signup` mutates connection-level session state (sets `$auth`
+    // to the new user). Run it on a local clone of the shared
+    // connection so the original root-authed handle is untouched and
+    // concurrent requests can't observe the swapped `$auth`. The
+    // refresh-token write below uses the same clone (the new user has
+    // permission to insert into `refresh_token` per its schema). See
+    // bd hangrier_games-c3ct (replaces the previous `auth_lock` guard).
+    let user_db = (*state.db).clone();
+    user_db
+        .use_ns(&state.namespace)
+        .use_db(&state.database)
+        .await
+        .map_err(|e| AppError::DbError(format!("Failed to scope signup session: {e}")))?;
+    let result = user_db
         .signup(Record {
             access: "user",
             namespace: &state.namespace,
@@ -138,7 +150,7 @@ async fn user_create(
             // Username is already in scope from the request payload.
             let user_id = extract_user_id_from_jwt(&jwt)?;
 
-            let token_pair = create_token_pair(&state, jwt, user_id, username).await?;
+            let token_pair = create_token_pair(&user_db, jwt, user_id, username).await?;
             Ok(token_response(token_pair))
         }
         Err(e) => {
@@ -171,12 +183,16 @@ async fn user_authenticate(
     let username = payload.username;
     let password = payload.password;
 
-    // Same race protection as `user_create`. Hold `auth_lock` for the
-    // entire signin -> refresh-token-create sequence so concurrent
-    // /api/games queries can't observe the swapped `$auth`.
-    let _auth_guard = state.auth_lock.lock().await;
-    let result = state
-        .db
+    // Same race protection as `user_create`: signin also mutates
+    // connection-level `$auth`, so run it on a local clone. See
+    // bd hangrier_games-c3ct.
+    let user_db = (*state.db).clone();
+    user_db
+        .use_ns(&state.namespace)
+        .use_db(&state.database)
+        .await
+        .map_err(|e| AppError::DbError(format!("Failed to scope signin session: {e}")))?;
+    let result = user_db
         .signin(Record {
             access: "user",
             namespace: &state.namespace,
@@ -195,7 +211,7 @@ async fn user_authenticate(
             // Username is already in scope from the request payload.
             let user_id = extract_user_id_from_jwt(&jwt)?;
 
-            let token_pair = create_token_pair(&state, jwt, user_id, username).await?;
+            let token_pair = create_token_pair(&user_db, jwt, user_id, username).await?;
             Ok(token_response(token_pair))
         }
         Err(_) => Err(AppError::Unauthorized("Invalid credentials".to_string())),

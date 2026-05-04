@@ -1,7 +1,7 @@
 use crate::games::game_tributes;
 use crate::storage::{UploadConstraints, validate_upload};
-use crate::{AppError, AppState};
-use axum::extract::{Multipart, Path, State};
+use crate::{AppError, AppState, AuthDb};
+use axum::extract::{Extension, Multipart, Path, State};
 use axum::http::StatusCode;
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -113,10 +113,9 @@ pub async fn create_tribute(
 
 pub async fn tribute_delete(
     Path((_, tribute_identifier)): Path<(String, String)>,
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<StatusCode, AppError> {
-    let tribute: Option<Tribute> = state
-        .db
+    let tribute: Option<Tribute> = db
         .delete(("tribute", &tribute_identifier))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to delete tribute: {}", e)))?;
@@ -130,7 +129,7 @@ pub async fn tribute_delete(
 
 pub async fn tribute_update(
     Path((_game_identifier, _tribute_identifier)): Path<(Uuid, Uuid)>,
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
     Json(payload): Json<EditTribute>,
 ) -> Result<StatusCode, AppError> {
     // Validate input
@@ -138,8 +137,7 @@ pub async fn tribute_update(
         return Err(AppError::ValidationError(format!("{}", e)));
     }
 
-    let response = state
-        .db
+    let response = db
         .query("UPDATE tribute SET name = $name, avatar = $avatar WHERE identifier = $identifier;")
         .bind(("identifier", payload.identifier.clone()))
         .bind(("name", payload.name.clone()))
@@ -161,11 +159,10 @@ pub async fn tribute_update(
 
 pub async fn tribute_detail(
     Path((_, tribute_identifier)): Path<(Uuid, Uuid)>,
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<Json<Tribute>, AppError> {
     let tribute_identifier = tribute_identifier.to_string();
-    let mut result = state
-        .db
+    let mut result = db
         .query("SELECT * FROM fn::get_full_tribute($identifier);")
         .bind(("identifier", tribute_identifier))
         .await
@@ -184,11 +181,10 @@ pub async fn tribute_detail(
 
 pub async fn tribute_log(
     Path((_, identifier)): Path<(Uuid, Uuid)>,
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<Json<Vec<GameMessage>>, AppError> {
     let identifier = identifier.to_string();
-    let mut result = state
-        .db
+    let mut result = db
         .query("SELECT * FROM fn::get_messages_by_tribute_id($identifier)")
         .bind(("identifier", identifier))
         .await
@@ -206,6 +202,7 @@ pub async fn tribute_log(
 pub async fn upload_avatar(
     Path((_, tribute_identifier)): Path<(Uuid, Uuid)>,
     State(state): State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
     mut multipart: Multipart,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let tribute_identifier = tribute_identifier.to_string();
@@ -258,8 +255,7 @@ pub async fn upload_avatar(
     let public_url = state.storage.public_url(&saved_path);
 
     // Update tribute avatar field in database
-    let response = state
-        .db
+    let response = db
         .query("UPDATE tribute SET avatar = $avatar WHERE identifier = $identifier;")
         .bind(("identifier", tribute_identifier.clone()))
         .bind(("avatar", Some(saved_path.clone())))

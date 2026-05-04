@@ -1,10 +1,10 @@
 extern crate core;
 
-use api::AppState;
 use api::auth::AUTH_ROUTER;
 use api::cleanup::start_cleanup_scheduler;
 use api::games::GAMES_ROUTER;
 use api::users::USERS_ROUTER;
+use api::{AppState, AuthDb};
 use axum::extract::{Request, State};
 use axum::http::StatusCode;
 use axum::http::header::{
@@ -220,7 +220,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         broadcaster,
         namespace: surreal_namespace,
         database: surreal_database,
-        auth_lock: std::sync::Arc::new(tokio::sync::Mutex::new(())),
     };
 
     // Start cleanup scheduler for refresh tokens
@@ -339,17 +338,28 @@ async fn surreal_jwt(State(state): State<AppState>, request: Request, next: Next
     }
 
     let jwt = Jwt::from(token.as_str());
-    // Hold `auth_lock` across both `authenticate` AND the downstream
-    // handler so no other authenticated request can mutate the shared
-    // SurrealDB connection's session mid-query. Without this, concurrent
-    // requests interleave and `$auth.id` evaluates against the wrong
-    // user, hiding the caller's own private games from
-    // `fn::get_list_games`. See bd hangrier_games-c853.
-    let _auth_guard = state.auth_lock.lock().await;
-    match state.db.authenticate(jwt).await {
-        Ok(_) => next.run(request).await,
-        Err(_) => StatusCode::UNAUTHORIZED.into_response(),
+    // Per-request session: clone the shared connection (independent
+    // session state, same underlying socket per SurrealDB Rust SDK 2.x
+    // multi-tenancy) and authenticate the clone. The original
+    // root-authenticated `state.db` is untouched, so concurrent requests
+    // can no longer race on `$auth`. The clone is injected as a request
+    // extension so handlers (extractor `AuthDb`) see it. See bd
+    // hangrier_games-c3ct (replaces the global `auth_lock` from c853).
+    let user_db = (*state.db).clone();
+    if user_db
+        .use_ns(&state.namespace)
+        .use_db(&state.database)
+        .await
+        .is_err()
+    {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
+    if user_db.authenticate(jwt).await.is_err() {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+    let mut request = request;
+    request.extensions_mut().insert(AuthDb(user_db));
+    next.run(request).await
 }
 
 /// Middleware to add rate limit headers to responses

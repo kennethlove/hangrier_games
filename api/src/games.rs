@@ -1,8 +1,8 @@
 use crate::tributes::{TRIBUTES_ROUTER, create_tribute};
-use crate::{AppError, AppState};
+use crate::{AppError, AppState, AuthDb};
 use axum::Json;
 use axum::Router;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Extension, Path, Query, State};
 use axum::http::{HeaderValue, StatusCode, header::LOCATION};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, put};
@@ -176,7 +176,7 @@ async fn create_game_area_edge(
 }
 
 pub async fn create_game(
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
     Json(payload): Json<CreateGame>,
 ) -> Result<Response, AppError> {
     // Validate input
@@ -212,20 +212,17 @@ pub async fn create_game(
     let game_rid = RecordId::from(("game", game_identifier.as_str()));
     let body = serde_json::to_value(&game)
         .map_err(|e| AppError::InternalServerError(format!("Failed to encode game: {}", e)))?;
-    state
-        .db
-        .query("UPSERT $rid CONTENT $body")
+    db.query("UPSERT $rid CONTENT $body")
         .bind(("rid", game_rid.clone()))
         .bind(("body", body))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create game: {}", e)))?;
-    crate::verify_record_persisted(&state.db, &game_rid, "create_game").await?;
+    crate::verify_record_persisted(&db, &game_rid, "create_game").await?;
 
     let created_game = game;
 
     // Create tributes concurrently
-    let tribute_futures =
-        (0..24).map(|idx| create_tribute(None, &game_identifier, &state.db, idx % 12));
+    let tribute_futures = (0..24).map(|idx| create_tribute(None, &game_identifier, &db, idx % 12));
     let tribute_results = futures::future::join_all(tribute_futures).await;
 
     if let Some(err) = tribute_results.into_iter().find_map(Result::err) {
@@ -239,8 +236,8 @@ pub async fn create_game(
     let base_item_count = payload.item_quantity.base_item_count();
 
     // Create areas concurrently with customized item count
-    let area_futures = Area::iter()
-        .map(|area| create_area(game_identifier.as_str(), area, base_item_count, &state.db));
+    let area_futures =
+        Area::iter().map(|area| create_area(game_identifier.as_str(), area, base_item_count, &db));
     let area_results = futures::future::join_all(area_futures).await;
 
     if let Some(err) = area_results.into_iter().find_map(Result::err) {
@@ -346,11 +343,10 @@ pub async fn add_item_to_area(
 
 pub async fn game_delete(
     game_identifier: Path<Uuid>,
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<StatusCode, AppError> {
     let game_identifier = game_identifier.to_string();
-    let mut result = state
-        .db
+    let mut result = db
         .query(
             r#"
         SELECT * FROM fn::get_tributes_items_by_game($game_id);
@@ -370,14 +366,13 @@ pub async fn game_delete(
         .take(1)
         .map_err(|e| AppError::InternalServerError(format!("Failed to take area pieces: {}", e)))?;
     if let Some(pieces) = game_pieces {
-        delete_pieces(pieces, &state.db).await?
+        delete_pieces(pieces, &db).await?
     };
     if let Some(pieces) = area_pieces {
-        delete_pieces(pieces, &state.db).await?
+        delete_pieces(pieces, &db).await?
     };
 
-    let game: Option<Game> = state
-        .db
+    let game: Option<Game> = db
         .delete(("game", &game_identifier))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to delete game: {}", e)))?;
@@ -416,7 +411,7 @@ async fn delete_pieces(
 }
 
 pub async fn game_list(
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
     Query(params): Query<PaginationParams>,
 ) -> Result<Json<PaginatedGames>, AppError> {
     // Validate pagination parameters
@@ -424,8 +419,7 @@ pub async fn game_list(
         .validate()
         .map_err(|e| AppError::ValidationError(format!("{}", e)))?;
 
-    let result = state
-        .db
+    let result = db
         .query("SELECT * FROM fn::get_list_games($limit, $offset)")
         .bind(("limit", params.limit))
         .bind(("offset", params.offset))
@@ -463,13 +457,12 @@ pub async fn game_list(
 
 pub async fn game_detail(
     game_identifier: Path<Uuid>,
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<Json<DisplayGame>, AppError> {
     // let identifier = game_identifier.0;
     let identifier = game_identifier.to_string();
 
-    let mut result = state
-        .db
+    let mut result = db
         .query("SELECT * FROM fn::get_detail_game($identifier)")
         .bind(("identifier", identifier.clone()))
         .await
@@ -488,7 +481,7 @@ pub async fn game_detail(
 
 pub async fn game_update(
     Path(game_identifier): Path<Uuid>,
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
     Json(payload): Json<EditGame>,
 ) -> Result<Json<Game>, AppError> {
     // Validate input
@@ -496,8 +489,7 @@ pub async fn game_update(
         return Err(AppError::ValidationError(format!("{}", e)));
     }
 
-    let response = state
-        .db
+    let response = db
         .query(
             r#"
         UPDATE game
@@ -531,10 +523,9 @@ pub async fn game_update(
 
 pub async fn game_areas(
     Path(identifier): Path<Uuid>,
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<Json<Vec<AreaDetails>>, AppError> {
-    let response = state
-        .db
+    let response = db
         .query(
             r#"
 SELECT (
@@ -564,10 +555,9 @@ SELECT (
 /// Returns 404 if the area is not bound to the game.
 pub async fn area_detail(
     Path((game_identifier, area_identifier)): Path<(Uuid, Uuid)>,
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<Json<AreaDetails>, AppError> {
-    let mut response = state
-        .db
+    let mut response = db
         .query(
             r#"
 SELECT (
@@ -601,10 +591,9 @@ SELECT (
 /// (`game<-playing_in<-tribute->owns->item`). Returns 404 otherwise.
 pub async fn item_detail(
     Path((game_identifier, item_identifier)): Path<(Uuid, Uuid)>,
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<Json<Item>, AppError> {
-    let mut response = state
-        .db
+    let mut response = db
         .query(
             r#"
 LET $game = (SELECT * FROM ONLY game WHERE identifier = $game_identifier LIMIT 1);
@@ -632,7 +621,7 @@ SELECT * FROM $candidates WHERE identifier = $item_identifier LIMIT 1;
 
 pub async fn game_tributes(
     Path(identifier): Path<Uuid>,
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
     Query(params): Query<PaginationParams>,
 ) -> Result<Json<PaginatedTributes>, AppError> {
     // Validate pagination parameters
@@ -643,8 +632,7 @@ pub async fn game_tributes(
     let game_identifier = identifier.to_string();
 
     // Get total count
-    let total: Option<u32> = state
-        .db
+    let total: Option<u32> = db
         .query("RETURN count(SELECT id FROM playing_in WHERE out.identifier=$game)")
         .bind(("game", game_identifier.clone()))
         .await
@@ -653,8 +641,7 @@ pub async fn game_tributes(
 
     let total = total.unwrap_or(0);
 
-    let response = state
-        .db
+    let response = db
         .query("SELECT * FROM fn::get_tributes_by_game($identifier);")
         .bind(("identifier", game_identifier.clone()))
         .await;
@@ -781,16 +768,17 @@ async fn run_game_cycles(
 pub async fn next_step(
     Path(identifier): Path<Uuid>,
     state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<Json<Option<Game>>, AppError> {
     let id = identifier.to_string();
     let id_str = id.as_str();
     let record_id = RecordId::from(("game", id_str));
-    let game_status = get_game_status(&state.db, id_str).await?;
+    let game_status = get_game_status(&db, id_str).await?;
 
     match game_status {
         GameStatus::NotStarted => {
-            update_game_status(&state.db, &record_id, GameStatus::InProgress).await?;
-            let mut game = get_full_game(identifier, &state.db).await?.0;
+            update_game_status(&db, &record_id, GameStatus::InProgress).await?;
+            let mut game = get_full_game(identifier, &db).await?.0;
             game.status = GameStatus::InProgress;
 
             // Broadcast game started
@@ -803,13 +791,13 @@ pub async fn next_step(
             Ok(Json(Some(game)))
         }
         GameStatus::InProgress => {
-            let dead_tribute_count = get_dead_tribute_count(&state.db, id_str).await?;
+            let dead_tribute_count = get_dead_tribute_count(&db, id_str).await?;
 
             if dead_tribute_count >= 24 {
-                update_game_status(&state.db, &record_id, GameStatus::Finished).await?;
+                update_game_status(&db, &record_id, GameStatus::Finished).await?;
 
                 // Find and broadcast winner
-                let game = get_full_game(identifier, &state.db).await?.0;
+                let game = get_full_game(identifier, &db).await?.0;
                 let winner = game
                     .tributes
                     .iter()
@@ -819,8 +807,8 @@ pub async fn next_step(
 
                 Ok(Json(None))
             } else {
-                let mut game = get_full_game(identifier, &state.db).await?.0;
-                run_game_cycles(&mut game, &state.db, &state.broadcaster).await?;
+                let mut game = get_full_game(identifier, &db).await?.0;
+                run_game_cycles(&mut game, &db, &state.broadcaster).await?;
 
                 Ok(Json(Some(game)))
             }
@@ -1330,11 +1318,10 @@ async fn save_tribute_items(
 
 async fn game_day_logs(
     Path((game_identifier, day)): Path<(Uuid, u32)>,
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<Json<Vec<GameMessage>>, AppError> {
     let game_identifier = game_identifier.to_string();
-    match state
-        .db
+    match db
         .query(
             r#"SELECT * FROM message
         WHERE string::starts_with(subject, $identifier) AND
@@ -1358,12 +1345,11 @@ async fn game_day_logs(
 
 async fn tribute_logs(
     Path((game_identifier, day, tribute_identifier)): Path<(Uuid, u32, Uuid)>,
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<Json<Vec<GameMessage>>, AppError> {
     let game_identifier = game_identifier.to_string();
     let tribute_identifier = tribute_identifier.to_string();
-    match state
-        .db
+    match db
         .query(
             r#"SELECT *
         FROM message
@@ -1391,7 +1377,7 @@ async fn tribute_logs(
 
 async fn timeline_summary(
     Path(game_identifier): Path<Uuid>,
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<Json<shared::messages::TimelineSummary>, AppError> {
     // `Game.current_phase` is `#[serde(skip)]` and there is no
     // `current_phase` column on the `game` table, so we derive the live
@@ -1406,8 +1392,7 @@ async fn timeline_summary(
 
     let game_identifier_str = game_identifier.to_string();
 
-    let mut game_resp = state
-        .db
+    let mut game_resp = db
         .query("SELECT day FROM game WHERE identifier = $identifier;")
         .bind(("identifier", game_identifier_str.clone()))
         .await
@@ -1421,8 +1406,7 @@ async fn timeline_summary(
 
     let current_day = game_row.day.unwrap_or(0);
 
-    let mut msg_resp = state
-        .db
+    let mut msg_resp = db
         .query(
             r#"SELECT * FROM message
             WHERE string::starts_with(subject, $identifier)
@@ -1456,11 +1440,10 @@ async fn timeline_summary(
 
 async fn publish_game(
     Path(game_identifier): Path<Uuid>,
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let game_identifier = game_identifier.to_string();
-    let response = state
-        .db
+    let response = db
         .query("UPDATE game SET private = false WHERE identifier = $identifier")
         .bind(("identifier", game_identifier))
         .await;
@@ -1475,11 +1458,10 @@ async fn publish_game(
 
 async fn unpublish_game(
     Path(game_identifier): Path<Uuid>,
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let game_identifier = game_identifier.to_string();
-    let response = state
-        .db
+    let response = db
         .query("UPDATE game SET private = true WHERE identifier = $identifier")
         .bind(("identifier", game_identifier))
         .await;
@@ -1494,11 +1476,10 @@ async fn unpublish_game(
 
 pub async fn game_display(
     game_identifier: Path<Uuid>,
-    state: State<AppState>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<Json<DisplayGame>, AppError> {
     let identifier = game_identifier.to_string();
-    let mut result = state
-        .db
+    let mut result = db
         .query("SELECT * FROM fn::get_display_game($identifier);")
         .bind(("identifier", identifier.clone()))
         .await

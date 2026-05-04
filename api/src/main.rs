@@ -3,7 +3,7 @@ extern crate core;
 use api::auth::AUTH_ROUTER;
 use api::cleanup::start_cleanup_scheduler;
 use api::games::GAMES_ROUTER;
-use api::users::USERS_ROUTER;
+use api::users::{USERS_PROTECTED_ROUTER, USERS_PUBLIC_ROUTER};
 use api::{AppState, AuthDb};
 use axum::extract::{Request, State};
 use axum::http::StatusCode;
@@ -236,7 +236,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 surreal_jwt,
             )),
         )
-        .nest("/users", USERS_ROUTER.clone())
+        .nest("/users", USERS_PUBLIC_ROUTER.clone())
+        .nest(
+            "/users",
+            USERS_PROTECTED_ROUTER
+                .clone()
+                .layer(middleware::from_fn_with_state(
+                    app_state.clone(),
+                    surreal_jwt,
+                )),
+        )
         .nest("/auth", AUTH_ROUTER.clone());
 
     let router = Router::new()

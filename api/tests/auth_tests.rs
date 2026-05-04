@@ -265,7 +265,7 @@ async fn test_session_endpoint() {
 
     // Call session endpoint with token
     let session_response = server
-        .get("/api/users")
+        .get("/api/users/session")
         .add_header("Authorization", format!("Bearer {}", access_token))
         .await;
 

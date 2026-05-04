@@ -1,24 +1,33 @@
 use crate::auth::{JWT_SECRET, RefreshToken, TokenResponse, store_refresh_token};
 use crate::cookies::{set_refresh_cookie, set_session_cookie};
-use crate::{AppError, AppState};
-use axum::extract::State;
+use crate::{AppError, AppState, AuthDb};
+use axum::extract::{Extension, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 use serde::{Deserialize, Serialize};
-use shared::RegistrationUser;
+use shared::{RegistrationUser, UserSession};
 use std::sync::LazyLock;
 use surrealdb::opt::auth::Record;
 use surrealdb::sql::Thing;
 use validator::Validate;
 
-pub static USERS_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
+/// Public users routes. Mounted in `main.rs` *outside* the `surreal_jwt`
+/// middleware because both endpoints establish auth from credentials, not
+/// from an existing session.
+pub static USERS_PUBLIC_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
     Router::new()
-        .route("/", get(session).post(user_create))
+        .route("/", post(user_create))
         .route("/authenticate", post(user_authenticate))
 });
+
+/// Authenticated users routes. Must be mounted *behind* `surreal_jwt` so
+/// `session` reads `$auth` from the per-request authed `AuthDb` clone
+/// instead of the root-authed shared connection. See bd hangrier_games-p9p0.
+pub static USERS_PROTECTED_ROUTER: LazyLock<Router<AppState>> =
+    LazyLock::new(|| Router::new().route("/session", get(session)));
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct JwtClaims {
@@ -83,27 +92,31 @@ async fn create_token_pair(
     })
 }
 
-async fn session(state: State<AppState>) -> Result<Json<String>, AppError> {
-    // `RETURN <string>$session` reads connection-level session state.
-    // Use a local clone of the shared connection (independent session,
-    // same socket — SurrealDB Rust SDK 2.x multi-tenancy) so concurrent
-    // signup/signin/authenticate calls can't race on `$session`. See
-    // bd hangrier_games-c3ct (replaces the previous `auth_lock` guard;
-    // original race was bd hangrier_games-c853 / PR #181).
-    //
-    // NOTE: this endpoint is unauthenticated — the local clone inherits
-    // root auth from `state.db`, so this returns the raw root session
-    // JSON and is only meaningful as a health/info probe. See bd
-    // hangrier_games-p9p0 for moving session under the JWT-protected nest.
-    let user_db = (*state.db).clone();
-    let mut response = user_db
-        .query("RETURN <string>$session")
+/// Returns the authenticated caller's user record (`id`, `username`).
+///
+/// Mounted behind `surreal_jwt`, so the per-request `AuthDb` clone has
+/// already been `authenticate`d with the caller's JWT — `$auth` resolves
+/// to their `user:` record. Raw `$session` is not exposed; we project to
+/// the small `UserSession` shape the frontend actually needs.
+async fn session(Extension(AuthDb(db)): Extension<AuthDb>) -> Result<Json<UserSession>, AppError> {
+    #[derive(Deserialize)]
+    struct AuthRow {
+        id: Thing,
+        username: String,
+    }
+
+    let mut response = db
+        .query("SELECT id, username FROM $auth")
         .await
         .map_err(|e| AppError::DbError(format!("Failed to query session: {e}")))?;
-    let res: Option<String> = response
+    let row: Option<AuthRow> = response
         .take(0)
         .map_err(|e| AppError::DbError(format!("Failed to read session result: {e}")))?;
-    Ok(Json(res.unwrap_or("No session data found!".into())))
+    let row = row.ok_or_else(|| AppError::Unauthorized("No authenticated session".into()))?;
+    Ok(Json(UserSession {
+        id: row.id.to_string(),
+        username: row.username,
+    }))
 }
 
 async fn user_create(

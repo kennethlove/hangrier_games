@@ -21,21 +21,30 @@ pub mod websocket;
 
 #[derive(Clone)]
 pub struct AppState {
+    /// Root-authenticated, shared SurrealDB connection. NEVER call
+    /// `.signup()`, `.signin()`, or `.authenticate()` on this handle
+    /// directly — those mutate connection-level session state and would
+    /// race across concurrent requests (see bd hangrier_games-c853).
+    /// Per-request user auth is done on a `clone()` (see `surreal_jwt`
+    /// middleware in `main.rs` and the `AuthDb` extractor below); the
+    /// SurrealDB Rust SDK's documented multi-tenancy model gives each
+    /// clone its own independent session (auth + variables) while sharing
+    /// the underlying socket.
     pub db: Arc<Surreal<Any>>,
     pub storage: Arc<dyn storage::StorageBackend>,
     pub broadcaster: Arc<websocket::GameBroadcaster>,
     pub namespace: String,
     pub database: String,
-    /// Serializes JWT authentication + downstream request handling on the
-    /// shared SurrealDB connection. `Surreal::authenticate` mutates
-    /// connection-level session state, so concurrent requests would
-    /// interleave and queries could observe a different user's `$auth`
-    /// (causing the user's own private games to vanish from
-    /// `fn::get_list_games` and similar). The lock is held across the
-    /// entire authenticated request so the auth context cannot change
-    /// until the response is built. See bd hangrier_games-c853.
-    pub auth_lock: Arc<tokio::sync::Mutex<()>>,
 }
+
+/// Per-request, JWT-authenticated SurrealDB session injected by the
+/// `surreal_jwt` middleware. Handlers behind that middleware should
+/// extract this instead of touching `AppState::db` so `$auth`-gated
+/// queries see the calling user's identity. The wrapped `Surreal<Any>`
+/// is a clone of the shared connection — independent session state, same
+/// underlying socket. See bd hangrier_games-c3ct.
+#[derive(Clone)]
+pub struct AuthDb(pub Surreal<Any>);
 
 #[derive(Debug, Error)]
 pub enum AppError {

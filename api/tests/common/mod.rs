@@ -87,7 +87,6 @@ impl TestDb {
             broadcaster: Arc::new(GameBroadcaster::default()),
             namespace: self.namespace.clone(),
             database: self.database.clone(),
-            auth_lock: Arc::new(tokio::sync::Mutex::new(())),
         }
     }
 
@@ -168,10 +167,21 @@ async fn surreal_jwt(
     }
 
     let jwt = Jwt::from(token);
-    match state.db.authenticate(jwt).await {
-        Ok(_) => next.run(request).await,
-        Err(_) => StatusCode::UNAUTHORIZED.into_response(),
+    let user_db = (*state.db).clone();
+    if user_db
+        .use_ns(&state.namespace)
+        .use_db(&state.database)
+        .await
+        .is_err()
+    {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
+    if user_db.authenticate(jwt).await.is_err() {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+    let mut request = request;
+    request.extensions_mut().insert(api::AuthDb(user_db));
+    next.run(request).await
 }
 
 /// Test user credentials

@@ -78,9 +78,12 @@ impl RefreshToken {
     }
 }
 
-/// Store a refresh token in the database
+/// Store a refresh token in the database. Uses the caller-provided
+/// `Surreal<Any>` (typically a per-request clone, see bd hangrier_games-c3ct)
+/// so the write happens under the right `$auth` for `refresh_token` table
+/// permissions.
 pub async fn store_refresh_token(
-    state: &AppState,
+    db: &surrealdb::Surreal<surrealdb::engine::any::Any>,
     refresh_token: &RefreshToken,
 ) -> Result<(), AppError> {
     // Bind via serde_json::Value to bypass the SurrealDB SDK's bespoke
@@ -88,9 +91,7 @@ pub async fn store_refresh_token(
     // can collapse externally-tagged enums and Option fields.
     let body = serde_json::to_value(refresh_token)
         .map_err(|e| AppError::DbError(format!("Failed to encode refresh token: {}", e)))?;
-    state
-        .db
-        .query("CREATE refresh_token CONTENT $body")
+    db.query("CREATE refresh_token CONTENT $body")
         .bind(("body", body))
         .await
         .map_err(|e| AppError::DbError(format!("Failed to store refresh token: {}", e)))?;
@@ -98,10 +99,12 @@ pub async fn store_refresh_token(
 }
 
 /// Retrieve a refresh token from the database by token string
-pub async fn get_refresh_token(state: &AppState, token: &str) -> Result<RefreshToken, AppError> {
+pub async fn get_refresh_token(
+    db: &surrealdb::Surreal<surrealdb::engine::any::Any>,
+    token: &str,
+) -> Result<RefreshToken, AppError> {
     let token_owned = token.to_string();
-    let mut result = state
-        .db
+    let mut result = db
         .query("SELECT * FROM refresh_token WHERE token = $tk LIMIT 1")
         .bind(("tk", token_owned))
         .await
@@ -118,10 +121,12 @@ pub async fn get_refresh_token(state: &AppState, token: &str) -> Result<RefreshT
 }
 
 /// Revoke a refresh token in the database
-pub async fn revoke_refresh_token(state: &AppState, token: &str) -> Result<(), AppError> {
+pub async fn revoke_refresh_token(
+    db: &surrealdb::Surreal<surrealdb::engine::any::Any>,
+    token: &str,
+) -> Result<(), AppError> {
     let token_owned = token.to_string();
-    let _: Option<RefreshToken> = state
-        .db
+    let _: Option<RefreshToken> = db
         .query("UPDATE refresh_token SET revoked = true WHERE token = $tk")
         .bind(("tk", token_owned))
         .await
@@ -187,8 +192,19 @@ async fn refresh_token(
         ));
     }
 
+    // refresh_token table is permission-gated by `$auth`; the request
+    // is unauthenticated (no JWT yet) so use a per-request clone of the
+    // shared root-authed connection. The clone keeps the original
+    // session untouched. See bd hangrier_games-c3ct.
+    let user_db = (*state.db).clone();
+    user_db
+        .use_ns(&state.namespace)
+        .use_db(&state.database)
+        .await
+        .map_err(|e| AppError::DbError(format!("Failed to scope refresh session: {e}")))?;
+
     // Retrieve the refresh token from the database
-    let token = get_refresh_token(&state, &refresh).await?;
+    let token = get_refresh_token(&user_db, &refresh).await?;
 
     // Validate the token
     if !token.is_valid() {
@@ -198,11 +214,11 @@ async fn refresh_token(
     }
 
     // Revoke the old refresh token (token rotation)
-    revoke_refresh_token(&state, &refresh).await?;
+    revoke_refresh_token(&user_db, &refresh).await?;
 
     // Generate new refresh token
     let new_refresh_token = RefreshToken::new(token.user_id.clone(), token.username.clone());
-    store_refresh_token(&state, &new_refresh_token).await?;
+    store_refresh_token(&user_db, &new_refresh_token).await?;
 
     // Generate new access token
     let access_token = generate_access_token(
@@ -234,7 +250,16 @@ async fn logout(
 
     if let Some(token) = refresh {
         // Best-effort revoke; clearing the cookie still happens either way.
-        let _ = revoke_refresh_token(&state, &token).await;
+        // Use a per-request clone (see bd hangrier_games-c3ct).
+        let user_db = (*state.db).clone();
+        if user_db
+            .use_ns(&state.namespace)
+            .use_db(&state.database)
+            .await
+            .is_ok()
+        {
+            let _ = revoke_refresh_token(&user_db, &token).await;
+        }
     }
 
     let mut response = StatusCode::NO_CONTENT.into_response();

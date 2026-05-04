@@ -539,6 +539,14 @@ pub fn summarize_periods(messages: &[GameMessage], current: (u32, Phase)) -> Vec
         }
     }
 
+    // Always seed the current period so the hub shows it even before any
+    // events are emitted (e.g. day 0 of a NotStarted game). Then back-fill
+    // every prior (day, phase) pair starting at day 1 so the summary list
+    // is dense up to the live period without gaps for empty cycles. (Day 0
+    // only ever has a Day phase — the engine never emits a day-0 Night.)
+    bucket
+        .entry((current_day, phase_ord(current_phase)))
+        .or_insert((0, 0));
     for d in 1..=current_day {
         bucket.entry((d, 0)).or_insert((0, 0));
         if d < current_day || matches!(current_phase, Phase::Night) {
@@ -786,7 +794,16 @@ mod tests {
     #[test]
     fn summarize_empty_input_with_current_day_zero() {
         let result = summarize_periods(&[], (0, Phase::Day));
-        assert!(result.is_empty(), "no periods reached when current_day=0");
+        assert_eq!(
+            result.len(),
+            1,
+            "current period (day 0, Day) should always be seeded"
+        );
+        assert_eq!(result[0].day, 0);
+        assert_eq!(result[0].phase, Phase::Day);
+        assert!(result[0].is_current);
+        assert_eq!(result[0].event_count, 0);
+        assert_eq!(result[0].deaths, 0);
     }
 
     #[test]

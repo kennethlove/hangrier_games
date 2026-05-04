@@ -129,14 +129,86 @@ pub enum MessageKind {
 
 /// Visible fatigue band derived from a tribute's stamina/max_stamina ratio.
 /// Lives in `shared/` because it is wire-visible via
-/// `MessagePayload::StaminaBandChanged`. Mirror of the `HungerBand`/`ThirstBand`
-/// pattern (those live in `game::tributes::survival` because they are not
-/// directly serialised on the wire — band-changed events use `String`).
+/// `MessagePayload::StaminaBandChanged`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum StaminaBand {
     Fresh,
     Winded,
     Exhausted,
+}
+
+/// Visible hunger band derived from a tribute's hunger counter. Lives in
+/// `shared/` because it is wire-visible via
+/// `MessagePayload::HungerBandChanged`. The mapping (counter → band) lives
+/// in `game::tributes::survival::hunger_band`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum HungerBand {
+    Sated,
+    Peckish,
+    Hungry,
+    Starving,
+}
+
+/// Visible thirst band derived from a tribute's thirst counter. Lives in
+/// `shared/` because it is wire-visible via
+/// `MessagePayload::ThirstBandChanged`. The mapping (counter → band) lives
+/// in `game::tributes::survival::thirst_band`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ThirstBand {
+    Sated,
+    Thirsty,
+    Parched,
+    Dehydrated,
+}
+
+impl StaminaBand {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            StaminaBand::Fresh => "Fresh",
+            StaminaBand::Winded => "Winded",
+            StaminaBand::Exhausted => "Exhausted",
+        }
+    }
+}
+
+impl std::fmt::Display for StaminaBand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl HungerBand {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            HungerBand::Sated => "Sated",
+            HungerBand::Peckish => "Peckish",
+            HungerBand::Hungry => "Hungry",
+            HungerBand::Starving => "Starving",
+        }
+    }
+}
+
+impl std::fmt::Display for HungerBand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl ThirstBand {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ThirstBand::Sated => "Sated",
+            ThirstBand::Thirsty => "Thirsty",
+            ThirstBand::Parched => "Parched",
+            ThirstBand::Dehydrated => "Dehydrated",
+        }
+    }
+}
+
+impl std::fmt::Display for ThirstBand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -237,18 +309,18 @@ pub enum MessagePayload {
     // Survival events (shelter + hunger/thirst spec).
     HungerBandChanged {
         tribute: TributeRef,
-        from: String,
-        to: String,
+        from: HungerBand,
+        to: HungerBand,
     },
     ThirstBandChanged {
         tribute: TributeRef,
-        from: String,
-        to: String,
+        from: ThirstBand,
+        to: ThirstBand,
     },
     StaminaBandChanged {
         tribute: TributeRef,
-        from: String,
-        to: String,
+        from: StaminaBand,
+        to: StaminaBand,
     },
     ShelterSought {
         tribute: TributeRef,
@@ -897,16 +969,16 @@ mod survival_event_tests {
     fn band_change_payloads_round_trip() {
         let p = MessagePayload::HungerBandChanged {
             tribute: tref(),
-            from: "Sated".into(),
-            to: "Hungry".into(),
+            from: HungerBand::Sated,
+            to: HungerBand::Hungry,
         };
         let back: MessagePayload =
             serde_json::from_str(&serde_json::to_string(&p).unwrap()).unwrap();
         assert_eq!(format!("{:?}", p), format!("{:?}", back));
         let p = MessagePayload::ThirstBandChanged {
             tribute: tref(),
-            from: "Sated".into(),
-            to: "Parched".into(),
+            from: ThirstBand::Sated,
+            to: ThirstBand::Parched,
         };
         let back: MessagePayload =
             serde_json::from_str(&serde_json::to_string(&p).unwrap()).unwrap();
@@ -917,8 +989,8 @@ mod survival_event_tests {
     fn stamina_band_change_round_trips_and_routes_to_state() {
         let p = MessagePayload::StaminaBandChanged {
             tribute: tref(),
-            from: "Fresh".into(),
-            to: "Winded".into(),
+            from: StaminaBand::Fresh,
+            to: StaminaBand::Winded,
         };
         let json = serde_json::to_string(&p).unwrap();
         let back: MessagePayload = serde_json::from_str(&json).unwrap();

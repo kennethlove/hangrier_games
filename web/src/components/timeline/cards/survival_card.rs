@@ -1,5 +1,5 @@
 use dioxus::prelude::*;
-use shared::messages::{GameMessage, MessagePayload};
+use shared::messages::{GameMessage, HungerBand, MessagePayload, ThirstBand};
 
 #[derive(Props, PartialEq, Clone)]
 pub struct SurvivalCardProps {
@@ -10,7 +10,7 @@ pub struct SurvivalCardProps {
 pub fn SurvivalCard(props: SurvivalCardProps) -> Element {
     match &props.message.payload {
         MessagePayload::HungerBandChanged { tribute, from, to } => {
-            let cls = hunger_class(to);
+            let cls = hunger_class(*to);
             rsx! {
                 article { class: "rounded border-l-4 border-amber-400 bg-amber-50 theme2:bg-amber-950/40 p-2 text-sm",
                     p {
@@ -23,7 +23,7 @@ pub fn SurvivalCard(props: SurvivalCardProps) -> Element {
             }
         }
         MessagePayload::ThirstBandChanged { tribute, from, to } => {
-            let cls = thirst_class(to);
+            let cls = thirst_class(*to);
             rsx! {
                 article { class: "rounded border-l-4 border-sky-400 bg-sky-50 theme2:bg-sky-950/40 p-2 text-sm",
                     p {
@@ -97,18 +97,18 @@ pub fn SurvivalCard(props: SurvivalCardProps) -> Element {
     }
 }
 
-fn hunger_class(band: &str) -> &'static str {
+fn hunger_class(band: HungerBand) -> &'static str {
     match band {
-        "Hungry" => "text-amber-600 theme2:text-amber-300",
-        "Starving" => "text-red-600 theme2:text-red-400 font-semibold",
+        HungerBand::Hungry => "text-amber-600 theme2:text-amber-300",
+        HungerBand::Starving => "text-red-600 theme2:text-red-400 font-semibold",
         _ => "text-stone-600 theme2:text-stone-300",
     }
 }
 
-fn thirst_class(band: &str) -> &'static str {
+fn thirst_class(band: ThirstBand) -> &'static str {
     match band {
-        "Parched" => "text-sky-600 theme2:text-sky-300",
-        "Dehydrated" => "text-red-600 theme2:text-red-400 font-semibold",
+        ThirstBand::Parched => "text-sky-600 theme2:text-sky-300",
+        ThirstBand::Dehydrated => "text-red-600 theme2:text-red-400 font-semibold",
         _ => "text-stone-600 theme2:text-stone-300",
     }
 }

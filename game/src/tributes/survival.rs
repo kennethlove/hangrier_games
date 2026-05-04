@@ -1,26 +1,14 @@
-use serde::{Deserialize, Serialize};
-
 use crate::areas::weather::Weather;
 use crate::tributes::Tribute;
 
+// Wire-visible band enums live in the `shared` crate (they are serialised
+// in `MessagePayload::{Hunger,Thirst}BandChanged`). Re-export them here so
+// existing `game::tributes::survival::{HungerBand, ThirstBand}` imports
+// keep compiling.
+pub use shared::messages::{HungerBand, ThirstBand};
+
 const HIGH_ATTR_THRESHOLD: u32 = 75;
 const LOW_ATTR_THRESHOLD: u32 = 25;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum HungerBand {
-    Sated,
-    Peckish,
-    Hungry,
-    Starving,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum ThirstBand {
-    Sated,
-    Thirsty,
-    Parched,
-    Dehydrated,
-}
 
 pub fn hunger_band(value: u8) -> HungerBand {
     match value {

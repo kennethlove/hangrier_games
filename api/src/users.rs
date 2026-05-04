@@ -85,13 +85,14 @@ async fn session(state: State<AppState>) -> Result<Json<String>, AppError> {
     // mutate the shared `Surreal<Any>` session mid-query. See
     // bd hangrier_games-c853 / PR #181 for the original race.
     let _auth_guard = state.auth_lock.lock().await;
-    let res: Option<String> = state
+    let mut response = state
         .db
         .query("RETURN <string>$session")
         .await
-        .unwrap()
+        .map_err(|e| AppError::DbError(format!("Failed to query session: {e}")))?;
+    let res: Option<String> = response
         .take(0)
-        .unwrap();
+        .map_err(|e| AppError::DbError(format!("Failed to read session result: {e}")))?;
     Ok(Json(res.unwrap_or("No session data found!".into())))
 }
 

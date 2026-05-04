@@ -2,7 +2,8 @@ use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use futures_util::{SinkExt, StreamExt};
 use gloo_net::websocket::{Message, futures::WebSocket};
-use shared::{GameEvent, WebSocketMessage};
+use shared::WebSocketMessage;
+use shared::messages::GameMessage;
 
 /// WebSocket connection state
 #[derive(Clone, Debug, PartialEq)]
@@ -20,12 +21,12 @@ const MAX_EVENTS: usize = 200;
 /// Hook to manage WebSocket connection for real-time game updates.
 ///
 /// Connects to `{API_HOST}/ws`, sends a `Subscribe { game_id }` frame,
-/// then streams `GameEvent`s into the returned signal. The connection state
-/// signal reflects the current lifecycle phase. The hook does not retry on
-/// disconnect; callers can observe `ConnectionState::Disconnected` and
-/// re-mount if needed.
-pub fn use_game_websocket(game_id: String) -> (Signal<Vec<GameEvent>>, Signal<ConnectionState>) {
-    let events = use_signal(Vec::<GameEvent>::new);
+/// then streams [`GameMessage`]s into the returned signal. The connection
+/// state signal reflects the current lifecycle phase. The hook does not
+/// retry on disconnect; callers can observe `ConnectionState::Disconnected`
+/// and re-mount if needed.
+pub fn use_game_websocket(game_id: String) -> (Signal<Vec<GameMessage>>, Signal<ConnectionState>) {
+    let events = use_signal(Vec::<GameMessage>::new);
     let connection_state = use_signal(|| ConnectionState::Connecting);
 
     use_effect(move || {
@@ -78,10 +79,10 @@ pub fn use_game_websocket(game_id: String) -> (Signal<Vec<GameEvent>>, Signal<Co
                         match serde_json::from_str::<WebSocketMessage>(&text) {
                             Ok(WebSocketMessage::GameEvent {
                                 game_id: gid,
-                                event,
+                                message,
                             }) if gid == game_id => {
                                 events.with_mut(|list| {
-                                    list.push(event);
+                                    list.push(*message);
                                     if list.len() > MAX_EVENTS {
                                         let drop_count = list.len() - MAX_EVENTS;
                                         list.drain(0..drop_count);

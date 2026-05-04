@@ -17,7 +17,8 @@ use crate::routes::Routes;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use reqwest::StatusCode;
-use shared::{DisplayGame, GameEvent, GameStatus};
+use shared::messages::MessagePayload;
+use shared::{DisplayGame, GameStatus};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) struct DisplayGameQ;
@@ -127,13 +128,12 @@ pub fn GamePage(identifier: String) -> Element {
         let evs = ws_events.read();
         let len = evs.len();
         let start = (*last_seen.peek()).min(len);
-        let bump_phase = evs[start..].iter().any(|ev| {
+        let bump_phase = evs[start..].iter().any(|msg| {
             matches!(
-                ev,
-                GameEvent::GameStarted { .. }
-                    | GameEvent::DayStarted { .. }
-                    | GameEvent::NightStarted { .. }
-                    | GameEvent::GameFinished { .. }
+                msg.payload,
+                MessagePayload::CycleStart { .. }
+                    | MessagePayload::CycleEnd { .. }
+                    | MessagePayload::GameEnded { .. }
             )
         });
         drop(evs);
@@ -172,9 +172,9 @@ pub fn GamePage(identifier: String) -> Element {
                 div {
                     class: "bg-gray-100 p-4 rounded-lg max-h-64 overflow-y-auto",
                     h3 { class: "font-bold mb-2", "Live Events" }
-                    for event in ws_events.read().iter() {
+                    for msg in ws_events.read().iter() {
                         div { class: "text-sm py-1 border-b border-gray-200",
-                            {format_game_event(event)}
+                            "{msg.content}"
                         }
                     }
                 }
@@ -187,118 +187,75 @@ pub fn GamePage(identifier: String) -> Element {
     }
 }
 
-pub(crate) fn format_game_event(event: &GameEvent) -> String {
-    match event {
-        GameEvent::GameStarted { day: _ } => "Tributes arrive in the arena.".to_string(),
-        GameEvent::GameFinished { winner } => {
-            if let Some(winner_name) = winner {
-                format!("Game finished! Winner: {}", winner_name)
-            } else {
-                "Game finished!".to_string()
-            }
-        }
-        GameEvent::DayStarted { day } => format!("Day {} started", day),
-        GameEvent::NightStarted { day } => format!("Night {} started", day),
-        GameEvent::TributeDied { name, cause, .. } => format!("{} died: {}", name, cause),
-        GameEvent::AreaEvent { area, event } => format!("{} in {}", event, area),
-        GameEvent::Combat { beat } => {
-            format!(
-                "{} vs {}: {:?}",
-                beat.attacker.name, beat.target.name, beat.outcome
-            )
-        }
-        GameEvent::Message { content, .. } => content.clone(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use shared::GameEvent;
+    use shared::messages::{
+        AreaEventKind, AreaRef, GameMessage, MessagePayload, MessageSource, Phase, TributeRef,
+    };
 
-    #[test]
-    fn game_started_uses_arrival_flavor() {
-        let s = format_game_event(&GameEvent::GameStarted { day: 1 });
-        assert_eq!(s, "Tributes arrive in the arena.");
+    fn make(content: &str, payload: MessagePayload) -> GameMessage {
+        GameMessage::new(
+            MessageSource::Game("g".into()),
+            1,
+            Phase::Day,
+            0,
+            0,
+            "subj".into(),
+            content.into(),
+            payload,
+        )
     }
 
     #[test]
-    fn game_finished_with_winner() {
-        let s = format_game_event(&GameEvent::GameFinished {
-            winner: Some("Katniss".to_string()),
-        });
-        assert_eq!(s, "Game finished! Winner: Katniss");
-    }
-
-    #[test]
-    fn game_finished_no_winner() {
-        let s = format_game_event(&GameEvent::GameFinished { winner: None });
-        assert_eq!(s, "Game finished!");
-    }
-
-    #[test]
-    fn day_and_night_phases() {
-        assert_eq!(
-            format_game_event(&GameEvent::DayStarted { day: 3 }),
-            "Day 3 started"
+    fn cycle_start_payload_round_trips_through_message() {
+        let msg = make(
+            "Day 1 dawns over the arena.",
+            MessagePayload::CycleStart {
+                day: 1,
+                phase: Phase::Day,
+            },
         );
-        assert_eq!(
-            format_game_event(&GameEvent::NightStarted { day: 3 }),
-            "Night 3 started"
-        );
+        assert_eq!(msg.content, "Day 1 dawns over the arena.");
+        assert!(matches!(
+            msg.payload,
+            MessagePayload::CycleStart {
+                day: 1,
+                phase: Phase::Day
+            }
+        ));
     }
 
     #[test]
-    fn tribute_died_includes_cause() {
-        let s = format_game_event(&GameEvent::TributeDied {
-            tribute_id: "t1".to_string(),
-            name: "Rue".to_string(),
-            cause: "spear".to_string(),
-        });
-        assert_eq!(s, "Rue died: spear");
+    fn arbitrary_payloads_keep_their_content() {
+        let msg = make(
+            "fire in north",
+            MessagePayload::AreaEvent {
+                area: AreaRef {
+                    identifier: "a".into(),
+                    name: "north".into(),
+                },
+                kind: AreaEventKind::Fire,
+                description: "fire".into(),
+            },
+        );
+        assert_eq!(msg.content, "fire in north");
     }
 
     #[test]
-    fn area_and_combat_format() {
-        assert_eq!(
-            format_game_event(&GameEvent::AreaEvent {
-                area: "north".to_string(),
-                event: "fire".to_string(),
-            }),
-            "fire in north"
+    fn tribute_killed_carries_victim() {
+        let msg = make(
+            "Rue died: spear",
+            MessagePayload::TributeKilled {
+                victim: TributeRef {
+                    identifier: "t1".into(),
+                    name: "Rue".into(),
+                },
+                killer: None,
+                cause: "spear".into(),
+            },
         );
-        assert_eq!(
-            format_game_event(&GameEvent::Combat {
-                beat: Box::new(shared::combat_beat::CombatBeat {
-                    attacker: shared::messages::TributeRef {
-                        identifier: "a".into(),
-                        name: "A".into(),
-                    },
-                    target: shared::messages::TributeRef {
-                        identifier: "b".into(),
-                        name: "B".into(),
-                    },
-                    weapon: None,
-                    shield: None,
-                    wear: vec![],
-                    outcome: shared::combat_beat::SwingOutcome::Miss,
-                    stress: shared::combat_beat::StressReport::default(),
-                    attacker_stamina_cost: 0,
-                    target_stamina_cost: 0,
-                }),
-            }),
-            "A vs B: Miss"
-        );
-    }
-
-    #[test]
-    fn message_passes_content_through() {
-        let s = format_game_event(&GameEvent::Message {
-            source: "narrator".to_string(),
-            content: "hello".to_string(),
-            game_day: 1,
-        });
-        assert_eq!(s, "hello");
+        assert_eq!(msg.content, "Rue died: spear");
+        assert!(msg.payload.involves("t1"));
     }
 }
 

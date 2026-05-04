@@ -752,16 +752,12 @@ async fn run_game_cycles(
         .map_err(|e| AppError::InternalServerError(format!("Failed to run day cycle: {}", e)))?;
     game.run_day_night_cycle(false)
         .map_err(|e| AppError::InternalServerError(format!("Failed to run night cycle: {}", e)))?;
-    let day = game.day.unwrap_or(0);
     let _ = save_game(game, db, broadcaster).await?;
-    // Persistence has happened; clients can now refetch the per-period
-    // timeline summary and see the deaths emitted during this cycle. The
-    // frontend's `GamePage` only invalidates `TimelineSummaryQ` on
-    // `GameStarted | DayStarted | NightStarted | GameFinished`, so without
-    // these broadcasts the per-period cards stay stuck on whatever
-    // snapshot was current at page load.
-    crate::websocket::broadcast_day_started(broadcaster, &game.identifier, day);
-    crate::websocket::broadcast_night_started(broadcaster, &game.identifier, day);
+    // Persistence has happened; the cycle's `CycleStart`/`CycleEnd`
+    // GameMessages were broadcast by `save_game` as it drained
+    // `game.messages`, so the frontend's `GamePage` already invalidates
+    // the per-period timeline summary on `MessagePayload::CycleStart`/
+    // `CycleEnd`/`GameEnded` without any extra synthesised broadcasts here.
     Ok(())
 }
 
@@ -909,19 +905,7 @@ async fn save_game(
 
         // Broadcast first so clients see updates even if persistence is slow.
         for log in &logs {
-            let source_str = match &log.source {
-                MessageSource::Game(id) => format!("game:{}", id),
-                MessageSource::Area(area) => format!("area:{}", area),
-                MessageSource::Tribute(trib) => format!("tribute:{}", trib),
-            };
-
-            crate::websocket::broadcast_game_message(
-                broadcaster,
-                &game.identifier,
-                &source_str,
-                &log.content,
-                game_day,
-            );
+            crate::websocket::broadcast_game_message(broadcaster, &game.identifier, log.clone());
         }
 
         let game_logs: Vec<GameLog> = logs

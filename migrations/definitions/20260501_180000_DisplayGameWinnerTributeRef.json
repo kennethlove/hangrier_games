@@ -1,1 +1,1 @@
-{"schemas":"--- original\n+++ modified\n@@ -55,8 +55,8 @@\n     );\n \n     LET $winner = (\n         IF count($living_tributes) == 1 THEN\n-            RETURN $living_tributes[0].name\n+            RETURN { identifier: $living_tributes[0].identifier, name: $living_tributes[0].name }\n         ELSE\n-            RETURN \"\"\n+            RETURN NONE\n         END\n     );\n","events":null}
+{"schemas":"--- original\n+++ modified\n","events":null}

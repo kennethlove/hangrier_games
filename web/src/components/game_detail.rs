@@ -283,6 +283,8 @@ mod tests {
                     wear: vec![],
                     outcome: shared::combat_beat::SwingOutcome::Miss,
                     stress: shared::combat_beat::StressReport::default(),
+                    attacker_stamina_cost: 0,
+                    target_stamina_cost: 0,
                 }),
             }),
             "A vs B: Miss"

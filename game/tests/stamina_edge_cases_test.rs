@@ -144,24 +144,32 @@ fn test_best_case_combined() {
     assert_eq!(cost, 11, "Best case hide should cost 11 stamina");
 }
 
-/// Edge case: stamina restoration
+/// Edge case: stamina recovery (formerly "restoration")
 #[test]
 fn test_stamina_restoration() {
-    let mut tribute = Tribute::default();
+    use game::tributes::actions::Action;
+    use game::tributes::combat_tuning::CombatTuning;
+    use game::tributes::survival::{HungerBand, ThirstBand};
 
-    // Initial state should be full stamina
+    let mut tribute = Tribute::default();
     assert_eq!(tribute.stamina, 100, "Initial stamina should be 100");
     assert_eq!(tribute.max_stamina, 100, "Max stamina should be 100");
 
-    // Deplete stamina
+    // Deplete stamina, then recover sheltered + resting (max rate, default 60).
     tribute.stamina = 25;
-
-    // Restore
-    tribute.restore_stamina();
+    let tuning = CombatTuning::default();
+    tribute.recover_stamina(
+        &Action::Rest,
+        true,
+        HungerBand::Sated,
+        ThirstBand::Sated,
+        &tuning,
+    );
 
     assert_eq!(
-        tribute.stamina, tribute.max_stamina,
-        "Stamina should be fully restored"
+        tribute.stamina,
+        25 + tuning.recovery_sheltered_resting,
+        "Stamina should recover by recovery_sheltered_resting when sheltered + resting"
     );
 }
 

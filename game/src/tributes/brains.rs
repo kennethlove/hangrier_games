@@ -494,6 +494,21 @@ impl Brain {
             return action;
         }
 
+        // Stamina override (spec §6.4 — runs after survival, before standard
+        // logic). For v1 we cannot easily plumb the live nearby-tribute list
+        // and the per-phase shelter flag through this signature; pass an
+        // empty threat slice and `sheltered=false`. The Exhausted -> Rest
+        // path still fires (the dominant outcome); the visible-band flee
+        // path is conservative until plumbing lands as a follow-up.
+        if let Some(action) = stamina_override(
+            tribute,
+            &[],
+            false,
+            &crate::tributes::combat_tuning::CombatTuning::default(),
+        ) {
+            return action;
+        }
+
         // Check for preferred action first
         if let Some(ref preferred_action) = self.preferred_action
             && rng.random_bool(self.preferred_action_percentage)
@@ -529,6 +544,18 @@ impl Brain {
             self.decide_action_few_enemies_with_terrain(tribute, is_concealed)
         } else {
             self.decide_action_many_enemies_with_terrain(tribute, is_concealed)
+        };
+
+        // Stamina action-gate: an actor that can't pay the per-swing cost
+        // cannot take Attack. Fall back to Rest so the tribute recovers
+        // instead of cycling back into the same un-payable choice.
+        let tuning = crate::tributes::combat_tuning::CombatTuning::default();
+        let base_action = if matches!(base_action, Action::Attack)
+            && action_score(tribute, &Action::Attack, &[], &tuning) == i32::MIN
+        {
+            Action::Rest
+        } else {
+            base_action
         };
 
         // Apply terrain modifiers to action choices
@@ -814,6 +841,108 @@ pub fn survival_override(
     }
 
     None
+}
+
+/// Stamina-band override layer. Returns `Some(Action)` to override the
+/// standard brain when the actor is Exhausted; returns `None` for Fresh and
+/// Winded (Winded is handled at action-scoring time via
+/// `winded_attack_score_penalty`).
+///
+/// Pipeline order (see spec):
+/// 1. Combat preempt
+/// 2. Gamemaker overrides
+/// 3. Hunger/thirst overrides (`survival_override`)
+/// 4. Stamina overrides (this fn)
+/// 5. Standard brain logic
+pub fn stamina_override(
+    tribute: &Tribute,
+    nearby: &[Tribute],
+    sheltered: bool,
+    tuning: &crate::tributes::combat_tuning::CombatTuning,
+) -> Option<Action> {
+    use crate::tributes::stamina_band::stamina_band;
+    use shared::messages::StaminaBand;
+
+    let band = stamina_band(tribute.stamina, tribute.max_stamina, tuning);
+    if band != StaminaBand::Exhausted {
+        return None;
+    }
+
+    // Visible-band flee: any nearby living tribute (other than self) with a
+    // better band is a threat. If we're not already sheltered, flee. The
+    // destination layer fills the destination based on the threat location.
+    if !sheltered {
+        let any_threat = nearby.iter().any(|other| {
+            other.identifier != tribute.identifier && other.attributes.health > 0 && {
+                let other_band = stamina_band(other.stamina, other.max_stamina, tuning);
+                matches!(other_band, StaminaBand::Fresh | StaminaBand::Winded)
+            }
+        });
+        if any_threat {
+            return Some(Action::Move(None));
+        }
+    }
+
+    // Otherwise hold position and recover.
+    Some(Action::Rest)
+}
+
+/// Score a candidate target for an `Action::Attack` decision. Higher is better.
+///
+/// Baseline favors low-HP targets (`-target.health`). When the actor is Fresh
+/// and the target is Winded or Exhausted, adds
+/// `tuning.fresh_target_visibly_tired_bonus` (predator instinct).
+pub fn target_attack_score(
+    actor: &Tribute,
+    target: &Tribute,
+    tuning: &crate::tributes::combat_tuning::CombatTuning,
+) -> i32 {
+    use crate::tributes::stamina_band::stamina_band;
+    use shared::messages::StaminaBand;
+
+    let base: i32 = -(target.attributes.health as i32);
+
+    let actor_band = stamina_band(actor.stamina, actor.max_stamina, tuning);
+    let target_band = stamina_band(target.stamina, target.max_stamina, tuning);
+
+    let predator_bonus = if matches!(actor_band, StaminaBand::Fresh)
+        && matches!(target_band, StaminaBand::Winded | StaminaBand::Exhausted)
+    {
+        tuning.fresh_target_visibly_tired_bonus
+    } else {
+        0
+    };
+
+    base + predator_bonus
+}
+
+/// Score a candidate action. `i32::MIN` signals "unavailable".
+///
+/// `Action::Attack` is gated on `actor.stamina >= tuning.stamina_cost_attacker`;
+/// Winded actors get `tuning.winded_attack_score_penalty` added (negative).
+pub fn action_score(
+    actor: &Tribute,
+    action: &Action,
+    _nearby: &[Tribute],
+    tuning: &crate::tributes::combat_tuning::CombatTuning,
+) -> i32 {
+    use crate::tributes::stamina_band::stamina_band;
+    use shared::messages::StaminaBand;
+
+    match action {
+        Action::Attack => {
+            if actor.stamina < tuning.stamina_cost_attacker {
+                return i32::MIN;
+            }
+            let band = stamina_band(actor.stamina, actor.max_stamina, tuning);
+            match band {
+                StaminaBand::Fresh => 0,
+                StaminaBand::Winded => tuning.winded_attack_score_penalty,
+                StaminaBand::Exhausted => tuning.winded_attack_score_penalty,
+            }
+        }
+        _ => 0,
+    }
 }
 
 #[cfg(test)]
@@ -1564,5 +1693,118 @@ mod survival_override_tests {
         t.hunger = 3;
         let action = survival_override(&t, BaseTerrain::Wetlands, &Weather::Clear, false);
         assert_eq!(action, None);
+    }
+
+    mod stamina {
+        use super::*;
+        use crate::tributes::combat_tuning::CombatTuning;
+
+        fn make(name: &str, stamina: u32) -> Tribute {
+            let mut t = Tribute::new(name.to_string(), None, None);
+            t.brain = Brain::default();
+            t.attributes = crate::tributes::Attributes::default();
+            t.stamina = stamina;
+            t.max_stamina = 100;
+            t
+        }
+
+        #[test]
+        fn fresh_returns_none() {
+            let t = make("F", 100);
+            let result = stamina_override(&t, &[], false, &CombatTuning::default());
+            assert_eq!(result, None);
+        }
+
+        #[test]
+        fn winded_returns_none() {
+            let t = make("W", 30);
+            let result = stamina_override(&t, &[], false, &CombatTuning::default());
+            assert_eq!(result, None);
+        }
+
+        #[test]
+        fn exhausted_in_shelter_returns_rest() {
+            let t = make("E", 10);
+            let result = stamina_override(&t, &[], true, &CombatTuning::default());
+            assert_eq!(result, Some(Action::Rest));
+        }
+
+        #[test]
+        fn exhausted_no_shelter_no_threats_rests() {
+            let t = make("E", 10);
+            let result = stamina_override(&t, &[], false, &CombatTuning::default());
+            assert_eq!(result, Some(Action::Rest));
+        }
+
+        #[test]
+        fn exhausted_with_fresh_threat_flees() {
+            let actor = make("E", 10);
+            let threat = make("Hunter", 100);
+            let result = stamina_override(&actor, &[threat], false, &CombatTuning::default());
+            assert!(matches!(result, Some(Action::Move(_))));
+        }
+
+        #[test]
+        fn exhausted_self_does_not_count_as_threat() {
+            // Same identifier as actor → not a threat.
+            let mut actor = make("E", 10);
+            actor.identifier = "self".to_string();
+            let mut clone = make("E", 100);
+            clone.identifier = "self".to_string();
+            let result = stamina_override(&actor, &[clone], false, &CombatTuning::default());
+            assert_eq!(result, Some(Action::Rest));
+        }
+
+        #[test]
+        fn fresh_actor_gets_predator_bonus_against_winded_target() {
+            let tuning = CombatTuning::default();
+            let actor = make("Fresh", 100);
+            let fresh_target = make("FreshT", 100);
+            let winded_target = make("WindedT", 30);
+            let s_fresh = target_attack_score(&actor, &fresh_target, &tuning);
+            let s_winded = target_attack_score(&actor, &winded_target, &tuning);
+            assert_eq!(s_winded - s_fresh, tuning.fresh_target_visibly_tired_bonus);
+        }
+
+        #[test]
+        fn fresh_actor_gets_predator_bonus_against_exhausted_target() {
+            let tuning = CombatTuning::default();
+            let actor = make("Fresh", 100);
+            let fresh_target = make("FreshT", 100);
+            let exhausted_target = make("ExT", 10);
+            let s_fresh = target_attack_score(&actor, &fresh_target, &tuning);
+            let s_ex = target_attack_score(&actor, &exhausted_target, &tuning);
+            assert_eq!(s_ex - s_fresh, tuning.fresh_target_visibly_tired_bonus);
+        }
+
+        #[test]
+        fn winded_actor_no_predator_bonus() {
+            let tuning = CombatTuning::default();
+            let actor = make("WActor", 30);
+            let fresh_target = make("FreshT", 100);
+            let winded_target = make("WindedT", 30);
+            let s_fresh = target_attack_score(&actor, &fresh_target, &tuning);
+            let s_winded = target_attack_score(&actor, &winded_target, &tuning);
+            assert_eq!(s_fresh, s_winded);
+        }
+
+        #[test]
+        fn action_gate_blocks_attack_when_stamina_below_cost() {
+            let tuning = CombatTuning::default();
+            let mut actor = make("Low", 100);
+            actor.stamina = tuning.stamina_cost_attacker - 1;
+            let score = action_score(&actor, &Action::Attack, &[], &tuning);
+            assert_eq!(score, i32::MIN);
+        }
+
+        #[test]
+        fn winded_actor_attack_score_lowered_by_penalty() {
+            let tuning = CombatTuning::default();
+            let fresh = make("F", 100);
+            let winded = make("W", 30);
+            let s_fresh = action_score(&fresh, &Action::Attack, &[], &tuning);
+            let s_winded = action_score(&winded, &Action::Attack, &[], &tuning);
+            assert_eq!(s_winded - s_fresh, tuning.winded_attack_score_penalty);
+        }
     }
 }

@@ -127,6 +127,18 @@ pub enum MessageKind {
     State,
 }
 
+/// Visible fatigue band derived from a tribute's stamina/max_stamina ratio.
+/// Lives in `shared/` because it is wire-visible via
+/// `MessagePayload::StaminaBandChanged`. Mirror of the `HungerBand`/`ThirstBand`
+/// pattern (those live in `game::tributes::survival` because they are not
+/// directly serialised on the wire — band-changed events use `String`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum StaminaBand {
+    Fresh,
+    Winded,
+    Exhausted,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum MessagePayload {
@@ -233,6 +245,11 @@ pub enum MessagePayload {
         from: String,
         to: String,
     },
+    StaminaBandChanged {
+        tribute: TributeRef,
+        from: String,
+        to: String,
+    },
     ShelterSought {
         tribute: TributeRef,
         area: AreaRef,
@@ -302,6 +319,7 @@ impl MessagePayload {
             | SanityBreak { .. }
             | HungerBandChanged { .. }
             | ThirstBandChanged { .. }
+            | StaminaBandChanged { .. }
             | ShelterSought { .. }
             | Foraged { .. }
             | Drank { .. }
@@ -339,6 +357,7 @@ impl MessagePayload {
             | SanityBreak { tribute }
             | HungerBandChanged { tribute, .. }
             | ThirstBandChanged { tribute, .. }
+            | StaminaBandChanged { tribute, .. }
             | ShelterSought { tribute, .. }
             | Foraged { tribute, .. }
             | Drank { tribute, .. }
@@ -892,6 +911,33 @@ mod survival_event_tests {
         let back: MessagePayload =
             serde_json::from_str(&serde_json::to_string(&p).unwrap()).unwrap();
         assert_eq!(format!("{:?}", p), format!("{:?}", back));
+    }
+
+    #[test]
+    fn stamina_band_change_round_trips_and_routes_to_state() {
+        let p = MessagePayload::StaminaBandChanged {
+            tribute: tref(),
+            from: "Fresh".into(),
+            to: "Winded".into(),
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        let back: MessagePayload = serde_json::from_str(&json).unwrap();
+        assert_eq!(format!("{:?}", p), format!("{:?}", back));
+        assert_eq!(p.kind(), MessageKind::State);
+        assert!(p.involves(&tref().identifier));
+    }
+
+    #[test]
+    fn stamina_band_enum_round_trips() {
+        for band in [
+            StaminaBand::Fresh,
+            StaminaBand::Winded,
+            StaminaBand::Exhausted,
+        ] {
+            let s = serde_json::to_string(&band).unwrap();
+            let back: StaminaBand = serde_json::from_str(&s).unwrap();
+            assert_eq!(band, back);
+        }
     }
 
     #[test]

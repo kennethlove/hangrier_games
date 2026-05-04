@@ -121,6 +121,11 @@ pub struct Game {
     /// every phase boundary alongside `tick_counter`.
     #[serde(skip, default)]
     pub emit_index: u32,
+
+    /// Tunable combat & stamina knobs. See spec
+    /// `2026-05-03-stamina-combat-resource-design.md`.
+    #[serde(default)]
+    pub combat_tuning: crate::tributes::combat_tuning::CombatTuning,
 }
 
 fn default_phase() -> crate::messages::Phase {
@@ -158,6 +163,7 @@ impl Default for Game {
             tick_counter: TickCounter::default(),
             current_phase: crate::messages::Phase::Day,
             emit_index: 0,
+            combat_tuning: crate::tributes::combat_tuning::CombatTuning::default(),
         }
     }
 }
@@ -971,6 +977,8 @@ impl Game {
             .map(|(area, tributes)| (*area, tributes.len() as u32))
             .collect();
 
+        let combat_tuning_snapshot = self.combat_tuning.clone();
+
         // Collected (actor_identifier, actor_name, content, payload, optional GameEvent)
         // tuples from all tributes this cycle. Drained into `self.messages` after
         // the mutable borrow of `self.tributes` ends.
@@ -1095,6 +1103,51 @@ impl Game {
                     ));
                 }
 
+                // Stamina recovery + band-cross detection. Runs once per
+                // phase per living tribute. For v1 we use Action::None (idle
+                // recovery 5/phase); proper Rest/sheltered scaling lands when
+                // the action chosen by `process_turn_phase` is plumbed back
+                // here. `sheltered` reuses the value computed above for the
+                // hunger/thirst tick.
+                if tribute.attributes.health > 0 {
+                    use crate::tributes::stamina_band::stamina_band;
+
+                    let prior_band = stamina_band(
+                        tribute.stamina,
+                        tribute.max_stamina,
+                        &combat_tuning_snapshot,
+                    );
+                    tribute.recover_stamina(
+                        &crate::tributes::actions::Action::None,
+                        sheltered,
+                        new_hunger,
+                        new_thirst,
+                        &combat_tuning_snapshot,
+                    );
+                    let new_band = stamina_band(
+                        tribute.stamina,
+                        tribute.max_stamina,
+                        &combat_tuning_snapshot,
+                    );
+                    if new_band != prior_band {
+                        let line = format!(
+                            "{} stamina: {:?} -> {:?}",
+                            tribute.name, prior_band, new_band
+                        );
+                        collected_events.push((
+                            tribute.identifier.clone(),
+                            tribute.name.clone(),
+                            line,
+                            Some(MessagePayload::StaminaBandChanged {
+                                tribute: tref.clone(),
+                                from: format!("{:?}", prior_band),
+                                to: format!("{:?}", new_band),
+                            }),
+                            None,
+                        ));
+                    }
+                }
+
                 // Death routing for survival-induced 0 HP. Dehydration takes
                 // precedence over starvation when both landed in the same
                 // tick.
@@ -1167,6 +1220,7 @@ impl Game {
                 all_areas: &all_areas_snapshot,
                 enemy_density: &enemy_density,
                 current_day: self.day.unwrap_or(1),
+                combat_tuning: &combat_tuning_snapshot,
             };
 
             // Get nearby tributes using the pre-computed map
@@ -1547,6 +1601,7 @@ mod tests {
             tick_counter: TickCounter::default(),
             current_phase: crate::messages::Phase::Day,
             emit_index: 0,
+            combat_tuning: crate::tributes::combat_tuning::CombatTuning::default(),
         }
     }
 

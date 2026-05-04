@@ -42,7 +42,7 @@ async fn test_create_game() {
         }))
         .await;
 
-    response.assert_status_ok();
+    response.assert_status(axum::http::StatusCode::CREATED);
 
     let body = response.json::<serde_json::Value>();
     assert!(body.get("identifier").is_some());
@@ -73,7 +73,7 @@ async fn test_list_games() {
                 "tribute_list": [],
             }))
             .await
-            .assert_status_ok();
+            .assert_status(axum::http::StatusCode::CREATED);
     }
 
     // List games
@@ -293,8 +293,8 @@ async fn test_game_areas() {
     let areas_body = areas_response.json::<serde_json::Value>();
     let areas = areas_body.as_array().unwrap();
 
-    // Should have 5 areas (Cornucopia + 4 cardinal directions)
-    assert_eq!(areas.len(), 5);
+    // Should have 7 areas (Cornucopia + Sector1..6)
+    assert_eq!(areas.len(), 7);
 
     test_db.cleanup().await;
 }
@@ -424,7 +424,7 @@ async fn timeline_summary_includes_current_period_even_when_empty() {
             "tribute_list": [],
         }))
         .await;
-    create_response.assert_status_ok();
+    create_response.assert_status(axum::http::StatusCode::CREATED);
     let game_id = create_response.json::<serde_json::Value>()["identifier"]
         .as_str()
         .unwrap()

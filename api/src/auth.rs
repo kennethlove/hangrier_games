@@ -86,14 +86,33 @@ pub async fn store_refresh_token(
     db: &surrealdb::Surreal<surrealdb::engine::any::Any>,
     refresh_token: &RefreshToken,
 ) -> Result<(), AppError> {
-    // Bind via serde_json::Value to bypass the SurrealDB SDK's bespoke
-    // type serializer (same workaround as save_game in games.rs), which
-    // can collapse externally-tagged enums and Option fields.
-    let body = serde_json::to_value(refresh_token)
-        .map_err(|e| AppError::DbError(format!("Failed to encode refresh token: {}", e)))?;
-    db.query("CREATE refresh_token CONTENT $body")
-        .bind(("body", body))
+    // Build the row inline so SurrealDB parses the `record<user>` /
+    // `datetime` literals natively, sidestepping the SDK serializer
+    // (which collapses `Thing` and `Datetime` to opaque enum payloads
+    // and triggers `FieldCheck` errors that the old `.await?` chain
+    // silently swallowed). See bd hangrier_games-lkxg.
+    let user_id_str = refresh_token.user_id.to_string();
+    let mut response = db
+        .query(
+            "CREATE refresh_token CONTENT {
+                token: $tk,
+                user_id: type::thing($user_id),
+                username: $username,
+                expires_at: type::datetime($expires_at),
+                revoked: $revoked,
+                created_at: type::datetime($created_at),
+            }",
+        )
+        .bind(("tk", refresh_token.token.clone()))
+        .bind(("user_id", user_id_str))
+        .bind(("username", refresh_token.username.clone()))
+        .bind(("expires_at", refresh_token.expires_at.to_raw()))
+        .bind(("revoked", refresh_token.revoked))
+        .bind(("created_at", refresh_token.created_at.to_raw()))
         .await
+        .map_err(|e| AppError::DbError(format!("Failed to store refresh token: {}", e)))?;
+    let _: Vec<RefreshToken> = response
+        .take(0)
         .map_err(|e| AppError::DbError(format!("Failed to store refresh token: {}", e)))?;
     Ok(())
 }

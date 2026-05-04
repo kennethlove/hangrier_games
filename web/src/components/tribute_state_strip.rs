@@ -1,11 +1,25 @@
 use dioxus::prelude::*;
 use game::tributes::Tribute;
 use game::tributes::survival::{HungerBand, ThirstBand, hunger_band, thirst_band};
+use shared::messages::StaminaBand;
+
+fn stamina_band_local(stamina: u32, max_stamina: u32) -> StaminaBand {
+    let pct = stamina
+        .checked_mul(100)
+        .and_then(|n| n.checked_div(max_stamina));
+    match pct {
+        None => StaminaBand::Exhausted,
+        Some(p) if p > 50 => StaminaBand::Fresh,
+        Some(p) if p > 20 => StaminaBand::Winded,
+        Some(_) => StaminaBand::Exhausted,
+    }
+}
 
 #[component]
 pub fn TributeStateStrip(tribute: Tribute, current_phase: Option<u32>) -> Element {
     let h_band = hunger_band(tribute.hunger);
     let t_band = thirst_band(tribute.thirst);
+    let s_band = stamina_band_local(tribute.stamina, tribute.max_stamina);
     let sheltered_phases_left = match (tribute.sheltered_until, current_phase) {
         (Some(until), Some(now)) if until > now => Some(until - now),
         _ => None,
@@ -13,6 +27,7 @@ pub fn TributeStateStrip(tribute: Tribute, current_phase: Option<u32>) -> Elemen
 
     let any_visible = h_band != HungerBand::Sated
         || t_band != ThirstBand::Sated
+        || s_band != StaminaBand::Fresh
         || sheltered_phases_left.is_some();
 
     if !any_visible {
@@ -27,6 +42,9 @@ pub fn TributeStateStrip(tribute: Tribute, current_phase: Option<u32>) -> Elemen
             }
             if t_band != ThirstBand::Sated {
                 ThirstPip { band: t_band, raw: tribute.thirst }
+            }
+            if s_band != StaminaBand::Fresh {
+                StaminaPip { band: s_band, current: tribute.stamina, max: tribute.max_stamina }
             }
             if let Some(left) = sheltered_phases_left {
                 ShelterPip { phases_left: left }
@@ -68,6 +86,24 @@ fn ThirstPip(band: ThirstBand, raw: u8) -> Element {
             "aria-label": "Thirst: {label}",
             title: "Thirst {raw} — {label}",
             span { class: "text-base", "💧" }
+            span { class: "text-xs uppercase tracking-wide", "{label}" }
+        }
+    }
+}
+
+#[component]
+fn StaminaPip(band: StaminaBand, current: u32, max: u32) -> Element {
+    let (glyph, cls, label) = match band {
+        StaminaBand::Winded => ("💨", "text-amber-400", "Winded"),
+        StaminaBand::Exhausted => ("🥵", "text-red-500 animate-pulse", "Exhausted"),
+        StaminaBand::Fresh => return rsx! {},
+    };
+    rsx! {
+        span {
+            class: "inline-flex items-center gap-1 {cls}",
+            "aria-label": "Stamina: {label}",
+            title: "Stamina {current}/{max} — {label}",
+            span { class: "text-base", "{glyph}" }
             span { class: "text-xs uppercase tracking-wide", "{label}" }
         }
     }

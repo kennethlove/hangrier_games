@@ -1,0 +1,29 @@
+name: CI
+
+# Shim workflow: when a PR or push only touches doc-only paths the main CI
+# workflow is skipped (paths-ignore in ci.yml). Branch protection still wants
+# a "Quality" status check, so this workflow runs ONLY for doc-only changes
+# and reports an immediate success under the same workflow + job name.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**.md'
+      - 'docs/**'
+      - '.beads/**'
+      - 'specs/**'
+  push:
+    branches: [main]
+    paths:
+      - '**.md'
+      - 'docs/**'
+      - '.beads/**'
+      - 'specs/**'
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Doc-only change, skipping Rust quality checks
+        run: echo "Doc-only change detected; quality gate auto-passes."

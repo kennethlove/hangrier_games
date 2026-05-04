@@ -62,7 +62,7 @@ jobs:
         run: cargo test --package shared
 
       - name: Test (api integration)
-        # api/tests/common/mod.rs spins up an in-memory SurrealDB per
-        # test, but the runner relies on a process-global SURREAL_MIG_PATH
-        # mutation, so the integration tests must run single-threaded.
-        run: cargo test --package api --tests -- --test-threads=1
+        # api/tests/common/mod.rs spins up an in-memory SurrealDB per test
+        # and sets SURREAL_MIG_PATH exactly once via OnceLock, so the
+        # integration suite is safe to run with default parallelism.
+        run: cargo test --package api --tests

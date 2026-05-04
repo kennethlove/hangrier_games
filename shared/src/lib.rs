@@ -259,6 +259,17 @@ pub struct CreatedBy {
     pub username: String,
 }
 
+/// Authenticated user identity returned by `GET /api/users/session`. Reads
+/// the per-request `$auth` SurrealDB record so the caller learns who they
+/// are without the frontend having to decode the JWT itself.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct UserSession {
+    /// SurrealDB record id (e.g. `user:abc123`) as a string. Useful for
+    /// cache keys and for matching `created_by` ownership on games.
+    pub id: String,
+    pub username: String,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct ListDisplayGame {
     pub identifier: String,

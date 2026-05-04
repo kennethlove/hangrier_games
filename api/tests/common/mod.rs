@@ -102,7 +102,7 @@ impl TestDb {
 pub fn create_test_router(state: AppState) -> Router {
     use api::auth::AUTH_ROUTER;
     use api::games::GAMES_ROUTER;
-    use api::users::USERS_ROUTER;
+    use api::users::{USERS_PROTECTED_ROUTER, USERS_PUBLIC_ROUTER};
     use api::websocket::websocket_handler;
     use axum::middleware;
     use axum::routing::get;
@@ -114,7 +114,13 @@ pub fn create_test_router(state: AppState) -> Router {
                 .clone()
                 .layer(middleware::from_fn_with_state(state.clone(), surreal_jwt)),
         )
-        .nest("/users", USERS_ROUTER.clone())
+        .nest("/users", USERS_PUBLIC_ROUTER.clone())
+        .nest(
+            "/users",
+            USERS_PROTECTED_ROUTER
+                .clone()
+                .layer(middleware::from_fn_with_state(state.clone(), surreal_jwt)),
+        )
         .nest("/auth", AUTH_ROUTER.clone());
 
     Router::new()

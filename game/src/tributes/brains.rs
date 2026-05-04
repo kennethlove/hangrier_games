@@ -222,6 +222,13 @@ impl Brain {
     /// hop along that path. When `all_areas` is empty (legacy callers,
     /// brains-only unit tests) the brain falls back to neighbor-only
     /// destination selection from `available_destinations`.
+    ///
+    /// This is the legacy neighbor-only entry point; it omits the
+    /// terrain-dependent survival and stamina overrides because it does
+    /// not yet receive the tribute's current terrain. Both entry points
+    /// share `run_pre_decision_overrides` for the terrain-independent
+    /// override layers (psychotic break / preferred action / alliance /
+    /// consumable).
     #[allow(clippy::too_many_arguments)]
     pub fn act(
         &self,
@@ -233,65 +240,8 @@ impl Brain {
         enemy_density: &HashMap<Area, u32>,
         rng: &mut impl Rng,
     ) -> Action {
-        if !tribute.is_alive() {
-            return Action::None;
-        }
-
-        // Psychotic break overrides normal behavior
-        if let Some(ref break_type) = self.psychotic_break {
-            return match break_type {
-                PsychoticBreakType::Berserk => {
-                    // Attack if enemies nearby, otherwise move to find enemies
-                    if nearby_tributes > 0 {
-                        Action::Attack
-                    } else {
-                        Action::Move(None)
-                    }
-                }
-                PsychoticBreakType::Paranoid => {
-                    // Always flee and hide
-                    if tribute.attributes.is_hidden {
-                        Action::None // Stay hidden
-                    } else {
-                        Action::Hide
-                    }
-                }
-                PsychoticBreakType::Catatonic => {
-                    // Do nothing
-                    Action::None
-                }
-                PsychoticBreakType::SelfDestructive => {
-                    // Seek danger: attack if enemies present, move otherwise
-                    // Ignore health completely
-                    if nearby_tributes > 0 {
-                        Action::Attack
-                    } else {
-                        Action::Move(None)
-                    }
-                }
-            };
-        }
-
-        // If there is a preferred action, we should take it, assuming a positive roll
-        if let Some(ref preferred_action) = self.preferred_action
-            && rng.random_bool(self.preferred_action_percentage)
-        {
-            return preferred_action.clone();
-        }
-
-        // Spec §6.1: alliance proposals are a deliberate first-class action,
-        // not an automatic encounter side-effect. Considered before the
-        // health/sanity branching below so a healthy social tribute
-        // occasionally spends a turn forming bonds instead of attacking.
-        if self.wants_to_propose_alliance(tribute, nearby_tributes, rng) {
-            return Action::ProposeAlliance;
-        }
-
-        // Does the tribute have items?
-        let has_consumables = !tribute.consumables().is_empty();
-        if has_consumables {
-            // Use an item
-            return Action::UseItem(None);
+        if let Some(early) = self.run_pre_decision_overrides(tribute, nearby_tributes, None, rng) {
+            return early;
         }
 
         let action = if nearby_tributes == 0 {
@@ -481,51 +431,10 @@ impl Brain {
         terrain: TerrainType,
         rng: &mut impl Rng,
     ) -> Action {
-        if !tribute.is_alive() {
-            return Action::None;
-        }
-
-        // Survival overrides (spec §6.4) run before the normal weighted
-        // scoring. Active combat (nearby enemies > 0) suppresses them.
-        let weather = crate::areas::weather::current_weather();
-        if let Some(action) =
-            survival_override(tribute, terrain.base, &weather, nearby_tributes > 0)
+        if let Some(early) =
+            self.run_pre_decision_overrides(tribute, nearby_tributes, Some(terrain.base), rng)
         {
-            return action;
-        }
-
-        // Stamina override (spec §6.4 — runs after survival, before standard
-        // logic). For v1 we cannot easily plumb the live nearby-tribute list
-        // and the per-phase shelter flag through this signature; pass an
-        // empty threat slice and `sheltered=false`. The Exhausted -> Rest
-        // path still fires (the dominant outcome); the visible-band flee
-        // path is conservative until plumbing lands as a follow-up.
-        if let Some(action) = stamina_override(
-            tribute,
-            &[],
-            false,
-            &crate::tributes::combat_tuning::CombatTuning::default(),
-        ) {
-            return action;
-        }
-
-        // Check for preferred action first
-        if let Some(ref preferred_action) = self.preferred_action
-            && rng.random_bool(self.preferred_action_percentage)
-        {
-            return preferred_action.clone();
-        }
-
-        // Spec §6.1: alliance proposals are a deliberate first-class action.
-        // Mirrors the gate in `act` so terrain-aware paths behave the same.
-        if self.wants_to_propose_alliance(tribute, nearby_tributes, rng) {
-            return Action::ProposeAlliance;
-        }
-
-        // Check if we have consumables
-        let has_consumables = !tribute.consumables().is_empty();
-        if has_consumables {
-            return Action::UseItem(None);
+            return early;
         }
 
         // Check if terrain is resource-scarce (should boost search/movement)
@@ -570,6 +479,104 @@ impl Brain {
             }
             other => other,
         }
+    }
+
+    /// Shared pre-decision override pipeline. Returns `Some(action)` to
+    /// short-circuit the per-call base scoring, or `None` to fall through
+    /// to the normal nearby-enemies branching.
+    ///
+    /// Layers run in this order:
+    /// 1. Liveness (dead → `Action::None`)
+    /// 2. Psychotic break
+    /// 3. Survival override (terrain-dependent; skipped when `terrain` is `None`)
+    /// 4. Stamina override (terrain-dependent for parity with survival)
+    /// 5. Preferred action
+    /// 6. Alliance proposal
+    /// 7. Consumable
+    ///
+    /// Layers 3 and 4 are gated on `terrain.is_some()` because the legacy
+    /// `act` entry point does not yet receive the tribute's current terrain
+    /// — those overrides depend on terrain for water/forage richness and
+    /// would be unsafe to fire blind.
+    fn run_pre_decision_overrides(
+        &self,
+        tribute: &Tribute,
+        nearby_tributes: u32,
+        terrain: Option<BaseTerrain>,
+        rng: &mut impl Rng,
+    ) -> Option<Action> {
+        if !tribute.is_alive() {
+            return Some(Action::None);
+        }
+
+        if let Some(ref break_type) = self.psychotic_break {
+            return Some(match break_type {
+                PsychoticBreakType::Berserk => {
+                    if nearby_tributes > 0 {
+                        Action::Attack
+                    } else {
+                        Action::Move(None)
+                    }
+                }
+                PsychoticBreakType::Paranoid => {
+                    if tribute.attributes.is_hidden {
+                        Action::None
+                    } else {
+                        Action::Hide
+                    }
+                }
+                PsychoticBreakType::Catatonic => Action::None,
+                PsychoticBreakType::SelfDestructive => {
+                    if nearby_tributes > 0 {
+                        Action::Attack
+                    } else {
+                        Action::Move(None)
+                    }
+                }
+            });
+        }
+
+        // Terrain-dependent overrides (spec §6.4). Active combat
+        // (nearby_tributes > 0) suppresses survival; stamina has its own
+        // visible-band flee path that handles the in-combat case.
+        if let Some(base) = terrain {
+            let weather = crate::areas::weather::current_weather();
+            if let Some(action) = survival_override(tribute, base, &weather, nearby_tributes > 0) {
+                return Some(action);
+            }
+
+            // Stamina override (spec §6.4 — runs after survival, before
+            // standard logic). For v1 we cannot easily plumb the live
+            // nearby-tribute list and the per-phase shelter flag through
+            // this signature; pass an empty threat slice and `sheltered=false`.
+            if let Some(action) = stamina_override(
+                tribute,
+                &[],
+                false,
+                &crate::tributes::combat_tuning::CombatTuning::default(),
+            ) {
+                return Some(action);
+            }
+        }
+
+        // Preferred action
+        if let Some(ref preferred_action) = self.preferred_action
+            && rng.random_bool(self.preferred_action_percentage)
+        {
+            return Some(preferred_action.clone());
+        }
+
+        // Spec §6.1: alliance proposals are a deliberate first-class action.
+        if self.wants_to_propose_alliance(tribute, nearby_tributes, rng) {
+            return Some(Action::ProposeAlliance);
+        }
+
+        // Consumables
+        if !tribute.consumables().is_empty() {
+            return Some(Action::UseItem(None));
+        }
+
+        None
     }
 
     fn decide_action_few_enemies_with_terrain(

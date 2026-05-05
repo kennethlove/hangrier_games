@@ -35,7 +35,8 @@ fn generate_env_file() {
 fn generate_icons_module() {
     let base = std::env::current_dir().expect("CARGO build cwd");
     let icons_root = base.join("assets/icons");
-    let dest = base.join("src/icons_generated.rs");
+    let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR");
+    let dest = std::path::PathBuf::from(out_dir).join("icons_generated.rs");
 
     let mut entries: Vec<IconEntry> = Vec::new();
     collect_tier(&icons_root.join("ui"), "Ui", "0 0 24 24", &mut entries);

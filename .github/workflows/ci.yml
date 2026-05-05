@@ -34,7 +34,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ci
+          shared-key: ci-fmt
           cache-on-failure: true
       - name: Stub web/src/env.rs for fmt
         # web/build.rs would normally generate web/src/env.rs from APP_*
@@ -58,7 +58,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ci
+          shared-key: ci-clippy
           cache-on-failure: true
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -88,7 +88,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ci
+          shared-key: ci-test-game
           cache-on-failure: true
       - name: Test (game)
         run: cargo test --package game
@@ -104,7 +104,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ci
+          shared-key: ci-test-shared
           cache-on-failure: true
       - name: Test (shared)
         run: cargo test --package shared
@@ -120,7 +120,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ci
+          shared-key: ci-test-api
           cache-on-failure: true
       - name: Test (api integration)
         # api/tests/common/mod.rs spins up an in-memory SurrealDB per test

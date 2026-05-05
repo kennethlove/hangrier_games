@@ -8,6 +8,7 @@ pub mod hooks;
 pub mod http;
 mod routes;
 mod storage;
+pub mod icons;
 pub mod theme;
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]

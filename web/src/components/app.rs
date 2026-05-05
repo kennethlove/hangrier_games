@@ -1,9 +1,9 @@
 use crate::LoadingState;
 use crate::components::game_edit::EditGameModal;
-use crate::components::icons::svg_icon::SpriteSheetLoader;
 use crate::components::loading_modal::LoadingModal;
 use crate::components::server_version::ServerVersion;
 use crate::components::tribute_edit::EditTributeModal;
+use crate::icons::SPRITE;
 use crate::routes::Routes;
 use crate::storage::{AppState, use_persistent};
 use crate::theme::Theme;
@@ -65,8 +65,13 @@ pub fn App() -> Element {
             href: asset!("/assets/dist/main.css")
         }
 
-        // Load the SVG sprite sheet for lazy-loaded icons
-        SpriteSheetLoader {}
+        // Inline the icon sprite once at the root so <use href="#..."/> resolves
+        // without an async fetch.
+        div {
+            id: "icon-sprite",
+            style: "display:none",
+            dangerous_inner_html: SPRITE,
+        }
 
         div {
             class: "{theme_signal.read()}",

@@ -476,9 +476,10 @@ impl Game {
 
     /// Prepares the game state for a new cycle.
     /// Clears old messages and area events.
-    /// Increments day count by 1 if it's a day cycle.
-    fn prepare_cycle(&mut self, day: bool) -> Result<(), GameError> {
-        if day {
+    /// Increments day count by 1 if this is the first phase of a new day.
+    /// (Day 1 starts at `Phase::Day`; Day 2+ starts at `Phase::Dawn`.)
+    fn prepare_cycle(&mut self, phase: crate::messages::Phase) -> Result<(), GameError> {
+        if self.is_new_day_boundary(phase) {
             self.day = Some(self.day.unwrap_or(0) + 1);
         }
 
@@ -489,28 +490,39 @@ impl Game {
         Ok(())
     }
 
+    /// True when this phase begins a new game-day. Day 1 begins at
+    /// `Phase::Day` (no Dawn1 per spec §3); Day 2+ begins at `Phase::Dawn`.
+    fn is_new_day_boundary(&self, phase: crate::messages::Phase) -> bool {
+        matches!(
+            (self.day, phase),
+            (None | Some(0), crate::messages::Phase::Day) | (Some(_), crate::messages::Phase::Dawn)
+        )
+    }
+
     /// Announces the start of the cycle.
-    fn announce_cycle_start(&mut self, day: bool) -> Result<(), GameError> {
+    fn announce_cycle_start(&mut self, phase: crate::messages::Phase) -> Result<(), GameError> {
         let current_day = self.day.unwrap_or(1);
         let game_id = self.identifier.clone();
         let subject = format!("game:{}", game_id);
-        let phase = if day {
-            crate::messages::Phase::Day
-        } else {
-            crate::messages::Phase::Night
-        };
 
-        let content = if day {
-            match current_day {
+        let content = match phase {
+            crate::messages::Phase::Dawn => {
+                format!("Dawn {} breaks pale over the arena.", current_day)
+            }
+            crate::messages::Phase::Day => match current_day {
                 1 => format!("Day {}: The games have begun!", current_day),
                 3 => format!(
                     "Day {}: Sponsors take note of the remaining tributes.",
                     current_day
                 ),
                 _ => format!("Day {} dawns over the arena.", current_day),
+            },
+            crate::messages::Phase::Dusk => {
+                format!("Dusk {} settles in long shadows.", current_day)
             }
-        } else {
-            format!("Night {} falls. The arena grows dark.", current_day)
+            crate::messages::Phase::Night => {
+                format!("Night {} falls. The arena grows dark.", current_day)
+            }
         };
 
         let payload = crate::messages::MessagePayload::CycleStart {
@@ -530,7 +542,7 @@ impl Game {
     }
 
     /// Announces the end of a cycle
-    fn announce_cycle_end(&mut self, day: bool) -> Result<(), GameError> {
+    fn announce_cycle_end(&mut self, phase: crate::messages::Phase) -> Result<(), GameError> {
         let game_id = self.identifier.clone();
         let current_day = self.day.unwrap_or(1);
 
@@ -540,12 +552,6 @@ impl Game {
         // duplicated those events with a `SanityBreak` fallback payload
         // which mis-classified them in the timeline.
 
-        let phase_str = if day { "day" } else { "night" };
-        let phase = if day {
-            crate::messages::Phase::Day
-        } else {
-            crate::messages::Phase::Night
-        };
         let payload = crate::messages::MessagePayload::CycleEnd {
             day: current_day,
             phase,
@@ -554,7 +560,7 @@ impl Game {
         self.push_message(
             crate::messages::MessageSource::Game(game_id.clone()),
             format!("game:{}", game_id),
-            format!("End of {} {}.", phase_str, current_day),
+            format!("End of {} {}.", phase, current_day),
             payload,
             tick,
         );
@@ -781,37 +787,44 @@ impl Game {
         Ok(())
     }
 
-    /// Runs the day and night cycles of one game round.
-    pub fn run_day_night_cycle(&mut self, day: bool) -> Result<(), GameError> {
+    /// Run one phase of the game. Substrate for the four-phase day model
+    /// (spec `2026-05-03-four-phase-day-design.md`). Replaces the legacy
+    /// `run_day_night_cycle(bool)` boundary; callers driving an entire day
+    /// should use `run_full_day` instead.
+    pub fn run_phase(&mut self, phase: crate::messages::Phase) -> Result<(), GameError> {
         // Phase boundary: reset transient cycle state. `tick` and `emit_index`
-        // are per-period and must restart at every Day/Night flip so causal
+        // are per-phase and must restart at every flip so causal
         // ordering inside a phase is contiguous from zero.
-        self.current_phase = if day {
-            crate::messages::Phase::Day
-        } else {
-            crate::messages::Phase::Night
-        };
+        self.current_phase = phase;
         self.tick_counter.reset();
         self.emit_index = 0;
 
         // Check if the game is over, and if so, end it.
-        // This will also post the final messages.
         self.check_for_winner()?;
 
-        // Prepare the game for a new cycle
-        self.prepare_cycle(day)?;
-
-        // Announce the start of the cycle
-        self.announce_cycle_start(day)?;
-
-        // Run the day
-        self.do_a_cycle(day)?;
-
-        // Announce the end of the cycle
-        self.announce_cycle_end(day)?;
+        self.prepare_cycle(phase)?;
+        self.announce_cycle_start(phase)?;
+        self.do_a_cycle(phase)?;
+        self.announce_cycle_end(phase)?;
 
         // Clean up any deaths
         self.clean_up_recent_deaths();
+        Ok(())
+    }
+
+    /// Run every phase of the next game-day in canonical order. Day 1 has
+    /// no Dawn (per spec §3); Day 2+ runs all four phases.
+    pub fn run_full_day(&mut self) -> Result<(), GameError> {
+        use crate::messages::Phase;
+        let next_day = self.day.unwrap_or(0) + 1;
+        let phases: &[Phase] = if next_day <= 1 {
+            &[Phase::Day, Phase::Dusk, Phase::Night]
+        } else {
+            &[Phase::Dawn, Phase::Day, Phase::Dusk, Phase::Night]
+        };
+        for &p in phases {
+            self.run_phase(p)?;
+        }
         Ok(())
     }
 
@@ -869,12 +882,19 @@ impl Game {
     }
 
     /// Triggers events for the current cycle.
-    fn trigger_cycle_events(&mut self, day: bool, rng: &mut SmallRng) -> Result<(), GameError> {
-        let frequency = if day {
-            DAY_EVENT_FREQUENCY
-        } else {
-            NIGHT_EVENT_FREQUENCY
+    fn trigger_cycle_events(
+        &mut self,
+        phase: crate::messages::Phase,
+        rng: &mut SmallRng,
+    ) -> Result<(), GameError> {
+        use crate::messages::Phase;
+        let frequency = match phase {
+            Phase::Day => DAY_EVENT_FREQUENCY,
+            Phase::Night => NIGHT_EVENT_FREQUENCY,
+            // Substrate-only: Dawn/Dusk are silent in PR1. PR2 redistributes.
+            Phase::Dawn | Phase::Dusk => return Ok(()),
         };
+        let day = phase == Phase::Day;
 
         // Collect events to trigger (avoid borrow conflicts)
         let mut events_to_process: Vec<(Area, AreaEvent)> = Vec::new();
@@ -988,11 +1008,13 @@ impl Game {
     /// phase.
     fn build_cycle_context(
         &self,
-        day: bool,
+        phase: crate::messages::Phase,
         closed_areas: Vec<Area>,
         living_tributes: Vec<Tribute>,
         living_tributes_count: usize,
     ) -> CycleContext {
+        use crate::messages::Phase;
+        let day = phase == Phase::Day;
         let action_suggestion = match (self.day, day) {
             (Some(1), true) => Some(ActionSuggestion {
                 action: Action::Move(None),
@@ -1360,14 +1382,14 @@ impl Game {
     /// gamemaker overrides a typed seam to inject suggestions.
     fn run_tribute_cycle(
         &mut self,
-        day: bool,
+        phase: crate::messages::Phase,
         rng: &mut SmallRng,
         closed_areas: Vec<Area>,
         living_tributes: Vec<Tribute>,
         living_tributes_count: usize,
     ) -> Result<(), GameError> {
         let ctx =
-            self.build_cycle_context(day, closed_areas, living_tributes, living_tributes_count);
+            self.build_cycle_context(phase, closed_areas, living_tributes, living_tributes_count);
         self.execute_cycle(ctx, rng)
     }
 
@@ -1379,7 +1401,7 @@ impl Game {
     /// 5. Close more areas by spawning more events if the tributes are getting low.
     /// 6. Run the tribute cycle.
     /// 7. Update the tributes in the game.
-    fn do_a_cycle(&mut self, day: bool) -> Result<(), GameError> {
+    fn do_a_cycle(&mut self, phase: crate::messages::Phase) -> Result<(), GameError> {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
 
         // Announce area events
@@ -1389,7 +1411,7 @@ impl Game {
         self.ensure_open_area();
 
         // Trigger any events for this cycle
-        self.trigger_cycle_events(day, &mut rng)?;
+        self.trigger_cycle_events(phase, &mut rng)?;
 
         // If the tribute count is low, constrain them by closing areas.
         self.constrain_areas(&mut rng)?;
@@ -1405,7 +1427,7 @@ impl Game {
         let living_tributes_count: usize = living_tributes.len();
 
         self.run_tribute_cycle(
-            day,
+            phase,
             &mut rng,
             closed_areas,
             living_tributes,
@@ -1836,6 +1858,7 @@ mod tests {
 
     #[test]
     fn test_prepare_cycle() {
+        use crate::messages::Phase;
         let mut game = Game::new("Test Game");
         let area = AreaDetails::new(Some("Lake".to_string()), Area::Sector1);
         let mut rng = rand::rng();
@@ -1843,13 +1866,14 @@ mod tests {
         game.day = Some(1);
         game.areas.push(area);
         game.areas[0].events.push(event.clone());
-        let _ = game.prepare_cycle(true);
+        // Dawn on Day 2+ advances the day and clears events.
+        let _ = game.prepare_cycle(Phase::Dawn);
         assert_eq!(game.day, Some(2));
         assert_eq!(game.areas[0].events.len(), 0);
 
         game.areas[0].events.push(event.clone());
-        let _ = game.prepare_cycle(false);
-        // Night cycle shouldn't advance the game day.
+        // Night never advances the day.
+        let _ = game.prepare_cycle(Phase::Night);
         assert_eq!(game.day, Some(2));
         assert_eq!(game.areas[0].events.len(), 0);
     }
@@ -1862,7 +1886,7 @@ mod tests {
         let tribute2 = create_tribute("Tribute2", true);
         let mut game = create_test_game_with_tributes(vec![tribute1.clone(), tribute2.clone()]);
         game.day = Some(1);
-        let _ = game.announce_cycle_start(true);
+        let _ = game.announce_cycle_start(crate::messages::Phase::Day);
         // Day 1 has a single announcement.
         assert_eq!(game.messages.len(), 1);
     }
@@ -1876,7 +1900,7 @@ mod tests {
         tribute2.set_status(TributeStatus::RecentlyDead);
         let mut game = create_test_game_with_tributes(vec![tribute1.clone(), tribute2.clone()]);
         game.day = Some(1);
-        let _ = game.announce_cycle_end(true);
+        let _ = game.announce_cycle_end(crate::messages::Phase::Day);
         // Death announcements moved to the kill site as typed
         // `MessagePayload::TributeKilled`. Only the cycle-end summary
         // remains here.
@@ -2025,7 +2049,7 @@ mod tests {
         // Run the tribute cycle
         let mut rng = SmallRng::from_rng(&mut rand::rng());
         let _ = game.run_tribute_cycle(
-            true,
+            crate::messages::Phase::Day,
             &mut rng,
             closed_areas,
             vec![tribute1.clone(), tribute2.clone()],
@@ -2178,7 +2202,7 @@ mod tests {
 
         let mut rng = SmallRng::seed_from_u64(211);
         let _ = game.run_tribute_cycle(
-            true,
+            crate::messages::Phase::Day,
             &mut rng,
             closed_areas,
             vec![tribute1.clone(), tribute2.clone()],
@@ -2245,7 +2269,7 @@ mod tests {
             let mut g = game.clone();
             let mut rng = SmallRng::seed_from_u64(seed);
             let _ = g.run_tribute_cycle(
-                true,
+                crate::messages::Phase::Day,
                 &mut rng,
                 closed_areas.clone(),
                 vec![t1.clone(), t2.clone()],
@@ -2311,7 +2335,7 @@ mod tests {
 
         let mut rng = SmallRng::seed_from_u64(313);
         let _ = game.run_tribute_cycle(
-            true,
+            crate::messages::Phase::Day,
             &mut rng,
             closed_areas,
             vec![betrayer.clone(), victim.clone()],
@@ -2365,7 +2389,7 @@ mod tests {
 
         let mut rng = SmallRng::seed_from_u64(419);
         let _ = game.run_tribute_cycle(
-            true,
+            crate::messages::Phase::Day,
             &mut rng,
             closed_areas,
             vec![loner.clone(), other.clone()],
@@ -2419,7 +2443,13 @@ mod tests {
         let closed_areas: Vec<Area> = vec![];
 
         let mut rng = SmallRng::seed_from_u64(547);
-        let _ = game.run_tribute_cycle(true, &mut rng, closed_areas, living, 1);
+        let _ = game.run_tribute_cycle(
+            crate::messages::Phase::Day,
+            &mut rng,
+            closed_areas,
+            living,
+            1,
+        );
 
         // Cycle drained the queue (no leftovers).
         assert!(
@@ -2479,7 +2509,13 @@ mod tests {
         let closed_areas: Vec<Area> = vec![];
 
         let mut rng = SmallRng::seed_from_u64(547);
-        let _ = game.run_tribute_cycle(true, &mut rng, closed_areas, living, 3);
+        let _ = game.run_tribute_cycle(
+            crate::messages::Phase::Day,
+            &mut rng,
+            closed_areas,
+            living,
+            3,
+        );
 
         let a2 = game.tributes.iter().find(|t| t.id == aid).unwrap();
         let b2 = game.tributes.iter().find(|t| t.id == bid).unwrap();
@@ -2532,7 +2568,13 @@ mod tests {
         let closed_areas: Vec<Area> = vec![];
 
         let mut rng = SmallRng::seed_from_u64(547);
-        let _ = game.run_tribute_cycle(true, &mut rng, closed_areas, living, 1);
+        let _ = game.run_tribute_cycle(
+            crate::messages::Phase::Day,
+            &mut rng,
+            closed_areas,
+            living,
+            1,
+        );
 
         // Cycle drained the queue.
         assert!(
@@ -2586,7 +2628,13 @@ mod tests {
         let closed_areas: Vec<Area> = vec![];
 
         let mut rng = SmallRng::seed_from_u64(547);
-        let _ = game.run_tribute_cycle(true, &mut rng, closed_areas, living, 1);
+        let _ = game.run_tribute_cycle(
+            crate::messages::Phase::Day,
+            &mut rng,
+            closed_areas,
+            living,
+            1,
+        );
 
         let d = game.tributes.iter().find(|t| t.id == did).unwrap();
         assert_eq!(d.status, TributeStatus::Dead);
@@ -2631,7 +2679,7 @@ mod tests {
             let mut g = game_with_area.clone();
             let mut rng = SmallRng::seed_from_u64(seed);
             let _ = g.run_tribute_cycle(
-                true,
+                crate::messages::Phase::Day,
                 &mut rng,
                 closed_areas.clone(),
                 vec![t1.clone(), t2.clone()],
@@ -2687,7 +2735,7 @@ mod tests {
 
         let mut rng = SmallRng::seed_from_u64(313);
         let _ = game.run_tribute_cycle(
-            true,
+            crate::messages::Phase::Day,
             &mut rng,
             closed_areas,
             vec![betrayer.clone(), victim.clone()],
@@ -2744,7 +2792,7 @@ mod tests {
             let mut g = game_with_area.clone();
             let mut rng = SmallRng::seed_from_u64(seed);
             let _ = g.run_tribute_cycle(
-                true,
+                crate::messages::Phase::Day,
                 &mut rng,
                 closed_areas.clone(),
                 vec![t1.clone(), t2.clone()],
@@ -2834,7 +2882,7 @@ mod tests {
 
         let mut rng = SmallRng::seed_from_u64(313);
         let _ = game.run_tribute_cycle(
-            true,
+            crate::messages::Phase::Day,
             &mut rng,
             closed_areas,
             vec![betrayer.clone(), victim.clone()],
@@ -2876,7 +2924,7 @@ mod tests {
         let tribute_a = create_tribute("A", true);
         let tribute_b = create_tribute("B", true);
         let mut game = create_test_game_with_tributes(vec![tribute_a, tribute_b]);
-        let _ = game.run_day_night_cycle(true);
+        let _ = game.run_phase(crate::messages::Phase::Day);
 
         let b_killed = game.messages.iter().find(|m| {
             matches!(&m.payload,
@@ -2915,7 +2963,7 @@ mod tests {
         let mut game = create_test_game_with_tributes(vec![a, b]);
         game.day = Some(1);
         // Run a single day cycle; survival tick fires once per living tribute.
-        let _ = game.run_day_night_cycle(true);
+        let _ = game.run_phase(crate::messages::Phase::Day);
         for t in &game.tributes {
             assert_eq!(t.hunger, 1, "{} hunger should be 1 after one tick", t.name);
             assert_eq!(t.thirst, 1, "{} thirst should be 1 after one tick", t.name);
@@ -2935,7 +2983,7 @@ mod tests {
         a.attributes.health = 1;
         let mut game = create_test_game_with_tributes(vec![a]);
         game.day = Some(1);
-        let _ = game.run_day_night_cycle(true);
+        let _ = game.run_phase(crate::messages::Phase::Day);
         let killed = game.messages.iter().any(|m| {
             matches!(&m.payload,
                 MessagePayload::TributeKilled { cause, .. } if cause == CAUSE_DEHYDRATION)

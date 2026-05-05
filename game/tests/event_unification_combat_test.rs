@@ -56,7 +56,8 @@ fn combat_events_reach_game_messages_with_tribute_source() {
     // Run several cycles to give combat plenty of opportunity to fire,
     // even if the brain occasionally picks Rest/Hide/Move.
     for _ in 0..6 {
-        game.run_day_night_cycle(true).expect("day cycle ran");
+        game.run_phase(shared::messages::Phase::Day)
+            .expect("day cycle ran");
         if game.messages.iter().any(is_tribute_sourced) {
             break;
         }

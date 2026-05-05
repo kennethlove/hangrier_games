@@ -51,7 +51,8 @@ fn movement_and_turn_phase_events_reach_game_messages() {
     // Run several cycles to give the brain plenty of opportunities to
     // pick non-attack actions.
     for _ in 0..8 {
-        game.run_day_night_cycle(true).expect("day cycle ran");
+        game.run_phase(shared::messages::Phase::Day)
+            .expect("day cycle ran");
     }
 
     let new_messages: Vec<&GameMessage> = game.messages.iter().skip(messages_before).collect();

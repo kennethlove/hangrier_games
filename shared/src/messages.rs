@@ -19,18 +19,58 @@ pub enum MessageSource {
     Tribute(String), // Tribute identifier
 }
 
-/// Day or night phase within a game tick.
+/// One of the four narrative beats within a game-day. Ordinal order
+/// (`Dawn = 0, Day = 1, Dusk = 2, Night = 3`) drives all chronological
+/// sorting of `GameMessage`s; the `Day` and `Night` variants keep their
+/// pre-existing serialized forms (`"day"` / `"night"`) so persisted games
+/// from the two-phase era continue to deserialize.
+///
+/// See `docs/superpowers/specs/2026-05-03-four-phase-day-design.md` (§§2-4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Phase {
+    Dawn,
     Day,
+    Dusk,
     Night,
+}
+
+impl Phase {
+    /// Numeric ordinal used to sort messages within a game-day. Stable
+    /// across the wire format because `summarize_periods` relies on it.
+    pub const fn ord(self) -> u8 {
+        match self {
+            Phase::Dawn => 0,
+            Phase::Day => 1,
+            Phase::Dusk => 2,
+            Phase::Night => 3,
+        }
+    }
+
+    /// Next phase in the canonical `Dawn → Day → Dusk → Night → Dawn`
+    /// cycle. Day-boundary handling (incrementing `current_day` after
+    /// `Night`) lives in the engine driver, not here.
+    pub const fn next(self) -> Phase {
+        match self {
+            Phase::Dawn => Phase::Day,
+            Phase::Day => Phase::Dusk,
+            Phase::Dusk => Phase::Night,
+            Phase::Night => Phase::Dawn,
+        }
+    }
+
+    /// All four phases in canonical order. Useful for iterating a full day.
+    pub const fn all() -> [Phase; 4] {
+        [Phase::Dawn, Phase::Day, Phase::Dusk, Phase::Night]
+    }
 }
 
 impl std::fmt::Display for Phase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Phase::Dawn => write!(f, "dawn"),
             Phase::Day => write!(f, "day"),
+            Phase::Dusk => write!(f, "dusk"),
             Phase::Night => write!(f, "night"),
         }
     }
@@ -41,7 +81,7 @@ pub struct ParsePhaseError;
 
 impl std::fmt::Display for ParsePhaseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "phase must be 'day' or 'night'")
+        write!(f, "phase must be 'dawn', 'day', 'dusk', or 'night'")
     }
 }
 
@@ -51,7 +91,9 @@ impl FromStr for Phase {
     type Err = ParsePhaseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "dawn" => Ok(Phase::Dawn),
             "day" => Ok(Phase::Day),
+            "dusk" => Ok(Phase::Dusk),
             "night" => Ok(Phase::Night),
             _ => Err(ParsePhaseError),
         }
@@ -514,18 +556,18 @@ pub struct TimelineSummary {
 /// Aggregate messages into one summary per (day, phase). Includes empty periods
 /// up to and including `current` so the hub shows the live period even when
 /// nothing has been emitted there yet. Periods past `current` are not emitted.
+///
+/// Day 1 is special-cased per the four-phase day spec (§3): tributes rise on
+/// the pedestals at `Day` so `Dawn1` is never emitted by the engine and is
+/// excluded from the back-fill. Subsequent days walk all four phases.
 pub fn summarize_periods(messages: &[GameMessage], current: (u32, Phase)) -> Vec<PeriodSummary> {
     use std::collections::BTreeMap;
 
     let (current_day, current_phase) = current;
-    let mut bucket: BTreeMap<(u32, u32), (u32, u32)> = BTreeMap::new();
-    let phase_ord = |p: Phase| match p {
-        Phase::Day => 0,
-        Phase::Night => 1,
-    };
+    let mut bucket: BTreeMap<(u32, u8), (u32, u32)> = BTreeMap::new();
 
     for m in messages {
-        let key = (m.game_day, phase_ord(m.phase));
+        let key = (m.game_day, m.phase.ord());
         let entry = bucket.entry(key).or_insert((0, 0));
         entry.1 += 1;
         if matches!(m.payload, MessagePayload::TributeKilled { .. })
@@ -542,22 +584,39 @@ pub fn summarize_periods(messages: &[GameMessage], current: (u32, Phase)) -> Vec
     // Always seed the current period so the hub shows it even before any
     // events are emitted (e.g. day 0 of a NotStarted game). Then back-fill
     // every prior (day, phase) pair starting at day 1 so the summary list
-    // is dense up to the live period without gaps for empty cycles. (Day 0
-    // only ever has a Day phase — the engine never emits a day-0 Night.)
+    // is dense up to the live period without gaps for empty cycles.
+    //
+    // Day 0 only ever has a `Day` phase (NotStarted seed). Day 1 skips
+    // `Dawn`. Day 2+ runs all four phases.
     bucket
-        .entry((current_day, phase_ord(current_phase)))
+        .entry((current_day, current_phase.ord()))
         .or_insert((0, 0));
     for d in 1..=current_day {
-        bucket.entry((d, 0)).or_insert((0, 0));
-        if d < current_day || matches!(current_phase, Phase::Night) {
-            bucket.entry((d, 1)).or_insert((0, 0));
+        let max_ord = if d < current_day {
+            Phase::Night.ord()
+        } else {
+            current_phase.ord()
+        };
+        for phase in Phase::all() {
+            // Skip Dawn1 — never emitted by the engine.
+            if d == 1 && phase == Phase::Dawn {
+                continue;
+            }
+            if phase.ord() <= max_ord {
+                bucket.entry((d, phase.ord())).or_insert((0, 0));
+            }
         }
     }
 
     bucket
         .into_iter()
         .map(|((day, p), (deaths, count))| {
-            let phase = if p == 0 { Phase::Day } else { Phase::Night };
+            let phase = match p {
+                0 => Phase::Dawn,
+                1 => Phase::Day,
+                2 => Phase::Dusk,
+                _ => Phase::Night,
+            };
             PeriodSummary {
                 day,
                 phase,
@@ -582,19 +641,43 @@ mod tests {
 
     #[test]
     fn phase_display_roundtrip() {
+        for p in Phase::all() {
+            let s = p.to_string();
+            assert_eq!(s.parse::<Phase>().unwrap(), p);
+        }
+        assert_eq!(Phase::Dawn.to_string(), "dawn");
         assert_eq!(Phase::Day.to_string(), "day");
+        assert_eq!(Phase::Dusk.to_string(), "dusk");
         assert_eq!(Phase::Night.to_string(), "night");
-        assert_eq!("day".parse::<Phase>().unwrap(), Phase::Day);
-        assert_eq!("night".parse::<Phase>().unwrap(), Phase::Night);
         assert!("noon".parse::<Phase>().is_err());
     }
 
     #[test]
     fn phase_serde_lowercase() {
-        let s = serde_json::to_string(&Phase::Day).unwrap();
-        assert_eq!(s, "\"day\"");
+        assert_eq!(serde_json::to_string(&Phase::Dawn).unwrap(), "\"dawn\"");
+        assert_eq!(serde_json::to_string(&Phase::Day).unwrap(), "\"day\"");
+        assert_eq!(serde_json::to_string(&Phase::Dusk).unwrap(), "\"dusk\"");
+        assert_eq!(serde_json::to_string(&Phase::Night).unwrap(), "\"night\"");
         let p: Phase = serde_json::from_str("\"night\"").unwrap();
         assert_eq!(p, Phase::Night);
+    }
+
+    #[test]
+    fn phase_ord_and_next_canonical_cycle() {
+        assert_eq!(Phase::Dawn.ord(), 0);
+        assert_eq!(Phase::Day.ord(), 1);
+        assert_eq!(Phase::Dusk.ord(), 2);
+        assert_eq!(Phase::Night.ord(), 3);
+        // Canonical cycle wraps Night -> Dawn so the engine can advance the
+        // game-day at the boundary without special-casing the wire format.
+        assert_eq!(Phase::Dawn.next(), Phase::Day);
+        assert_eq!(Phase::Day.next(), Phase::Dusk);
+        assert_eq!(Phase::Dusk.next(), Phase::Night);
+        assert_eq!(Phase::Night.next(), Phase::Dawn);
+        assert_eq!(
+            Phase::all(),
+            [Phase::Dawn, Phase::Day, Phase::Dusk, Phase::Night]
+        );
     }
 
     #[test]
@@ -832,7 +915,8 @@ mod tests {
             make_msg(2, Phase::Day, killed.clone()),
         ];
         let result = summarize_periods(&msgs, (2, Phase::Day));
-        assert_eq!(result.len(), 3);
+        // Day 1: Day/Dusk/Night (Dawn1 skipped per spec §3) + Day 2: Dawn/Day.
+        assert_eq!(result.len(), 5);
         assert_eq!(
             result[0],
             PeriodSummary {
@@ -847,6 +931,16 @@ mod tests {
             result[1],
             PeriodSummary {
                 day: 1,
+                phase: Phase::Dusk,
+                deaths: 0,
+                event_count: 0,
+                is_current: false
+            }
+        );
+        assert_eq!(
+            result[2],
+            PeriodSummary {
+                day: 1,
                 phase: Phase::Night,
                 deaths: 0,
                 event_count: 1,
@@ -854,7 +948,17 @@ mod tests {
             }
         );
         assert_eq!(
-            result[2],
+            result[3],
+            PeriodSummary {
+                day: 2,
+                phase: Phase::Dawn,
+                deaths: 0,
+                event_count: 0,
+                is_current: false
+            }
+        );
+        assert_eq!(
+            result[4],
             PeriodSummary {
                 day: 2,
                 phase: Phase::Day,
@@ -868,37 +972,16 @@ mod tests {
     #[test]
     fn summarize_includes_empty_reached_periods() {
         let result = summarize_periods(&[], (2, Phase::Day));
-        assert_eq!(result.len(), 3);
-        assert_eq!(
-            result[0],
-            PeriodSummary {
-                day: 1,
-                phase: Phase::Day,
-                deaths: 0,
-                event_count: 0,
-                is_current: false
-            }
-        );
-        assert_eq!(
-            result[1],
-            PeriodSummary {
-                day: 1,
-                phase: Phase::Night,
-                deaths: 0,
-                event_count: 0,
-                is_current: false
-            }
-        );
-        assert_eq!(
-            result[2],
-            PeriodSummary {
-                day: 2,
-                phase: Phase::Day,
-                deaths: 0,
-                event_count: 0,
-                is_current: true
-            }
-        );
+        // Day 1: Day/Dusk/Night (Dawn1 skipped) + Day 2: Dawn/Day.
+        assert_eq!(result.len(), 5);
+        assert_eq!(result[0].day, 1);
+        assert_eq!(result[0].phase, Phase::Day);
+        assert_eq!(result[1].phase, Phase::Dusk);
+        assert_eq!(result[2].phase, Phase::Night);
+        assert_eq!(result[3].day, 2);
+        assert_eq!(result[3].phase, Phase::Dawn);
+        assert_eq!(result[4].phase, Phase::Day);
+        assert!(result[4].is_current);
     }
 
     #[test]

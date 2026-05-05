@@ -21,6 +21,10 @@ pub enum GameOutput<'a> {
     TributeWins(&'a str),
     TributeRest(&'a str),
     TributeLongRest(&'a str),
+    /// Tribute begins a multi-phase sleep (PR2c.1).
+    TributeSleeps(&'a str),
+    /// Tribute wakes naturally after their planned sleep duration elapses.
+    TributeWakesRested(&'a str),
     TributeHide(&'a str),
     TributeTravel(&'a str, &'a str, &'a str),
     TributeTakeItem(&'a str, &'a str),
@@ -136,6 +140,12 @@ impl<'a> Display for GameOutput<'a> {
                     "💤 {} rests and recovers a little health and sanity",
                     tribute
                 )
+            }
+            GameOutput::TributeSleeps(tribute) => {
+                write!(f, "😴 {} settles in to sleep", tribute)
+            }
+            GameOutput::TributeWakesRested(tribute) => {
+                write!(f, "🌅 {} wakes, well-rested", tribute)
             }
             GameOutput::TributeHide(tribute) => {
                 write!(f, "🫥 {} tries to hide", tribute)

@@ -11,6 +11,11 @@ use std::collections::HashMap;
 
 const LOW_ENEMY_LIMIT: u32 = 6;
 
+/// Sleep gating thresholds (PR2c.1, bd-9sjj). See `Brain::should_sleep`.
+const SLEEP_DOMINANT_THRESHOLD: u32 = 12;
+const SLEEP_WANT_THRESHOLD: u32 = 6;
+const SLEEP_EXHAUSTED_PCT: u32 = 25;
+
 /// Score penalty applied per enemy in a destination area, used by
 /// `Brain::choose_destination` to disperse crowded tributes.
 const CROWD_PENALTY_PER_ENEMY: i32 = 8;
@@ -479,6 +484,59 @@ impl Brain {
             }
             other => other,
         }
+    }
+
+    /// Phase-aware sleep gate (PR2c.1, bd-9sjj). Decides whether the
+    /// tribute should begin a multi-phase sleep *now*, returning
+    /// `Some(Action::Sleep { duration_phases })` to preempt the standard
+    /// brain pipeline, or `None` to defer to `act`.
+    ///
+    /// Conditions (per spec `2026-05-03-four-phase-day-design.md` §6.4):
+    /// - Already-sleeping tributes never re-enter the gate (they bypass
+    ///   `process_turn_phase` entirely via the engine's sleep tick).
+    /// - Tributes mid-psychotic-break cannot choose sleep.
+    /// - At/over the dominant wakefulness threshold (12+ phases),
+    ///   tributes sleep regardless of safety. Duration: 4 phases.
+    /// - At/over the want threshold (6+ phases) AND no nearby hostiles
+    ///   AND phase is Night or Dusk: sleep. Duration: 3 phases.
+    /// - Stamina exhausted (≤25% of max) AND no nearby hostiles AND
+    ///   non-Day phase: sleep. Duration: 2 phases.
+    pub fn should_sleep(
+        &self,
+        tribute: &Tribute,
+        nearby_tributes: u32,
+        phase: shared::messages::Phase,
+        _rng: &mut impl Rng,
+    ) -> Option<Action> {
+        use shared::messages::Phase;
+
+        if !tribute.is_alive() || tribute.sleeping {
+            return None;
+        }
+        if self.psychotic_break.is_some() {
+            return None;
+        }
+
+        let safe = nearby_tributes == 0;
+        let is_night_or_dusk = matches!(phase, Phase::Night | Phase::Dusk);
+        let is_day = matches!(phase, Phase::Day);
+
+        if tribute.cycles_awake >= SLEEP_DOMINANT_THRESHOLD {
+            return Some(Action::Sleep { duration_phases: 4 });
+        }
+
+        if tribute.cycles_awake >= SLEEP_WANT_THRESHOLD && safe && is_night_or_dusk {
+            return Some(Action::Sleep { duration_phases: 3 });
+        }
+
+        let stamina_pct = (tribute.stamina * 100)
+            .checked_div(tribute.max_stamina)
+            .unwrap_or(0);
+        if stamina_pct <= SLEEP_EXHAUSTED_PCT && safe && !is_day {
+            return Some(Action::Sleep { duration_phases: 2 });
+        }
+
+        None
     }
 
     /// Shared pre-decision override pipeline. Returns `Some(action)` to
@@ -1640,6 +1698,66 @@ mod tests {
             .expect("expected a destination");
         // Tie on "others" (0 vs 0): scoring order picks the first area.
         assert_eq!(chosen, Area::Sector1);
+    }
+
+    // ---- Sleep gating (PR2c.1, bd-9sjj) ----
+
+    #[rstest]
+    fn should_sleep_dominant_threshold_overrides_safety(tribute: Tribute, mut small_rng: SmallRng) {
+        use shared::messages::Phase;
+        let mut t = tribute.clone();
+        t.cycles_awake = SLEEP_DOMINANT_THRESHOLD;
+        let action = t.brain.should_sleep(&t, 5, Phase::Day, &mut small_rng);
+        assert!(matches!(action, Some(Action::Sleep { duration_phases: 4 })));
+    }
+
+    #[rstest]
+    fn should_sleep_want_threshold_requires_safety_and_night(
+        tribute: Tribute,
+        mut small_rng: SmallRng,
+    ) {
+        use shared::messages::Phase;
+        let mut t = tribute.clone();
+        t.cycles_awake = SLEEP_WANT_THRESHOLD;
+        let action = t.brain.should_sleep(&t, 0, Phase::Night, &mut small_rng);
+        assert!(matches!(action, Some(Action::Sleep { duration_phases: 3 })));
+        let action = t.brain.should_sleep(&t, 1, Phase::Night, &mut small_rng);
+        assert!(action.is_none());
+        let action = t.brain.should_sleep(&t, 0, Phase::Day, &mut small_rng);
+        assert!(action.is_none());
+    }
+
+    #[rstest]
+    fn should_sleep_exhausted_naps_when_safe_off_day(tribute: Tribute, mut small_rng: SmallRng) {
+        use shared::messages::Phase;
+        let mut t = tribute.clone();
+        t.cycles_awake = 1;
+        t.stamina = 10;
+        let action = t.brain.should_sleep(&t, 0, Phase::Dusk, &mut small_rng);
+        assert!(matches!(action, Some(Action::Sleep { duration_phases: 2 })));
+        let action = t.brain.should_sleep(&t, 0, Phase::Day, &mut small_rng);
+        assert!(action.is_none());
+    }
+
+    #[rstest]
+    fn should_sleep_psychotic_break_blocks_sleep(tribute: Tribute, mut small_rng: SmallRng) {
+        use shared::messages::Phase;
+        let mut t = tribute.clone();
+        t.cycles_awake = SLEEP_DOMINANT_THRESHOLD + 4;
+        t.brain.psychotic_break = Some(PsychoticBreakType::Berserk);
+        let action = t.brain.should_sleep(&t, 0, Phase::Night, &mut small_rng);
+        assert!(action.is_none());
+    }
+
+    #[rstest]
+    fn should_sleep_already_sleeping_returns_none(tribute: Tribute, mut small_rng: SmallRng) {
+        use shared::messages::Phase;
+        let mut t = tribute.clone();
+        t.sleeping = true;
+        t.sleep_remaining = 2;
+        t.cycles_awake = SLEEP_DOMINANT_THRESHOLD + 10;
+        let action = t.brain.should_sleep(&t, 0, Phase::Night, &mut small_rng);
+        assert!(action.is_none());
     }
 }
 

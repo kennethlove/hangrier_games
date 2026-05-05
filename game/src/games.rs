@@ -31,6 +31,24 @@ const SLEEP_HP_PER_PHASE: u32 = 5;
 /// explicit per-tribute max field.)
 const SLEEP_HP_CAP: u32 = 100;
 
+/// Project a game-side `AreaEvent` onto the cross-cutting
+/// `shared::messages::AreaEventKind` taxonomy used by sleep-interruption
+/// payloads (PR2c.2, bd-1zju). The mapping collapses several seasonal /
+/// terrain variants into the same broad "kind" so downstream consumers
+/// (UI badges, announcer prompts) can treat them uniformly.
+fn area_event_to_kind(ev: &AreaEvent) -> shared::messages::AreaEventKind {
+    use shared::messages::AreaEventKind as K;
+    match ev {
+        AreaEvent::Wildfire | AreaEvent::Sandstorm => K::Fire,
+        AreaEvent::Flood | AreaEvent::Drought => K::Flood,
+        AreaEvent::Earthquake
+        | AreaEvent::Avalanche
+        | AreaEvent::Landslide
+        | AreaEvent::Rockslide => K::Earthquake,
+        AreaEvent::Blizzard | AreaEvent::Heatwave => K::Storm,
+    }
+}
+
 /// Errors that can occur during game operations.
 #[derive(Debug, Clone, PartialEq)]
 pub enum GameError {
@@ -1295,6 +1313,37 @@ impl Game {
                 use crate::messages::{MessagePayload, TributeRef};
                 use shared::messages::WakeReason;
 
+                // Spec §6.4 PR2c.2 (bd-1zju). Before regenerating, check
+                // whether an area event in the sleeper's current area is
+                // active. If so, wake the tribute with the appropriate
+                // `InterruptionKind::AreaEvent` and skip regen this phase
+                // — they didn't actually rest, they were jolted awake.
+                let area_event_kind = area_details_map
+                    .get(&tribute.area)
+                    .and_then(|&idx| self.areas.get(idx))
+                    .and_then(|a| a.events.first())
+                    .map(area_event_to_kind);
+                if let Some(kind) = area_event_kind {
+                    let mut wake_events: Vec<crate::messages::TaggedEvent> = Vec::new();
+                    let woke = tribute.wake_interrupted(
+                        shared::messages::InterruptionKind::AreaEvent { kind },
+                        phase,
+                        &mut wake_events,
+                    );
+                    if woke {
+                        for ev in wake_events.drain(..) {
+                            collected_events.push((
+                                tribute.identifier.clone(),
+                                tribute.name.clone(),
+                                ev.content,
+                                Some(ev.payload),
+                                None,
+                            ));
+                        }
+                        continue;
+                    }
+                }
+
                 let blocked = matches!(
                     tribute.status,
                     TributeStatus::Wounded | TributeStatus::Infected | TributeStatus::Sick
@@ -1767,6 +1816,48 @@ impl Game {
                             payload,
                             tick,
                         );
+                    }
+                }
+                AllianceEvent::AllianceSummons { summoner, target } => {
+                    // Spec §6.4 PR2c.2 (bd-1zju). When the target is asleep,
+                    // an ally's summons interrupts the rest. Currently no
+                    // production code emits this event; the handler is in
+                    // place so future PRs (or test scaffolding) can wake
+                    // sleeping allies through the standard alliance pipeline.
+                    let summoner_ref = self.tributes.iter().find(|t| t.id == summoner).map(|t| {
+                        crate::messages::TributeRef {
+                            identifier: t.identifier.clone(),
+                            name: t.name.clone(),
+                        }
+                    });
+                    let Some(s_ref) = summoner_ref else { continue };
+                    let phase = self.current_phase;
+                    let mut wake_events: Vec<crate::messages::TaggedEvent> = Vec::new();
+                    let woke_info =
+                        if let Some(t) = self.tributes.iter_mut().find(|t| t.id == target) {
+                            if t.wake_interrupted(
+                                shared::messages::InterruptionKind::AllianceSummons { ally: s_ref },
+                                phase,
+                                &mut wake_events,
+                            ) {
+                                Some((t.identifier.clone(), t.name.clone()))
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+                    if let Some((t_id, t_name)) = woke_info {
+                        for ev in wake_events.drain(..) {
+                            let tick = self.tick_counter.next();
+                            self.push_message(
+                                crate::messages::MessageSource::Tribute(t_id.clone()),
+                                t_name.clone(),
+                                ev.content,
+                                ev.payload,
+                                tick,
+                            );
+                        }
                     }
                 }
             }
@@ -3170,5 +3261,97 @@ mod tests {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
         let _ = game.run_tribute_cycle(Phase::Night, &mut rng, vec![], vec![t], 1);
         assert_eq!(game.tributes[0].cycles_awake, 4);
+    }
+
+    // ---- Sleep interruption (PR2c.2, bd-1zju) ----
+
+    #[test]
+    fn area_event_interrupts_sleeping_tribute() {
+        use crate::areas::events::AreaEvent;
+        use crate::messages::{MessagePayload, Phase};
+        let mut t = create_tribute("Sleeper", true);
+        t.sleeping = true;
+        t.sleep_remaining = 5;
+        t.cycles_awake = 9;
+        t.stamina = 10;
+        let prior_stamina = t.stamina;
+        let mut game = create_test_game_with_tributes(vec![t.clone()]);
+        let mut area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
+        area.events.push(AreaEvent::Wildfire);
+        game.areas.push(area);
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+        let _ = game.run_tribute_cycle(Phase::Night, &mut rng, vec![], vec![t], 1);
+
+        let woken = &game.tributes[0];
+        assert!(!woken.sleeping, "area-event should wake sleeper");
+        assert_eq!(woken.sleep_remaining, 0);
+        assert_eq!(woken.cycles_awake, 0);
+        // Interrupted sleep skips the sleep-tick regen branch entirely
+        // (the +5 idle recovery from `recover_stamina` in the survival
+        // block still runs, so we just assert sleep regen did NOT add
+        // the additional SLEEP_STAMINA_PER_PHASE on top).
+        assert!(
+            woken.stamina < prior_stamina + SLEEP_STAMINA_PER_PHASE,
+            "sleep-tick regen must be skipped on interruption (stamina={})",
+            woken.stamina
+        );
+
+        let woke = game.messages.iter().any(|m| {
+            matches!(
+                &m.payload,
+                MessagePayload::TributeWoke {
+                    reason: shared::messages::WakeReason::Interrupted {
+                        event: shared::messages::InterruptionKind::AreaEvent {
+                            kind: shared::messages::AreaEventKind::Fire,
+                        },
+                    },
+                    ..
+                }
+            )
+        });
+        assert!(woke, "expected TributeWoke{{Interrupted/AreaEvent/Fire}}");
+    }
+
+    #[test]
+    fn alliance_summons_wakes_sleeping_target() {
+        use crate::messages::MessagePayload;
+        let mut summoner = create_tribute("Cinna", true);
+        let mut target = create_tribute("Katniss", true);
+        target.sleeping = true;
+        target.sleep_remaining = 3;
+        target.cycles_awake = 6;
+        let summoner_id = summoner.id;
+        let target_id = target.id;
+        // Cross-link as allies so the relationship is plausible (handler
+        // doesn't strictly require it but semantically that's the contract).
+        summoner.allies.push(target_id);
+        target.allies.push(summoner_id);
+
+        let mut game = create_test_game_with_tributes(vec![summoner, target]);
+        game.alliance_events
+            .push(crate::tributes::alliances::AllianceEvent::AllianceSummons {
+                summoner: summoner_id,
+                target: target_id,
+            });
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+        game.process_alliance_events(&mut rng);
+
+        let woken = &game.tributes[1];
+        assert!(!woken.sleeping, "summons should wake sleeping ally");
+        assert_eq!(woken.sleep_remaining, 0);
+        assert_eq!(woken.cycles_awake, 0);
+
+        let woke = game.messages.iter().any(|m| {
+            matches!(
+                &m.payload,
+                MessagePayload::TributeWoke {
+                    reason: shared::messages::WakeReason::Interrupted {
+                        event: shared::messages::InterruptionKind::AllianceSummons { .. },
+                    },
+                    ..
+                }
+            )
+        });
+        assert!(woke, "expected TributeWoke{{Interrupted/AllianceSummons}}");
     }
 }

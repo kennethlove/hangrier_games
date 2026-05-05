@@ -37,6 +37,13 @@ pub enum AllianceEvent {
         deceased: Uuid,
         killer: Option<Uuid>,
     },
+    /// An ally summons another ally to their location. When the target is
+    /// asleep, the game loop wakes them via `Tribute::wake_interrupted`
+    /// with `InterruptionKind::AllianceSummons` (spec §6.4 PR2c.2, bd-1zju).
+    AllianceSummons {
+        summoner: Uuid,
+        target: Uuid,
+    },
 }
 
 /// Refuser gate per spec §6.1. Two tributes pass the gate if either both

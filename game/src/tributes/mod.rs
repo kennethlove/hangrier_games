@@ -600,8 +600,13 @@ impl Tribute {
                     events,
                 );
                 if let Some(mut target) = target {
-                    let outcome =
-                        self.attacks(&mut target, rng, events, environment_details.combat_tuning);
+                    let outcome = self.attacks(
+                        &mut target,
+                        rng,
+                        events,
+                        environment_details.phase,
+                        environment_details.combat_tuning,
+                    );
                     match outcome {
                         AttackOutcome::Kill(_, mut target) => {
                             self.statistics.kills += 1;
@@ -829,6 +834,40 @@ impl Tribute {
 
         let mut rng = SmallRng::from_rng(&mut rand::rng());
         Some(enemies.choose(&mut rng).unwrap().clone())
+    }
+
+    /// Wake an interrupted sleeper (PR2c.2, bd-1zju). Resets the sleep
+    /// state and `cycles_awake` per spec §6.4 ("rude awakening = no rest")
+    /// and pushes a `TributeWoke { Interrupted }` event onto `events`.
+    /// Returns `true` if the tribute was actually sleeping (and was woken),
+    /// `false` otherwise — letting callers branch on whether the
+    /// interruption-trigger path applies further consequences.
+    pub fn wake_interrupted(
+        &mut self,
+        reason: shared::messages::InterruptionKind,
+        phase: shared::messages::Phase,
+        events: &mut Vec<TaggedEvent>,
+    ) -> bool {
+        use shared::messages::WakeReason;
+
+        if !self.sleeping {
+            return false;
+        }
+        self.sleeping = false;
+        self.sleep_remaining = 0;
+        self.cycles_awake = 0;
+        events.push(TaggedEvent::new(
+            crate::output::GameOutput::TributeWakesInterrupted(self.name.as_str()).to_string(),
+            MessagePayload::TributeWoke {
+                tribute: TributeRef {
+                    identifier: self.identifier.clone(),
+                    name: self.name.clone(),
+                },
+                phase,
+                reason: WakeReason::Interrupted { event: reason },
+            },
+        ));
+        true
     }
 
     /// Drain this tribute's per-turn alliance event buffer. Called by
@@ -1491,5 +1530,60 @@ mod tests {
         // the documented contract is what matters and is asserted by the
         // single-side mutation: the function signature takes `&mut self`
         // and returns nothing, with no reference to the broken ally.
+    }
+
+    #[test]
+    fn wake_interrupted_returns_false_when_not_sleeping() {
+        use crate::messages::TributeRef;
+        let mut t = Tribute::new("Foxface".to_string(), Some(1), None);
+        let mut events: Vec<TaggedEvent> = Vec::new();
+        let woke = t.wake_interrupted(
+            shared::messages::InterruptionKind::Ambush {
+                attacker: TributeRef {
+                    identifier: "x".to_string(),
+                    name: "X".to_string(),
+                },
+            },
+            shared::messages::Phase::Day,
+            &mut events,
+        );
+        assert!(!woke);
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn wake_interrupted_resets_state_and_emits_tribute_woke() {
+        let mut t = Tribute::new("Foxface".to_string(), Some(1), None);
+        t.sleeping = true;
+        t.sleep_remaining = 3;
+        t.cycles_awake = 7;
+        let mut events: Vec<TaggedEvent> = Vec::new();
+        let woke = t.wake_interrupted(
+            shared::messages::InterruptionKind::AreaEvent {
+                kind: shared::messages::AreaEventKind::Fire,
+            },
+            shared::messages::Phase::Night,
+            &mut events,
+        );
+        assert!(woke);
+        assert!(!t.sleeping);
+        assert_eq!(t.sleep_remaining, 0);
+        assert_eq!(t.cycles_awake, 0);
+        assert_eq!(events.len(), 1);
+        match &events[0].payload {
+            crate::messages::MessagePayload::TributeWoke { reason, phase, .. } => {
+                assert_eq!(*phase, shared::messages::Phase::Night);
+                match reason {
+                    shared::messages::WakeReason::Interrupted {
+                        event:
+                            shared::messages::InterruptionKind::AreaEvent {
+                                kind: shared::messages::AreaEventKind::Fire,
+                            },
+                    } => {}
+                    other => panic!("unexpected reason: {:?}", other),
+                }
+            }
+            other => panic!("expected TributeWoke payload, got {:?}", other),
+        }
     }
 }

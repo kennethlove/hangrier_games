@@ -25,6 +25,9 @@ pub enum GameOutput<'a> {
     TributeSleeps(&'a str),
     /// Tribute wakes naturally after their planned sleep duration elapses.
     TributeWakesRested(&'a str),
+    /// Tribute is forcibly woken by an interruption (ambush, area event,
+    /// alliance summons). PR2c.2 / bd-1zju.
+    TributeWakesInterrupted(&'a str),
     TributeHide(&'a str),
     TributeTravel(&'a str, &'a str, &'a str),
     TributeTakeItem(&'a str, &'a str),
@@ -146,6 +149,9 @@ impl<'a> Display for GameOutput<'a> {
             }
             GameOutput::TributeWakesRested(tribute) => {
                 write!(f, "🌅 {} wakes, well-rested", tribute)
+            }
+            GameOutput::TributeWakesInterrupted(tribute) => {
+                write!(f, "⚡ {} jolts awake", tribute)
             }
             GameOutput::TributeHide(tribute) => {
                 write!(f, "🫥 {} tries to hide", tribute)

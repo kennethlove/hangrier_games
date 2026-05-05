@@ -244,6 +244,22 @@ pub struct Tribute {
     /// Escalating step counter for HP drain while Dehydrated.
     #[serde(default)]
     pub dehydration_drain_step: u8,
+    /// Phases since the tribute last completed a full sleep. Increments by 1
+    /// each phase the tribute is *not* sleeping. Resets on
+    /// `WakeReason::Rested`. See spec
+    /// `2026-05-03-four-phase-day-design.md` §6.4.
+    #[serde(default)]
+    pub cycles_awake: u32,
+    /// True while mid-`Action::Sleep`. Affects ambush vulnerability once the
+    /// sleep mechanic lands; this PR keeps it `false` for every brain-driven
+    /// tribute (substrate only).
+    #[serde(default)]
+    pub sleeping: bool,
+    /// Phases left in the current `Action::Sleep` countdown. `0` when awake.
+    /// Decremented by the engine; on hitting zero the tribute wakes with
+    /// `WakeReason::Rested`.
+    #[serde(default)]
+    pub sleep_remaining: u8,
 }
 
 impl Default for Tribute {
@@ -301,6 +317,9 @@ impl Tribute {
             sheltered_until: None,
             starvation_drain_step: 0,
             dehydration_drain_step: 0,
+            cycles_awake: 0,
+            sleeping: false,
+            sleep_remaining: 0,
         }
     }
 
@@ -712,6 +731,9 @@ impl Tribute {
             | Action::DrinkFromTerrain
             | Action::Eat(_)
             | Action::DrinkItem(_) => {}
+            // Sleep is a substrate-only variant in PR2a; brain integration
+            // and emitters land in PR2c.
+            Action::Sleep { .. } => {}
         }
     }
 
@@ -872,6 +894,8 @@ pub fn calculate_stamina_cost(
         Action::Forage => 15.0,
         Action::DrinkFromTerrain => 5.0,
         Action::Eat(_) | Action::DrinkItem(_) => 0.0,
+        // Sleep is free at the action layer; phase scheduler handles it.
+        Action::Sleep { .. } => 0.0,
     };
 
     // If base cost is 0, no need to calculate multipliers
@@ -1203,6 +1227,21 @@ mod tests {
         assert_eq!(loaded.sheltered_until, None);
         assert_eq!(loaded.starvation_drain_step, 0);
         assert_eq!(loaded.dehydration_drain_step, 0);
+    }
+
+    #[test]
+    fn tribute_legacy_json_loads_with_sleep_defaults() {
+        // JSON missing the new sleep fields must default to zero/false.
+        let t = Tribute::new("Legacy".to_string(), Some(1), None);
+        let mut json: serde_json::Value = serde_json::to_value(&t).unwrap();
+        let obj = json.as_object_mut().unwrap();
+        obj.remove("cycles_awake");
+        obj.remove("sleeping");
+        obj.remove("sleep_remaining");
+        let loaded: Tribute = serde_json::from_value(json).expect("legacy load must succeed");
+        assert_eq!(loaded.cycles_awake, 0);
+        assert!(!loaded.sleeping);
+        assert_eq!(loaded.sleep_remaining, 0);
     }
 
     #[rstest]

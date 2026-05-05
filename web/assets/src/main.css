@@ -3,6 +3,50 @@
 @source "../../src/**/*.rs";
 @source "../../../shared/src/**/*.rs";
 
+/* ---- Hangrier Games v1 design tokens ---- */
+:root, .dark {
+  --color-bg: #19121A;
+  --color-surface: #241829;
+  --color-surface-2: #1F1521;
+  --color-border: #3A2440;
+  --color-text: #F2EBE2;
+  --color-text-muted: #A498A2;
+  --color-primary: #00E5FF;
+  --color-danger: #FF2E6E;
+  --color-gold: #E8B14B;
+}
+
+.light {
+  --color-bg: #FBF6E9;
+  --color-surface: #FFFCF2;
+  --color-surface-2: #F4EAC9;
+  --color-border: #E8DCB8;
+  --color-text: #1A1410;
+  --color-text-muted: #6B5938;
+  --color-primary: #007A99;
+  --color-danger: #C8003C;
+  --color-gold: #B8861B;
+}
+
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface-2: var(--color-surface-2);
+  --color-border: var(--color-border);
+  --color-text: var(--color-text);
+  --color-text-muted: var(--color-text-muted);
+  --color-primary: var(--color-primary);
+  --color-danger: var(--color-danger);
+  --color-gold: var(--color-gold);
+
+  --font-display: "Bebas Neue", Impact, sans-serif;
+  --font-text: "Source Sans 3", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --radius-card: 0.625rem;   /* 10px */
+  --radius-inner: 0.375rem;  /* 6px */
+}
+
 @variant theme1 (&:where(.theme1, .theme1 *));
 @variant theme2 (&:where(.theme2, .theme2 *));
 @variant theme3 (&:where(.theme3, .theme3 *));

@@ -62,10 +62,8 @@ pub fn Icon(
     #[props(default)]
     size: Option<IconSize>,
     tier: IconTier,
-    #[props(default)]
-    class: String,
-    #[props(default)]
-    aria_label: Option<String>,
+    #[props(default)] class: String,
+    #[props(default)] aria_label: Option<String>,
 ) -> Element {
     let size_class = size.unwrap_or_else(|| tier.default_size()).class();
     let combined_class = if class.is_empty() {

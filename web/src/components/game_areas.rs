@@ -1,9 +1,8 @@
 use crate::cache::QueryError;
-use crate::components::icons::lock_closed::LockClosedIcon;
-use crate::components::icons::lock_open::LockOpenIcon;
 use crate::components::item_icon::ItemIcon;
 use crate::components::map::Map;
 use crate::http::WithCredentials;
+use crate::icons::{LockClosedIcon, LockOpenIcon};
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::areas::AreaDetails;
@@ -77,17 +76,11 @@ pub fn GameAreaList(game: DisplayGame) -> Element {
                                 div {
                                     if area.is_open() {
                                         LockOpenIcon {
-                                            class: r#"
-                                            size-4
-
-                                            "#,
+                                            class: "".to_string(),
                                         }
                                     } else {
                                         LockClosedIcon {
-                                            class: r#"
-                                            size-4
-
-                                            "#,
+                                            class: "".to_string(),
                                         }
                                     }
                                 }

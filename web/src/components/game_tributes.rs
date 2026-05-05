@@ -1,11 +1,10 @@
 use crate::cache::QueryError;
-use crate::components::icons::loading::LoadingIcon;
-use crate::components::icons::map_pin::MapPinIcon;
 use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_edit::TributeEdit;
 use crate::components::tribute_state_strip::TributeStateStrip;
 use crate::components::tribute_status_icon::TributeStatusIcon;
 use crate::http::WithCredentials;
+use crate::icons::{LoadingIcon, MapPinIcon};
 use crate::routes::Routes;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
@@ -213,11 +212,7 @@ pub fn GameTributeListMember(
                         mb-2
                         "#,
                         MapPinIcon {
-                            class: r#"
-                            size-6
-                            ml-1
-
-                            "#,
+                            class: "".to_string(),
                         }
                         span {
                             class: "",

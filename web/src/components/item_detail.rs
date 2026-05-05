@@ -1,7 +1,7 @@
 use crate::cache::QueryError;
-use crate::components::icons::uturn::UTurnIcon;
 use crate::components::item_icon::ItemIcon;
 use crate::http::WithCredentials;
+use crate::icons::UturnIcon;
 use crate::routes::Routes;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
@@ -60,7 +60,7 @@ pub fn ItemDetail(game_identifier: String, item_identifier: String) -> Element {
                         Link {
                             to: Routes::GamePage { identifier: game_identifier.clone() },
                             class: "inline-flex items-center gap-1 text-sm underline",
-                            UTurnIcon { class: "size-4 fill-current" }
+                            UturnIcon { class: "text-current".to_string() }
                             "Back to game"
                         }
                     }

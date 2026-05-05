@@ -1,4 +1,4 @@
-use crate::components::icons::svg_icon::SvgIcon;
+use crate::icons::NarrativeIcon;
 use dioxus::prelude::*;
 use game::tributes::statuses::TributeStatus;
 
@@ -33,7 +33,7 @@ pub fn TributeStatusIcon(status: TributeStatus, css_class: String) -> Element {
     rsx! {
         span {
             title: status.to_string(),
-            SvgIcon { name: icon_name, class: css_class },
+            NarrativeIcon { name: icon_name, class: css_class },
             span { class: "sr-only", "{status}"},
         }
     }

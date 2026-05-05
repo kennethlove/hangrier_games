@@ -1,10 +1,10 @@
 use crate::cache::MutationError;
 use crate::components::game_detail::DisplayGameQ;
 use crate::components::games_list::GamesListQ;
-use crate::components::icons::edit::EditIcon;
 use crate::components::modal::{Modal, Props as ModalProps};
 use crate::components::{Button, Input};
 use crate::http::WithCredentials;
+use crate::icons::EditIcon;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use shared::EditGame;

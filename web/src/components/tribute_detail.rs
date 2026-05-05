@@ -1,11 +1,11 @@
 use crate::cache::QueryError;
 use crate::components::game_tributes::GameTributesQ;
-use crate::components::icons::uturn::UTurnIcon;
 use crate::components::info_detail::InfoDetail;
 use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_status_icon::TributeStatusIcon;
 use crate::components::tribute_survival_section::TributeSurvivalSection;
 use crate::http::WithCredentials;
+use crate::icons::UturnIcon;
 use crate::routes::Routes;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
@@ -142,11 +142,9 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                             to: Routes::GamePage {
                                 identifier: game_identifier.clone()
                             },
-                            UTurnIcon {
-                                class: r#"
-                                size-5
-
-                                "#,
+                            UturnIcon {
+                                size: crate::components::ui::IconSize::Md,
+                                class: "".to_string(),
                             }
                         }
                     }

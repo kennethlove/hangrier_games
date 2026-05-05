@@ -370,10 +370,7 @@ fn TributeStaminaRow(current: u32, max: u32) -> Element {
     let (color_cls, label) = match band {
         StaminaBand::Fresh => ("text-emerald-600 ", "Fresh"),
         StaminaBand::Winded => ("text-amber-700 ", "Winded"),
-        StaminaBand::Exhausted => (
-            "text-red-600  font-semibold",
-            "Exhausted",
-        ),
+        StaminaBand::Exhausted => ("text-red-600  font-semibold", "Exhausted"),
     };
     rsx! {
         dl {

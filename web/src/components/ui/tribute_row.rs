@@ -12,7 +12,11 @@ pub struct TributeRowProps {
 
 #[component]
 pub fn TributeRow(props: TributeRowProps) -> Element {
-    let stat_color = if props.highlight { "text-primary" } else { "text-text" };
+    let stat_color = if props.highlight {
+        "text-primary"
+    } else {
+        "text-text"
+    };
     rsx! {
         div {
             class: "flex items-center gap-3.5 py-2.5 border-t border-border first:border-t-0",

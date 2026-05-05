@@ -17,7 +17,7 @@ pub fn DeathCard(props: DeathCardProps) -> Element {
         tribute_identifier: props.victim.identifier.clone(),
     };
     rsx! {
-        article { class: "rounded border-l-4 border-red-500 bg-red-50 theme2:bg-red-950 p-3",
+        article { class: "rounded border-l-4 border-red-500 bg-red-50  p-3",
             header { class: "font-semibold",
                 "💀 "
                 Link { to: victim_route, class: "underline", "{props.victim.name}" }
@@ -43,7 +43,7 @@ pub fn DeathCard(props: DeathCardProps) -> Element {
 
 fn cause_class(cause: &str) -> &'static str {
     match cause {
-        "starvation" | "dehydration" => "text-amber-600 theme2:text-amber-300 italic",
+        "starvation" | "dehydration" => "text-amber-600  italic",
         _ => "text-gray-600",
     }
 }

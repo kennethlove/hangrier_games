@@ -29,7 +29,7 @@ pub fn AllianceCard(props: AllianceCardProps) -> Element {
         _ => ("🤝", "alliance event".to_string()),
     };
     rsx! {
-        article { class: "rounded border-l-4 border-emerald-500 bg-emerald-50 theme2:bg-emerald-950 p-3",
+        article { class: "rounded border-l-4 border-emerald-500 bg-emerald-50  p-3",
             header { class: "font-semibold", "{icon} {body}" }
         }
     }

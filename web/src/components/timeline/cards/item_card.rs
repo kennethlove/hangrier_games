@@ -76,7 +76,7 @@ pub fn ItemCard(props: ItemCardProps) -> Element {
         _ => rsx! { "item event" },
     };
     rsx! {
-        article { class: "rounded border-l-4 border-yellow-500 bg-yellow-50 theme2:bg-yellow-950 p-3",
+        article { class: "rounded border-l-4 border-yellow-500 bg-yellow-50  p-3",
             header { class: "font-semibold",
                 "🎒 "
                 {inner}

@@ -33,7 +33,7 @@ pub fn StateCard(props: StateCardProps) -> Element {
         _ => "state event".to_string(),
     };
     rsx! {
-        article { class: "rounded border-l-4 border-gray-400 bg-gray-50 theme2:bg-gray-900 p-2 text-sm",
+        article { class: "rounded border-l-4 border-gray-400 bg-gray-50  p-2 text-sm",
             "🌫️ {body}"
         }
     }

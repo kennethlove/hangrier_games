@@ -113,6 +113,9 @@ pub struct ActionSuggestion {
 #[derive(Debug)]
 pub struct EnvironmentContext<'a> {
     pub is_day: bool,
+    /// Full four-phase value for the current cycle. Used by sleep scoring
+    /// (Brain::should_sleep) and emitters (TributeSlept/TributeWoke).
+    pub phase: shared::messages::Phase,
     pub area_details: &'a mut AreaDetails,
     pub closed_areas: &'a [Area],
     pub available_destinations: Vec<crate::areas::DestinationInfo>,
@@ -474,15 +477,30 @@ impl Tribute {
 
         // Get tribute action
         let number_of_nearby_tributes = encounter_context.nearby_tributes_count;
-        let action = self.brain.act(
+        // Sleep gating (PR2c.1, bd-9sjj) runs before the standard brain
+        // pipeline so a needed sleep cleanly preempts attack / move /
+        // forage scoring. `Brain::should_sleep` is a phase-aware override
+        // that returns `Some(Action::Sleep { duration_phases })` when the
+        // tribute's wakefulness, stamina, and local-safety state warrant
+        // it. Psychotic-break tributes are excluded inside the helper.
+        let action = if let Some(sleep_action) = self.brain.should_sleep(
             self,
             number_of_nearby_tributes,
-            &environment_details.available_destinations,
-            environment_details.all_areas,
-            environment_details.closed_areas,
-            environment_details.enemy_density,
+            environment_details.phase,
             rng,
-        );
+        ) {
+            sleep_action
+        } else {
+            self.brain.act(
+                self,
+                number_of_nearby_tributes,
+                &environment_details.available_destinations,
+                environment_details.all_areas,
+                environment_details.closed_areas,
+                environment_details.enemy_density,
+                rng,
+            )
+        };
 
         let closed_areas = environment_details.closed_areas;
 
@@ -731,9 +749,27 @@ impl Tribute {
             | Action::DrinkFromTerrain
             | Action::Eat(_)
             | Action::DrinkItem(_) => {}
-            // Sleep is a substrate-only variant in PR2a; brain integration
-            // and emitters land in PR2c.
-            Action::Sleep { .. } => {}
+            // Sleep entry (PR2c.1, bd-9sjj). The brain has elected to begin
+            // a multi-phase sleep; flip the flag, prime the countdown, and
+            // emit `TributeSlept` with zeroed restoration counters. The
+            // engine's per-phase sleep tick (Game::execute_cycle) will
+            // perform the actual stamina/HP regen and emit `TributeWoke`
+            // when `sleep_remaining` drains to zero. Interruptions
+            // (ambush / area-event / alliance-summons) are bd-1zju /
+            // PR2c.2.
+            Action::Sleep { duration_phases } => {
+                self.sleeping = true;
+                self.sleep_remaining = *duration_phases;
+                events.push(TaggedEvent::new(
+                    GameOutput::TributeSleeps(self.name.as_str()).to_string(),
+                    MessagePayload::TributeSlept {
+                        tribute: tribute_ref(),
+                        phase: environment_details.phase,
+                        restored_stamina: 0,
+                        restored_hp: 0,
+                    },
+                ));
+            }
         }
     }
 

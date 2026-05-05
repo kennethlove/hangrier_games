@@ -19,6 +19,18 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use uuid::Uuid;
 
+/// Stamina restored per phase to a sleeping tribute (PR2c.1, bd-9sjj).
+/// Placeholder pending observability tuning per spec
+/// `2026-05-03-four-phase-day-design.md` §6.4.
+const SLEEP_STAMINA_PER_PHASE: u32 = 25;
+/// HP restored per phase to a sleeping tribute, gated on absence of
+/// Wounded / Infected / Sick.
+const SLEEP_HP_PER_PHASE: u32 = 5;
+/// Soft cap for sleep-driven HP regen so it never exceeds the natural
+/// 100-point ceiling. (Tributes' `attributes.health` is `u32` without an
+/// explicit per-tribute max field.)
+const SLEEP_HP_CAP: u32 = 100;
+
 /// Errors that can occur during game operations.
 #[derive(Debug, Clone, PartialEq)]
 pub enum GameError {
@@ -198,6 +210,11 @@ type CollectedEvent = (
 struct CycleContext {
     /// True for the day half of the cycle, false for night.
     is_day: bool,
+    /// Full four-phase value (Dawn / Day / Dusk / Night) for this cycle.
+    /// Threaded through to `EnvironmentContext` and the sleep tick handler
+    /// so brain scoring and `TributeSlept` / `TributeWoke` payloads see the
+    /// real phase rather than reconstructing it from `is_day`.
+    phase: crate::messages::Phase,
     /// Current game day (1-indexed). Mirrors `Game::day.unwrap_or(1)` and
     /// is forwarded into `EnvironmentContext::current_day`.
     current_day: u32,
@@ -1053,6 +1070,7 @@ impl Game {
 
         CycleContext {
             is_day: day,
+            phase,
             current_day: self.day.unwrap_or(1),
             action_suggestion,
             area_details_map,
@@ -1073,6 +1091,7 @@ impl Game {
     fn execute_cycle(&mut self, ctx: CycleContext, rng: &mut SmallRng) -> Result<(), GameError> {
         let CycleContext {
             is_day: day,
+            phase,
             current_day,
             action_suggestion,
             area_details_map,
@@ -1264,6 +1283,70 @@ impl Game {
                 }
             }
 
+            // Sleep tick (PR2c.1, bd-9sjj). Sleeping tributes skip the
+            // brain pipeline entirely: regen stamina (always) and HP
+            // (gated on absence of Wounded / Infected / Sick per spec
+            // §6.4), then decrement `sleep_remaining`. When the
+            // countdown drains to zero, flip `sleeping = false`, reset
+            // `cycles_awake`, and emit `TributeWoke { Rested }`.
+            // Interruption handling lives in PR2c.2 (bd-1zju); this PR
+            // ships the natural-wake path only.
+            if tribute.sleeping {
+                use crate::messages::{MessagePayload, TributeRef};
+                use shared::messages::WakeReason;
+
+                let blocked = matches!(
+                    tribute.status,
+                    TributeStatus::Wounded | TributeStatus::Infected | TributeStatus::Sick
+                );
+                let prior_stamina = tribute.stamina;
+                let prior_hp = tribute.attributes.health;
+                tribute.stamina = tribute
+                    .stamina
+                    .saturating_add(SLEEP_STAMINA_PER_PHASE)
+                    .min(tribute.max_stamina);
+                if !blocked {
+                    tribute.attributes.health = tribute
+                        .attributes
+                        .health
+                        .saturating_add(SLEEP_HP_PER_PHASE)
+                        .min(SLEEP_HP_CAP);
+                }
+                let restored_stamina = tribute.stamina.saturating_sub(prior_stamina);
+                let restored_hp = tribute.attributes.health.saturating_sub(prior_hp);
+
+                // The TributeSlept emission for the *entry* phase happens
+                // in process_turn_phase. Each subsequent phase the sleeper
+                // is silent except for the final TributeWoke; we do not
+                // re-emit per-phase regen events to avoid log spam. The
+                // restored_* totals are consumed by the consolidated
+                // TributeWoke payload.
+                tribute.sleep_remaining = tribute.sleep_remaining.saturating_sub(1);
+                if tribute.sleep_remaining == 0 {
+                    tribute.sleeping = false;
+                    tribute.cycles_awake = 0;
+                    let tref = TributeRef {
+                        identifier: tribute.identifier.clone(),
+                        name: tribute.name.clone(),
+                    };
+                    let line = crate::output::GameOutput::TributeWakesRested(tribute.name.as_str())
+                        .to_string();
+                    collected_events.push((
+                        tribute.identifier.clone(),
+                        tribute.name.clone(),
+                        line,
+                        Some(MessagePayload::TributeWoke {
+                            tribute: tref,
+                            phase,
+                            reason: WakeReason::Rested,
+                        }),
+                        None,
+                    ));
+                }
+                let _ = (restored_stamina, restored_hp);
+                continue;
+            }
+
             let area_index = match area_details_map.get(&tribute.area) {
                 Some(&idx) => idx,
                 None => continue,
@@ -1299,6 +1382,7 @@ impl Game {
 
             let mut environment_details = EnvironmentContext {
                 is_day: day,
+                phase,
                 area_details,
                 closed_areas: &closed_areas,
                 available_destinations,
@@ -2997,5 +3081,94 @@ mod tests {
                 MessagePayload::TributeKilled { cause, .. } if cause == CAUSE_DEHYDRATION)
         });
         assert!(killed, "expected a TributeKilled with cause=dehydration");
+    }
+
+    // ---- Sleep tick (PR2c.1, bd-9sjj) ----
+
+    #[test]
+    fn sleeping_tribute_naturally_wakes_after_duration_emits_tribute_woke() {
+        use crate::messages::{MessagePayload, Phase};
+        let mut t = create_tribute("Sleeper", true);
+        t.sleeping = true;
+        t.sleep_remaining = 1;
+        t.cycles_awake = 9;
+        t.stamina = 50;
+        let mut game = create_test_game_with_tributes(vec![t.clone()]);
+        let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
+        game.areas.push(area);
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+        let _ = game.run_tribute_cycle(Phase::Night, &mut rng, vec![], vec![t], 1);
+
+        let woken = &game.tributes[0];
+        assert!(!woken.sleeping, "tribute should be awake");
+        assert_eq!(woken.sleep_remaining, 0);
+        assert_eq!(woken.cycles_awake, 0, "natural wake resets cycles_awake");
+
+        let woke = game.messages.iter().any(|m| {
+            matches!(
+                &m.payload,
+                MessagePayload::TributeWoke {
+                    reason: shared::messages::WakeReason::Rested,
+                    ..
+                }
+            )
+        });
+        assert!(woke, "expected a TributeWoke{{Rested}} message");
+    }
+
+    #[test]
+    fn sleeping_tribute_regenerates_stamina_each_phase() {
+        use crate::messages::Phase;
+        let mut t = create_tribute("Sleeper", true);
+        t.sleeping = true;
+        t.sleep_remaining = 3; // multi-phase sleep
+        t.stamina = 10;
+        t.max_stamina = 100;
+        let prior = t.stamina;
+        let mut game = create_test_game_with_tributes(vec![t.clone()]);
+        let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
+        game.areas.push(area);
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+        let _ = game.run_tribute_cycle(Phase::Night, &mut rng, vec![], vec![t], 1);
+
+        let after = &game.tributes[0];
+        assert!(after.sleeping, "still mid-sleep");
+        assert_eq!(after.sleep_remaining, 2);
+        assert!(after.stamina > prior, "stamina should regen");
+    }
+
+    #[test]
+    fn sleeping_wounded_tribute_does_not_regen_hp() {
+        use crate::messages::Phase;
+        let mut t = create_tribute("Sleeper", true);
+        t.sleeping = true;
+        t.sleep_remaining = 3;
+        t.attributes.health = 40;
+        t.status = TributeStatus::Wounded;
+        let prior_hp = t.attributes.health;
+        let mut game = create_test_game_with_tributes(vec![t.clone()]);
+        let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
+        game.areas.push(area);
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+        let _ = game.run_tribute_cycle(Phase::Night, &mut rng, vec![], vec![t], 1);
+        assert_eq!(
+            game.tributes[0].attributes.health, prior_hp,
+            "wounded tributes do not heal while sleeping"
+        );
+    }
+
+    #[test]
+    fn cycles_awake_does_not_increment_while_sleeping() {
+        use crate::messages::Phase;
+        let mut t = create_tribute("Sleeper", true);
+        t.sleeping = true;
+        t.sleep_remaining = 3;
+        t.cycles_awake = 4;
+        let mut game = create_test_game_with_tributes(vec![t.clone()]);
+        let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
+        game.areas.push(area);
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+        let _ = game.run_tribute_cycle(Phase::Night, &mut rng, vec![], vec![t], 1);
+        assert_eq!(game.tributes[0].cycles_awake, 4);
     }
 }

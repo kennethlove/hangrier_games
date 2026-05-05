@@ -5,6 +5,8 @@ pub mod cycle_card;
 pub mod death_card;
 pub mod item_card;
 pub mod movement_card;
+pub mod sleep_card;
 pub mod stamina_card;
 pub mod state_card;
 pub mod survival_card;
+pub mod wake_card;

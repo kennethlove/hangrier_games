@@ -56,14 +56,21 @@ impl TestDb {
         // to its working dir; tests run with CWD=api/, but those folders live at
         // the workspace root. Point the runner there via SURREAL_MIG_PATH (the
         // env var honored by surrealdb-migrations when no .surrealdb config is
-        // present).
-        let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .expect("api crate must have a parent (workspace root)");
-        // SAFETY: tests run with --test-threads=1, so this process-global mutation is safe.
-        unsafe {
-            std::env::set_var("SURREAL_MIG_PATH", workspace_root);
-        }
+        // present). The value is constant across the whole test process, so we
+        // set it exactly once via OnceLock — this lets api integration tests
+        // run in parallel without racing on the env mutation.
+        static MIG_PATH_SET: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+        MIG_PATH_SET.get_or_init(|| {
+            let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("api crate must have a parent (workspace root)");
+            // SAFETY: this initializer runs exactly once, before any test
+            // thread reads SURREAL_MIG_PATH, so the process-global mutation
+            // is sound under default (parallel) test execution.
+            unsafe {
+                std::env::set_var("SURREAL_MIG_PATH", workspace_root);
+            }
+        });
         MigrationRunner::new(&db)
             .up()
             .await

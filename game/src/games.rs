@@ -174,6 +174,55 @@ impl Display for Game {
     }
 }
 
+/// One per-tribute event collected during `execute_cycle` and drained
+/// into `Game::messages` by `flush_tribute_events`.
+///
+/// Tuple shape: `(actor_identifier, actor_name, content, payload, optional GameEvent)`.
+/// Sites carrying a typed `MessagePayload` (Some) push that payload directly;
+/// legacy stringly sites carry `None` and synthesise a fallback in the drain.
+type CollectedEvent = (
+    String,
+    String,
+    String,
+    Option<crate::messages::MessagePayload>,
+    Option<crate::events::GameEvent>,
+);
+
+/// Pre-computed, immutable view of cycle inputs produced by
+/// `Game::build_cycle_context` and consumed by `Game::execute_cycle`.
+///
+/// Splitting these out gives gamemaker overrides (and future cycle
+/// modifiers) a typed seam between the "snapshot the world" phase and the
+/// "iterate `&mut self.tributes`" phase that previously lived together
+/// in `run_tribute_cycle`.
+struct CycleContext {
+    /// True for the day half of the cycle, false for night.
+    is_day: bool,
+    /// Current game day (1-indexed). Mirrors `Game::day.unwrap_or(1)` and
+    /// is forwarded into `EnvironmentContext::current_day`.
+    current_day: u32,
+    /// Optional global action suggestion (e.g. day-1 spread, day-3
+    /// Cornucopia push).
+    action_suggestion: Option<ActionSuggestion>,
+    /// `Area -> index into self.areas` for O(1) area lookup during the
+    /// `&mut self.tributes` iteration.
+    area_details_map: HashMap<Area, usize>,
+    /// Owned per-area tribute snapshots used to build `EncounterContext`
+    /// without re-borrowing `self.tributes` during the executor loop.
+    tributes_by_area: HashMap<Area, Vec<Tribute>>,
+    /// Per-area living-tribute density (4wnj). Read by
+    /// `Brain::choose_destination` as a crowd penalty.
+    enemy_density: HashMap<Area, u32>,
+    /// Cached combat tuning so the executor never has to re-borrow `self`.
+    combat_tuning_snapshot: crate::tributes::combat_tuning::CombatTuning,
+    /// Read-only snapshot of every area for multi-hop pathfinding.
+    all_areas_snapshot: Vec<AreaDetails>,
+    /// Areas closed for this cycle, propagated into `EnvironmentContext`.
+    closed_areas: Vec<Area>,
+    /// Total living tribute count (used by `EncounterContext`).
+    living_tributes_count: usize,
+}
+
 impl Game {
     /// Create a new game with a given name.
     pub fn new(name: &str) -> Self {
@@ -929,16 +978,21 @@ impl Game {
         Ok(())
     }
 
-    /// Runs the tributes' logic for the current cycle.
-    fn run_tribute_cycle(
-        &mut self,
+    /// Pre-computed, immutable view of game state used by `execute_cycle`.
+    ///
+    /// `build_cycle_context` materialises this from `&self` so the executor
+    /// half of the cycle (which holds `&mut self`) can read pre-snapshotted
+    /// data without re-borrowing. This split also gives gamemaker overrides
+    /// (and future cycle-modifier hooks) a typed seam between the
+    /// "what the world looks like" phase and the "what each tribute does"
+    /// phase.
+    fn build_cycle_context(
+        &self,
         day: bool,
-        rng: &mut SmallRng,
         closed_areas: Vec<Area>,
         living_tributes: Vec<Tribute>,
         living_tributes_count: usize,
-    ) -> Result<(), GameError> {
-        // Pre-compute global action suggestion
+    ) -> CycleContext {
         let action_suggestion = match (self.day, day) {
             (Some(1), true) => Some(ActionSuggestion {
                 action: Action::Move(None),
@@ -951,17 +1005,15 @@ impl Game {
             (_, _) => None,
         };
 
-        // Create area details lookup map
         let mut area_details_map = HashMap::with_capacity(self.areas.len());
-        for (i, area_detail) in self.areas.iter_mut().enumerate() {
+        for (i, area_detail) in self.areas.iter().enumerate() {
             if let Some(area) = &area_detail.area {
                 area_details_map.insert(*area, i);
             }
         }
 
-        // Group tributes by area for faster lookups
-        let mut tributes_by_area: HashMap<Area, Vec<&Tribute>> = HashMap::new();
-        for tribute in &living_tributes {
+        let mut tributes_by_area: HashMap<Area, Vec<Tribute>> = HashMap::new();
+        for tribute in living_tributes {
             tributes_by_area
                 .entry(tribute.area)
                 .or_default()
@@ -977,35 +1029,43 @@ impl Game {
             .map(|(area, tributes)| (*area, tributes.len() as u32))
             .collect();
 
-        let combat_tuning_snapshot = self.combat_tuning.clone();
+        CycleContext {
+            is_day: day,
+            current_day: self.day.unwrap_or(1),
+            action_suggestion,
+            area_details_map,
+            tributes_by_area,
+            enemy_density,
+            combat_tuning_snapshot: self.combat_tuning.clone(),
+            all_areas_snapshot: self.areas.clone(),
+            closed_areas,
+            living_tributes_count,
+        }
+    }
 
-        // Collected (actor_identifier, actor_name, content, payload, optional GameEvent)
-        // tuples from all tributes this cycle. Drained into `self.messages` after
-        // the mutable borrow of `self.tributes` ends.
-        //
-        // `payload` (Some) carries the typed `MessagePayload` produced by tribute
-        // action sites that have been migrated to emit `TaggedEvent`. Sites
-        // still using the legacy stringly path carry `None` and synthesise a
-        // fallback payload in the drain.
-        type CollectedEvent = (
-            String,
-            String,
-            String,
-            Option<crate::messages::MessagePayload>,
-            Option<crate::events::GameEvent>,
-        );
+    /// Iterate over `self.tributes`, applying survival ticks, brain decisions,
+    /// and combat using the pre-built `CycleContext`. After the iteration
+    /// ends the collected per-tribute events are drained into `self.messages`
+    /// via `flush_tribute_events`, and any alliance events emitted during the
+    /// cycle are processed.
+    fn execute_cycle(&mut self, ctx: CycleContext, rng: &mut SmallRng) -> Result<(), GameError> {
+        let CycleContext {
+            is_day: day,
+            current_day,
+            action_suggestion,
+            area_details_map,
+            tributes_by_area,
+            enemy_density,
+            combat_tuning_snapshot,
+            all_areas_snapshot,
+            closed_areas,
+            living_tributes_count,
+        } = ctx;
+
         let mut collected_events: Vec<CollectedEvent> = Vec::new();
-
-        // Alliance formation now happens during each tribute's own turn via
-        // `Action::ProposeAlliance` (see `Brain::wants_to_propose_alliance`
-        // and the `Action::ProposeAlliance` arm in `Tribute::do_action`).
-        // Successful proposals enqueue `AllianceEvent::FormationRecorded`,
-        // which is applied symmetrically by `process_alliance_events` after
-        // the cycle.
         let mut drained_alliance_events: Vec<crate::tributes::alliances::AllianceEvent> =
             Vec::new();
 
-        // Process tributes
         for tribute in self.tributes.iter_mut() {
             if !tribute.is_alive() {
                 // Newly-dead tributes (status=RecentlyDead going into this
@@ -1205,11 +1265,6 @@ impl Game {
                 })
                 .collect();
 
-            // Snapshot all areas before taking the mutable borrow on this
-            // tribute's area. The snapshot feeds multi-hop pathfinding which
-            // needs to reason about the full topology, not just neighbors.
-            let all_areas_snapshot: Vec<crate::areas::AreaDetails> = self.areas.clone();
-
             let area_details = &mut self.areas[area_index];
 
             let mut environment_details = EnvironmentContext {
@@ -1219,7 +1274,7 @@ impl Game {
                 available_destinations,
                 all_areas: &all_areas_snapshot,
                 enemy_density: &enemy_density,
-                current_day: self.day.unwrap_or(1),
+                current_day,
                 combat_tuning: &combat_tuning_snapshot,
             };
 
@@ -1236,7 +1291,7 @@ impl Game {
             let targets: Vec<Tribute> = nearby_tributes
                 .iter()
                 .filter(|t| t.is_visible() && t.identifier != tribute.identifier)
-                .map(|&t| t.clone())
+                .cloned()
                 .collect();
 
             let encounter_context = EncounterContext {
@@ -1265,13 +1320,25 @@ impl Game {
             drained_alliance_events.append(&mut tribute.drain_alliance_events());
         }
 
-        // Drain collected events into game messages now that the mutable borrow ends.
-        // Each contiguous run of events sharing the same `identifier` is one
-        // tribute action and gets a single fresh tick from `self.tick_counter`.
-        // Per-event `emit_index` (advanced inside `push_message`) preserves
-        // intra-tribute ordering. Sites carrying a typed `MessagePayload`
-        // (alliance formation today, more after future migrations) push that
-        // payload directly; legacy stringly sites synthesise a fallback.
+        self.flush_tribute_events(collected_events);
+
+        // Promote drained alliance events into the game queue and process them
+        // so betrayal/death cascades take effect before the next cycle.
+        if !drained_alliance_events.is_empty() {
+            self.alliance_events.append(&mut drained_alliance_events);
+            self.process_alliance_events(rng);
+        }
+        Ok(())
+    }
+
+    /// Drain collected per-tribute events into `self.messages`.
+    ///
+    /// Each contiguous run of events sharing the same `identifier` is one
+    /// tribute action and gets a single fresh tick from `self.tick_counter`.
+    /// Per-event `emit_index` (advanced inside `push_message`) preserves
+    /// intra-tribute ordering. Sites carrying a typed `MessagePayload` push
+    /// that payload directly; legacy stringly sites synthesise a fallback.
+    fn flush_tribute_events(&mut self, collected_events: Vec<CollectedEvent>) {
         let mut last_identifier: Option<String> = None;
         let mut current_tick: u32 = self.tick_counter.boundary();
         for (identifier, _name, content, payload, _event) in collected_events {
@@ -1283,14 +1350,25 @@ impl Game {
             let payload = payload.unwrap_or_else(|| Self::fallback_payload(&source));
             self.push_message(source, identifier, content, payload, current_tick);
         }
+    }
 
-        // Promote drained alliance events into the game queue and process them
-        // so betrayal/death cascades take effect before the next cycle.
-        if !drained_alliance_events.is_empty() {
-            self.alliance_events.append(&mut drained_alliance_events);
-            self.process_alliance_events(rng);
-        }
-        Ok(())
+    /// Runs the tributes' logic for the current cycle.
+    ///
+    /// Thin wrapper that builds the immutable `CycleContext` from `&self`
+    /// then runs `execute_cycle` with `&mut self`. The split makes the
+    /// "snapshot" and "mutate" halves separately testable and gives
+    /// gamemaker overrides a typed seam to inject suggestions.
+    fn run_tribute_cycle(
+        &mut self,
+        day: bool,
+        rng: &mut SmallRng,
+        closed_areas: Vec<Area>,
+        living_tributes: Vec<Tribute>,
+        living_tributes_count: usize,
+    ) -> Result<(), GameError> {
+        let ctx =
+            self.build_cycle_context(day, closed_areas, living_tributes, living_tributes_count);
+        self.execute_cycle(ctx, rng)
     }
 
     /// Runs a cycle of the game, either day or night.

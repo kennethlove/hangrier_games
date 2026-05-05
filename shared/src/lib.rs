@@ -6,10 +6,14 @@ use validator::{Validate, ValidationError};
 pub mod combat_beat;
 pub mod messages;
 
-use crate::combat_beat::CombatBeat;
-use crate::messages::TributeRef;
+use crate::messages::{GameMessage, TributeRef};
 
-/// WebSocket message protocol for real-time game updates
+/// WebSocket message protocol for real-time game updates.
+///
+/// `GameEvent` carries a fully-typed [`GameMessage`] (the same shape the
+/// REST timeline endpoints serve), so consumers can dispatch on
+/// `message.payload` ([`crate::messages::MessagePayload`]) instead of
+/// parsing a separate, lossy event hierarchy.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum WebSocketMessage {
@@ -17,40 +21,13 @@ pub enum WebSocketMessage {
     Subscribe { game_id: String },
     /// Client unsubscribes from game updates
     Unsubscribe { game_id: String },
-    /// Server sends game event to subscribed clients
-    GameEvent { game_id: String, event: GameEvent },
+    /// Server sends a game message to subscribed clients.
+    GameEvent {
+        game_id: String,
+        message: Box<GameMessage>,
+    },
     /// Server sends error message
     Error { message: String },
-}
-
-/// Real-time game events broadcast to WebSocket clients
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[serde(tag = "event_type")]
-pub enum GameEvent {
-    /// Game has started
-    GameStarted { day: u32 },
-    /// Game has finished
-    GameFinished { winner: Option<String> },
-    /// New day has started
-    DayStarted { day: u32 },
-    /// Night phase has started
-    NightStarted { day: u32 },
-    /// Tribute died
-    TributeDied {
-        tribute_id: String,
-        name: String,
-        cause: String,
-    },
-    /// Area event occurred
-    AreaEvent { area: String, event: String },
-    /// Combat swing occurred
-    Combat { beat: Box<CombatBeat> },
-    /// Generic message (tribute action, announcement, etc.)
-    Message {
-        source: String,
-        content: String,
-        game_day: u32,
-    },
 }
 
 /// Item quantity preset for game customization.

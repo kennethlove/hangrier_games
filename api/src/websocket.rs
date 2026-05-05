@@ -6,7 +6,8 @@ use axum::{
     response::Response,
 };
 use futures::{sink::SinkExt, stream::StreamExt};
-use shared::{GameEvent, WebSocketMessage};
+use shared::WebSocketMessage;
+use shared::messages::{GameMessage, MessagePayload, MessageSource, Phase, TributeRef};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tracing::{debug, error, info, warn};
@@ -132,56 +133,67 @@ async fn handle_socket(socket: WebSocket, broadcaster: Arc<GameBroadcaster>) {
     info!("WebSocket client disconnected");
 }
 
-/// Convert game message to broadcast event
-pub fn broadcast_game_message(
-    broadcaster: &GameBroadcaster,
-    game_id: &str,
-    source: &str,
-    content: &str,
-    game_day: u32,
-) {
+/// Broadcast a typed [`GameMessage`] (drained from `Game::messages`) to
+/// subscribed websocket clients. The message rides as-is so frontends can
+/// dispatch on `MessagePayload` directly without parsing a parallel event
+/// hierarchy.
+pub fn broadcast_game_message(broadcaster: &GameBroadcaster, game_id: &str, message: GameMessage) {
     broadcaster.broadcast(WebSocketMessage::GameEvent {
         game_id: game_id.to_string(),
-        event: GameEvent::Message {
-            source: source.to_string(),
-            content: content.to_string(),
-            game_day,
-        },
+        message: Box::new(message),
     });
 }
 
-/// Broadcast game started event
+/// Synthesize and broadcast a lifecycle [`MessagePayload::CycleStart`] for a
+/// game whose status just transitioned to `InProgress` but where the engine
+/// has not yet run a cycle (so it has not had a chance to emit a
+/// `CycleStart` itself).
 pub fn broadcast_game_started(broadcaster: &GameBroadcaster, game_id: &str, day: u32) {
-    broadcaster.broadcast(WebSocketMessage::GameEvent {
-        game_id: game_id.to_string(),
-        event: GameEvent::GameStarted { day },
-    });
+    let payload = MessagePayload::CycleStart {
+        day,
+        phase: Phase::Day,
+    };
+    let msg = GameMessage::new(
+        MessageSource::Game(game_id.to_string()),
+        day,
+        Phase::Day,
+        0,
+        0,
+        format!("game:{}", game_id),
+        format!("Day {} dawns over the arena.", day),
+        payload,
+    );
+    broadcast_game_message(broadcaster, game_id, msg);
 }
 
-/// Broadcast day started event
-pub fn broadcast_day_started(broadcaster: &GameBroadcaster, game_id: &str, day: u32) {
-    broadcaster.broadcast(WebSocketMessage::GameEvent {
-        game_id: game_id.to_string(),
-        event: GameEvent::DayStarted { day },
-    });
-}
-
-/// Broadcast night started event
-pub fn broadcast_night_started(broadcaster: &GameBroadcaster, game_id: &str, day: u32) {
-    broadcaster.broadcast(WebSocketMessage::GameEvent {
-        game_id: game_id.to_string(),
-        event: GameEvent::NightStarted { day },
-    });
-}
-
-/// Broadcast game finished event
+/// Synthesize and broadcast a lifecycle [`MessagePayload::GameEnded`] for a
+/// game that finished without an additional cycle being run (e.g. the
+/// 24-deaths-already early-finish path in `next_step`).
 pub fn broadcast_game_finished(
     broadcaster: &GameBroadcaster,
     game_id: &str,
     winner: Option<String>,
 ) {
-    broadcaster.broadcast(WebSocketMessage::GameEvent {
-        game_id: game_id.to_string(),
-        event: GameEvent::GameFinished { winner },
+    let winner_ref = winner.map(|name| TributeRef {
+        identifier: String::new(),
+        name,
     });
+    let payload = MessagePayload::GameEnded {
+        winner: winner_ref.clone(),
+    };
+    let content = match &winner_ref {
+        Some(w) => format!("{} has won the game!", w.name),
+        None => "The game has ended with no survivors.".to_string(),
+    };
+    let msg = GameMessage::new(
+        MessageSource::Game(game_id.to_string()),
+        0,
+        Phase::Day,
+        0,
+        0,
+        format!("game:{}", game_id),
+        content,
+        payload,
+    );
+    broadcast_game_message(broadcaster, game_id, msg);
 }

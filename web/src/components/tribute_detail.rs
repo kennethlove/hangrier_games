@@ -131,17 +131,7 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                     class: "flex flex-row gap-4 mb-4 place-items-center place-content-between",
                     h2 {
                         class: r#"
-                        theme1:text-2xl
-                        theme1:font-[Cinzel]
-                        theme1:text-amber-300
 
-                        theme2:font-[Playfair_Display]
-                        theme2:text-3xl
-                        theme2:text-green-200
-
-                        theme3:font-[Orbitron]
-                        theme3:text-2xl
-                        theme3:text-stone-700
                         "#,
 
                         "{tribute.name}"
@@ -156,14 +146,7 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                             UTurnIcon {
                                 class: r#"
                                 size-5
-                                theme1:fill-amber-500
-                                theme1:hover:fill-amber-200
 
-                                theme2:fill-green-200/50
-                                theme2:hover:fill-green-200
-
-                                theme3:fill-amber-600/50
-                                theme3:hover:fill-amber-600
                                 "#,
                             }
                         }
@@ -183,8 +166,6 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                     lg:gap-8
                     xl:grid-cols-4
 
-                    theme1:text-stone-200
-                    theme2:text-green-200
                     "#,
 
                     InfoDetail {
@@ -207,8 +188,7 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                                     status: tribute.status.clone(),
                                     css_class: r#"
                                     size-5
-                                    theme1:fill-stone-200
-                                    theme2:fill-green-200
+
                                     "#
                                 }
                                 span {
@@ -238,8 +218,7 @@ pub fn TributeDetail(game_identifier: String, tribute_identifier: String) -> Ele
                                         item: item.clone(),
                                         css_class: r#"
                                         size-8
-                                        theme1:fill-amber-500
-                                        theme2:fill-green-200
+
                                         "#,
                                     }
                                     span {
@@ -322,7 +301,7 @@ fn TributeLog(game_identifier: String, identifier: String) -> Element {
         QueryStateData::Settled { res: Ok(logs), .. } => {
             rsx! {
                 ul {
-                    class: "theme1:text-stone-200 theme2:text-green-200 theme3:text-stone-800",
+                    class: "  ",
                     for log in logs {
                         li {
                             p {
@@ -389,10 +368,10 @@ fn TributeStaminaRow(current: u32, max: u32) -> Element {
         StaminaBand::Exhausted
     };
     let (color_cls, label) = match band {
-        StaminaBand::Fresh => ("text-emerald-600 theme2:text-emerald-300", "Fresh"),
-        StaminaBand::Winded => ("text-amber-700 theme2:text-amber-300", "Winded"),
+        StaminaBand::Fresh => ("text-emerald-600 ", "Fresh"),
+        StaminaBand::Winded => ("text-amber-700 ", "Winded"),
         StaminaBand::Exhausted => (
-            "text-red-600 theme2:text-red-400 font-semibold",
+            "text-red-600  font-semibold",
             "Exhausted",
         ),
     };
@@ -479,7 +458,7 @@ fn TributeAllies(game_identifier: String, ally_ids: Vec<uuid::Uuid>) -> Element 
                                         rsx! {
                                             TributeStatusIcon {
                                                 status: t.status.clone(),
-                                                css_class: "size-4 theme1:fill-amber-500 theme2:fill-green-200".to_string(),
+                                                css_class: "size-4  ".to_string(),
                                             }
                                             Link {
                                                 class: "{link_class}",

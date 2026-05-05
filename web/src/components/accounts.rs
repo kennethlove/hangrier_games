@@ -119,14 +119,7 @@ pub fn AccountsPage() -> Element {
                 RegisterForm {}
             }
             p {
-                class: r#"
-                text-sm
-                text-center
-                theme1:text-amber-200
-                theme2:text-green-200
-                theme3:text-stone-200
-                "#,
-
+                class: "text-sm text-center text-text-muted",
                 "Your username and password are stored in a secure database. We do not share your data with third parties."
             }
         }
@@ -150,16 +143,7 @@ fn LoginForm() -> Element {
         div {
             class: "flex flex-col gap-4",
             h2 {
-                class: r#"
-                text-xl
-                theme1:font-[Cinzel]
-                theme1:text-amber-500
-                theme2:font-[Playfair_Display]
-                theme2:text-green-300
-                theme2:font-bold
-                theme2:tracking-wide
-                "#,
-
+                class: "font-display text-2xl tracking-wide text-text",
                 "Login"
             }
             form {
@@ -216,12 +200,7 @@ fn LoginForm() -> Element {
                 },
                 if !username_error_signal.read().is_empty() {
                     div {
-                        class: r#"
-                        text-sm
-                        theme1:text-orange-300
-                        theme2:text-teal-300
-                        theme3:text-amber-400
-                        "#,
+                        class: "text-sm text-danger",
                         "{username_error_signal.read()}"
                     }
                 }
@@ -235,12 +214,7 @@ fn LoginForm() -> Element {
                 }
                 if !password_error_signal.read().is_empty() {
                     div {
-                        class: r#"
-                        text-sm
-                        theme1:text-orange-300
-                        theme2:text-teal-300
-                        theme3:text-amber-400
-                        "#,
+                        class: "text-sm text-danger",
                         "{password_error_signal.read()}"
                     }
                 }
@@ -282,18 +256,7 @@ fn RegisterForm() -> Element {
         div {
             class: "flex flex-col gap-4",
             h2 {
-                class: r#"
-                text-xl
-                theme1:font-[Cinzel]
-                theme1:text-amber-500
-                theme2:font-[Playfair_Display]
-                theme2:text-green-300
-                theme2:font-bold
-                theme2:tracking-wide
-                theme3:font-[Orbitron]
-                theme3:text-stone-700
-                "#,
-
+                class: "font-display text-2xl tracking-wide text-text",
                 "Register"
             }
             form {
@@ -385,12 +348,7 @@ fn RegisterForm() -> Element {
                 },
                 if !username_error_signal.read().is_empty() {
                     div {
-                        class: r#"
-                        text-sm
-                        theme1:text-orange-300
-                        theme2:text-teal-300
-                        theme3:text-amber-400
-                        "#,
+                        class: "text-sm text-danger",
                         "{username_error_signal.read()}"
                     }
                 }
@@ -404,12 +362,7 @@ fn RegisterForm() -> Element {
                 }
                 if !password_error_signal.read().is_empty() {
                     div {
-                        class: r#"
-                        text-sm
-                        theme1:text-orange-300
-                        theme2:text-teal-300
-                        theme3:text-amber-400
-                        "#,
+                        class: "text-sm text-danger",
                         "{password_error_signal.read()}"
                     }
                 }
@@ -471,16 +424,7 @@ fn LogoutButton() -> Element {
                 navigator.replace(Routes::Home {});
             },
             p {
-                class: r#"
-                text-xl
-                text-center
-                theme1:text-amber-500
-                theme1:font-[Cinzel]
-                theme2:text-green-300
-                theme2:font-[Playfair_Display]
-                theme3:text-stone-700
-                theme3:font-[Orbitron]
-                "#,
+                class: "font-display text-2xl text-center tracking-wide text-text",
                 "Thanks for playing, {username}!"
             }
             ThemedButton {

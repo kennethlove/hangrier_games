@@ -48,7 +48,7 @@ impl QueryCapability for GamesListQ {
 fn NoGames() -> Element {
     rsx! {
         p {
-            class: "pb-4 text-center theme1:text-stone-200 theme2:text-green-200 theme3:text-stone-700",
+            class: "pb-4 text-center text-text-muted",
             "No games yet"
         }
     }
@@ -73,11 +73,7 @@ pub fn GamesList() -> Element {
                     NoGames {}
                 } else {
                     ul {
-                        class: r#"
-                        xl:grid
-                        xl:grid-cols-2
-                        xl:gap-4
-                        "#,
+                        class: "xl:grid xl:grid-cols-2 xl:gap-4",
                         for game in games {
                             GameListMember { game: game.clone() }
                         }
@@ -96,7 +92,7 @@ pub fn GamesList() -> Element {
             }
         }
         QueryStateData::Loading { .. } | QueryStateData::Pending => rsx! { p {
-            class: "pb-4 text-center theme1:text-stone-200 theme2:text-green-200 theme3:text-stone-700",
+            class: "pb-4 text-center text-text-muted",
             "Loading..."
         } },
         QueryStateData::Settled {
@@ -107,7 +103,7 @@ pub fn GamesList() -> Element {
             res: Err(QueryError::BadJson),
             ..
         } => rsx! { p {
-            class: "pb-4 text-center theme1:text-stone-200 theme2:text-green-200 theme3:text-stone-700",
+            class: "pb-4 text-center text-text-muted",
             "Bad JSON response"
         } },
         QueryStateData::Settled { res: Err(_), .. } => rsx! { p { "Something went wrong" } },
@@ -115,19 +111,7 @@ pub fn GamesList() -> Element {
 
     rsx! {
         div {
-            class: r#"
-            flex
-            flex-col
-            flex-col-reverse
-            sm:flex-row
-            flex-wrap
-            sm:flex-nowrap
-            gap-2
-            place-content-center
-            py-2
-            mb-4
-            theme1:bg-transparent
-            "#,
+            class: "flex flex-col flex-col-reverse sm:flex-row flex-wrap sm:flex-nowrap gap-2 place-content-center py-2 mb-4",
             CreateGameButton {}
             CreateGameForm {}
         }
@@ -171,45 +155,11 @@ pub fn GameListMember(game: ListDisplayGame) -> Element {
 
     rsx! {
         li {
-            class: r#"
-            block
-            w-full
-            border
-            p-2
-            mb-4
-            xl:mb-0
-            transition
-
-            theme1:border-stone-950
-            theme1:bg-stone-800/65
-            theme1:hover:bg-stone-800/75
-            theme1:rounded-sm
-
-            theme2:border-none
-            theme2:bg-green-900
-            theme2:rounded-md
-
-            theme3:border-3
-            theme3:border-gold-rich
-            theme3:bg-stone-50/75
-            "#,
+            class: "block w-full border border-border bg-surface rounded-card p-4 mb-4 xl:mb-0 transition hover:bg-surface-2",
             div {
                 class: "flex place-content-between",
                 h2 {
-                    class: r#"
-                    text-xl
-                    theme1:font-[Cinzel]
-                    theme1:text-amber-300
-                    theme1:hover:underline
-
-                    theme2:text-green-200
-                    theme2:hover:underline
-                    theme2:hover:decoration-wavy
-                    theme2:hover:decoration-2
-                    theme2:mb-2
-
-                    theme3:text-yellow-600
-                    "#,
+                    class: "font-display text-2xl tracking-wide text-text hover:text-primary",
                     Link {
                         to: Routes::GamePage {
                             identifier: game.identifier.clone()
@@ -225,59 +175,26 @@ pub fn GameListMember(game: ListDisplayGame) -> Element {
                             identifier: game.identifier.clone(),
                             name: game.name.clone(),
                             private: game.private,
-                            icon_class: r#"
-                            size-4
-                            theme1:fill-amber-600
-                            theme1:hover:fill-amber-500
-
-                            theme2:fill-green-200/50
-                            theme2:hover:fill-green-200
-
-                            theme3:fill-yellow-600
-                            theme3:hover:fill-amber-500
-                            "#,
+                            icon_class: "size-4 fill-text-muted hover:fill-primary",
                         }
                         GameDelete {
                             game_name: game.name.clone(),
                             game_identifier: game.identifier.clone(),
-                            icon_class: r#"
-                            size-4
-                            theme1:fill-amber-600
-                            theme1:hover:fill-amber-500
-
-                            theme2:fill-green-200/50
-                            theme2:hover:fill-green-200
-
-                            theme3:fill-yellow-600
-                            theme3:hover:fill-amber-500
-                            "#,
+                            icon_class: "size-4 fill-text-muted hover:fill-danger",
                         }
                     }
                 } else {
                     div {
                         class: "flex flex-row gap-2",
                         p {
-                            class: r#"
-                            text-sm
-                            theme1:text-stone-200/75
-                            theme2:text-green-200/50
-                            theme3:text-stone-700
-                            "#,
+                            class: "text-sm text-text-muted",
                             "By {created_by.username}"
                         }
                     }
                 }
             }
             div {
-                class: r#"
-                flex
-                flex-row
-                place-content-between
-                text-xs
-                theme1:text-stone-200/75
-                theme2:text-green-200/50
-                theme3:text-stone-700
-                "#,
+                class: "flex flex-row place-content-between text-xs font-mono text-text-muted mt-2",
                 p { class: "flex-grow", "{living_count} / {game.tribute_count} tributes" }
                 p { class: "flex-grow", "Day {game.day.unwrap_or_default()}" }
                 p {
@@ -291,19 +208,9 @@ pub fn GameListMember(game: ListDisplayGame) -> Element {
                 div {
                     class: "px-2",
                     if game.private {
-                        EyeClosedIcon { class: r#"
-                            size-4
-                            theme1:fill-amber-600
-                            theme2:fill-green-200/50
-                            theme3:fill-yellow-600
-                        "# }
+                        EyeClosedIcon { class: "size-4 fill-text-muted" }
                     } else {
-                        EyeOpenIcon { class: r#"
-                            size-4
-                            theme1:fill-amber-600
-                            theme2:fill-green-200/50
-                            theme3:fill-yellow-600
-                        "# }
+                        EyeOpenIcon { class: "size-4 fill-text-muted" }
                     }
                 }
             }

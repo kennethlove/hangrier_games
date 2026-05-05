@@ -5,7 +5,6 @@ use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_edit::TributeEdit;
 use crate::components::tribute_state_strip::TributeStateStrip;
 use crate::components::tribute_status_icon::TributeStatusIcon;
-use crate::env::APP_API_HOST;
 use crate::http::WithCredentials;
 use crate::routes::Routes;
 use dioxus::prelude::*;
@@ -34,10 +33,10 @@ impl QueryCapability for GameTributesQ {
         let request = client
             .request(
                 reqwest::Method::GET,
-                format!(
-                    "{}/api/games/{}/tributes?limit=24&offset=0",
-                    APP_API_HOST, game_identifier
-                ),
+                crate::api_url::api_url(&format!(
+                    "/api/games/{}/tributes?limit=24&offset=0",
+                    game_identifier
+                )),
             )
             .with_credentials();
         match request.send().await {

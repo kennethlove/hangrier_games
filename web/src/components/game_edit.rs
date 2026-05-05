@@ -4,7 +4,6 @@ use crate::components::games_list::GamesListQ;
 use crate::components::icons::edit::EditIcon;
 use crate::components::modal::{Modal, Props as ModalProps};
 use crate::components::{Button, Input};
-use crate::env::APP_API_HOST;
 use crate::http::WithCredentials;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
@@ -21,7 +20,7 @@ impl MutationCapability for EditGameM {
     async fn run(&self, args: &EditGame) -> Result<String, MutationError> {
         let identifier = args.identifier.clone();
         let client = reqwest::Client::new();
-        let url: String = format!("{}/api/games/{}", APP_API_HOST, identifier);
+        let url: String = crate::api_url::api_url(&format!("/api/games/{}", identifier));
         let response = client
             .put(url)
             .with_credentials()

@@ -3,7 +3,6 @@ use crate::components::icons::lock_closed::LockClosedIcon;
 use crate::components::icons::lock_open::LockOpenIcon;
 use crate::components::item_icon::ItemIcon;
 use crate::components::map::Map;
-use crate::env::APP_API_HOST;
 use crate::http::WithCredentials;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
@@ -23,7 +22,7 @@ impl QueryCapability for GameAreasQ {
         let request = client
             .request(
                 reqwest::Method::GET,
-                format!("{}/api/games/{}/areas", APP_API_HOST, identifier),
+                crate::api_url::api_url(&format!("/api/games/{}/areas", identifier)),
             )
             .with_credentials();
         match request.send().await {

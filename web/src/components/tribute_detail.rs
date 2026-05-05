@@ -5,7 +5,6 @@ use crate::components::info_detail::InfoDetail;
 use crate::components::item_icon::ItemIcon;
 use crate::components::tribute_status_icon::TributeStatusIcon;
 use crate::components::tribute_survival_section::TributeSurvivalSection;
-use crate::env::APP_API_HOST;
 use crate::http::WithCredentials;
 use crate::routes::Routes;
 use dioxus::prelude::*;
@@ -29,10 +28,10 @@ impl QueryCapability for TributeQ {
         let request = client
             .request(
                 reqwest::Method::GET,
-                format!(
-                    "{}/api/games/{}/tributes/{}",
-                    APP_API_HOST, game_identifier, tribute_identifier
-                ),
+                crate::api_url::api_url(&format!(
+                    "/api/games/{}/tributes/{}",
+                    game_identifier, tribute_identifier
+                )),
             )
             .with_credentials();
         match request.send().await {
@@ -65,10 +64,10 @@ impl QueryCapability for TributeLogQ {
         let request = client
             .request(
                 reqwest::Method::GET,
-                format!(
-                    "{}/api/games/{}/tributes/{}/log",
-                    APP_API_HOST, game_identifier, identifier
-                ),
+                crate::api_url::api_url(&format!(
+                    "/api/games/{}/tributes/{}/log",
+                    game_identifier, identifier
+                )),
             )
             .with_credentials();
         match request.send().await {

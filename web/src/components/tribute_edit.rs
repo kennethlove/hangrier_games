@@ -4,7 +4,6 @@ use crate::components::icons::edit::EditIcon;
 use crate::components::modal::{Modal, Props as ModalProps};
 use crate::components::tribute_detail::TributeQ;
 use crate::components::{Button, Input};
-use crate::env::APP_API_HOST;
 use crate::http::WithCredentials;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
@@ -23,10 +22,10 @@ impl MutationCapability for EditTributeM {
         let identifier = tribute.identifier.clone();
         let game_identifier = args.1.clone();
         let client = reqwest::Client::new();
-        let url: String = format!(
-            "{}/api/games/{}/tributes/{}",
-            APP_API_HOST, game_identifier, identifier
-        );
+        let url: String = crate::api_url::api_url(&format!(
+            "/api/games/{}/tributes/{}",
+            game_identifier, identifier
+        ));
         let response = client
             .put(url)
             .with_credentials()
@@ -174,10 +173,10 @@ pub fn EditTributeForm() -> Element {
                 let file_data = bytes.to_vec();
 
                 let client = reqwest::Client::new();
-                let url = format!(
-                    "{}/api/games/{}/tributes/{}/avatar",
-                    APP_API_HOST, game_id, tribute_id
-                );
+                let url = crate::api_url::api_url(&format!(
+                    "/api/games/{}/tributes/{}/avatar",
+                    game_id, tribute_id
+                ));
 
                 let part = reqwest::multipart::Part::bytes(file_data).file_name(file_name.clone());
 

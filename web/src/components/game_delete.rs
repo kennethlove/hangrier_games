@@ -2,7 +2,6 @@ use crate::cache::MutationError;
 use crate::components::Button;
 use crate::components::games_list::GamesListQ;
 use crate::components::icons::delete::DeleteIcon;
-use crate::env::APP_API_HOST;
 use crate::http::WithCredentials;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
@@ -21,7 +20,7 @@ impl MutationCapability for DeleteGameM {
         let identifier = args.0.clone();
         let name = args.1.clone();
         let client = reqwest::Client::new();
-        let url: String = format!("{}/api/games/{}", APP_API_HOST, identifier);
+        let url: String = crate::api_url::api_url(&format!("/api/games/{}", identifier));
         let response = client.delete(url).with_credentials().send().await;
         match response {
             Ok(r) if r.status().is_success() => Ok((identifier, name)),

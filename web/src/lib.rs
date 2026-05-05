@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+pub mod api_url;
 mod cache;
 pub mod components;
 pub(crate) mod env;

@@ -1,7 +1,6 @@
 use crate::cache::QueryError;
 use crate::components::icons::uturn::UTurnIcon;
 use crate::components::item_icon::ItemIcon;
-use crate::env::APP_API_HOST;
 use crate::http::WithCredentials;
 use crate::routes::Routes;
 use dioxus::prelude::*;
@@ -22,10 +21,10 @@ impl QueryCapability for ItemDetailQ {
         let request = client
             .request(
                 reqwest::Method::GET,
-                format!(
-                    "{}/api/games/{}/items/{}",
-                    APP_API_HOST, game_identifier, item_identifier
-                ),
+                crate::api_url::api_url(&format!(
+                    "/api/games/{}/items/{}",
+                    game_identifier, item_identifier
+                )),
             )
             .with_credentials();
         match request.send().await {

@@ -1,6 +1,5 @@
 use crate::cache::MutationError;
 use crate::components::game_tributes::GameTributesQ;
-use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use game::games::GAME;
@@ -18,10 +17,10 @@ impl MutationCapability for DeleteTributeM {
     async fn run(&self, name: &String) -> Result<String, MutationError> {
         let game_name = GAME.with_borrow(|g| g.name.clone());
         let client = reqwest::Client::new();
-        let url: String = format!(
-            "{}/api/games/{}/tributes/{}",
-            APP_API_HOST, game_name, name
-        );
+        let url: String = crate::api_url::api_url(&format!(
+            "/api/games/{}/tributes/{}",
+            game_name, name
+        ));
         let response = client.delete(url).send().await;
         match response {
             Ok(r) if r.status().is_success() => Ok(name.clone()),

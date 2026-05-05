@@ -57,7 +57,7 @@ pub fn App() -> Element {
             crossorigin: "anonymous"
         }
         document::Link {
-            href: "https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&family=Work+Sans:ital,wght@0,100..900;1,100..900&family=Orbitron:wght@400..900&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap",
+            href: "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap",
             rel: "stylesheet"
         }
 
@@ -78,7 +78,7 @@ pub fn App() -> Element {
                 frame
                 transition
                 duration-500
-                font-[Work_Sans]
+                font-text
 
                 theme1:bg-red-900/85
 

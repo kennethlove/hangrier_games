@@ -1,7 +1,8 @@
 use crate::components::timeline::cards::{
     alliance_card::AllianceCard, combat_card::CombatCard, combat_swing_card::CombatSwingCard,
     cycle_card::CycleCard, death_card::DeathCard, item_card::ItemCard, movement_card::MovementCard,
-    stamina_card::StaminaCard, state_card::StateCard, survival_card::SurvivalCard,
+    sleep_card::SleepCard, stamina_card::StaminaCard, state_card::StateCard,
+    survival_card::SurvivalCard, wake_card::WakeCard,
 };
 use dioxus::prelude::*;
 use shared::messages::{GameMessage, MessageKind, MessagePayload};
@@ -61,6 +62,8 @@ pub fn EventCard(props: EventCardProps) -> Element {
                 MessagePayload::CycleStart { .. }
                 | MessagePayload::CycleEnd { .. }
                 | MessagePayload::GameEnded { .. } => rsx! { CycleCard { message: props.message.clone() } },
+                MessagePayload::TributeSlept { .. } => rsx! { SleepCard { message: props.message.clone() } },
+                MessagePayload::TributeWoke { .. } => rsx! { WakeCard { message: props.message.clone() } },
                 _ => rsx! { StateCard { message: props.message.clone() } },
             },
             MessageKind::CombatSwing => {

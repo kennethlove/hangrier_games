@@ -1,6 +1,5 @@
 use crate::cache::MutationError;
 use crate::components::{Input, ThemedButton};
-use crate::env::APP_API_HOST;
 use crate::http::WithCredentials;
 use crate::routes::Routes;
 use crate::storage::{AppState, use_persistent};
@@ -25,7 +24,7 @@ impl MutationCapability for RegisterUserM {
         });
 
         match client
-            .post(format!("{}/api/users", APP_API_HOST))
+            .post(crate::api_url::api_url("/api/users"))
             .with_credentials()
             .json(&json_body)
             .send()
@@ -72,7 +71,7 @@ impl MutationCapability for LoginUserM {
         });
 
         match client
-            .post(format!("{}/api/users/authenticate", APP_API_HOST))
+            .post(crate::api_url::api_url("/api/users/authenticate"))
             .with_credentials()
             .json(&json_body)
             .send()
@@ -415,7 +414,7 @@ fn LogoutButton() -> Element {
 
                 spawn(async move {
                     let _ = reqwest::Client::new()
-                        .post(format!("{}/api/auth/logout", APP_API_HOST))
+                        .post(crate::api_url::api_url("/api/auth/logout"))
                         .with_credentials()
                         .send()
                         .await;

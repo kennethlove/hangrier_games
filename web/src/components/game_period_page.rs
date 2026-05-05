@@ -8,7 +8,6 @@ use crate::cache::QueryError;
 use crate::components::TributeFilterChips;
 use crate::components::filter_chips::FilterChips;
 use crate::components::timeline::{FilterMode, PeriodFilters, Timeline};
-use crate::env::APP_API_HOST;
 use crate::hooks::use_timeline_summary::use_timeline_summary;
 use crate::http::WithCredentials;
 use crate::routes::Routes;
@@ -27,7 +26,7 @@ impl QueryCapability for DayLogQ {
 
     async fn run(&self, keys: &(String, u32)) -> Result<Vec<GameMessage>, QueryError> {
         let (id, day) = keys;
-        let url = format!("{APP_API_HOST}/api/games/{id}/log/{day}");
+        let url = crate::api_url::api_url(&format!("/api/games/{id}/log/{day}"));
         let resp = reqwest::Client::new()
             .get(&url)
             .with_credentials()

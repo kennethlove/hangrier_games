@@ -36,3 +36,13 @@ script = []
 # Javascript code file
 # serve: [dev-server] only
 script = []
+
+# Proxy /api and /ws to the API server so the dev frontend is same-origin
+# with the backend. Keeps HttpOnly auth cookies out of third-party-cookie
+# territory (Chrome silently drops Set-Cookie on cross-origin responses with
+# 3p cookies blocked, which is the default). See bd-jgxd.
+[[web.proxy]]
+backend = "http://127.0.0.1:3000/api/"
+
+[[web.proxy]]
+backend = "http://127.0.0.1:3000/ws"

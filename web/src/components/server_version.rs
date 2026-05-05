@@ -1,4 +1,3 @@
-use crate::env::APP_API_HOST;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 
@@ -12,7 +11,10 @@ impl QueryCapability for ServerVersionQ {
 
     async fn run(&self, _keys: &()) -> Result<String, ()> {
         let client = reqwest::Client::new();
-        let request = client.request(reqwest::Method::GET, APP_API_HOST.to_string());
+        let request = client.request(
+            reqwest::Method::GET,
+            crate::api_url::api_url("/api/version"),
+        );
         match request.send().await {
             Ok(response) => match response.json::<String>().await {
                 Ok(version) => Ok(version),

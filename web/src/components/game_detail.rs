@@ -9,7 +9,6 @@ use crate::components::info_detail::InfoDetail;
 use crate::components::period_grid::PeriodGrid;
 use crate::components::recap_card::RecapCard;
 use crate::components::timeline::PeriodFilters;
-use crate::env::APP_API_HOST;
 use crate::hooks::use_timeline_summary::use_timeline_summary;
 use crate::hooks::{ConnectionState, use_game_websocket};
 use crate::http::WithCredentials;
@@ -33,7 +32,7 @@ impl QueryCapability for DisplayGameQ {
         let request = client
             .request(
                 reqwest::Method::GET,
-                format!("{}/api/games/{}/display", APP_API_HOST, identifier),
+                crate::api_url::api_url(&format!("/api/games/{}/display", identifier)),
             )
             .with_credentials();
         match request.send().await {
@@ -89,7 +88,7 @@ impl MutationCapability for NextStepM {
     async fn run(&self, args: &String) -> Result<NextStepResult, MutationError> {
         let identifier = args.clone();
         let client = reqwest::Client::new();
-        let url: String = format!("{}/api/games/{}/next", APP_API_HOST, identifier);
+        let url: String = crate::api_url::api_url(&format!("/api/games/{}/next", identifier));
         let request = client.request(reqwest::Method::PUT, url).with_credentials();
         match request.send().await {
             Ok(response) => match response.status() {

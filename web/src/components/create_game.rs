@@ -2,7 +2,6 @@ use crate::LoadingState;
 use crate::cache::MutationError;
 use crate::components::games_list::GamesListQ;
 use crate::components::{Input, ThemedButton};
-use crate::env::APP_API_HOST;
 use crate::http::WithCredentials;
 use crate::routes::Routes;
 use dioxus::prelude::*;
@@ -29,7 +28,7 @@ impl MutationCapability for CreateGameM {
         };
 
         let response = client
-            .request(reqwest::Method::POST, format!("{}/api/games", APP_API_HOST))
+            .request(reqwest::Method::POST, crate::api_url::api_url("/api/games"))
             .with_credentials()
             .json(&json_body);
 

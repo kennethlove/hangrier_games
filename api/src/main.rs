@@ -229,6 +229,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Cleanup scheduler initialized");
 
     let api_routes = Router::new()
+        .route(
+            "/version",
+            axum::routing::get(|| async { Json(env!("CARGO_PKG_VERSION")) }),
+        )
         .nest(
             "/games",
             GAMES_ROUTER.clone().layer(middleware::from_fn_with_state(

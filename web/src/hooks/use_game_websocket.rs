@@ -122,8 +122,16 @@ pub fn use_game_websocket(game_id: String) -> (Signal<Vec<GameMessage>>, Signal<
 }
 
 /// Convert an `http(s)://host[/path]` API host into a `ws(s)://host/ws` URL.
+///
+/// When `api_host` is empty, derive the WS endpoint from the current page
+/// origin (`window.location`). Used by the dev setup where the dx server
+/// proxies `/api` and `/ws` to the API, so the frontend issues all
+/// requests same-origin and avoids cross-origin third-party-cookie blocks.
 pub(crate) fn build_ws_url(api_host: &str, _game_id: &str) -> String {
     let base = api_host.trim_end_matches('/');
+    if base.is_empty() {
+        return same_origin_ws_url();
+    }
     let ws_base = if let Some(rest) = base.strip_prefix("https://") {
         format!("wss://{}", rest)
     } else if let Some(rest) = base.strip_prefix("http://") {
@@ -133,6 +141,24 @@ pub(crate) fn build_ws_url(api_host: &str, _game_id: &str) -> String {
         base.to_string()
     };
     format!("{}/ws", ws_base)
+}
+
+#[cfg(target_arch = "wasm32")]
+fn same_origin_ws_url() -> String {
+    let location = web_sys::window()
+        .and_then(|w| w.location().host().ok())
+        .unwrap_or_default();
+    let proto = web_sys::window()
+        .and_then(|w| w.location().protocol().ok())
+        .unwrap_or_default();
+    let scheme = if proto == "https:" { "wss" } else { "ws" };
+    format!("{scheme}://{location}/ws")
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn same_origin_ws_url() -> String {
+    // Host-target tests don't have a window; default to localhost.
+    "ws://localhost/ws".to_string()
 }
 
 #[cfg(test)]
@@ -176,5 +202,14 @@ mod tests {
     fn unknown_scheme_passthrough() {
         // No http/https prefix and no ws prefix: caller's string is taken as-is.
         assert_eq!(build_ws_url("localhost:3000", "g"), "localhost:3000/ws");
+    }
+
+    #[test]
+    fn empty_host_falls_back_to_same_origin() {
+        // Host-target build returns the test stub; the wasm path is exercised
+        // in-browser. Assert non-empty and well-formed.
+        let url = build_ws_url("", "g");
+        assert!(url.starts_with("ws"), "got {url}");
+        assert!(url.ends_with("/ws"), "got {url}");
     }
 }

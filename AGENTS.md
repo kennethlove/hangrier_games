@@ -77,13 +77,15 @@ just fmt
 Required `.env` at repo root (already exists):
 ```bash
 ENV=development
-APP_API_HOST=http://127.0.0.1:3000    # Frontend → API
+APP_API_HOST=                          # Empty in dev: relative URLs go through dx serve proxy
 SURREAL_HOST=ws://localhost:8000       # API → SurrealDB
 SURREAL_USER=root
 SURREAL_PASS=root
 ```
 
-**Frontend build.rs codegen**: Web crate reads `APP_*` env vars at build time and generates `src/env.rs`. Change requires rebuild.
+**Dev proxy**: `web/Dioxus.toml` declares `[[web.proxy]]` entries that forward `/api/*` and `/ws` from the dx dev server (`:8080`) to the API (`:3000`). This keeps frontend + backend same-origin so HttpOnly auth cookies aren't dropped as third-party. See bd-jgxd.
+
+**Frontend build.rs codegen**: Web crate reads `APP_*` env vars at build time and generates `src/env.rs`. When `APP_API_HOST` is empty, `crate::api_url::api_url()` derives the absolute URL from `window.location` at runtime (reqwest WASM requires absolute URLs).
 
 ## Critical Quirks
 

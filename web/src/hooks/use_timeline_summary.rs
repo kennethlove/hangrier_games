@@ -1,5 +1,4 @@
 use crate::cache::QueryError;
-use crate::env::APP_API_HOST;
 use crate::http::WithCredentials;
 use dioxus_query::prelude::*;
 use reqwest::StatusCode;
@@ -14,7 +13,7 @@ impl QueryCapability for TimelineSummaryQ {
     type Keys = String;
 
     async fn run(&self, id: &String) -> Result<TimelineSummary, QueryError> {
-        let url = format!("{APP_API_HOST}/api/games/{id}/timeline-summary");
+        let url = crate::api_url::api_url(&format!("/api/games/{id}/timeline-summary"));
         let resp = reqwest::Client::new()
             .get(&url)
             .with_credentials()

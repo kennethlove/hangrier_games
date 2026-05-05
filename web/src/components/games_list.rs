@@ -3,7 +3,6 @@ use crate::components::game_edit::GameEdit;
 use crate::components::icons::eye_closed::EyeClosedIcon;
 use crate::components::icons::eye_open::EyeOpenIcon;
 use crate::components::{Button, CreateGameButton, CreateGameForm, DeleteGameModal, GameDelete};
-use crate::env::APP_API_HOST;
 use crate::http::WithCredentials;
 use crate::routes::Routes;
 use dioxus::prelude::*;
@@ -30,7 +29,7 @@ impl QueryCapability for GamesListQ {
         let request = client
             .request(
                 reqwest::Method::GET,
-                format!("{}/api/games?limit=20&offset=0", APP_API_HOST),
+                crate::api_url::api_url("/api/games?limit=20&offset=0"),
             )
             .with_credentials();
 

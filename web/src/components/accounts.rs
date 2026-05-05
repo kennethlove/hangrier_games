@@ -102,7 +102,32 @@ pub fn Accounts() -> Element {
 
 #[component]
 pub fn AccountsPage() -> Element {
-    let storage = use_persistent("hangry-games", AppState::default);
+    let mut storage = use_persistent("hangry-games", AppState::default);
+
+    // Self-heal stale auth: if LocalStorage thinks we're logged in but the
+    // HttpOnly `hg_session` cookie is missing/expired, the server will 401
+    // every API call and the user gets stranded on the LogoutButton view
+    // with no way back. Probe a cheap protected endpoint on mount and clear
+    // the stale username so the login form renders. See bd-7bpa.
+    use_effect(move || {
+        if storage.get().username.is_none() {
+            return;
+        }
+        spawn(async move {
+            let res = reqwest::Client::new()
+                .get(format!("{}/api/users/session", APP_API_HOST))
+                .with_credentials()
+                .send()
+                .await;
+            if let Ok(r) = res
+                && r.status() == reqwest::StatusCode::UNAUTHORIZED
+            {
+                let mut state = storage.get();
+                state.username = None;
+                storage.set(state);
+            }
+        });
+    });
 
     rsx! {
         if storage.get().username.is_some() {

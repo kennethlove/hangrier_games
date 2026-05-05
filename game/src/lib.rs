@@ -7,6 +7,7 @@ pub mod items;
 pub mod messages;
 pub mod output;
 pub mod pathfinding;
+pub mod phases;
 pub mod terrain;
 pub mod threats;
 pub mod tributes;

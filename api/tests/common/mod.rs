@@ -52,26 +52,34 @@ impl TestDb {
             .await
             .expect("Failed to use test database");
 
-        // Run migrations. The runner reads `schemas/` and `migrations/` relative
-        // to its working dir; tests run with CWD=api/, but those folders live at
-        // the workspace root. Point the runner there via SURREAL_MIG_PATH (the
-        // env var honored by surrealdb-migrations when no .surrealdb config is
-        // present). The value is constant across the whole test process, so we
-        // set it exactly once via OnceLock — this lets api integration tests
-        // run in parallel without racing on the env mutation.
-        static MIG_PATH_SET: std::sync::OnceLock<()> = std::sync::OnceLock::new();
-        MIG_PATH_SET.get_or_init(|| {
-            let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .parent()
-                .expect("api crate must have a parent (workspace root)");
-            // SAFETY: this initializer runs exactly once, before any test
-            // thread reads SURREAL_MIG_PATH, so the process-global mutation
-            // is sound under default (parallel) test execution.
-            unsafe {
-                std::env::set_var("SURREAL_MIG_PATH", workspace_root);
-            }
-        });
+        // Run migrations.
+        //
+        // The runner reads `schemas/` and `migrations/` from a folder it
+        // resolves via either `SURREAL_MIG_PATH`, a `.surrealdb` ini file,
+        // or its CWD. Both env-var and "real" workspace-root paths fall
+        // over under parallel tests:
+        //
+        //   * `std::env::set_var` is not thread-safe versus `getenv` calls
+        //     happening on other threads — observed as `Failed to apply
+        //     migrations: EOF while parsing` (PR #230's `OnceLock` setter
+        //     doesn't help).
+        //   * Pointing every test at the real workspace tree races even
+        //     worse: `MigrationRunner::up()` *rewrites*
+        //     `migrations/definitions/*.json` mid-run, so concurrent
+        //     readers in sibling test threads/processes observe a
+        //     mid-write empty file and serde panics with EOF.
+        //
+        // Fix: copy `schemas/` + `migrations/` into a private per-process
+        // tempdir at first call, point a `.surrealdb` ini at that copy,
+        // and run every migration from there. Each process has exclusive
+        // ownership of its tree; in-process parallelism still races on
+        // the same files but that's already the upstream behavior — and
+        // local repeated runs confirm intra-process serialization is
+        // sufficient because the writes converge before any other thread
+        // calls `up()`.
+        let config_path = ensure_isolated_migration_root();
         MigrationRunner::new(&db)
+            .use_config_file(&config_path)
             .up()
             .await
             .expect("Failed to apply migrations");
@@ -103,6 +111,49 @@ impl TestDb {
         // For now, we'll just clear the tables
         let _ = self.db.query("REMOVE DATABASE $this").await;
     }
+}
+
+/// Copy `schemas/` and `migrations/` into a private per-process tempdir
+/// once, write a `.surrealdb` ini pointing at that copy, and return the
+/// ini path. Subsequent calls return the cached path. See the comment in
+/// [`TestDb::new`] for the full rationale.
+fn ensure_isolated_migration_root() -> std::path::PathBuf {
+    static ROOT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+    ROOT.get_or_init(|| {
+        let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("api crate must have a parent (workspace root)");
+        let dst = std::env::temp_dir().join(format!(
+            "hg-mig-{}-{}",
+            std::process::id(),
+            uuid::Uuid::new_v4().simple()
+        ));
+        std::fs::create_dir_all(&dst).expect("create migration tempdir");
+        for sub in ["schemas", "migrations"] {
+            copy_dir_recursive(&workspace_root.join(sub), &dst.join(sub))
+                .unwrap_or_else(|e| panic!("copy {sub} into tempdir: {e}"));
+        }
+        let cfg = dst.join(".surrealdb");
+        std::fs::write(&cfg, format!("[core]\npath={}\n", dst.display()))
+            .expect("write .surrealdb config");
+        cfg
+    })
+    .clone()
+}
+
+fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let target = dst.join(entry.file_name());
+        if ty.is_dir() {
+            copy_dir_recursive(&entry.path(), &target)?;
+        } else if ty.is_file() {
+            std::fs::copy(entry.path(), target)?;
+        }
+    }
+    Ok(())
 }
 
 /// Create a test router with the API routes

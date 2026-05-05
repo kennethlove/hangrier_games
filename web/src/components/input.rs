@@ -35,23 +35,6 @@ pub fn Input(props: InputProperties) -> Element {
             py-1
             transition
 
-            theme1:border-amber-600
-            theme1:text-amber-200
-            theme1:placeholder-amber-200/50
-            theme1:bg-stone-800/65
-            theme1:hover:bg-stone-800/75
-            theme1:focus:bg-stone-800/75
-            theme1:rounded-sm
-
-            theme2:border-green-400
-            theme2:text-green-900
-            theme2:placeholder-green-900/50
-            theme2:rounded-md
-
-            theme3:bg-stone-50/50
-            theme3:border-yellow-600
-            theme3:placeholder-stone-500
-            theme3:text-stone-800
             {classes}
             "#,
         }

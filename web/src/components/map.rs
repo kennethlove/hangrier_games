@@ -89,7 +89,7 @@ pub fn Map(areas: Vec<AreaDetails>) -> Element {
                             polygon {
                                 id: "{area_id}",
                                 "data-open": "{is_open}",
-                                class: "fill-stone-200 data-[open=false]:fill-red-500 theme3:fill-stone-400 {stroke_class}",
+                                class: "fill-stone-200 data-[open=false]:fill-red-500  {stroke_class}",
                                 points: "{points}",
                                 stroke_width: if is_selected { "4" } else { "2" },
                             }

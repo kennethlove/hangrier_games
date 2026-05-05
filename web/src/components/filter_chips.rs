@@ -35,9 +35,9 @@ pub fn FilterChips(props: FilterChipsProps) -> Element {
 
     let chip_class = |active: bool| -> &'static str {
         if active {
-            "rounded-full px-3 py-1 text-sm bg-amber-500 text-amber-50 theme2:bg-green-600 theme3:bg-purple-500"
+            "rounded-full px-3 py-1 text-sm bg-amber-500 text-amber-50  "
         } else {
-            "rounded-full px-3 py-1 text-sm border border-amber-400 text-amber-700 theme2:border-green-600 theme2:text-green-300 theme3:border-purple-400 theme3:text-purple-200"
+            "rounded-full px-3 py-1 text-sm border border-amber-400 text-amber-700    "
         }
     };
 

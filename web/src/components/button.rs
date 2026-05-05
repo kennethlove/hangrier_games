@@ -48,31 +48,6 @@ pub fn ThemedButton(props: ButtonProps) -> Element {
 
     let classes = format!(
         r#"
-    theme1:bg-radial
-    theme1:from-amber-300
-    theme1:to-red-500
-    theme1:border-red-500
-    theme1:text-red-900
-    theme1:hover:text-stone-200
-    theme1:hover:from-amber-500
-    theme1:hover:to-red-700
-    theme1:rounded-sm
-
-    theme2:text-green-800
-    theme2:bg-linear-to-b
-    theme2:from-green-400
-    theme2:to-teal-500
-    theme2:border-none
-    theme2:hover:text-green-200
-    theme2:hover:from-green-500
-    theme2:hover:to-teal-600
-    theme2:rounded-md
-
-    theme3:border-none
-    theme3:bg-gold-rich
-    theme3:hover:bg-gold-rich-reverse
-    theme3:text-stone-700
-    theme3:hover:text-stone-50
 
     {extra_classes}
     "#

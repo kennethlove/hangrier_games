@@ -75,11 +75,31 @@ impl Tribute {
         target: &mut Tribute,
         rng: &mut impl Rng,
         events: &mut Vec<TaggedEvent>,
+        phase: shared::messages::Phase,
         tuning: &crate::tributes::combat_tuning::CombatTuning,
     ) -> AttackOutcome {
         // Check self-attack BEFORE deducting stamina (stamina mutation would
         // otherwise break the derived PartialEq equality check below).
         let is_self_attack = self == target;
+
+        // Sleep ambush (PR2c.2, bd-1zju). If the target is asleep we wake
+        // them with `InterruptionKind::Ambush` BEFORE damage resolution so
+        // the wake-event precedes any TributeWounded / TributeKilled
+        // emission. The ambush still lands — sleeping targets still take
+        // the swing — but at least the timeline reflects the rude awakening.
+        if !is_self_attack && target.sleeping {
+            let attacker_ref = TributeRef {
+                identifier: self.identifier.clone(),
+                name: self.name.clone(),
+            };
+            target.wake_interrupted(
+                shared::messages::InterruptionKind::Ambush {
+                    attacker: attacker_ref,
+                },
+                phase,
+                events,
+            );
+        }
 
         // Per-swing stamina cost: deduct from both combatants up-front.
         // Saturating semantics ensure neither tribute goes negative.
@@ -1016,6 +1036,7 @@ mod tests {
             &mut target,
             &mut small_rng,
             &mut Vec::new(),
+            shared::messages::Phase::Day,
             &CombatTuning::default(),
         );
         assert_eq!(outcome, AttackOutcome::Wound(attacker.clone(), target));
@@ -1032,6 +1053,7 @@ mod tests {
             &mut target,
             &mut small_rng,
             &mut Vec::new(),
+            shared::messages::Phase::Day,
             &CombatTuning::default(),
         );
         assert_eq!(outcome, AttackOutcome::Kill(attacker, target));
@@ -1050,6 +1072,7 @@ mod tests {
             &mut target,
             &mut small_rng,
             &mut Vec::new(),
+            shared::messages::Phase::Day,
             &CombatTuning::default(),
         );
         assert_eq!(
@@ -1074,6 +1097,7 @@ mod tests {
             &mut target,
             &mut small_rng,
             &mut Vec::new(),
+            shared::messages::Phase::Day,
             &CombatTuning::default(),
         );
         assert!(matches!(result, AttackOutcome::Kill(_, _)));
@@ -1094,6 +1118,7 @@ mod tests {
             &mut target,
             &mut small_rng,
             &mut Vec::new(),
+            shared::messages::Phase::Day,
             &CombatTuning::default(),
         );
         assert_eq!(result, AttackOutcome::Miss(attacker, target));
@@ -1108,7 +1133,13 @@ mod tests {
         let mut target = Tribute::new("B".to_string(), None, None);
         target.stamina = 100;
         target.max_stamina = 100;
-        let _ = attacker.attacks(&mut target, &mut small_rng, &mut Vec::new(), &tuning);
+        let _ = attacker.attacks(
+            &mut target,
+            &mut small_rng,
+            &mut Vec::new(),
+            shared::messages::Phase::Day,
+            &tuning,
+        );
         assert_eq!(attacker.stamina, 100 - tuning.stamina_cost_attacker);
         assert_eq!(target.stamina, 100 - tuning.stamina_cost_target);
     }
@@ -1122,7 +1153,13 @@ mod tests {
         let mut target = Tribute::new("B".to_string(), None, None);
         target.stamina = 3;
         target.max_stamina = 100;
-        let _ = attacker.attacks(&mut target, &mut small_rng, &mut Vec::new(), &tuning);
+        let _ = attacker.attacks(
+            &mut target,
+            &mut small_rng,
+            &mut Vec::new(),
+            shared::messages::Phase::Day,
+            &tuning,
+        );
         assert_eq!(attacker.stamina, 0);
         assert_eq!(target.stamina, 0);
     }
@@ -1147,8 +1184,20 @@ mod tests {
 
         let mut rng_a = SmallRng::seed_from_u64(42);
         let mut rng_b = SmallRng::seed_from_u64(42);
-        let out_a = a_fresh.attacks(&mut t1, &mut rng_a, &mut Vec::new(), &tuning);
-        let out_b = a_winded.attacks(&mut t2, &mut rng_b, &mut Vec::new(), &tuning);
+        let out_a = a_fresh.attacks(
+            &mut t1,
+            &mut rng_a,
+            &mut Vec::new(),
+            shared::messages::Phase::Day,
+            &tuning,
+        );
+        let out_b = a_winded.attacks(
+            &mut t2,
+            &mut rng_b,
+            &mut Vec::new(),
+            shared::messages::Phase::Day,
+            &tuning,
+        );
 
         // Different bands → different outcomes from same seed (or at minimum,
         // different post-state). Use Tribute hp loss as the witness.
@@ -1167,7 +1216,13 @@ mod tests {
         target.stamina = 100;
         target.max_stamina = 100;
         let mut events = Vec::new();
-        let _ = attacker.attacks(&mut target, &mut small_rng, &mut events, &tuning);
+        let _ = attacker.attacks(
+            &mut target,
+            &mut small_rng,
+            &mut events,
+            shared::messages::Phase::Day,
+            &tuning,
+        );
         let beats: Vec<_> = events
             .iter()
             .filter_map(|e| match &e.payload {
@@ -1400,6 +1455,7 @@ mod tests {
             &mut target,
             &mut rng,
             &mut Vec::new(),
+            shared::messages::Phase::Day,
             &CombatTuning::default(),
         );
 
@@ -1441,6 +1497,7 @@ mod tests {
             &mut target,
             &mut rng,
             &mut Vec::new(),
+            shared::messages::Phase::Day,
             &CombatTuning::default(),
         );
 
@@ -1478,6 +1535,7 @@ mod tests {
             &mut target,
             &mut small_rng,
             &mut events,
+            shared::messages::Phase::Day,
             &CombatTuning::default(),
         );
 
@@ -1516,7 +1574,13 @@ mod tests {
             let mut attacker = Tribute::new(format!("A{seed}"), None, None);
             let mut target = Tribute::new(format!("T{seed}"), None, None);
             let mut rng = SmallRng::seed_from_u64(seed);
-            let _ = attacker.attacks(&mut target, &mut rng, &mut events, &CombatTuning::default());
+            let _ = attacker.attacks(
+                &mut target,
+                &mut rng,
+                &mut events,
+                shared::messages::Phase::Day,
+                &CombatTuning::default(),
+            );
 
             let swings: Vec<_> = events
                 .iter()
@@ -1547,6 +1611,7 @@ mod tests {
             &mut clone,
             &mut small_rng,
             &mut events,
+            shared::messages::Phase::Day,
             &CombatTuning::default(),
         );
         let swings: usize = events
@@ -1593,7 +1658,13 @@ mod tests {
 
         let mut events: Vec<TaggedEvent> = Vec::new();
         let mut rng = SmallRng::seed_from_u64(42);
-        let _ = attacker.attacks(&mut target, &mut rng, &mut events, &CombatTuning::default());
+        let _ = attacker.attacks(
+            &mut target,
+            &mut rng,
+            &mut events,
+            shared::messages::Phase::Day,
+            &CombatTuning::default(),
+        );
 
         let beat = events
             .iter()
@@ -1633,7 +1704,13 @@ mod tests {
 
         let mut events: Vec<TaggedEvent> = Vec::new();
         let mut rng = SmallRng::seed_from_u64(7);
-        let _ = attacker.attacks(&mut target, &mut rng, &mut events, &CombatTuning::default());
+        let _ = attacker.attacks(
+            &mut target,
+            &mut rng,
+            &mut events,
+            shared::messages::Phase::Day,
+            &CombatTuning::default(),
+        );
 
         let beat = events
             .iter()
@@ -1673,7 +1750,13 @@ mod tests {
 
             let mut events: Vec<TaggedEvent> = Vec::new();
             let mut rng = SmallRng::seed_from_u64(seed);
-            let _ = attacker.attacks(&mut target, &mut rng, &mut events, &CombatTuning::default());
+            let _ = attacker.attacks(
+                &mut target,
+                &mut rng,
+                &mut events,
+                shared::messages::Phase::Day,
+                &CombatTuning::default(),
+            );
 
             let beat = match events.iter().find_map(|e| match &e.payload {
                 MessagePayload::CombatSwing(b) => Some(b),
@@ -1722,7 +1805,13 @@ mod tests {
 
         let mut events: Vec<TaggedEvent> = Vec::new();
         let mut rng = SmallRng::seed_from_u64(123);
-        let _ = attacker.attacks(&mut target, &mut rng, &mut events, &CombatTuning::default());
+        let _ = attacker.attacks(
+            &mut target,
+            &mut rng,
+            &mut events,
+            shared::messages::Phase::Day,
+            &CombatTuning::default(),
+        );
 
         let beat = events
             .iter()
@@ -1757,7 +1846,13 @@ mod tests {
 
             let mut events: Vec<TaggedEvent> = Vec::new();
             let mut rng = SmallRng::seed_from_u64(seed);
-            let _ = attacker.attacks(&mut target, &mut rng, &mut events, &CombatTuning::default());
+            let _ = attacker.attacks(
+                &mut target,
+                &mut rng,
+                &mut events,
+                shared::messages::Phase::Day,
+                &CombatTuning::default(),
+            );
 
             // Find the engagement (skip seeds that didn't produce one, e.g.
             // pure fumble paths emit a standalone TributeWounded instead and
@@ -1818,7 +1913,13 @@ mod tests {
 
         let mut events: Vec<TaggedEvent> = Vec::new();
         let mut rng = SmallRng::seed_from_u64(1);
-        let _ = attacker.attacks(&mut target, &mut rng, &mut events, &CombatTuning::default());
+        let _ = attacker.attacks(
+            &mut target,
+            &mut rng,
+            &mut events,
+            shared::messages::Phase::Day,
+            &CombatTuning::default(),
+        );
 
         let beat = events
             .iter()
@@ -1853,7 +1954,13 @@ mod tests {
 
             let mut events: Vec<TaggedEvent> = Vec::new();
             let mut rng = SmallRng::seed_from_u64(seed);
-            let _ = attacker.attacks(&mut target, &mut rng, &mut events, &CombatTuning::default());
+            let _ = attacker.attacks(
+                &mut target,
+                &mut rng,
+                &mut events,
+                shared::messages::Phase::Day,
+                &CombatTuning::default(),
+            );
 
             let Some(detail_lines) = events.iter().find_map(|e| match &e.payload {
                 MessagePayload::Combat(eng) => Some(eng.detail_lines.clone()),
@@ -1884,5 +1991,51 @@ mod tests {
                 "seed {seed}: horrified lines from CombatBeat must match detail_lines"
             );
         }
+    }
+
+    #[rstest]
+    fn attacking_sleeping_target_emits_ambush_wake(mut small_rng: SmallRng) {
+        // Spec §6.4 PR2c.2 (bd-1zju): hitting a sleeping tribute must wake
+        // them with `WakeReason::Interrupted { Ambush }` BEFORE damage
+        // resolution. The ambush still lands; we just verify the wake
+        // event precedes any TributeWounded / Killed event in `events`.
+        let mut attacker = Tribute::new("Cato".to_string(), None, None);
+        attacker.attributes.strength = 10;
+        let mut target = Tribute::new("Rue".to_string(), None, None);
+        target.sleeping = true;
+        target.sleep_remaining = 4;
+        target.cycles_awake = 12;
+
+        let mut events: Vec<TaggedEvent> = Vec::new();
+        let _ = attacker.attacks(
+            &mut target,
+            &mut small_rng,
+            &mut events,
+            shared::messages::Phase::Night,
+            &CombatTuning::default(),
+        );
+
+        assert!(!target.sleeping, "ambushed target must wake");
+        assert_eq!(target.sleep_remaining, 0);
+        assert_eq!(target.cycles_awake, 0);
+
+        let woke_idx = events
+            .iter()
+            .position(|e| {
+                matches!(
+                    &e.payload,
+                    MessagePayload::TributeWoke {
+                        reason: shared::messages::WakeReason::Interrupted {
+                            event: shared::messages::InterruptionKind::Ambush { .. },
+                        },
+                        ..
+                    }
+                )
+            })
+            .expect("expected one ambush TributeWoke event");
+        assert_eq!(
+            woke_idx, 0,
+            "ambush wake must be emitted before damage resolution"
+        );
     }
 }

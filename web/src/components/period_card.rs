@@ -20,7 +20,9 @@ pub struct PeriodCardProps {
 #[component]
 pub fn PeriodCard(props: PeriodCardProps) -> Element {
     let phase_label = match props.phase {
+        Phase::Dawn => "Dawn",
         Phase::Day => "Day",
+        Phase::Dusk => "Dusk",
         Phase::Night => "Night",
     };
 

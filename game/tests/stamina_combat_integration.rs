@@ -17,7 +17,7 @@ fn per_phase_loop_emits_stamina_band_changed_when_band_crosses() {
     let id = t.identifier.clone();
     g.tributes.push(t);
 
-    let _ = g.run_day_night_cycle(true);
+    let _ = g.run_phase(shared::messages::Phase::Day);
 
     let crossed = g.messages.iter().any(|m| {
         matches!(&m.payload,
@@ -44,7 +44,7 @@ fn fresh_tribute_emits_no_band_change_when_recovery_keeps_band() {
     let id = t.identifier.clone();
     g.tributes.push(t);
 
-    let _ = g.run_day_night_cycle(true);
+    let _ = g.run_phase(shared::messages::Phase::Day);
 
     let crossed = g.messages.iter().any(|m| {
         matches!(&m.payload, MessagePayload::StaminaBandChanged { tribute, .. } if tribute.identifier == id)

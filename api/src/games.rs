@@ -748,10 +748,8 @@ async fn run_game_cycles(
     db: &Surreal<Any>,
     broadcaster: &crate::websocket::GameBroadcaster,
 ) -> Result<(), AppError> {
-    game.run_day_night_cycle(true)
-        .map_err(|e| AppError::InternalServerError(format!("Failed to run day cycle: {}", e)))?;
-    game.run_day_night_cycle(false)
-        .map_err(|e| AppError::InternalServerError(format!("Failed to run night cycle: {}", e)))?;
+    game.run_full_day()
+        .map_err(|e| AppError::InternalServerError(format!("Failed to run game day: {}", e)))?;
     let _ = save_game(game, db, broadcaster).await?;
     // Persistence has happened; the cycle's `CycleStart`/`CycleEnd`
     // GameMessages were broadcast by `save_game` as it drained

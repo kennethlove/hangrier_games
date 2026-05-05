@@ -23,3 +23,6 @@ web/src/env.rs
 
 # Superpowers (local agent state)
 .superpowers/
+
+# Local Crush config (contains MCP tokens)
+.crush.json

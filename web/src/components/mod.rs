@@ -28,7 +28,6 @@ pub mod games_list;
 pub use games_list::GamesList;
 mod home;
 pub use home::Home;
-pub mod icons;
 mod icons_page;
 pub use icons_page::IconsPage;
 mod info_detail;

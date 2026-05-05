@@ -6,6 +6,7 @@ pub mod components;
 pub(crate) mod env;
 pub mod hooks;
 pub mod http;
+pub mod icons;
 mod routes;
 mod storage;
 pub mod theme;

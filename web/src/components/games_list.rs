@@ -1,9 +1,8 @@
 use crate::cache::QueryError;
 use crate::components::game_edit::GameEdit;
-use crate::components::icons::eye_closed::EyeClosedIcon;
-use crate::components::icons::eye_open::EyeOpenIcon;
 use crate::components::{Button, CreateGameButton, CreateGameForm, DeleteGameModal, GameDelete};
 use crate::http::WithCredentials;
+use crate::icons::{EyeClosedIcon, EyeOpenIcon};
 use crate::routes::Routes;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
@@ -174,12 +173,12 @@ pub fn GameListMember(game: ListDisplayGame) -> Element {
                             identifier: game.identifier.clone(),
                             name: game.name.clone(),
                             private: game.private,
-                            icon_class: "size-4 fill-text-muted hover:fill-primary",
+                            icon_class: "text-text-muted hover:text-primary",
                         }
                         GameDelete {
                             game_name: game.name.clone(),
                             game_identifier: game.identifier.clone(),
-                            icon_class: "size-4 fill-text-muted hover:fill-danger",
+                            icon_class: "text-text-muted hover:text-danger",
                         }
                     }
                 } else {
@@ -207,9 +206,9 @@ pub fn GameListMember(game: ListDisplayGame) -> Element {
                 div {
                     class: "px-2",
                     if game.private {
-                        EyeClosedIcon { class: "size-4 fill-text-muted" }
+                        EyeClosedIcon { class: "text-text-muted".to_string() }
                     } else {
-                        EyeOpenIcon { class: "size-4 fill-text-muted" }
+                        EyeOpenIcon { class: "text-text-muted".to_string() }
                     }
                 }
             }

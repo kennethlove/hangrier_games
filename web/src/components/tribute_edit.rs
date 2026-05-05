@@ -1,10 +1,10 @@
 use crate::cache::MutationError;
 use crate::components::game_tributes::GameTributesQ;
-use crate::components::icons::edit::EditIcon;
 use crate::components::modal::{Modal, Props as ModalProps};
 use crate::components::tribute_detail::TributeQ;
 use crate::components::{Button, Input};
 use crate::http::WithCredentials;
+use crate::icons::EditIcon;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use shared::EditTribute;
@@ -71,10 +71,7 @@ pub fn TributeEdit(
             "#,
             onclick,
             EditIcon {
-                class: r#"
-                size-4
-
-                "#,
+                class: "".to_string(),
             }
         }
     }

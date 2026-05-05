@@ -161,7 +161,7 @@ The `web/src/` directory implements the **Dioxus WebAssembly frontend** for Hang
 1. **Tailwind CSS**: Built via `npm` in `assets/` → `assets/dist/main.css`
 2. **Fonts**: Google Fonts loaded via `<link>` in `App` component
 3. **Favicons**: Theme-specific PNG files in `assets/favicons/`
-4. **Icons**: Inline SVG components in `components/icons/`
+4. **Icons**: Sprite-sheet based system. SVG sources live in `assets/icons/{ui,narrative}/`; `build.rs` generates `src/icons_generated.rs` with `IconName` enum, `SPRITE` const, and per-icon wrapper components. Public API in `src/icons.rs`. Sprite is inlined once at app root (`#icon-sprite`); icons reference it via `<use href="#ui-edit">` etc.
 
 ### Development Workflow
 
@@ -205,11 +205,16 @@ src/
     ├── server_version.rs # Server version display
     ├── credits.rs       # Credits page
     ├── icons_page.rs    # Icon showcase
-    └── icons/           # SVG icon components
-        ├── mod.rs
-        ├── mockingjay.rs, edit.rs, delete.rs, etc.
-        └── game_icons_net/ # Status effect icons (50+ SVGs)
+    └── ui/icon.rs       # Icon primitive (IconSize, IconTier)
 ```
+
+### Icon System
+
+- Source SVGs in `web/assets/icons/{ui,narrative}/`
+- `build.rs` walks the dirs and emits `web/src/icons_generated.rs` (gitignored)
+- Public API: `crate::icons::{Icon, IconSize, IconTier, NarrativeIcon, LoadingIcon, EditIcon, ...}`
+- Color via `currentColor` (use `text-*` Tailwind utilities; sprite paths set fill/stroke to currentColor)
+- Sprite inlined at app root in `App` via `<div id="icon-sprite" hidden dangerous_inner_html=SPRITE>`
 
 ### Dependencies
 

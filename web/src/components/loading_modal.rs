@@ -1,6 +1,6 @@
 use crate::LoadingState;
-use crate::components::icons::loading::LoadingIcon;
 use crate::components::modal::{Modal, Props as ModalProps};
+use crate::icons::LoadingIcon;
 use dioxus::prelude::*;
 
 #[component]

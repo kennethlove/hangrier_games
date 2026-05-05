@@ -1,8 +1,8 @@
 use crate::cache::MutationError;
 use crate::components::Button;
 use crate::components::games_list::GamesListQ;
-use crate::components::icons::delete::DeleteIcon;
 use crate::http::WithCredentials;
+use crate::icons::DeleteIcon;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use gloo_storage::Storage;

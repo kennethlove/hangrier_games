@@ -1,9 +1,7 @@
 use crate::cache::QueryError;
-use crate::components::icons::lock_closed::LockClosedIcon;
-use crate::components::icons::lock_open::LockOpenIcon;
-use crate::components::icons::uturn::UTurnIcon;
 use crate::components::item_icon::ItemIcon;
 use crate::http::WithCredentials;
+use crate::icons::{LockClosedIcon, LockOpenIcon, UturnIcon};
 use crate::routes::Routes;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
@@ -63,7 +61,7 @@ pub fn AreaDetail(game_identifier: String, area_identifier: String) -> Element {
                         Link {
                             to: Routes::GamePage { identifier: game_identifier.clone() },
                             class: "inline-flex items-center gap-1 text-sm underline",
-                            UTurnIcon { class: "size-4 fill-current" }
+                            UturnIcon { class: "text-current".to_string() }
                             "Back to game"
                         }
                     }
@@ -75,11 +73,11 @@ pub fn AreaDetail(game_identifier: String, area_identifier: String) -> Element {
                         }
                         if area.is_open() {
                             LockOpenIcon {
-                                class: "size-5   "
+                                class: "".to_string()
                             }
                         } else {
                             LockClosedIcon {
-                                class: "size-5   "
+                                class: "".to_string()
                             }
                         }
                     }

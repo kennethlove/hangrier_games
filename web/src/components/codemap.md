@@ -101,25 +101,12 @@ edit_game_signal.set(Some(EditGame(id, name, private))); // Opens modal
 
 **Pattern**: Exhaustive match on domain types → SVG components
 
-**ItemIcon** (`item_icon.rs`):
-```rust
-match item.item_type {
-    ItemType::Consumable => match item.attribute {
-        Attribute::Health => rsx!(HealthPotionIcon { class }),
-        Attribute::Sanity => rsx!(SpinningTopIcon { class }),
-        // ...
-    },
-    ItemType::Weapon => match weapon_name {
-        "sword" => rsx!(PointySwordIcon { class }),
-        "dagger" => rsx!(PlainDaggerIcon { class }),
-        // ...
-    }
-}
-```
+**ItemIcon** (`item_icon.rs`): looks up sprite name via `crate::icons::icon_name_for_item_legacy(&item)` then renders `NarrativeIcon { name, class }`.
 
 **TributeStatusIcon** (`tribute_status_icon.rs`):
-- Maps 14 status variants to game-icons.net SVGs
-- Examples: `Healthy → HeartsIcon`, `Dead → DeadIcon`, `Poisoned → PoisonBottleIcon`
+- Maps 17 status variants to narrative sprite names
+- Examples: `Healthy → "hearts"`, `Dead → "dead"`, `Poisoned → "poison_bottle"`
+- Renders via `NarrativeIcon { name, class }`
 
 #### 5. Theme System
 
@@ -377,18 +364,12 @@ components/
 │   └── navbar.rs
 │
 ├── Icon Systems
-│   ├── item_icon.rs
-│   ├── tribute_status_icon.rs
-│   └── icons/
-│       ├── mod.rs
-│       ├── edit.rs, delete.rs, uturn.rs
-│       ├── eye_open.rs, eye_closed.rs
-│       ├── lock_open.rs, lock_closed.rs
-│       ├── map_pin.rs, loading.rs
-│       ├── mockingjay.rs, mockingjay_arrow.rs, mockingjay_flight.rs
-│       └── game_icons_net/
-│           ├── mod.rs
-│           └── 37 game icons (weapons, consumables, statuses)
+│   ├── item_icon.rs        (uses crate::icons::NarrativeIcon)
+│   ├── tribute_status_icon.rs (uses crate::icons::NarrativeIcon)
+│   └── ui/icon.rs          (Icon primitive: IconSize, IconTier)
+│   # SVG sources: web/assets/icons/{ui,narrative}/*.svg
+│   # Codegen output: web/src/icons_generated.rs (gitignored)
+│   # Public API: web/src/icons.rs
 │
 └── Other
     ├── accounts.rs
@@ -450,8 +431,7 @@ let req = client.get(url).with_credentials();
 - **Issue**: `game_tributes.rs` has N+1 problem (fetches each tribute individually)
 
 ### WASM Size
-- 50+ SVG icons embedded → ~25KB overhead
-- **Optimization**: Consider sprite sheets or lazy loading
+- 46 SVG icons inlined as a single sprite sheet at app root → referenced via `<use href="#sprite-id">`
 
 ### Rendering
 - Dioxus reactive diffing → Only changed subtrees re-render

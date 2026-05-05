@@ -1,5 +1,6 @@
 pub mod button;
 pub mod event_card;
+pub mod icon;
 pub mod live_pill;
 pub mod scoreboard;
 pub mod section_label;
@@ -10,6 +11,7 @@ pub mod tribute_row;
 
 pub use button::{Button, ButtonVariant};
 pub use event_card::EventCard;
+pub use icon::{Icon, IconSize, IconTier};
 pub use live_pill::LivePill;
 pub use scoreboard::Scoreboard;
 pub use section_label::SectionLabel;

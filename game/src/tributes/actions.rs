@@ -47,6 +47,14 @@ pub enum Action {
     Eat(Option<Item>),
     /// Spend the turn drinking a Water item from inventory.
     DrinkItem(Option<Item>),
+    /// Sleep for `duration_phases` phases. The tribute is unreachable to the
+    /// brain pipeline while sleeping; the engine decrements the counter and
+    /// emits `MessagePayload::TributeWoke` on the wake-up phase. Defined here
+    /// as the substrate for the four-phase sleep mechanic; the brain does
+    /// not yet score this action (see bd-xi0z follow-ups).
+    Sleep {
+        duration_phases: u8,
+    },
 }
 
 impl Display for Action {
@@ -65,6 +73,7 @@ impl Display for Action {
             Action::DrinkFromTerrain => write!(f, "drink from terrain"),
             Action::Eat(_) => write!(f, "eat"),
             Action::DrinkItem(_) => write!(f, "drink item"),
+            Action::Sleep { .. } => write!(f, "sleep"),
         }
     }
 }
@@ -87,6 +96,7 @@ impl FromStr for Action {
             "drink from terrain" => Ok(Action::DrinkFromTerrain),
             "eat" => Ok(Action::Eat(None)),
             "drink item" => Ok(Action::DrinkItem(None)),
+            "sleep" => Ok(Action::Sleep { duration_phases: 0 }),
             _ => Err(()),
         }
     }

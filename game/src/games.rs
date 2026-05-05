@@ -1139,6 +1139,14 @@ impl Game {
                 let prior_hunger = hunger_band(tribute.hunger);
                 let prior_thirst = thirst_band(tribute.thirst);
 
+                // Sleep substrate (bd-s0je): once per phase, every living
+                // tribute that did NOT spend the phase asleep ages by one
+                // cycle. The brain doesn't yet score `Action::Sleep`, so this
+                // simply tracks accumulated wakefulness for downstream PRs.
+                if !tribute.sleeping {
+                    tribute.cycles_awake = tribute.cycles_awake.saturating_add(1);
+                }
+
                 tick_survival(tribute, &weather, sheltered);
                 let hp_lost_starv = apply_starvation_drain(tribute);
                 let hp_lost_dehy = apply_dehydration_drain(tribute);

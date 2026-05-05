@@ -253,6 +253,29 @@ impl std::fmt::Display for ThirstBand {
     }
 }
 
+/// Why a sleeping tribute woke. Pairs with `MessagePayload::TributeWoke`.
+/// See spec `2026-05-03-four-phase-day-design.md` §6.4 / §8.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "reason")]
+pub enum WakeReason {
+    /// The tribute slept the planned duration without interruption.
+    Rested,
+    /// Sleep was cut short. `event` describes the interrupting cause.
+    Interrupted { event: InterruptionKind },
+}
+
+/// Concrete cause of a sleep interruption (`WakeReason::Interrupted`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "interruption")]
+pub enum InterruptionKind {
+    /// Another tribute attacked the sleeper.
+    Ambush { attacker: TributeRef },
+    /// An area event (storm, mutts, etc.) hit the sleeper's area.
+    AreaEvent { kind: AreaEventKind },
+    /// An ally summoned the tribute (alliance event cascade).
+    AllianceSummons { ally: TributeRef },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum MessagePayload {
@@ -400,6 +423,24 @@ pub enum MessagePayload {
         day: u32,
         phase: Phase,
     },
+    /// Emitted when a tribute begins sleeping (resolution of `Action::Sleep`).
+    /// `restored_*` fields are zero on the first phase of a multi-phase sleep
+    /// and accumulate per phase as the engine ticks the sleeper. See spec
+    /// `2026-05-03-four-phase-day-design.md` §6.4 / §8.
+    TributeSlept {
+        tribute: TributeRef,
+        phase: Phase,
+        restored_stamina: u32,
+        restored_hp: u32,
+    },
+    /// Emitted when a sleeping tribute wakes — either because the planned
+    /// sleep duration elapsed (`WakeReason::Rested`) or because something
+    /// interrupted them (`WakeReason::Interrupted`).
+    TributeWoke {
+        tribute: TributeRef,
+        phase: Phase,
+        reason: WakeReason,
+    },
     /// Emitted when the game ends. `winner` is `Some` for the lone-survivor
     /// case and `None` for "no survivors".
     GameEnded {
@@ -437,7 +478,9 @@ impl MessagePayload {
             | ShelterSought { .. }
             | Foraged { .. }
             | Drank { .. }
-            | Ate { .. } => MessageKind::State,
+            | Ate { .. }
+            | TributeSlept { .. }
+            | TributeWoke { .. } => MessageKind::State,
         }
     }
 
@@ -475,7 +518,9 @@ impl MessagePayload {
             | ShelterSought { tribute, .. }
             | Foraged { tribute, .. }
             | Drank { tribute, .. }
-            | Ate { tribute, .. } => r(tribute),
+            | Ate { tribute, .. }
+            | TributeSlept { tribute, .. }
+            | TributeWoke { tribute, .. } => r(tribute),
             SponsorGift { recipient, .. } => r(recipient),
             AreaClosed { .. } | AreaEvent { .. } => false,
             CycleStart { .. } | CycleEnd { .. } => false,
@@ -1158,5 +1203,81 @@ mod survival_event_tests {
         };
         assert!(p.involves("t1"));
         assert!(!p.involves("other"));
+    }
+
+    #[test]
+    fn wake_reason_serde_roundtrip_rested() {
+        let r = WakeReason::Rested;
+        let s = serde_json::to_string(&r).unwrap();
+        let back: WakeReason = serde_json::from_str(&s).unwrap();
+        assert_eq!(back, r);
+    }
+
+    #[test]
+    fn wake_reason_serde_roundtrip_interrupted_variants() {
+        let cases = vec![
+            WakeReason::Interrupted {
+                event: InterruptionKind::Ambush {
+                    attacker: TributeRef {
+                        identifier: "a".into(),
+                        name: "A".into(),
+                    },
+                },
+            },
+            WakeReason::Interrupted {
+                event: InterruptionKind::AreaEvent {
+                    kind: AreaEventKind::Fire,
+                },
+            },
+            WakeReason::Interrupted {
+                event: InterruptionKind::AllianceSummons {
+                    ally: TributeRef {
+                        identifier: "b".into(),
+                        name: "B".into(),
+                    },
+                },
+            },
+        ];
+        for r in cases {
+            let s = serde_json::to_string(&r).unwrap();
+            let back: WakeReason = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, r);
+        }
+    }
+
+    #[test]
+    fn tribute_slept_woke_payload_kind_is_state() {
+        let slept = MessagePayload::TributeSlept {
+            tribute: tref(),
+            phase: Phase::Night,
+            restored_stamina: 5,
+            restored_hp: 2,
+        };
+        let woke = MessagePayload::TributeWoke {
+            tribute: tref(),
+            phase: Phase::Dawn,
+            reason: WakeReason::Rested,
+        };
+        assert_eq!(slept.kind(), MessageKind::State);
+        assert_eq!(woke.kind(), MessageKind::State);
+    }
+
+    #[test]
+    fn tribute_slept_woke_involves_tribute() {
+        let slept = MessagePayload::TributeSlept {
+            tribute: tref(),
+            phase: Phase::Night,
+            restored_stamina: 0,
+            restored_hp: 0,
+        };
+        let woke = MessagePayload::TributeWoke {
+            tribute: tref(),
+            phase: Phase::Dawn,
+            reason: WakeReason::Rested,
+        };
+        assert!(slept.involves("t1"));
+        assert!(!slept.involves("other"));
+        assert!(woke.involves("t1"));
+        assert!(!woke.involves("other"));
     }
 }

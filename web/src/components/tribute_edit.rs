@@ -74,14 +74,7 @@ pub fn TributeEdit(
             EditIcon {
                 class: r#"
                 size-4
-                theme1:fill-amber-500
-                theme1:hover:fill-amber-200
 
-                theme2:fill-green-200/50
-                theme2:hover:fill-green-200
-
-                theme3:fill-amber-600/50
-                theme3:hover:fill-amber-600
                 "#,
             }
         }
@@ -226,13 +219,6 @@ pub fn EditTributeForm() -> Element {
             grid-col
             gap-4
 
-            theme1:bg-stone-200
-            theme1:text-stone-900
-
-            theme2:bg-green-200
-            theme2:text-green-900
-
-            theme3:bg-stone-50
             "#,
             onsubmit: save,
 

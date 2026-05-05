@@ -23,7 +23,7 @@ pub fn CombatCard(props: CombatCardProps) -> Element {
     };
     let has_details = !props.detail_lines.is_empty();
     rsx! {
-        article { class: "rounded border-l-4 border-orange-500 bg-orange-50 theme2:bg-orange-950 p-3",
+        article { class: "rounded border-l-4 border-orange-500 bg-orange-50  p-3",
             header { class: "font-semibold",
                 "⚔️ "
                 Link {

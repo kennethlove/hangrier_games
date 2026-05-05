@@ -71,26 +71,14 @@ pub fn GameTributes(game: DisplayGame) -> Element {
                             class: r#"
                             col-span-2
                             pb-4
-                            theme1:not-last-of-type:border-b-2
-                            theme1:border-amber-900
-                            theme2:not-last-of-type:border-b-1
-                            theme2:border-dotted
-                            theme2:border-green-200
-                            theme3:not-last-of-type:border-b-2
-                            theme3:border-gold-rich
+
                             "#,
                             h3 {
                                 class: r#"
                                 text-xl
                                 text-center
                                 mb-2
-                                theme1:text-stone-200
-                                theme1:font-[Cinzel]
-                                theme2:text-green-200
-                                theme2:font-[Playfair_Display]
-                                theme3:text-yellow-700
-                                theme3:drop-shadow-sm
-                                theme3:font-[Orbitron]
+
                                 "#,
                                 "District {chunk.first().unwrap().district}"
                             }
@@ -148,25 +136,6 @@ pub fn GameTributeListMember(
             self-start
             overflow-hidden
 
-            theme1:border-1
-            theme1:text-stone-200
-            theme1:data-[alive=false]:border-red-500/50
-            theme1:motion-safe:data-[alive=true]:border-tracer
-            theme1:motion-safe:data-[alive=true]:border-2
-            theme1:motion-reduce:data-[alive=true]:border-green-500
-
-            theme2:data-[alive=true]:border-green-400
-            theme2:data-[alive=false]:border-red-400
-            theme2:data-[alive=false]:bg-linear-to-r
-            theme2:data-[alive=false]:from-green-900
-            theme2:data-[alive=false]:to-red-900/75
-            theme2:text-green-200
-            theme2:rounded-md
-
-            theme3:border-3
-            theme3:data-[alive=true]:border-gold-rich
-            theme3:data-[alive=false]:opacity-50
-            theme3:bg-stone-50
             "#,
 
             div {
@@ -187,34 +156,11 @@ pub fn GameTributeListMember(
                         class: r#"
                         mb-2
 
-                        theme1:font-[Cinzel]
-                        theme1:text-lg
-
-                        theme2:font-[Playfair_Display]
-                        theme2:text-xl
-                        theme2:text-green-200
-                        theme2:hover:underline
-                        theme2:hover:decoration-2
-                        theme2:hover:decoration-wavy
-
-                        theme3:font-semibold
                         "#,
 
                         Link {
                             class: r#"
-                            theme1:font-semibold
-                            theme1:text-xl
-                            theme1:text-amber-500
-                            theme1:hover:text-amber-200
-                            theme1:hover:border-b-2
-                            theme1:hover:border-amber-500
 
-                            theme2:text-green-200
-                            theme2:hover:text-green-200
-
-                            theme3:hover:border-b-2
-                            theme3:hover:border-yellow-500
-                            theme3:hover:text-yellow-500
                             "#,
                             to: Routes::TributeDetail {
                                 game_identifier: game_identifier.clone(),
@@ -245,8 +191,7 @@ pub fn GameTributeListMember(
                             css_class: r#"
                             size-6
                             ml-1
-                            theme1:fill-amber-500
-                            theme2:fill-green-200
+
                             mb-2
                             "#,
                         }
@@ -272,8 +217,7 @@ pub fn GameTributeListMember(
                             class: r#"
                             size-6
                             ml-1
-                            theme1:fill-amber-500
-                            theme2:fill-green-200
+
                             "#,
                         }
                         span {
@@ -291,8 +235,7 @@ pub fn GameTributeListMember(
                                     item: fist_item,
                                     css_class: r#"
                                     size-8
-                                    theme1:fill-amber-500
-                                    theme2:fill-green-200
+
                                     "#,
                                 }
                                 span {
@@ -308,8 +251,7 @@ pub fn GameTributeListMember(
                                         item: item.clone(),
                                         css_class: r#"
                                         size-8
-                                        theme1:fill-amber-500
-                                        theme2:fill-green-200
+
                                         "#,
                                     }
                                     span {

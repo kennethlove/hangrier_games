@@ -327,17 +327,7 @@ fn GameState(identifier: String) -> Element {
 
                         h2 {
                             class: r#"
-                            theme1:text-2xl
-                            theme1:font-[Cinzel]
-                            theme1:text-amber-300
 
-                            theme2:font-[Playfair_Display]
-                            theme2:text-3xl
-                            theme2:text-green-200
-
-                            theme3:font-[Orbitron]
-                            theme3:text-2xl
-                            theme3:text-stone-700
                             "#,
 
                             "{game_name}"
@@ -351,23 +341,13 @@ fn GameState(identifier: String) -> Element {
                                 icon_class: r#"
                                 size-4
 
-                                theme1:fill-amber-500
-                                theme1:hover:fill-amber-200
-
-                                theme2:fill-green-200/50
-                                theme2:hover:fill-green-200
-
-                                theme3:fill-amber-700/75
-                                theme3:hover:fill-amber-700
                                 "#
                             }
                         } else {
                             span {
                                 class: r#"
                                 text-sm
-                                theme1:text-stone-200/75
-                                theme2:text-green-200/50
-                                theme3:text-stone-700
+
                                 "#,
                                 "By {creator}"
                             }
@@ -392,9 +372,7 @@ fn GameState(identifier: String) -> Element {
                 p {
                     class: r#"
                     text-center
-                    theme1:text-stone-200
-                    theme2:text-green-200
-                    theme3:text-slate-700
+
                     "#,
                     "Game not found"
                 }
@@ -408,17 +386,13 @@ fn GameState(identifier: String) -> Element {
                 p {
                     class: r#"
                     text-center
-                    theme1:text-stone-200
-                    theme2:text-green-200
-                    theme3:text-slate-700
+
                     "#,
 
                     h2 {
                         class: r#"
                         text-2xl
-                        theme1:text-amber-300
-                        theme2:text-green-200
-                        theme3:text-slate-700
+
                         "#,
                         "Unauthorized"
                     }
@@ -427,12 +401,7 @@ fn GameState(identifier: String) -> Element {
                         Link {
                             class: r#"
                             underline
-                            theme1:text-amber-300
-                            theme1:hover:text-amber-200
-                            theme2:text-green-200
-                            theme2:hover:text-green-100
-                            theme3:text-slate-700
-                            theme3:hover:text-slate-500
+
                             "#,
                             to: Routes::AccountsPage {},
                             "login or signup?"
@@ -446,9 +415,7 @@ fn GameState(identifier: String) -> Element {
                 p {
                     class: r#"
                     text-center
-                    theme1:text-stone-200
-                    theme2:text-green-200
-                    theme3:text-slate-700
+
                     "#,
                     "Failed to load: {e:?}"
                 }
@@ -459,9 +426,7 @@ fn GameState(identifier: String) -> Element {
                 p {
                     class: r#"
                     text-center
-                    theme1:text-stone-200
-                    theme2:text-green-200
-                    theme3:text-slate-700
+
                     "#,
                     "Loading..."
                 }
@@ -499,21 +464,14 @@ fn GameStats(identifier: String) -> Element {
                         p {
                             class: r#"
                             flex-grow
-                            theme1:text-amber-300
-                            theme2:text-green-200
 
-                            theme3:text-stone-700
                             "#,
 
                             span {
                                 class: r#"
                                 block
                                 text-sm
-                                theme1:text-amber-500
-                                theme1:font-semibold
-                                theme2:text-teal-500
-                                theme3:text-yellow-600
-                                theme3:font-semibold
+
                                 "#,
 
                                 "status"
@@ -523,20 +481,14 @@ fn GameStats(identifier: String) -> Element {
                         p {
                             class: r#"
                             flex-grow
-                            theme1:text-amber-300
-                            theme2:text-green-200
-                            theme3:text-stone-700
+
                             "#,
 
                             span {
                                 class: r#"
                                 block
                                 text-sm
-                                theme1:text-amber-500
-                                theme1:font-semibold
-                                theme2:text-teal-500
-                                theme3:text-yellow-600
-                                theme3:font-semibold
+
                                 "#,
 
                                 "day"
@@ -545,20 +497,14 @@ fn GameStats(identifier: String) -> Element {
                         }
                         p {
                             class: r#"
-                            theme1:text-amber-300
-                            theme2:text-green-200
-                            theme3:text-stone-700
+
                             "#,
 
                             span {
                                 class: r#"
                                 block
                                 text-sm
-                                theme1:text-amber-500
-                                theme1:font-semibold
-                                theme2:text-teal-500
-                                theme3:text-yellow-600
-                                theme3:font-semibold
+
                                 "#,
 
                                 "tributes alive"
@@ -577,9 +523,7 @@ fn GameStats(identifier: String) -> Element {
                 p {
                     class: r#"
                     text-center
-                    theme1:text-stone-200
-                    theme2:text-green-200
-                    theme3:text-slate-700
+
                     "#,
                     "Loading..."
                 }
@@ -651,9 +595,6 @@ fn GameDetails(identifier: String) -> Element {
                     class: r#"
                     text-center
 
-                    theme1:text-stone-200
-                    theme2:text-green-200
-                    theme3:text-slate-700
                     "#,
                     "Loading..."
                 }

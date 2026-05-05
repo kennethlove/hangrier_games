@@ -58,19 +58,7 @@ pub fn GameAreaList(game: DisplayGame) -> Element {
                             class: r#"
                             border
                             p-2
-                            theme1:data-[open=true]:border-green-500
-                            theme1:data-[open=false]:border-red-500
-                            theme1:text-stone-200
 
-                            theme2:border-3
-                            theme2:rounded-md
-                            theme2:bg-green-200
-                            theme2:data-[open=true]:border-green-500
-                            theme2:data-[open=false]:border-red-400
-
-                            theme3:border-2
-                            theme3:data-[open=true]:border-green-600
-                            theme3:data-[open=false]:border-red-500
                             "#,
 
                             div {
@@ -79,9 +67,7 @@ pub fn GameAreaList(game: DisplayGame) -> Element {
                                     class: r#"
                                     flex-grow
                                     text-xl
-                                    theme1:text-amber-300
-                                    theme2:text-green-800
-                                    theme3:font-semibold
+
                                     "#,
 
                                     "{area.name}"
@@ -94,16 +80,14 @@ pub fn GameAreaList(game: DisplayGame) -> Element {
                                         LockOpenIcon {
                                             class: r#"
                                             size-4
-                                            theme1:fill-amber-300
-                                            theme2:fill-green-900
+
                                             "#,
                                         }
                                     } else {
                                         LockClosedIcon {
                                             class: r#"
                                             size-4
-                                            theme1:fill-amber-300
-                                            theme2:fill-green-900
+
                                             "#,
                                         }
                                     }
@@ -112,16 +96,7 @@ pub fn GameAreaList(game: DisplayGame) -> Element {
 
                             h5 {
                                 class: r#"
-                                theme1:text-amber-200
 
-                                theme2:text-green-200
-                                theme2:bg-green-800
-                                theme2:px-2
-                                theme2:rounded-sm
-
-                                theme3:border-gold-rich
-                                theme3:border-0
-                                theme3:border-b-2
                                 "#,
 
                                 "Items"
@@ -141,8 +116,7 @@ pub fn GameAreaList(game: DisplayGame) -> Element {
                                                 item: item.clone(),
                                                 css_class: r#"
                                                 size-8
-                                                theme1:fill-amber-500
-                                                theme2:fill-green-800
+
                                                 "#,
                                             }
                                             span {
@@ -157,16 +131,7 @@ pub fn GameAreaList(game: DisplayGame) -> Element {
 
                             h5 {
                                 class: r#"
-                                theme1:text-amber-200
 
-                                theme2:text-green-200
-                                theme2:bg-green-800
-                                theme2:px-2
-                                theme2:rounded-sm
-
-                                theme3:border-gold-rich
-                                theme3:border-0
-                                theme3:border-b-2
                                 "#,
 
                                 "Events"

@@ -55,7 +55,7 @@ pub fn MovementCard(props: MovementCardProps) -> Element {
         _ => rsx! { "{props.message.content}" },
     };
     rsx! {
-        article { class: "rounded border-l-4 border-sky-500 bg-sky-50 theme2:bg-sky-950 p-3",
+        article { class: "rounded border-l-4 border-sky-500 bg-sky-50  p-3",
             header { class: "font-semibold",
                 "🧭 "
                 {body}

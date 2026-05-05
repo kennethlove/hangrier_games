@@ -114,15 +114,6 @@ pub fn DeleteGameModal() -> Element {
                         grid-col
                         gap-4
 
-                        theme1:bg-stone-200
-                        theme1:text-stone-900
-
-                        theme2:bg-green-200
-                        theme2:text-green-900
-
-                        theme3:bg-stone-50
-                        theme3:border-3
-                        theme3:border-gold-rich
                         "#,
 
                         h1 {
@@ -131,13 +122,6 @@ pub fn DeleteGameModal() -> Element {
                             p-2
                             text-lg
 
-                            theme1:bg-red-900
-                            theme1:text-stone-200
-
-                            theme2:bg-green-800
-                            theme2:text-green-200
-
-                            theme3:font-[Orbitron]
                             "#,
 
                             "Delete game?"

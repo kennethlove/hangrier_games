@@ -69,7 +69,7 @@ pub fn ItemDetail(game_identifier: String, item_identifier: String) -> Element {
                         class: "flex flex-row gap-3 items-center",
                         ItemIcon {
                             item: item.clone(),
-                            css_class: "size-10 theme1:fill-amber-500 theme2:fill-green-800",
+                            css_class: "size-10  ",
                         }
                         h1 {
                             class: "text-2xl font-semibold",

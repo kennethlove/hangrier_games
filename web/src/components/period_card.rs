@@ -27,7 +27,7 @@ pub fn PeriodCard(props: PeriodCardProps) -> Element {
     };
 
     let current_class = if props.is_current {
-        "ring-2 ring-amber-400 theme2:ring-green-400 theme3:ring-purple-400"
+        "ring-2 ring-amber-400  "
     } else {
         ""
     };
@@ -43,11 +43,11 @@ pub fn PeriodCard(props: PeriodCardProps) -> Element {
     rsx! {
         Link {
             to: route,
-            class: "block rounded-lg border p-4 hover:shadow-lg transition theme1:bg-amber-50 theme1:border-amber-200 theme2:bg-slate-800 theme2:border-green-700 theme3:bg-purple-900 theme3:border-purple-600 {current_class}",
+            class: "block rounded-lg border p-4 hover:shadow-lg transition       {current_class}",
             div { class: "flex items-center justify-between mb-2",
                 h3 { class: "font-semibold", "Day {props.day} — {phase_label}" }
                 if props.is_current {
-                    span { class: "text-xs uppercase tracking-wide text-amber-600 theme2:text-green-400 theme3:text-purple-300",
+                    span { class: "text-xs uppercase tracking-wide text-amber-600  ",
                         "live"
                     }
                 }

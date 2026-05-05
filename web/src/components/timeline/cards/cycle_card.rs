@@ -13,17 +13,10 @@ pub struct CycleCardProps {
 #[component]
 pub fn CycleCard(props: CycleCardProps) -> Element {
     let (icon, accent) = match &props.message.payload {
-        MessagePayload::CycleStart { .. } => {
-            ("🌅", "border-amber-500 bg-amber-50 theme2:bg-amber-950")
-        }
-        MessagePayload::CycleEnd { .. } => {
-            ("🌙", "border-indigo-500 bg-indigo-50 theme2:bg-indigo-950")
-        }
-        MessagePayload::GameEnded { .. } => (
-            "🏁",
-            "border-emerald-600 bg-emerald-50 theme2:bg-emerald-950",
-        ),
-        _ => ("📣", "border-sky-500 bg-sky-50 theme2:bg-sky-950"),
+        MessagePayload::CycleStart { .. } => ("🌅", "border-amber-500 bg-amber-50 "),
+        MessagePayload::CycleEnd { .. } => ("🌙", "border-indigo-500 bg-indigo-50 "),
+        MessagePayload::GameEnded { .. } => ("🏁", "border-emerald-600 bg-emerald-50 "),
+        _ => ("📣", "border-sky-500 bg-sky-50 "),
     };
     rsx! {
         article { class: "rounded border-l-4 p-3 {accent}",

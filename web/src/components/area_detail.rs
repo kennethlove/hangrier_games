@@ -76,11 +76,11 @@ pub fn AreaDetail(game_identifier: String, area_identifier: String) -> Element {
                         }
                         if area.is_open() {
                             LockOpenIcon {
-                                class: "size-5 theme1:fill-amber-300 theme2:fill-green-900 theme3:fill-yellow-700"
+                                class: "size-5   "
                             }
                         } else {
                             LockClosedIcon {
-                                class: "size-5 theme1:fill-amber-300 theme2:fill-green-900 theme3:fill-yellow-700"
+                                class: "size-5   "
                             }
                         }
                     }
@@ -100,7 +100,7 @@ pub fn AreaDetail(game_identifier: String, area_identifier: String) -> Element {
                                         class: "flex flex-row gap-2 items-center",
                                         ItemIcon {
                                             item: item.clone(),
-                                            css_class: "size-6 theme1:fill-amber-500 theme2:fill-green-800",
+                                            css_class: "size-6  ",
                                         }
                                         Link {
                                             to: Routes::ItemDetail {

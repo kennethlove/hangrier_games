@@ -12,7 +12,7 @@ pub fn SurvivalCard(props: SurvivalCardProps) -> Element {
         MessagePayload::HungerBandChanged { tribute, from, to } => {
             let cls = hunger_class(*to);
             rsx! {
-                article { class: "rounded border-l-4 border-amber-400 bg-amber-50 theme2:bg-amber-950/40 p-2 text-sm",
+                article { class: "rounded border-l-4 border-amber-400 bg-amber-50  p-2 text-sm",
                     p {
                         class: "{cls}",
                         "{tribute.name} is now "
@@ -25,7 +25,7 @@ pub fn SurvivalCard(props: SurvivalCardProps) -> Element {
         MessagePayload::ThirstBandChanged { tribute, from, to } => {
             let cls = thirst_class(*to);
             rsx! {
-                article { class: "rounded border-l-4 border-sky-400 bg-sky-50 theme2:bg-sky-950/40 p-2 text-sm",
+                article { class: "rounded border-l-4 border-sky-400 bg-sky-50  p-2 text-sm",
                     p {
                         class: "{cls}",
                         "{tribute.name} is now "
@@ -41,9 +41,9 @@ pub fn SurvivalCard(props: SurvivalCardProps) -> Element {
             success,
             roll: _,
         } => rsx! {
-            article { class: "rounded border-l-4 border-emerald-400 bg-emerald-50 theme2:bg-emerald-950/40 p-2 text-sm",
+            article { class: "rounded border-l-4 border-emerald-400 bg-emerald-50  p-2 text-sm",
                 p {
-                    class: "text-xs text-stone-600 theme2:text-stone-300",
+                    class: "text-xs text-stone-600 ",
                     if *success {
                         "🏠 {tribute.name} found shelter in {area.name}."
                     } else {
@@ -58,9 +58,9 @@ pub fn SurvivalCard(props: SurvivalCardProps) -> Element {
             success,
             debt_recovered,
         } => rsx! {
-            article { class: "rounded border-l-4 border-lime-500 bg-lime-50 theme2:bg-lime-950/40 p-2 text-sm",
+            article { class: "rounded border-l-4 border-lime-500 bg-lime-50  p-2 text-sm",
                 p {
-                    class: "text-xs text-stone-600 theme2:text-stone-300",
+                    class: "text-xs text-stone-600 ",
                     if *success {
                         "🌿 {tribute.name} foraged in {area.name} (+{debt_recovered} hunger relief)."
                     } else {
@@ -74,9 +74,9 @@ pub fn SurvivalCard(props: SurvivalCardProps) -> Element {
             source: _,
             debt_recovered,
         } => rsx! {
-            article { class: "rounded border-l-4 border-sky-400 bg-sky-50 theme2:bg-sky-950/40 p-2 text-sm",
+            article { class: "rounded border-l-4 border-sky-400 bg-sky-50  p-2 text-sm",
                 p {
-                    class: "text-xs text-stone-600 theme2:text-stone-300",
+                    class: "text-xs text-stone-600 ",
                     "💧 {tribute.name} drank (+{debt_recovered} thirst relief)."
                 }
             }
@@ -86,9 +86,9 @@ pub fn SurvivalCard(props: SurvivalCardProps) -> Element {
             item: _,
             debt_recovered,
         } => rsx! {
-            article { class: "rounded border-l-4 border-amber-400 bg-amber-50 theme2:bg-amber-950/40 p-2 text-sm",
+            article { class: "rounded border-l-4 border-amber-400 bg-amber-50  p-2 text-sm",
                 p {
-                    class: "text-xs text-stone-600 theme2:text-stone-300",
+                    class: "text-xs text-stone-600 ",
                     "🍗 {tribute.name} ate (+{debt_recovered} hunger relief)."
                 }
             }
@@ -99,16 +99,16 @@ pub fn SurvivalCard(props: SurvivalCardProps) -> Element {
 
 fn hunger_class(band: HungerBand) -> &'static str {
     match band {
-        HungerBand::Hungry => "text-amber-600 theme2:text-amber-300",
-        HungerBand::Starving => "text-red-600 theme2:text-red-400 font-semibold",
-        _ => "text-stone-600 theme2:text-stone-300",
+        HungerBand::Hungry => "text-amber-600 ",
+        HungerBand::Starving => "text-red-600  font-semibold",
+        _ => "text-stone-600 ",
     }
 }
 
 fn thirst_class(band: ThirstBand) -> &'static str {
     match band {
-        ThirstBand::Parched => "text-sky-600 theme2:text-sky-300",
-        ThirstBand::Dehydrated => "text-red-600 theme2:text-red-400 font-semibold",
-        _ => "text-stone-600 theme2:text-stone-300",
+        ThirstBand::Parched => "text-sky-600 ",
+        ThirstBand::Dehydrated => "text-red-600  font-semibold",
+        _ => "text-stone-600 ",
     }
 }

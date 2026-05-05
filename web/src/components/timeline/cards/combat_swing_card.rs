@@ -44,7 +44,7 @@ pub fn CombatSwingCard(props: CombatSwingCardProps) -> Element {
     let has_stress = beat.stress.stress_damage > 0;
 
     rsx! {
-        article { class: "rounded border-l-4 border-amber-500 bg-amber-50 theme2:bg-amber-950 p-3",
+        article { class: "rounded border-l-4 border-amber-500 bg-amber-50  p-3",
             header { class: "font-semibold flex flex-wrap items-center gap-1",
                 "{icon} "
                 Link {

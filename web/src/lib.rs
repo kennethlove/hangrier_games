@@ -7,6 +7,7 @@ pub mod hooks;
 pub mod http;
 mod routes;
 mod storage;
+pub mod theme;
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub enum LoadingState {

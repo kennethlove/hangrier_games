@@ -36,25 +36,25 @@ pub fn StaminaCard(props: StaminaCardProps) -> Element {
     let (border_cls, bg_cls, glyph, phrase) = match (direction, to.as_str()) {
         (Direction::Worsening, "Winded") => (
             "border-amber-400",
-            "bg-amber-50 theme2:bg-amber-950/40",
+            "bg-amber-50 ",
             "💨",
             format!("{} is winded.", tribute.name),
         ),
         (Direction::Worsening, "Exhausted") => (
             "border-red-500",
-            "bg-red-50 theme2:bg-red-950/40",
+            "bg-red-50 ",
             "🥵",
             format!("{} is exhausted.", tribute.name),
         ),
         (Direction::Recovery, _) => (
             "border-emerald-400",
-            "bg-emerald-50 theme2:bg-emerald-950/40",
+            "bg-emerald-50 ",
             "🌿",
             format!("{} caught their breath.", tribute.name),
         ),
         _ => (
             "border-stone-400",
-            "bg-stone-50 theme2:bg-stone-900/40",
+            "bg-stone-50 ",
             "•",
             format!("{}: {} → {}", tribute.name, from, to),
         ),
@@ -64,7 +64,7 @@ pub fn StaminaCard(props: StaminaCardProps) -> Element {
         article {
             class: "rounded border-l-4 {border_cls} {bg_cls} p-2 text-sm",
             p {
-                class: "text-xs text-stone-700 theme2:text-stone-200",
+                class: "text-xs text-stone-700 ",
                 "{glyph} {phrase}"
                 span { class: "text-[10px] text-stone-500 ml-2", "(was {from})" }
             }

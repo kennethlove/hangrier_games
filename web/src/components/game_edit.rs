@@ -144,13 +144,6 @@ pub fn EditGameForm() -> Element {
             grid-col
             gap-4
 
-            theme1:bg-stone-200
-            theme1:text-stone-900
-
-            theme2:text-green-900
-            theme2:bg-green-200
-
-            theme3:bg-stone-50
             "#,
             onsubmit: save,
             label {

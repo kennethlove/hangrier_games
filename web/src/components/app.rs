@@ -5,7 +5,8 @@ use crate::components::loading_modal::LoadingModal;
 use crate::components::server_version::ServerVersion;
 use crate::components::tribute_edit::EditTributeModal;
 use crate::routes::Routes;
-use crate::storage::{AppState, Colorscheme, use_persistent};
+use crate::storage::{AppState, use_persistent};
+use crate::theme::Theme;
 use dioxus::prelude::*;
 use game::games::Game;
 use shared::{DeleteGame, EditGame, EditTribute};
@@ -17,7 +18,7 @@ pub fn App() -> Element {
     let loading_signal: Signal<LoadingState> = use_signal(LoadingState::default);
     use_context_provider(|| loading_signal);
 
-    let theme_signal: Signal<Colorscheme> = use_signal(|| storage.get().colorscheme);
+    let theme_signal: Signal<Theme> = use_signal(|| storage.get().theme);
     use_context_provider(|| theme_signal);
 
     let game_signal: Signal<Option<Game>> = use_signal(|| None);
@@ -35,9 +36,8 @@ pub fn App() -> Element {
     let client_version = env!("CARGO_PKG_VERSION");
 
     let favicon = match *theme_signal.read() {
-        Colorscheme::One => asset!("/assets/favicons/theme1.png"),
-        Colorscheme::Two => asset!("/assets/favicons/theme2.png"),
-        Colorscheme::Three => asset!("/assets/favicons/theme3.png"),
+        Theme::Dark => asset!("/assets/favicons/dark.png"),
+        Theme::Light => asset!("/assets/favicons/light.png"),
     };
 
     rsx! {
@@ -57,7 +57,7 @@ pub fn App() -> Element {
             crossorigin: "anonymous"
         }
         document::Link {
-            href: "https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&family=Work+Sans:ital,wght@0,100..900;1,100..900&family=Orbitron:wght@400..900&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap",
+            href: "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap",
             rel: "stylesheet"
         }
 
@@ -71,30 +71,7 @@ pub fn App() -> Element {
         div {
             class: "{theme_signal.read()}",
             div {
-                class: r#"
-                grid
-                min-v-full
-                min-h-screen
-                frame
-                transition
-                duration-500
-                font-[Work_Sans]
-
-                theme1:bg-red-900/85
-
-                theme2:bg-green-800/85
-                theme2:bg-[url("../assets/images/waves.svg")]
-                theme2:bg-no-repeat
-                theme2:bg-origin-border
-                theme2:bg-bottom
-                theme2:bg-fixed
-
-                theme3:bg-linear-to-b
-                theme3:from-stone-50/80
-                theme3:to-stone-900/95
-                theme3:bg-top
-                theme3:bg-fixed
-                "#,
+                class: "grid min-h-screen frame transition duration-500 font-text bg-bg text-text",
 
                 div {
                     class: r#"
@@ -105,26 +82,18 @@ pub fn App() -> Element {
                 }
 
                 footer {
-                    class: r#"
-                    mt-4
-                    pb-4
-                    text-xs
-                    text-center
-                    theme1:text-stone-200
-                    theme2:text-green-900
-                    theme3:text-stone-400
-                    "#,
+                    class: "mt-4 pb-4 text-xs text-center text-text-muted",
 
                     p {
                         "Made with 💜 by ",
                         a {
-                            class: "underline theme1:text-amber-300 theme2:text-green-200 theme3:text-yellow-600",
+                            class: "underline text-primary",
                             href: "https://thekennethlove.com",
                             "klove"
                         },
                         ". ",
                         a {
-                            class: "underline theme1:text-amber-300 theme2:text-green-200 theme3:text-yellow-600",
+                            class: "underline text-primary",
                             href: "/credits",
                             "Credits"
                         }

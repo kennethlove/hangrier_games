@@ -68,21 +68,27 @@ impl TestDb {
         //     `migrations/definitions/*.json` mid-run, so concurrent
         //     readers in sibling test threads/processes observe a
         //     mid-write empty file and serde panics with EOF.
+        //   * A single per-process tempdir was tried previously but
+        //     in-process parallelism (libtest spawns N test threads)
+        //     still races on the same shared `migrations/definitions/`
+        //     tree — same EOF panic in CI.
         //
-        // Fix: copy `schemas/` + `migrations/` into a private per-process
-        // tempdir at first call, point a `.surrealdb` ini at that copy,
-        // and run every migration from there. Each process has exclusive
-        // ownership of its tree; in-process parallelism still races on
-        // the same files but that's already the upstream behavior — and
-        // local repeated runs confirm intra-process serialization is
-        // sufficient because the writes converge before any other thread
-        // calls `up()`.
-        let config_path = ensure_isolated_migration_root();
+        // Fix: copy `schemas/` + `migrations/` into a private *per-test*
+        // tempdir (cheap — these are small files), point a `.surrealdb`
+        // ini at that copy, and run migrations from there. Each test
+        // owns its own tree so concurrent rewrites are impossible.
+        // Belt-and-suspenders: a global mutex serializes the actual
+        // `up()` invocation against the shared template directory we
+        // copy from, since `read_dir` over a directory being written by
+        // the migration tool can also EOF.
+        let config_path = build_isolated_migration_root();
+        let _guard = MIGRATION_LOCK.lock().await;
         MigrationRunner::new(&db)
             .use_config_file(&config_path)
             .up()
             .await
             .expect("Failed to apply migrations");
+        drop(_guard);
 
         TestDb {
             db,
@@ -113,33 +119,66 @@ impl TestDb {
     }
 }
 
-/// Copy `schemas/` and `migrations/` into a private per-process tempdir
-/// once, write a `.surrealdb` ini pointing at that copy, and return the
-/// ini path. Subsequent calls return the cached path. See the comment in
-/// [`TestDb::new`] for the full rationale.
-fn ensure_isolated_migration_root() -> std::path::PathBuf {
-    static ROOT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
-    ROOT.get_or_init(|| {
-        let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .expect("api crate must have a parent (workspace root)");
-        let dst = std::env::temp_dir().join(format!(
-            "hg-mig-{}-{}",
-            std::process::id(),
-            uuid::Uuid::new_v4().simple()
-        ));
-        std::fs::create_dir_all(&dst).expect("create migration tempdir");
-        for sub in ["schemas", "migrations"] {
-            copy_dir_recursive(&workspace_root.join(sub), &dst.join(sub))
-                .unwrap_or_else(|e| panic!("copy {sub} into tempdir: {e}"));
-        }
-        let cfg = dst.join(".surrealdb");
-        std::fs::write(&cfg, format!("[core]\npath={}\n", dst.display()))
-            .expect("write .surrealdb config");
-        cfg
-    })
-    .clone()
+/// Build a fresh per-test migration root by copying `schemas/` and
+/// `migrations/` from a process-cached source tree (`SOURCE_ROOT`) into
+/// a unique tempdir, then writing a `.surrealdb` ini that points at the
+/// copy. Each test gets its own tree so the migration runner's mid-run
+/// rewrites of `migrations/definitions/*.json` cannot race against any
+/// other test thread. See the comment in [`TestDb::new`] for full
+/// rationale.
+fn build_isolated_migration_root() -> std::path::PathBuf {
+    let src = source_migration_root();
+    let dst = std::env::temp_dir().join(format!(
+        "hg-mig-{}-{}",
+        std::process::id(),
+        uuid::Uuid::new_v4().simple()
+    ));
+    std::fs::create_dir_all(&dst).expect("create migration tempdir");
+    for sub in ["schemas", "migrations"] {
+        copy_dir_recursive(&src.join(sub), &dst.join(sub))
+            .unwrap_or_else(|e| panic!("copy {sub} into tempdir: {e}"));
+    }
+    let cfg = dst.join(".surrealdb");
+    std::fs::write(&cfg, format!("[core]\npath={}\n", dst.display()))
+        .expect("write .surrealdb config");
+    cfg
 }
+
+/// Process-wide source-of-truth for migration files. We do NOT point
+/// tests at the workspace tree directly because `MigrationRunner::up()`
+/// rewrites files in `migrations/definitions/`. Instead, copy the
+/// workspace tree into a per-process tempdir once, treat that as the
+/// read-only source, and snapshot from it on every test.
+fn source_migration_root() -> std::path::PathBuf {
+    static SOURCE: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+    SOURCE
+        .get_or_init(|| {
+            let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("api crate must have a parent (workspace root)");
+            let dst = std::env::temp_dir().join(format!(
+                "hg-mig-src-{}-{}",
+                std::process::id(),
+                uuid::Uuid::new_v4().simple()
+            ));
+            std::fs::create_dir_all(&dst).expect("create migration source tempdir");
+            for sub in ["schemas", "migrations"] {
+                copy_dir_recursive(&workspace_root.join(sub), &dst.join(sub))
+                    .unwrap_or_else(|e| panic!("seed {sub} source tempdir: {e}"));
+            }
+            dst
+        })
+        .clone()
+}
+
+/// Serializes `MigrationRunner::up()` calls. Belt-and-suspenders on top
+/// of per-test tempdirs: while each test's *destination* tree is
+/// private, libtest's many threads can still all enter `up()` at the
+/// same time, and the runner has historically been fragile under heavy
+/// concurrent invocation. The lock is cheap (held only for the
+/// migration call) and removes the last source of intermittent EOF
+/// panics in CI.
+static MIGRATION_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
     std::fs::create_dir_all(dst)?;

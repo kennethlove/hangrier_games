@@ -1,9 +1,8 @@
+use crate::theme::Theme;
 use dioxus::prelude::*;
 use gloo_storage::{LocalStorage, Storage};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
 
 /// A persistent storage hook that can be used to store data across application reloads.
 pub fn use_persistent<T: Serialize + DeserializeOwned + Default + 'static>(
@@ -54,46 +53,9 @@ impl<T: Serialize + DeserializeOwned + Clone + 'static> UsePersistent<T> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-pub enum Colorscheme {
-    #[default]
-    One,
-    Two,
-    Three,
-}
-
-impl Display for Colorscheme {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Colorscheme::One => {
-                write!(f, "theme1")
-            }
-            Colorscheme::Two => {
-                write!(f, "theme2")
-            }
-            Colorscheme::Three => {
-                write!(f, "theme3")
-            }
-        }
-    }
-}
-
-impl FromStr for Colorscheme {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "theme1" => Ok(Colorscheme::One),
-            "theme2" => Ok(Colorscheme::Two),
-            "theme3" => Ok(Colorscheme::Three),
-            _ => Err("invalid colorscheme".into()),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppState {
-    pub(crate) colorscheme: Colorscheme,
+    pub(crate) theme: Theme,
     /// Username persisted purely for UI display ("Logout, {username}!")
     /// and to drive auth-aware nav rendering. The actual session lives in
     /// the HttpOnly `hg_session` cookie set by the API and is invisible to
@@ -102,13 +64,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn switch_to_theme_one(&mut self) {
-        self.colorscheme = Colorscheme::One;
-    }
-    pub fn switch_to_theme_two(&mut self) {
-        self.colorscheme = Colorscheme::Two;
-    }
-    pub fn switch_to_theme_three(&mut self) {
-        self.colorscheme = Colorscheme::Three;
+    pub fn set_theme(&mut self, theme: Theme) {
+        self.theme = theme;
     }
 }

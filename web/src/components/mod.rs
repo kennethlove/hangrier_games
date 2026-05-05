@@ -68,3 +68,4 @@ mod tribute_status_icon;
 pub use tribute_status_icon::TributeStatusIcon;
 mod tribute_survival_section;
 pub use tribute_survival_section::TributeSurvivalSection;
+pub mod ui;

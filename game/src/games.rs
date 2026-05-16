@@ -572,10 +572,24 @@ impl Game {
         };
         let tick = self.tick_counter.boundary();
         self.push_message(
+            crate::messages::MessageSource::Game(game_id.clone()),
+            subject.clone(),
+            content.clone(),
+            payload,
+            tick,
+        );
+
+        // PhaseStarted: four-phase day substrate (spec §4 step 4).
+        let phase_payload = crate::messages::MessagePayload::PhaseStarted {
+            day: current_day,
+            phase,
+            weather_summary: None,
+        };
+        self.push_message(
             crate::messages::MessageSource::Game(game_id),
             subject,
             content,
-            payload,
+            phase_payload,
             tick,
         );
 
@@ -603,6 +617,19 @@ impl Game {
             format!("game:{}", game_id),
             format!("End of {} {}.", phase, current_day),
             payload,
+            tick,
+        );
+
+        // PhaseEnded: four-phase day substrate (spec §4 step 4).
+        let phase_payload = crate::messages::MessagePayload::PhaseEnded {
+            day: current_day,
+            phase,
+        };
+        self.push_message(
+            crate::messages::MessageSource::Game(game_id.clone()),
+            format!("game:{}", game_id),
+            format!("End of {} {}.", phase, current_day),
+            phase_payload,
             tick,
         );
         Ok(())
@@ -2176,8 +2203,8 @@ mod tests {
         let mut game = create_test_game_with_tributes(vec![tribute1.clone(), tribute2.clone()]);
         game.day = Some(1);
         let _ = game.announce_cycle_start(crate::messages::Phase::Day);
-        // Day 1 has a single announcement.
-        assert_eq!(game.messages.len(), 1);
+        // Day 1 has two announcements: legacy CycleStart + new PhaseStarted.
+        assert_eq!(game.messages.len(), 2);
     }
 
     #[test]
@@ -2191,9 +2218,9 @@ mod tests {
         game.day = Some(1);
         let _ = game.announce_cycle_end(crate::messages::Phase::Day);
         // Death announcements moved to the kill site as typed
-        // `MessagePayload::TributeKilled`. Only the cycle-end summary
-        // remains here.
-        assert_eq!(game.messages.len(), 1);
+        // `MessagePayload::TributeKilled`. Two messages remain:
+        // legacy CycleEnd + new PhaseEnded.
+        assert_eq!(game.messages.len(), 2);
     }
 
     #[test]

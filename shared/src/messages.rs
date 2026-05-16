@@ -167,6 +167,8 @@ pub enum MessageKind {
     Movement,
     Item,
     State,
+    /// Sponsor gift delivery.
+    SponsorGift,
 }
 
 /// Visible fatigue band derived from a tribute's stamina/max_stamina ratio.
@@ -463,9 +465,8 @@ impl MessagePayload {
             TributeMoved { .. } | TributeHidden { .. } | AreaClosed { .. } | AreaEvent { .. } => {
                 MessageKind::Movement
             }
-            ItemFound { .. } | ItemUsed { .. } | ItemDropped { .. } | SponsorGift { .. } => {
-                MessageKind::Item
-            }
+            ItemFound { .. } | ItemUsed { .. } | ItemDropped { .. } => MessageKind::Item,
+            SponsorGift { .. } => MessageKind::SponsorGift,
             CycleStart { .. } | CycleEnd { .. } | GameEnded { .. } => MessageKind::State,
             TributeWounded { .. }
             | TributeRested { .. }
@@ -849,14 +850,15 @@ mod tests {
                 item: item.clone(),
                 area: area.clone(),
             },
-            MessagePayload::SponsorGift {
-                recipient: t("a"),
-                item: item.clone(),
-                donor: "Capitol".into(),
-            },
         ] {
             assert_eq!(p.kind(), MessageKind::Item);
         }
+        let sponsor = MessagePayload::SponsorGift {
+            recipient: t("a"),
+            item: item.clone(),
+            donor: "Capitol".into(),
+        };
+        assert_eq!(sponsor.kind(), MessageKind::SponsorGift);
     }
 
     #[test]

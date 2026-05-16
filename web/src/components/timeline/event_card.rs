@@ -49,6 +49,10 @@ pub fn EventCard(props: EventCardProps) -> Element {
                 game_identifier: props.game_identifier.clone(),
                 message: props.message.clone(),
             } },
+            MessageKind::SponsorGift => rsx! { ItemCard {
+                game_identifier: props.game_identifier.clone(),
+                message: props.message.clone(),
+            } },
             MessageKind::State => match payload {
                 MessagePayload::StaminaBandChanged { .. } => {
                     rsx! { StaminaCard { message: props.message.clone() } }

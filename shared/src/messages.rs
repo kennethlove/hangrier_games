@@ -425,6 +425,19 @@ pub enum MessagePayload {
         day: u32,
         phase: Phase,
     },
+    /// Emitted at the start of each phase (Dawn/Day/Dusk/Night).
+    /// Replaces the legacy `GameDayStart`/`GameNightStart` events.
+    PhaseStarted {
+        day: u32,
+        phase: Phase,
+        weather_summary: Option<String>,
+    },
+    /// Emitted at the end of each phase.
+    /// Replaces the legacy `GameDayEnd`/`GameNightEnd` events.
+    PhaseEnded {
+        day: u32,
+        phase: Phase,
+    },
     /// Emitted when a tribute begins sleeping (resolution of `Action::Sleep`).
     /// `restored_*` fields are zero on the first phase of a multi-phase sleep
     /// and accumulate per phase as the engine ticks the sleeper. See spec
@@ -467,7 +480,11 @@ impl MessagePayload {
             }
             ItemFound { .. } | ItemUsed { .. } | ItemDropped { .. } => MessageKind::Item,
             SponsorGift { .. } => MessageKind::SponsorGift,
-            CycleStart { .. } | CycleEnd { .. } | GameEnded { .. } => MessageKind::State,
+            CycleStart { .. }
+            | CycleEnd { .. }
+            | PhaseStarted { .. }
+            | PhaseEnded { .. }
+            | GameEnded { .. } => MessageKind::State,
             TributeWounded { .. }
             | TributeRested { .. }
             | TributeStarved { .. }
@@ -524,7 +541,7 @@ impl MessagePayload {
             | TributeWoke { tribute, .. } => r(tribute),
             SponsorGift { recipient, .. } => r(recipient),
             AreaClosed { .. } | AreaEvent { .. } => false,
-            CycleStart { .. } | CycleEnd { .. } => false,
+            CycleStart { .. } | CycleEnd { .. } | PhaseStarted { .. } | PhaseEnded { .. } => false,
             GameEnded { winner } => winner.as_ref().is_some_and(r),
         }
     }

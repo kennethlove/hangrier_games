@@ -358,20 +358,6 @@ impl Tribute {
         rng: &mut impl Rng,
         events: &mut Vec<TaggedEvent>,
     ) {
-        let self_identifier = self.identifier.clone();
-        let self_name = self.name.clone();
-        let tribute_ref = || TributeRef {
-            identifier: self_identifier.clone(),
-            name: self_name.clone(),
-        };
-        let area_ref = |a: Area| {
-            let s = a.to_string();
-            AreaRef {
-                identifier: s.clone(),
-                name: s,
-            }
-        };
-
         // Tribute is already dead, do nothing. (No event emitted — noise drop.)
         if !self.is_alive() {
             return;
@@ -397,7 +383,10 @@ impl Tribute {
             events.push(TaggedEvent::new(
                 line,
                 MessagePayload::TributeKilled {
-                    victim: tribute_ref(),
+                    victim: TributeRef {
+                        identifier: self.identifier.clone(),
+                        name: self.name.clone(),
+                    },
                     killer: None,
                     cause: "untracked".into(),
                 },
@@ -427,11 +416,7 @@ impl Tribute {
                         betrayer: self.id,
                         victim: victim.id,
                     });
-                // The human-readable betrayal line is emitted at the game
-                // level inside `process_alliance_events` so it can be tagged
-                // with `MessageKind::BetrayalTriggered`. See games.rs.
             }
-            // Reset the timer whether or not an ally was available.
             self.turns_since_last_betrayal = 0;
         }
 
@@ -448,20 +433,12 @@ impl Tribute {
 
         // Set a preferred action if one is suggested
         if let Some(suggestion) = action_suggestion {
-            self.brain.set_preferred_action(
-                suggestion.action,
-                suggestion.probability.unwrap_or(1.0), // If no probability is set, perform the preferred action.
-            );
+            self.brain
+                .set_preferred_action(suggestion.action, suggestion.probability.unwrap_or(1.0));
         }
 
         // Get tribute action
         let number_of_nearby_tributes = encounter_context.nearby_tributes_count;
-        // Sleep gating (PR2c.1, bd-9sjj) runs before the standard brain
-        // pipeline so a needed sleep cleanly preempts attack / move /
-        // forage scoring. `Brain::should_sleep` is a phase-aware override
-        // that returns `Some(Action::Sleep { duration_phases })` when the
-        // tribute's wakefulness, stamina, and local-safety state warrant
-        // it. Psychotic-break tributes are excluded inside the helper.
         let action = if let Some(sleep_action) = self.brain.should_sleep(
             self,
             number_of_nearby_tributes,
@@ -484,276 +461,48 @@ impl Tribute {
 
         let closed_areas = environment_details.closed_areas;
 
-        match &action {
+        match action {
             Action::Move(area) => {
-                let travel_result = match area {
-                    Some(specific_area) => self.travels(closed_areas, Some(*specific_area), events),
-                    None => self.travels(closed_areas, None, events),
-                };
-
-                match travel_result {
-                    TravelResult::Success(destination) => {
-                        // Find destination info from available_destinations
-                        let dest_info = environment_details
-                            .available_destinations
-                            .iter()
-                            .find(|d| d.area == destination);
-
-                        match dest_info {
-                            Some(info) => {
-                                // Check if tribute has enough stamina
-                                if self.stamina >= info.stamina_cost {
-                                    // Move and deduct stamina
-                                    self.area = destination;
-                                    self.stamina = self.stamina.saturating_sub(info.stamina_cost);
-                                } else {
-                                    // Insufficient stamina - exhausted. travels() already
-                                    // pushed a TributeMoves event optimistically; remove it
-                                    // so the log doesn't contradict itself ("moves from X"
-                                    // immediately followed by "too exhausted to move from X").
-                                    events.pop();
-                                    self.short_rests();
-                                    let line = GameOutput::TributeTravelExhausted(
-                                        self.name.as_str(),
-                                        &self.area.to_string(),
-                                    )
-                                    .to_string();
-                                    events.push(TaggedEvent::new(
-                                        line,
-                                        MessagePayload::TributeRested {
-                                            tribute: tribute_ref(),
-                                            hp_restored: 0,
-                                        },
-                                    ));
-                                }
-                            }
-                            None => {
-                                // Destination not in available_destinations (shouldn't happen)
-                                self.short_rests();
-                            }
-                        }
-                    }
-                    TravelResult::Failure => {
-                        self.short_rests();
-                    }
-                }
+                self.act_move(
+                    &area,
+                    closed_areas,
+                    &environment_details.available_destinations,
+                    events,
+                );
             }
             Action::Rest => {
-                let line = GameOutput::TributeRest(self.name.as_str()).to_string();
-                events.push(TaggedEvent::new(
-                    line,
-                    MessagePayload::TributeRested {
-                        tribute: tribute_ref(),
-                        hp_restored: 0,
-                    },
-                ));
-                self.long_rests();
+                self.act_rest(events);
             }
             Action::Hide => {
-                let hidden = self.hides();
-                let current_area = self.area;
-                if hidden {
-                    let line = GameOutput::TributeHide(self.name.as_str()).to_string();
-                    events.push(TaggedEvent::new(
-                        line,
-                        MessagePayload::TributeHidden {
-                            tribute: tribute_ref(),
-                            area: area_ref(current_area),
-                        },
-                    ));
-                } else {
-                    // Just log as regular hide, game doesn't distinguish failure in output
-                    let line = GameOutput::TributeHide(self.name.as_str()).to_string();
-                    events.push(TaggedEvent::new(
-                        line,
-                        MessagePayload::TributeHidden {
-                            tribute: tribute_ref(),
-                            area: area_ref(current_area),
-                        },
-                    ));
-                }
+                self.act_hide(events);
             }
             Action::Attack => {
-                let target = self.pick_target(
+                self.act_attack(
                     encounter_context.potential_targets,
                     encounter_context.total_living_tributes,
                     events,
+                    rng,
+                    environment_details.phase,
+                    environment_details.combat_tuning,
                 );
-                if let Some(mut target) = target {
-                    let outcome = self.attacks(
-                        &mut target,
-                        rng,
-                        events,
-                        environment_details.phase,
-                        environment_details.combat_tuning,
-                    );
-                    match outcome {
-                        AttackOutcome::Kill(_, mut target) => {
-                            self.statistics.kills += 1;
-                            target.statistics.day_killed =
-                                Some(self.statistics.game.parse().unwrap_or(1));
-                        }
-                        AttackOutcome::Wound(_, _) | AttackOutcome::Miss(_, _) => {}
-                    }
-                }
-                // If no target, no output needed - already logged elsewhere
             }
             Action::TakeItem => {
-                if let Some(item) = self.take_nearby_item(area_details) {
-                    let line =
-                        GameOutput::TributeTakeItem(self.name.as_str(), &item.name).to_string();
-                    let item_ref = ItemRef {
-                        identifier: item.identifier.clone(),
-                        name: item.name.clone(),
-                    };
-                    let current_area = self.area;
-                    events.push(TaggedEvent::new(
-                        line,
-                        MessagePayload::ItemFound {
-                            tribute: tribute_ref(),
-                            item: item_ref,
-                            area: area_ref(current_area),
-                        },
-                    ));
-                }
-                // If no items available, no output
+                self.act_take_item(area_details, events);
             }
             Action::UseItem(maybe_item) => {
-                if let Some(item) = maybe_item {
-                    if let Err(error) = self.try_use_consumable(item) {
-                        let line = GameOutput::TributeCannotUseItem(
-                            self.name.as_str(),
-                            &error.to_string(),
-                        )
-                        .to_string();
-                        let item_ref = ItemRef {
-                            identifier: item.identifier.clone(),
-                            name: item.name.clone(),
-                        };
-                        events.push(TaggedEvent::new(
-                            line,
-                            MessagePayload::ItemUsed {
-                                tribute: tribute_ref(),
-                                item: item_ref,
-                            },
-                        ));
-                    } else {
-                        let line = GameOutput::TributeUseItem(self.name.as_str(), item).to_string();
-                        let item_ref = ItemRef {
-                            identifier: item.identifier.clone(),
-                            name: item.name.clone(),
-                        };
-                        events.push(TaggedEvent::new(
-                            line,
-                            MessagePayload::ItemUsed {
-                                tribute: tribute_ref(),
-                                item: item_ref,
-                            },
-                        ));
-                    }
-                }
+                self.act_use_item(&maybe_item, events);
             }
-            Action::None => {
-                // Tribute does nothing - no output needed
-            }
+            Action::None => {}
             Action::ProposeAlliance => {
-                // Pick a candidate from potential_targets (already filtered to
-                // the actor's current area by the caller). Skip current allies,
-                // dead tributes, and those at the per-tribute cap. Skip
-                // candidates that fail the refuser gate so the message we emit
-                // doesn't promise something the alliance roll can never grant.
-                use crate::tributes::alliances::{
-                    self, MAX_ALLIES, deciding_factor, passes_gate, try_form_alliance,
-                };
-                let candidates: Vec<&Tribute> = encounter_context
-                    .potential_targets
-                    .iter()
-                    .filter(|t| t.is_alive())
-                    .filter(|t| !self.allies.contains(&t.id))
-                    .filter(|t| t.allies.len() < MAX_ALLIES)
-                    .filter(|t| passes_gate(&self.traits, &t.traits))
-                    .collect();
-                if candidates.is_empty() {
-                    // No viable candidate; treat as a wasted social attempt.
-                    // Emit nothing — the proposer is alone-among-rivals and
-                    // the log already records nearby tributes via earlier
-                    // events.
-                    return;
-                }
-                let target = {
-                    use rand::seq::IndexedRandom;
-                    candidates.choose(rng).cloned().unwrap()
-                };
-                let target_ref = TributeRef {
-                    identifier: target.identifier.clone(),
-                    name: target.name.clone(),
-                };
-                // Emit an AllianceProposed message regardless of outcome so
-                // the player sees the social action.
-                let proposed_line =
-                    format!("🤝 {} proposes an alliance to {}.", self.name, target.name);
-                events.push(TaggedEvent::new(
-                    proposed_line,
-                    MessagePayload::AllianceProposed {
-                        proposer: tribute_ref(),
-                        target: target_ref.clone(),
-                    },
-                ));
-
-                let same_district = self.district == target.district;
-                let formed = try_form_alliance(
-                    &self.traits,
-                    &target.traits,
-                    same_district,
-                    self.allies.len(),
-                    target.allies.len(),
-                    rng,
-                );
-                if formed {
-                    let factor = deciding_factor(&self.traits, &target.traits, same_district);
-                    let factor_label = factor
-                        .as_ref()
-                        .map(|f| f.label())
-                        .unwrap_or("mutual circumstance")
-                        .to_string();
-                    // Defer the symmetric `allies` push and the
-                    // AllianceFormed message to game::process_alliance_events
-                    // so we don't need a `&mut` borrow on `target` here.
-                    self.alliance_events
-                        .push(alliances::AllianceEvent::FormationRecorded {
-                            proposer: self.id,
-                            target: target.id,
-                            factor: factor_label,
-                        });
-                }
+                self.act_propose_alliance(&encounter_context, rng, events);
             }
-            // Survival actions: full handling is wired in Task 12. For now
-            // they're recognized but produce no events here.
             Action::SeekShelter
             | Action::Forage
             | Action::DrinkFromTerrain
             | Action::Eat(_)
             | Action::DrinkItem(_) => {}
-            // Sleep entry (PR2c.1, bd-9sjj). The brain has elected to begin
-            // a multi-phase sleep; flip the flag, prime the countdown, and
-            // emit `TributeSlept` with zeroed restoration counters. The
-            // engine's per-phase sleep tick (Game::execute_cycle) will
-            // perform the actual stamina/HP regen and emit `TributeWoke`
-            // when `sleep_remaining` drains to zero. Interruptions
-            // (ambush / area-event / alliance-summons) are bd-1zju /
-            // PR2c.2.
             Action::Sleep { duration_phases } => {
-                self.sleeping = true;
-                self.sleep_remaining = *duration_phases;
-                events.push(TaggedEvent::new(
-                    GameOutput::TributeSleeps(self.name.as_str()).to_string(),
-                    MessagePayload::TributeSlept {
-                        tribute: tribute_ref(),
-                        phase: environment_details.phase,
-                        restored_stamina: 0,
-                        restored_hp: 0,
-                    },
-                ));
+                self.act_sleep(duration_phases, environment_details.phase, events);
             }
         }
     }
@@ -814,6 +563,286 @@ impl Tribute {
 
         let mut rng = SmallRng::from_rng(&mut rand::rng());
         Some(enemies.choose(&mut rng).unwrap().clone())
+    }
+
+    // --- Per-Action executor helpers (extracted from process_turn_phase) ---
+
+    fn act_move(
+        &mut self,
+        area: &Option<Area>,
+        closed_areas: &[Area],
+        available_destinations: &[crate::areas::DestinationInfo],
+        events: &mut Vec<TaggedEvent>,
+    ) {
+        let tribute_ref = TributeRef {
+            identifier: self.identifier.clone(),
+            name: self.name.clone(),
+        };
+
+        let travel_result = match area {
+            Some(specific_area) => self.travels(closed_areas, Some(*specific_area), events),
+            None => self.travels(closed_areas, None, events),
+        };
+
+        match travel_result {
+            TravelResult::Success(destination) => {
+                let dest_info = available_destinations
+                    .iter()
+                    .find(|d| d.area == destination);
+
+                match dest_info {
+                    Some(info) => {
+                        if self.stamina >= info.stamina_cost {
+                            self.area = destination;
+                            self.stamina = self.stamina.saturating_sub(info.stamina_cost);
+                        } else {
+                            events.pop();
+                            self.short_rests();
+                            let line = GameOutput::TributeTravelExhausted(
+                                self.name.as_str(),
+                                &self.area.to_string(),
+                            )
+                            .to_string();
+                            events.push(TaggedEvent::new(
+                                line,
+                                MessagePayload::TributeRested {
+                                    tribute: tribute_ref,
+                                    hp_restored: 0,
+                                },
+                            ));
+                        }
+                    }
+                    None => {
+                        self.short_rests();
+                    }
+                }
+            }
+            TravelResult::Failure => {
+                self.short_rests();
+            }
+        }
+    }
+
+    fn act_rest(&mut self, events: &mut Vec<TaggedEvent>) {
+        let tribute_ref = TributeRef {
+            identifier: self.identifier.clone(),
+            name: self.name.clone(),
+        };
+        let line = GameOutput::TributeRest(self.name.as_str()).to_string();
+        events.push(TaggedEvent::new(
+            line,
+            MessagePayload::TributeRested {
+                tribute: tribute_ref,
+                hp_restored: 0,
+            },
+        ));
+        self.long_rests();
+    }
+
+    fn act_hide(&mut self, events: &mut Vec<TaggedEvent>) {
+        let tribute_ref = TributeRef {
+            identifier: self.identifier.clone(),
+            name: self.name.clone(),
+        };
+        let area_ref = |a: Area| {
+            let s = a.to_string();
+            AreaRef {
+                identifier: s.clone(),
+                name: s,
+            }
+        };
+
+        let _hidden = self.hides();
+        let current_area = self.area;
+        let line = GameOutput::TributeHide(self.name.as_str()).to_string();
+        events.push(TaggedEvent::new(
+            line,
+            MessagePayload::TributeHidden {
+                tribute: tribute_ref,
+                area: area_ref(current_area),
+            },
+        ));
+    }
+
+    fn act_attack(
+        &mut self,
+        potential_targets: Vec<Tribute>,
+        total_living_tributes: u32,
+        events: &mut Vec<TaggedEvent>,
+        rng: &mut impl Rng,
+        phase: shared::messages::Phase,
+        combat_tuning: &crate::tributes::combat_tuning::CombatTuning,
+    ) {
+        let target = self.pick_target(potential_targets, total_living_tributes, events);
+        if let Some(mut target) = target {
+            let outcome = self.attacks(&mut target, rng, events, phase, combat_tuning);
+            match outcome {
+                AttackOutcome::Kill(_, mut target) => {
+                    self.statistics.kills += 1;
+                    target.statistics.day_killed = Some(self.statistics.game.parse().unwrap_or(1));
+                }
+                AttackOutcome::Wound(_, _) | AttackOutcome::Miss(_, _) => {}
+            }
+        }
+    }
+
+    fn act_take_item(&mut self, area_details: &mut AreaDetails, events: &mut Vec<TaggedEvent>) {
+        if let Some(item) = self.take_nearby_item(area_details) {
+            let tribute_ref = TributeRef {
+                identifier: self.identifier.clone(),
+                name: self.name.clone(),
+            };
+            let area_ref = |a: Area| {
+                let s = a.to_string();
+                AreaRef {
+                    identifier: s.clone(),
+                    name: s,
+                }
+            };
+            let line = GameOutput::TributeTakeItem(self.name.as_str(), &item.name).to_string();
+            let item_ref = ItemRef {
+                identifier: item.identifier.clone(),
+                name: item.name.clone(),
+            };
+            let current_area = self.area;
+            events.push(TaggedEvent::new(
+                line,
+                MessagePayload::ItemFound {
+                    tribute: tribute_ref,
+                    item: item_ref,
+                    area: area_ref(current_area),
+                },
+            ));
+        }
+    }
+
+    fn act_use_item(&mut self, maybe_item: &Option<Item>, events: &mut Vec<TaggedEvent>) {
+        if let Some(item) = maybe_item {
+            let tribute_ref = TributeRef {
+                identifier: self.identifier.clone(),
+                name: self.name.clone(),
+            };
+            if let Err(error) = self.try_use_consumable(item) {
+                let line = GameOutput::TributeCannotUseItem(self.name.as_str(), &error.to_string())
+                    .to_string();
+                let item_ref = ItemRef {
+                    identifier: item.identifier.clone(),
+                    name: item.name.clone(),
+                };
+                events.push(TaggedEvent::new(
+                    line,
+                    MessagePayload::ItemUsed {
+                        tribute: tribute_ref,
+                        item: item_ref,
+                    },
+                ));
+            } else {
+                let line = GameOutput::TributeUseItem(self.name.as_str(), item).to_string();
+                let item_ref = ItemRef {
+                    identifier: item.identifier.clone(),
+                    name: item.name.clone(),
+                };
+                events.push(TaggedEvent::new(
+                    line,
+                    MessagePayload::ItemUsed {
+                        tribute: tribute_ref,
+                        item: item_ref,
+                    },
+                ));
+            }
+        }
+    }
+
+    fn act_propose_alliance(
+        &mut self,
+        encounter_context: &EncounterContext,
+        rng: &mut impl Rng,
+        events: &mut Vec<TaggedEvent>,
+    ) {
+        use crate::tributes::alliances::{
+            MAX_ALLIES, deciding_factor, passes_gate, try_form_alliance,
+        };
+
+        let tribute_ref = TributeRef {
+            identifier: self.identifier.clone(),
+            name: self.name.clone(),
+        };
+
+        let candidates: Vec<&Tribute> = encounter_context
+            .potential_targets
+            .iter()
+            .filter(|t| t.is_alive())
+            .filter(|t| !self.allies.contains(&t.id))
+            .filter(|t| t.allies.len() < MAX_ALLIES)
+            .filter(|t| passes_gate(&self.traits, &t.traits))
+            .collect();
+        if candidates.is_empty() {
+            return;
+        }
+        let target = {
+            use rand::seq::IndexedRandom;
+            candidates.choose(rng).cloned().unwrap()
+        };
+        let target_ref = TributeRef {
+            identifier: target.identifier.clone(),
+            name: target.name.clone(),
+        };
+
+        let proposed_line = format!("🤝 {} proposes an alliance to {}.", self.name, target.name);
+        events.push(TaggedEvent::new(
+            proposed_line,
+            MessagePayload::AllianceProposed {
+                proposer: tribute_ref,
+                target: target_ref.clone(),
+            },
+        ));
+
+        let same_district = self.district == target.district;
+        let formed = try_form_alliance(
+            &self.traits,
+            &target.traits,
+            same_district,
+            self.allies.len(),
+            target.allies.len(),
+            rng,
+        );
+        if formed {
+            let factor = deciding_factor(&self.traits, &target.traits, same_district);
+            let factor_label = factor
+                .as_ref()
+                .map(|f| f.label())
+                .unwrap_or("mutual circumstance")
+                .to_string();
+            self.alliance_events
+                .push(alliances::AllianceEvent::FormationRecorded {
+                    proposer: self.id,
+                    target: target.id,
+                    factor: factor_label,
+                });
+        }
+    }
+
+    fn act_sleep(
+        &mut self,
+        duration_phases: u8,
+        phase: shared::messages::Phase,
+        events: &mut Vec<TaggedEvent>,
+    ) {
+        let tribute_ref = TributeRef {
+            identifier: self.identifier.clone(),
+            name: self.name.clone(),
+        };
+        self.sleeping = true;
+        self.sleep_remaining = duration_phases;
+        events.push(TaggedEvent::new(
+            GameOutput::TributeSleeps(self.name.as_str()).to_string(),
+            MessagePayload::TributeSlept {
+                tribute: tribute_ref,
+                phase,
+                restored_stamina: 0,
+                restored_hp: 0,
+            },
+        ));
     }
 
     /// Wake an interrupted sleeper (PR2c.2, bd-1zju). Resets the sleep

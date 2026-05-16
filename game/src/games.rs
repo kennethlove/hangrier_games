@@ -1158,7 +1158,13 @@ impl Game {
         let mut drained_alliance_events: Vec<crate::tributes::alliances::AllianceEvent> =
             Vec::new();
 
-        for tribute in self.tributes.iter_mut() {
+        // Two-phase resolution (tm6a): collect indices of tributes that
+        // survive survival/sleep ticks first, then execute actions in a
+        // second pass with liveness checks so tributes killed by earlier
+        // actions in the same phase cannot act.
+        let mut tributes_to_act: Vec<usize> = Vec::new();
+
+        for (idx, tribute) in self.tributes.iter_mut().enumerate() {
             if !tribute.is_alive() {
                 // Newly-dead tributes (status=RecentlyDead going into this
                 // cycle) trigger a DeathRecorded event so allies process the
@@ -1426,6 +1432,33 @@ impl Game {
                     ));
                 }
                 let _ = (restored_stamina, restored_hp);
+                continue;
+            }
+
+            // Tribute survived survival + sleep ticks — queue for action phase.
+            // Two-phase resolution (tm6a): actions execute in a second pass
+            // with liveness checks so tributes killed by earlier actions
+            // cannot act.
+            tributes_to_act.push(idx);
+        }
+
+        // --- Phase 2: Execute actions with liveness checks ---
+        for idx in tributes_to_act {
+            let tribute = &mut self.tributes[idx];
+
+            // Liveness gate: tribute may have been killed by an earlier
+            // action in this same phase (tm6a).
+            if !tribute.is_alive() {
+                if tribute.status == TributeStatus::RecentlyDead {
+                    let killer = tribute.recently_killed_by.take();
+                    drained_alliance_events.push(
+                        crate::tributes::alliances::AllianceEvent::DeathRecorded {
+                            deceased: tribute.id,
+                            killer,
+                        },
+                    );
+                }
+                tribute.status = TributeStatus::Dead;
                 continue;
             }
 

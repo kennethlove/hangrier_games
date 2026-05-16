@@ -3,8 +3,10 @@ use std::fmt::{Debug, Display};
 use std::str::FromStr;
 use validator::{Validate, ValidationError};
 
+pub mod audience;
 pub mod combat_beat;
 pub mod messages;
+pub mod sponsors;
 
 use crate::messages::{GameMessage, TributeRef};
 

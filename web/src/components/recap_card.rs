@@ -32,7 +32,7 @@ pub fn RecapCard(props: RecapCardProps) -> Element {
     let game_id = props.game.identifier.clone();
 
     rsx! {
-        section { class: "rounded-lg border bg-amber-50   p-4 mb-4",
+        section { class: "rounded-lg border bg-surface p-4 mb-4",
             header {
                 class: "flex items-center justify-between cursor-pointer",
                 onclick: toggle,

@@ -156,6 +156,11 @@ pub struct Game {
     /// `2026-05-03-stamina-combat-resource-design.md`.
     #[serde(default)]
     pub combat_tuning: crate::tributes::combat_tuning::CombatTuning,
+
+    /// NPC sponsors that observe events and build per-tribute affinity.
+    /// Lazily spawned on first cycle for backward-compat with pre-sponsorship games.
+    #[serde(default)]
+    pub sponsors: Vec<shared::sponsors::Sponsor>,
 }
 
 fn default_phase() -> crate::messages::Phase {
@@ -194,6 +199,7 @@ impl Default for Game {
             current_phase: crate::messages::Phase::Day,
             emit_index: 0,
             combat_tuning: crate::tributes::combat_tuning::CombatTuning::default(),
+            sponsors: vec![],
         }
     }
 }
@@ -1529,9 +1535,37 @@ impl Game {
         living_tributes: Vec<Tribute>,
         living_tributes_count: usize,
     ) -> Result<(), GameError> {
+        // Lazy-spawn sponsors for in-progress games created before sponsorship landed.
+        if self.sponsors.is_empty() {
+            self.spawn_sponsors(rng);
+        }
+
         let ctx =
             self.build_cycle_context(phase, closed_areas, living_tributes, living_tributes_count);
-        self.execute_cycle(ctx, rng)
+
+        // Snapshot message count so we can isolate this cycle's payloads for
+        // the sponsorship translator.
+        let pre_cycle_msg_len = self.messages.len();
+
+        self.execute_cycle(ctx, rng)?;
+
+        // Sponsorship PR1: translate cycle messages → AudienceEvents and update affinities.
+        let cycle_payloads: Vec<shared::messages::MessagePayload> = self
+            .messages
+            .iter()
+            .skip(pre_cycle_msg_len)
+            .map(|m| m.payload.clone())
+            .collect();
+        {
+            let ctx = crate::sponsors::SponsorContext::new(self);
+            let mut all_events = Vec::new();
+            for p in &cycle_payloads {
+                all_events.extend(crate::sponsors::translate(p, &ctx));
+            }
+            crate::sponsors::update_affinities(self, &all_events);
+        }
+
+        Ok(())
     }
 
     /// Runs a cycle of the game, either day or night.
@@ -1863,6 +1897,50 @@ impl Game {
             }
         }
     }
+
+    /// Spawn one sponsor per archetype using the shared catalog.
+    /// Loyalist gets a randomly-assigned district (1..=12). Budget is rolled
+    /// inside the archetype's budget band. Idempotent: no-op if `self.sponsors`
+    /// is already populated.
+    pub fn spawn_sponsors(&mut self, rng: &mut impl Rng) {
+        use shared::sponsors::{ARCHETYPES, ArchetypeId, Sponsor};
+        use std::collections::HashMap;
+
+        if !self.sponsors.is_empty() {
+            return;
+        }
+
+        for (idx, archetype) in ARCHETYPES.iter().enumerate() {
+            let (lo, hi) = archetype.budget_band;
+            let budget = rng.random_range(lo..=hi);
+            let bound_district = if archetype.id == ArchetypeId::Loyalist {
+                Some(rng.random_range(1u8..=12))
+            } else {
+                None
+            };
+
+            self.sponsors.push(Sponsor {
+                id: idx as u32,
+                archetype: archetype.id,
+                budget_remaining: budget,
+                bound_district,
+                affinity: HashMap::new(),
+            });
+        }
+    }
+
+    /// Test helper: returns `(canonical_name, tribute_identifier, affinity)` triples.
+    pub fn sponsor_affinity_snapshot(&self) -> Vec<(&'static str, String, i32)> {
+        let mut out = Vec::new();
+        for s in &self.sponsors {
+            let mut entries: Vec<_> = s.affinity.iter().collect();
+            entries.sort_by_key(|(k, _)| (*k).clone());
+            for (tribute, value) in entries {
+                out.push((s.canonical_name(), tribute.clone(), *value));
+            }
+        }
+        out
+    }
 }
 
 #[cfg(test)]
@@ -1885,6 +1963,7 @@ mod tests {
             current_phase: crate::messages::Phase::Day,
             emit_index: 0,
             combat_tuning: crate::tributes::combat_tuning::CombatTuning::default(),
+            sponsors: vec![],
         }
     }
 
@@ -3353,5 +3432,41 @@ mod tests {
             )
         });
         assert!(woke, "expected TributeWoke{{Interrupted/AllianceSummons}}");
+    }
+
+    #[test]
+    fn spawn_sponsors_creates_six_with_loyalist_district() {
+        let mut game = Game::default();
+        let mut rng = SmallRng::seed_from_u64(42);
+        game.spawn_sponsors(&mut rng);
+
+        assert_eq!(game.sponsors.len(), 6);
+        let loyalist = game
+            .sponsors
+            .iter()
+            .find(|s| s.archetype == shared::sponsors::ArchetypeId::Loyalist)
+            .expect("Loyalist must spawn");
+        let district = loyalist.bound_district.expect("Loyalist gets a district");
+        assert!((1u8..=12).contains(&district));
+    }
+
+    #[test]
+    fn spawn_sponsors_is_idempotent() {
+        let mut game = Game::default();
+        let mut rng = SmallRng::seed_from_u64(1);
+        game.spawn_sponsors(&mut rng);
+        game.spawn_sponsors(&mut rng);
+        assert_eq!(game.sponsors.len(), 6);
+    }
+
+    #[test]
+    fn budget_falls_inside_archetype_band() {
+        let mut game = Game::default();
+        let mut rng = SmallRng::seed_from_u64(7);
+        game.spawn_sponsors(&mut rng);
+        for s in &game.sponsors {
+            let band = shared::sponsors::archetype(s.archetype).budget_band;
+            assert!(s.budget_remaining >= band.0 && s.budget_remaining <= band.1);
+        }
     }
 }

@@ -1,7 +1,8 @@
 use crate::LoadingState;
 use crate::cache::MutationError;
+use crate::components::Input;
 use crate::components::games_list::GamesListQ;
-use crate::components::{Input, ThemedButton};
+use crate::components::ui::{Button, ButtonVariant};
 use crate::http::WithCredentials;
 use crate::routes::Routes;
 use dioxus::prelude::*;
@@ -98,7 +99,8 @@ pub fn CreateGameButton() -> Element {
     rsx! {
         div {
             class: "flex flex-col gap-1",
-            ThemedButton {
+            Button {
+                variant: ButtonVariant::Primary,
                 onclick,
                 "Quickstart"
             }
@@ -171,7 +173,8 @@ pub fn CreateGameForm() -> Element {
                         game_name_signal.set(e.value().clone());
                     }
                 }
-                ThemedButton {
+                Button {
+                    variant: ButtonVariant::Primary,
                     r#type: "submit",
                     "Create game"
                 }

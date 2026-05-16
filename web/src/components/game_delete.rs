@@ -1,6 +1,6 @@
 use crate::cache::MutationError;
-use crate::components::Button;
 use crate::components::games_list::GamesListQ;
+use crate::components::ui::{Button, ButtonVariant};
 use crate::http::WithCredentials;
 use crate::icons::DeleteIcon;
 use dioxus::prelude::*;
@@ -49,7 +49,7 @@ pub fn GameDelete(game_identifier: String, game_name: String, icon_class: String
 
     rsx! {
         Button {
-            class: Some("border-none".to_string()),
+            variant: ButtonVariant::Ghost,
             title,
             onclick,
             DeleteIcon { class: icon_class }
@@ -134,10 +134,12 @@ pub fn DeleteGameModal() -> Element {
                         div {
                             class: "flex justify-end gap-2",
                             Button {
+                                variant: ButtonVariant::Danger,
                                 onclick: delete,
                                 "Yes"
                             }
                             Button {
+                                variant: ButtonVariant::Ghost,
                                 onclick: dismiss,
                                 "No"
                             }

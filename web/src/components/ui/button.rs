@@ -32,14 +32,23 @@ pub fn Button(
     #[props(default = ButtonVariant::Primary)] variant: ButtonVariant,
     #[props(default = false)] disabled: bool,
     #[props(default)] onclick: EventHandler<MouseEvent>,
+    #[props(default = "button".to_string())] r#type: String,
+    title: Option<String>,
+    class: Option<String>,
     children: Element,
 ) -> Element {
+    let classes = match class {
+        Some(extra) => format!("{} {}", variant.classes(), extra),
+        None => variant.classes().to_string(),
+    };
+
     rsx! {
         button {
-            r#type: "button",
-            class: "{variant.classes()}",
+            r#type,
+            class: classes,
             disabled,
             onclick: move |evt| onclick.call(evt),
+            title,
             {children}
         }
     }

@@ -41,7 +41,7 @@ pub fn PeriodCard(props: PeriodCardProps) -> Element {
     let (icon, accent) = phase_visual(props.phase);
 
     let current_class = if props.is_current {
-        "ring-2 ring-amber-400  "
+        "ring-2 ring-gold "
     } else {
         ""
     };
@@ -61,7 +61,7 @@ pub fn PeriodCard(props: PeriodCardProps) -> Element {
             div { class: "flex items-center justify-between mb-2",
                 h3 { class: "font-semibold", "{icon} Day {props.day} — {label}" }
                 if props.is_current {
-                    span { class: "text-xs uppercase tracking-wide text-amber-600  ",
+                    span { class: "text-xs uppercase tracking-wide text-gold ",
                         "live"
                     }
                 }

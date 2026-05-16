@@ -154,25 +154,25 @@ pub fn GamePage(identifier: String) -> Element {
 
             {match ws_connection() {
                 ConnectionState::Connected => rsx! {
-                    div { class: "text-sm text-green-600", "Live updates connected" }
+                    div { class: "text-sm text-primary", "Live updates connected" }
                 },
                 ConnectionState::Connecting => rsx! {
-                    div { class: "text-sm text-yellow-600", "Connecting to live updates..." }
+                    div { class: "text-sm text-gold", "Connecting to live updates..." }
                 },
                 ConnectionState::Disconnected => rsx! {
-                    div { class: "text-sm text-gray-600", "Live updates disconnected" }
+                    div { class: "text-sm text-muted", "Live updates disconnected" }
                 },
                 ConnectionState::Error(ref msg) => rsx! {
-                    div { class: "text-sm text-red-600", "Connection error: {msg}" }
+                    div { class: "text-sm text-danger", "Connection error: {msg}" }
                 },
             }}
 
             if !ws_events.read().is_empty() {
                 div {
-                    class: "bg-gray-100 p-4 rounded-lg max-h-64 overflow-y-auto",
+                    class: "bg-surface p-4 rounded-lg max-h-64 overflow-y-auto",
                     h3 { class: "font-bold mb-2", "Live Events" }
                     for msg in ws_events.read().iter() {
-                        div { class: "text-sm py-1 border-b border-gray-200",
+                        div { class: "text-sm py-1 border-b border-border",
                             "{msg.content}"
                         }
                     }

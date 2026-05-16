@@ -1,4 +1,4 @@
-use crate::components::ui::{Button, ButtonVariant, TopBar};
+use crate::components::ui::{Button, ButtonVariant, NavLink, TopBar};
 use crate::routes::Routes;
 use crate::storage::{AppState, use_persistent};
 use crate::theme::Theme;
@@ -29,11 +29,11 @@ pub fn Navbar() -> Element {
             nav {
                 aria_label: "Main navigation",
                 class: "flex items-center gap-6 font-text font-bold text-[11px] uppercase tracking-[0.16em] text-text-muted",
-                Link { class: "hover:text-text", to: Routes::Home {}, "Home" }
+                NavLink { to: Routes::Home {}, "Home" }
                 if signed_in {
-                    Link { class: "hover:text-text", to: Routes::GamesList {}, "Games" }
+                    NavLink { to: Routes::GamesList {}, "Games" }
                 }
-                Link { class: "hover:text-text", to: Routes::AccountsPage {}, "Account" }
+                NavLink { to: Routes::AccountsPage {}, "Account" }
             }
             div { class: "ml-auto",
                 Button { variant: ButtonVariant::Ghost, onclick: toggle_theme, "{label}" }

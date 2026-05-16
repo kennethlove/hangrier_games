@@ -1,8 +1,9 @@
 use crate::cache::MutationError;
+use crate::components::Input;
 use crate::components::game_tributes::GameTributesQ;
 use crate::components::modal::{Modal, Props as ModalProps};
 use crate::components::tribute_detail::TributeQ;
-use crate::components::{Button, Input};
+use crate::components::ui::{Button, ButtonVariant};
 use crate::http::WithCredentials;
 use crate::icons::EditIcon;
 use dioxus::prelude::*;
@@ -66,9 +67,7 @@ pub fn TributeEdit(
 
     rsx! {
         Button {
-            class: r#"
-            border-none
-            "#,
+            variant: ButtonVariant::Ghost,
             onclick,
             EditIcon {
                 class: "".to_string(),
@@ -271,10 +270,12 @@ pub fn EditTributeForm() -> Element {
             div {
                 class: "flex justify-end gap-2",
                 Button {
+                    variant: ButtonVariant::Primary,
                     r#type: "submit",
                     "Update"
                 }
                 Button {
+                    variant: ButtonVariant::Ghost,
                     onclick: dismiss,
                     "Cancel"
                 }

@@ -1,6 +1,7 @@
 use crate::cache::QueryError;
 use crate::components::game_edit::GameEdit;
-use crate::components::{Button, CreateGameButton, CreateGameForm, DeleteGameModal, GameDelete};
+use crate::components::ui::{Button, ButtonVariant};
+use crate::components::{CreateGameButton, CreateGameForm, DeleteGameModal, GameDelete};
 use crate::http::WithCredentials;
 use crate::icons::{EyeClosedIcon, EyeOpenIcon};
 use crate::routes::Routes;
@@ -137,6 +138,7 @@ fn RefreshButton() -> Element {
         div {
             class: "text-center",
             Button {
+                variant: ButtonVariant::Primary,
                 onclick,
                 "Refresh"
             }
@@ -228,6 +230,7 @@ fn LoadMoreButton(current_offset: u32, limit: u32) -> Element {
 
     rsx! {
         Button {
+            variant: ButtonVariant::Primary,
             onclick,
             "Load More Games"
         }

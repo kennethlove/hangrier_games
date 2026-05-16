@@ -1,8 +1,9 @@
 use crate::cache::MutationError;
+use crate::components::Input;
 use crate::components::game_detail::DisplayGameQ;
 use crate::components::games_list::GamesListQ;
 use crate::components::modal::{Modal, Props as ModalProps};
-use crate::components::{Button, Input};
+use crate::components::ui::{Button, ButtonVariant};
 use crate::http::WithCredentials;
 use crate::icons::EditIcon;
 use dioxus::prelude::*;
@@ -58,7 +59,7 @@ pub fn GameEdit(identifier: String, name: String, icon_class: String, private: b
 
     rsx! {
         Button {
-            class: "border-none",
+            variant: ButtonVariant::Ghost,
             title,
             onclick,
             EditIcon { class: icon_class }
@@ -186,10 +187,12 @@ pub fn EditGameForm() -> Element {
             div {
                 class: "flex justify-end gap-2",
                 Button {
+                    variant: ButtonVariant::Primary,
                     r#type: "submit",
                     "Update"
                 }
                 Button {
+                    variant: ButtonVariant::Ghost,
                     onclick: dismiss,
                     "Cancel"
                 }

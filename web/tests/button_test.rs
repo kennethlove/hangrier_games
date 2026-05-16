@@ -1,9 +1,8 @@
 #![allow(non_snake_case)]
 
 use dioxus::prelude::*;
-use web::components::{Button, ThemedButton};
+use web::components::ui::{Button, ButtonVariant};
 
-/// Test that Button renders correctly with minimal props
 #[test]
 fn test_button_renders_with_defaults() {
     let mut dom = VirtualDom::new(|| {
@@ -15,48 +14,68 @@ fn test_button_renders_with_defaults() {
     });
 
     let _edits = dom.rebuild_to_vec();
-    // Component should build without panicking
 }
 
-/// Test that Button renders with all props provided
-#[test]
-fn test_button_renders_with_all_props() {
-    let mut dom = VirtualDom::new(|| {
-        rsx! {
-            Button {
-                class: "custom-class".to_string(),
-                title: "Custom Title".to_string(),
-                r#type: "submit".to_string(),
-                disabled: true,
-                children: rsx!("Submit")
-            }
+fn primary_button() -> Element {
+    rsx! {
+        Button {
+            variant: ButtonVariant::Primary,
+            children: rsx!("Primary")
         }
-    });
-
-    let _edits = dom.rebuild_to_vec();
-    // Component should build without panicking
+    }
 }
 
-/// Test that Button handles onclick handler
-#[test]
-fn test_button_with_onclick() {
-    let mut dom = VirtualDom::new(|| {
-        let mut clicked = use_signal(|| false);
-
-        rsx! {
-            Button {
-                onclick: move |_| clicked.set(true),
-                children: rsx!("Click me")
-            }
-            div { "{clicked}" }
+fn ghost_button() -> Element {
+    rsx! {
+        Button {
+            variant: ButtonVariant::Ghost,
+            children: rsx!("Ghost")
         }
-    });
-
-    let _edits = dom.rebuild_to_vec();
-    // Component should build without panicking
+    }
 }
 
-/// Test that Button can be disabled
+fn danger_button() -> Element {
+    rsx! {
+        Button {
+            variant: ButtonVariant::Danger,
+            children: rsx!("Danger")
+        }
+    }
+}
+
+fn chrome_button() -> Element {
+    rsx! {
+        Button {
+            variant: ButtonVariant::Chrome,
+            children: rsx!("Chrome")
+        }
+    }
+}
+
+#[test]
+fn test_button_primary_variant() {
+    let mut dom = VirtualDom::new(primary_button);
+    let _edits = dom.rebuild_to_vec();
+}
+
+#[test]
+fn test_button_ghost_variant() {
+    let mut dom = VirtualDom::new(ghost_button);
+    let _edits = dom.rebuild_to_vec();
+}
+
+#[test]
+fn test_button_danger_variant() {
+    let mut dom = VirtualDom::new(danger_button);
+    let _edits = dom.rebuild_to_vec();
+}
+
+#[test]
+fn test_button_chrome_variant() {
+    let mut dom = VirtualDom::new(chrome_button);
+    let _edits = dom.rebuild_to_vec();
+}
+
 #[test]
 fn test_button_disabled_state() {
     let mut dom = VirtualDom::new(|| {
@@ -69,69 +88,61 @@ fn test_button_disabled_state() {
     });
 
     let _edits = dom.rebuild_to_vec();
-    // Component should build without panicking
 }
 
-/// Test that ThemedButton renders with defaults
 #[test]
-fn test_themed_button_renders() {
+fn test_button_with_title() {
     let mut dom = VirtualDom::new(|| {
         rsx! {
-            ThemedButton {
-                children: rsx!("Themed Button")
+            Button {
+                title: "Tooltip text".to_string(),
+                children: rsx!("Hover me")
             }
         }
     });
 
     let _edits = dom.rebuild_to_vec();
-    // Component should build without panicking
 }
 
-/// Test that ThemedButton applies extra classes
 #[test]
-fn test_themed_button_with_extra_classes() {
+fn test_button_submit_type() {
     let mut dom = VirtualDom::new(|| {
         rsx! {
-            ThemedButton {
-                class: "extra-class".to_string(),
-                children: rsx!("Themed")
+            Button {
+                r#type: "submit".to_string(),
+                children: rsx!("Submit")
             }
         }
     });
 
     let _edits = dom.rebuild_to_vec();
-    // Component should build without panicking
 }
 
-/// Test that ThemedButton can be disabled
 #[test]
-fn test_themed_button_disabled() {
+fn test_button_with_extra_class() {
     let mut dom = VirtualDom::new(|| {
         rsx! {
-            ThemedButton {
-                disabled: true,
-                children: rsx!("Disabled Themed")
+            Button {
+                class: "w-full".to_string(),
+                children: rsx!("Full width")
             }
         }
     });
 
     let _edits = dom.rebuild_to_vec();
-    // Component should build without panicking
 }
 
-/// Test multiple buttons render side by side
 #[test]
 fn test_multiple_buttons_render() {
     let mut dom = VirtualDom::new(|| {
         rsx! {
             div {
-                Button { children: rsx!("Button 1") }
-                Button { children: rsx!("Button 2") }
-                ThemedButton { children: rsx!("Themed Button") }
+                Button { variant: ButtonVariant::Primary, children: rsx!("Primary") }
+                Button { variant: ButtonVariant::Ghost, children: rsx!("Ghost") }
+                Button { variant: ButtonVariant::Danger, children: rsx!("Danger") }
             }
         }
     });
 
     let _edits = dom.rebuild_to_vec();
-    // Component should build without panicking
 }

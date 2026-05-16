@@ -4,8 +4,6 @@ mod app;
 pub use app::App;
 mod area_detail;
 pub use area_detail::AreaDetail;
-mod button;
-pub use button::{Button, ThemedButton};
 mod create_game;
 pub use create_game::{CreateGameButton, CreateGameForm};
 mod credits;

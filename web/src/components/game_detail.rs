@@ -1,6 +1,5 @@
 use crate::LoadingState;
 use crate::cache::{MutationError, QueryError};
-use crate::components::ThemedButton;
 use crate::components::game_areas::GameAreaList;
 use crate::components::game_edit::GameEdit;
 use crate::components::game_tributes::GameTributes;
@@ -9,6 +8,7 @@ use crate::components::info_detail::InfoDetail;
 use crate::components::period_grid::PeriodGrid;
 use crate::components::recap_card::RecapCard;
 use crate::components::timeline::PeriodFilters;
+use crate::components::ui::{Button, ButtonVariant};
 use crate::hooks::use_timeline_summary::use_timeline_summary;
 use crate::hooks::{ConnectionState, use_game_websocket};
 use crate::http::WithCredentials;
@@ -353,8 +353,8 @@ fn GameState(identifier: String) -> Element {
                         }
                     }
                     if is_mine && !is_finished {
-                        ThemedButton {
-                            class: "place-self-center-safe",
+                        Button {
+                            variant: ButtonVariant::Primary,
                             onclick: next_step_handler,
                             disabled: is_finished,
                             "{game_next_step}"

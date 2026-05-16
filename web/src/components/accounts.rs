@@ -1,5 +1,6 @@
 use crate::cache::MutationError;
-use crate::components::{Input, ThemedButton};
+use crate::components::Input;
+use crate::components::ui::{Button, ButtonVariant};
 use crate::http::WithCredentials;
 use crate::routes::Routes;
 use crate::storage::{AppState, use_persistent};
@@ -227,7 +228,8 @@ fn LoginForm() -> Element {
                 }
                 div {
                     class: "clear",
-                    ThemedButton {
+                    Button {
+                        variant: ButtonVariant::Primary,
                         r#type: "submit",
                         "Login"
                     }
@@ -382,8 +384,9 @@ fn RegisterForm() -> Element {
                     }
                 }
                 div {
-                    ThemedButton {
-                        disabled: Some(*disabled_signal.read()),
+                    Button {
+                        variant: ButtonVariant::Primary,
+                        disabled: *disabled_signal.read(),
                         r#type: "submit",
                         "Register"
                     }
@@ -426,8 +429,9 @@ fn LogoutButton() -> Element {
                 class: "font-display text-2xl text-center tracking-wide text-text",
                 "Thanks for playing, {username}!"
             }
-            ThemedButton {
-                class: "w-full",
+            Button {
+                variant: ButtonVariant::Primary,
+                class: "w-full".to_string(),
                 r#type: "submit",
                 "Logout"
             }

@@ -2,4 +2,48 @@
 source: game/tests/sponsor_affinity_snapshot.rs
 expression: snapshot
 ---
-[]
+- - Aesthete
+  - Tribute0
+  - 8
+- - Aesthete
+  - Tribute1
+  - 8
+- - Aesthete
+  - Tribute2
+  - -4
+- - Aesthete
+  - Tribute3
+  - -4
+- - Loyalist
+  - Tribute0
+  - -5
+- - Loyalist
+  - Tribute1
+  - -5
+- - Loyalist
+  - Tribute4
+  - -8
+- - Sadist
+  - Tribute2
+  - 11
+- - Sadist
+  - Tribute3
+  - 11
+- - Compassionate
+  - Tribute2
+  - -8
+- - Compassionate
+  - Tribute3
+  - -8
+- - Strategist
+  - Tribute0
+  - 6
+- - Strategist
+  - Tribute1
+  - 6
+- - Strategist
+  - Tribute2
+  - 4
+- - Strategist
+  - Tribute3
+  - 4

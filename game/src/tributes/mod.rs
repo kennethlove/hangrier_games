@@ -18,7 +18,7 @@ pub use combat::{attack_contest, update_stats};
 pub use movement::TravelResult;
 
 use crate::areas::{Area, AreaDetails};
-use crate::items::{Item, OwnsItems};
+use crate::items::Item;
 use crate::messages::{AreaRef, ItemRef, MessagePayload, TaggedEvent, TributeRef};
 use crate::output::GameOutput;
 use crate::tributes::events::TributeEvent;
@@ -433,27 +433,6 @@ impl Tribute {
             }
             // Reset the timer whether or not an ally was available.
             self.turns_since_last_betrayal = 0;
-        }
-
-        // Any generous patrons this round? Sponsors don't intervene on day 1
-        // — tributes have to earn patron interest before the first gifts arrive.
-        if environment_details.current_day > 1
-            && let Some(gift) = self.receive_patron_gift(&mut *rng)
-        {
-            let line = GameOutput::SponsorGift(self.name.as_str(), &gift).to_string();
-            let item_ref = ItemRef {
-                identifier: gift.identifier.clone(),
-                name: gift.name.clone(),
-            };
-            events.push(TaggedEvent::new(
-                line,
-                MessagePayload::SponsorGift {
-                    recipient: tribute_ref(),
-                    item: item_ref,
-                    donor: "Sponsor".into(),
-                },
-            ));
-            self.add_item(gift);
         }
 
         // Nighttime terror

@@ -1550,6 +1550,7 @@ impl Game {
         self.execute_cycle(ctx, rng)?;
 
         // Sponsorship PR1: translate cycle messages → AudienceEvents and update affinities.
+        // PR2: resolve gifts and deliver them.
         let cycle_payloads: Vec<shared::messages::MessagePayload> = self
             .messages
             .iter()
@@ -1563,6 +1564,32 @@ impl Game {
                 all_events.extend(crate::sponsors::translate(p, &ctx));
             }
             crate::sponsors::update_affinities(self, &all_events);
+
+            // Gift resolution: sponsors with high affinity and remaining budget
+            // may deliver items to affected tributes.
+            let gifts = crate::sponsors::resolve_gifts(self, &all_events, rng);
+            for gift in gifts {
+                let recipient_id = match &gift.payload {
+                    shared::messages::MessagePayload::SponsorGift { recipient, .. } => {
+                        recipient.identifier.clone()
+                    }
+                    _ => unreachable!(),
+                };
+                let line =
+                    crate::output::GameOutput::SponsorGift(&recipient_id, &gift.item).to_string();
+                let source = crate::messages::MessageSource::Game(self.identifier.clone());
+                let subject = format!("sponsor_gift:{recipient_id}");
+                let tick = self.tick_counter.next();
+                let payload = gift.payload;
+                if let Some(tribute) = self
+                    .tributes
+                    .iter_mut()
+                    .find(|t| t.identifier == recipient_id)
+                {
+                    tribute.add_item(gift.item);
+                }
+                self.push_message(source, subject, line, payload, tick);
+            }
         }
 
         Ok(())

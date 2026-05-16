@@ -10,7 +10,6 @@
 use crate::areas::AreaDetails;
 use crate::items::{Attribute, Item, ItemError, OwnsItems};
 use crate::tributes::Tribute;
-use rand::RngExt;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
 
@@ -64,26 +63,6 @@ impl OwnsItems for Tribute {
 }
 
 impl Tribute {
-    /// Receive a gift from patrons based on district
-    pub(crate) fn receive_patron_gift(&mut self, mut rng: impl Rng) -> Option<Item> {
-        // Gift from patrons?
-        let chance = match self.district {
-            1 | 2 => 1.0 / 10.0,
-            3 | 4 => 1.0 / 15.0,
-            5 | 6 => 1.0 / 20.0,
-            7 | 8 => 1.0 / 25.0,
-            9 | 10 => 1.0 / 30.0,
-            11 | 12 => 1.0 / 50.0,
-            _ => 1.0, // Mainly for testing/debugging purposes
-        };
-
-        if rng.random_bool(chance) {
-            Some(Item::new_random_consumable())
-        } else {
-            None
-        }
-    }
-
     /// Take an item from the current area
     pub(crate) fn take_nearby_item(&mut self, area_details: &mut AreaDetails) -> Option<Item> {
         let mut rng = SmallRng::from_rng(&mut rand::rng());

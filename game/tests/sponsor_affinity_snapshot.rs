@@ -1,12 +1,14 @@
-//! Snapshots a 3-cycle simulation with a fixed seed and asserts the resulting
-//! per-(sponsor, tribute) affinity table is stable. Regenerate with
-//! `cargo insta accept` after intentional rebalances.
+//! Snapshots sponsor affinity evolution given a deterministic set of
+//! audience events. Regenerate with `cargo insta accept` after intentional
+//! rebalances.
 
 use game::areas::{Area, AreaDetails};
 use game::games::Game;
+use game::sponsors::{SponsorContext, translate, update_affinities};
 use game::terrain::{BaseTerrain, TerrainType};
 use game::tributes::Tribute;
-use shared::messages::Phase;
+use rand::SeedableRng;
+use shared::messages::{MessagePayload, TributeRef};
 
 fn build_test_game() -> Game {
     let mut game = Game::new("snapshot-test");
@@ -30,13 +32,54 @@ fn build_test_game() -> Game {
     game
 }
 
+fn tref(name: &str) -> TributeRef {
+    TributeRef {
+        identifier: name.into(),
+        name: name.into(),
+    }
+}
+
 #[test]
 fn three_cycle_affinity() {
     let mut game = build_test_game();
 
-    // Run 3 phases (Day → Dusk → Night) to simulate a partial day.
-    for phase in [Phase::Day, Phase::Dusk, Phase::Night] {
-        game.run_phase(phase).expect("phase should succeed");
+    // Seed sponsors deterministically.
+    let mut rng = rand::rngs::SmallRng::seed_from_u64(0xDEAD_BEEF);
+    game.spawn_sponsors(&mut rng);
+
+    // Simulate three cycles worth of events deterministically.
+    // Cycle 1: a kill + an alliance
+    let cycle1_payloads = vec![
+        MessagePayload::TributeKilled {
+            victim: tref("Tribute0"),
+            killer: Some(tref("Tribute1")),
+            cause: "spear".into(),
+        },
+        MessagePayload::AllianceFormed {
+            members: vec![tref("Tribute2"), tref("Tribute3")],
+        },
+    ];
+
+    // Cycle 2: a betrayal
+    let cycle2_payloads = vec![MessagePayload::BetrayalTriggered {
+        betrayer: tref("Tribute2"),
+        victim: tref("Tribute3"),
+    }];
+
+    // Cycle 3: another kill (environmental)
+    let cycle3_payloads = vec![MessagePayload::TributeKilled {
+        victim: tref("Tribute4"),
+        killer: None,
+        cause: "fall".into(),
+    }];
+
+    for payloads in [cycle1_payloads, cycle2_payloads, cycle3_payloads] {
+        let ctx = SponsorContext::new(&game);
+        let mut events = Vec::new();
+        for p in &payloads {
+            events.extend(translate(p, &ctx));
+        }
+        update_affinities(&mut game, &events);
     }
 
     let snapshot = game.sponsor_affinity_snapshot();

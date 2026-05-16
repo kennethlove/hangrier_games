@@ -34,6 +34,19 @@ pub enum ItemKindTag {
     Shield,
 }
 
+/// Item cost table used by the gift resolver.
+pub const ITEM_COSTS: &[(ItemKindTag, u32)] = &[
+    (ItemKindTag::Food, 5),
+    (ItemKindTag::Water, 5),
+    (ItemKindTag::Bandage, 10),
+    (ItemKindTag::Antidote, 18),
+    (ItemKindTag::Map, 12),
+    (ItemKindTag::Signal, 20),
+    (ItemKindTag::WeaponBasic, 25),
+    (ItemKindTag::WeaponRare, 45),
+    (ItemKindTag::Shield, 30),
+];
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Sponsor {
     pub id: u32,

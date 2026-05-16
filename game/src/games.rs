@@ -1534,10 +1534,32 @@ impl Game {
     /// Per-event `emit_index` (advanced inside `push_message`) preserves
     /// intra-tribute ordering. Sites carrying a typed `MessagePayload` push
     /// that payload directly; legacy stringly sites synthesise a fallback.
+    ///
+    /// Message coalescing (spec §11.5): repeated `MovedTo` events for the
+    /// same area within a phase collapse into a single emission — only the
+    /// first is kept, duplicates are silently dropped.
     fn flush_tribute_events(&mut self, collected_events: Vec<CollectedEvent>) {
+        use crate::messages::MessagePayload;
+
         let mut last_identifier: Option<String> = None;
         let mut current_tick: u32 = self.tick_counter.boundary();
+        // Track last MovedTo area per tribute for coalescing.
+        let mut last_move_area: HashMap<String, String> = HashMap::new();
+
         for (identifier, _name, content, payload, _event) in collected_events {
+            // Coalesce: skip TributeMoved if same destination as last move for this tribute.
+            if let Some(MessagePayload::TributeMoved { to: dest_area, .. }) = &payload
+                && let Some(last_area) = last_move_area.get(&identifier)
+                && last_area == &dest_area.name
+            {
+                continue;
+            }
+
+            // Record the destination area for future coalescing.
+            if let Some(MessagePayload::TributeMoved { to: dest_area, .. }) = &payload {
+                last_move_area.insert(identifier.clone(), dest_area.name.clone());
+            }
+
             if last_identifier.as_ref() != Some(&identifier) {
                 current_tick = self.tick_counter.next();
                 last_identifier = Some(identifier.clone());

@@ -243,9 +243,12 @@ impl Brain {
         all_areas: &[AreaDetails],
         closed_areas: &[Area],
         enemy_density: &HashMap<Area, u32>,
+        phase: shared::messages::Phase,
         rng: &mut impl Rng,
     ) -> Action {
-        if let Some(early) = self.run_pre_decision_overrides(tribute, nearby_tributes, None, rng) {
+        if let Some(early) =
+            self.run_pre_decision_overrides(tribute, nearby_tributes, None, Some(phase), rng)
+        {
             return early;
         }
 
@@ -434,11 +437,16 @@ impl Brain {
         tribute: &Tribute,
         nearby_tributes: u32,
         terrain: TerrainType,
+        phase: shared::messages::Phase,
         rng: &mut impl Rng,
     ) -> Action {
-        if let Some(early) =
-            self.run_pre_decision_overrides(tribute, nearby_tributes, Some(terrain.base), rng)
-        {
+        if let Some(early) = self.run_pre_decision_overrides(
+            tribute,
+            nearby_tributes,
+            Some(terrain.base),
+            Some(phase),
+            rng,
+        ) {
             return early;
         }
 
@@ -561,6 +569,7 @@ impl Brain {
         tribute: &Tribute,
         nearby_tributes: u32,
         terrain: Option<BaseTerrain>,
+        _phase: Option<shared::messages::Phase>,
         rng: &mut impl Rng,
     ) -> Option<Action> {
         if !tribute.is_alive() {
@@ -625,6 +634,9 @@ impl Brain {
         }
 
         // Spec §6.1: alliance proposals are a deliberate first-class action.
+        // Phase-gating is deferred to v2 per spec §13 ("Social events —
+        // alliance formation gated by phase"). The `phase` parameter is
+        // threaded through for future use.
         if self.wants_to_propose_alliance(tribute, nearby_tributes, rng) {
             return Some(Action::ProposeAlliance);
         }
@@ -1018,6 +1030,7 @@ mod tests {
     use crate::tributes::actions::Action;
     use rand::prelude::*;
     use rstest::{fixture, rstest};
+    use shared::messages::Phase;
 
     #[fixture]
     fn tribute() -> Tribute {
@@ -1051,6 +1064,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Move(None));
@@ -1067,6 +1081,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Move(None));
@@ -1083,6 +1098,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::None);
@@ -1099,6 +1115,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Rest);
@@ -1119,6 +1136,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Hide);
@@ -1134,6 +1152,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Attack);
@@ -1151,6 +1170,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Move(None));
@@ -1166,6 +1186,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Rest);
@@ -1193,6 +1214,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::UseItem(None));
@@ -1208,6 +1230,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Hide);
@@ -1224,6 +1247,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Move(None));
@@ -1239,6 +1263,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Rest);
@@ -1259,6 +1284,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Attack);
@@ -1278,6 +1304,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Attack);
@@ -1297,6 +1324,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::None);
@@ -1316,6 +1344,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Attack);
@@ -1335,6 +1364,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Move(None));
@@ -1354,6 +1384,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Hide);
@@ -1375,6 +1406,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Attack);
@@ -1463,6 +1495,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Attack);
@@ -1480,6 +1513,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::Hide);
@@ -1497,6 +1531,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         assert_eq!(action, Action::None);
@@ -1515,6 +1550,7 @@ mod tests {
             &[],
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
         // Self-destructive ignores health and attacks
@@ -1618,6 +1654,7 @@ mod tests {
             &all_areas,
             &[],
             &HashMap::new(),
+            Phase::Day,
             &mut small_rng,
         );
 

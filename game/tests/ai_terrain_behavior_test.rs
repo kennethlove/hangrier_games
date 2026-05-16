@@ -95,7 +95,13 @@ fn test_concealed_terrain_boosts_hiding(mut small_rng: SmallRng) {
     let forest_terrain = TerrainType::new(BaseTerrain::Forest, vec![]).unwrap();
 
     // Test that action weights favor Hide in concealed terrain
-    let action = brain.decide_action_with_terrain(&tribute, 3, forest_terrain, &mut small_rng);
+    let action = brain.decide_action_with_terrain(
+        &tribute,
+        3,
+        forest_terrain,
+        shared::messages::Phase::Day,
+        &mut small_rng,
+    );
 
     // With few enemies and concealed terrain, should prefer hiding
     // (This tests the weight boost logic)
@@ -117,7 +123,13 @@ fn test_resource_scarce_terrain_boosts_search(mut small_rng: SmallRng) {
 
     // The brain should recognize Desert as resource-scarce and boost search weight
     // This is a behavioral test - we expect search/move actions in scarce terrain
-    let action = brain.decide_action_with_terrain(&tribute, 0, desert_terrain, &mut small_rng);
+    let action = brain.decide_action_with_terrain(
+        &tribute,
+        0,
+        desert_terrain,
+        shared::messages::Phase::Day,
+        &mut small_rng,
+    );
 
     // Should prefer moving/searching in resource-scarce terrain when alone
     assert!(matches!(action, game::tributes::actions::Action::Move(_)));

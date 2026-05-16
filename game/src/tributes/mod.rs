@@ -477,6 +477,7 @@ impl Tribute {
                 environment_details.all_areas,
                 environment_details.closed_areas,
                 environment_details.enemy_density,
+                environment_details.phase,
                 rng,
             )
         };

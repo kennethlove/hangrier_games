@@ -621,6 +621,7 @@ impl Game {
         );
 
         // PhaseEnded: four-phase day substrate (spec §4 step 4).
+        // Reuse the same message — no duplicate content string.
         let phase_payload = crate::messages::MessagePayload::PhaseEnded {
             day: current_day,
             phase,
@@ -628,7 +629,7 @@ impl Game {
         self.push_message(
             crate::messages::MessageSource::Game(game_id.clone()),
             format!("game:{}", game_id),
-            format!("End of {} {}.", phase, current_day),
+            String::new(),
             phase_payload,
             tick,
         );
@@ -1235,14 +1236,10 @@ impl Game {
                 };
 
                 if new_hunger != prior_hunger {
-                    let line = format!(
-                        "{} hunger: {:?} -> {:?}",
-                        tribute.name, prior_hunger, new_hunger
-                    );
                     collected_events.push((
                         tribute.identifier.clone(),
                         tribute.name.clone(),
-                        line,
+                        String::new(),
                         Some(MessagePayload::HungerBandChanged {
                             tribute: tref.clone(),
                             from: prior_hunger,
@@ -1252,14 +1249,10 @@ impl Game {
                     ));
                 }
                 if new_thirst != prior_thirst {
-                    let line = format!(
-                        "{} thirst: {:?} -> {:?}",
-                        tribute.name, prior_thirst, new_thirst
-                    );
                     collected_events.push((
                         tribute.identifier.clone(),
                         tribute.name.clone(),
-                        line,
+                        String::new(),
                         Some(MessagePayload::ThirstBandChanged {
                             tribute: tref.clone(),
                             from: prior_thirst,

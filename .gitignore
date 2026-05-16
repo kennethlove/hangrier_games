@@ -28,3 +28,6 @@ web/src/env.rs
 .crush.json
 
 .indxr-cache/
+
+# OpenCode
+.opencode/

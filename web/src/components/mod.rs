@@ -51,6 +51,8 @@ pub use period_card::PeriodCard;
 mod period_grid;
 pub use period_grid::PeriodGrid;
 mod period_grid_empty;
+mod period_timeline;
+pub use period_timeline::PeriodTimeline;
 mod recap_card;
 pub use recap_card::RecapCard;
 mod tribute_detail;

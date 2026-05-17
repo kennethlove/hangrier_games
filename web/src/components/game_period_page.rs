@@ -7,10 +7,10 @@
 use crate::cache::QueryError;
 use crate::components::TributeFilterChips;
 use crate::components::filter_chips::FilterChips;
+use crate::components::period_timeline::PeriodTimeline;
 use crate::components::timeline::{FilterMode, PeriodFilters, Timeline};
 use crate::hooks::use_timeline_summary::use_timeline_summary;
 use crate::http::WithCredentials;
-use crate::routes::Routes;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use reqwest::StatusCode;
@@ -52,8 +52,8 @@ pub fn GamePeriodPage(
     identifier: String,
     day: u32,
     phase: Phase,
-    filter: String,
-    tribute: String,
+    filter: Option<String>,
+    tribute: Option<String>,
 ) -> Element {
     let mut filters: Signal<PeriodFilters> = use_context();
 
@@ -66,39 +66,22 @@ pub fn GamePeriodPage(
     use_hook(move || {
         let mut f = filters.write();
         f.hydrate(&seed_id);
-        if !seed_filter.is_empty() {
-            f.set_filter(&seed_id, FilterMode::from_query_value(&seed_filter));
+        if let Some(ref sf) = seed_filter {
+            f.set_filter(&seed_id, FilterMode::from_query_value(sf));
         }
-        if !seed_tribute.is_empty() {
-            f.set_tribute_filter(&seed_id, Some(seed_tribute));
+        if let Some(ref st) = seed_tribute {
+            f.set_tribute_filter(&seed_id, Some(st.clone()));
         }
     });
 
-    let filter_mode = filters.read().filter_for(&identifier);
-    let tribute_filter = filters.read().tribute_filter(&identifier);
-
-    // context → URL: whenever the filter or tribute selection changes, replace
-    // the current history entry so the URL always reflects the visible slice.
-    {
-        let nav_id = identifier.clone();
-        let nav_filter = filter_mode.to_query_value();
-        let nav_tribute = tribute_filter.clone().unwrap_or_default();
-        let url_filter = filter.clone();
-        let url_tribute = tribute.clone();
-        let navigator = use_navigator();
-        use_effect(move || {
-            if nav_filter == url_filter && nav_tribute == url_tribute {
-                return;
-            }
-            navigator.replace(Routes::GamePeriodPage {
-                identifier: nav_id.clone(),
-                day,
-                phase,
-                filter: nav_filter.clone(),
-                tribute: nav_tribute.clone(),
-            });
-        });
-    }
+    let filter_mode = use_memo({
+        let id = identifier.clone();
+        move || filters.read().filter_for(&id)
+    });
+    let tribute_filter = use_memo({
+        let id = identifier.clone();
+        move || filters.read().tribute_filter(&id)
+    });
 
     let summary_q = use_timeline_summary(identifier.clone());
 
@@ -116,9 +99,12 @@ pub fn GamePeriodPage(
 
     if !valid {
         return rsx! {
-            div { class: "space-y-2",
-                h1 { class: "text-2xl font-semibold", "Period not found" }
-                p { class: "text-gray-600", "Day {day} ({phase}) doesn't exist for this game." }
+            div { class: "space-y-4",
+                PeriodTimeline { identifier: identifier.clone() }
+                div { class: "space-y-2",
+                    h1 { class: "text-2xl font-semibold", "Period not found" }
+                    p { class: "text-gray-600", "Day {day} ({phase}) doesn't exist for this game." }
+                }
             }
         };
     }
@@ -129,6 +115,7 @@ pub fn GamePeriodPage(
 
     rsx! {
         div { class: "space-y-4",
+            PeriodTimeline { identifier: identifier.clone() }
             h1 { class: "text-2xl font-semibold", "Day {day} — {phase}" }
             FilterChips { game_identifier: identifier.clone() }
             TributeFilterChips { game_identifier: identifier.clone() }
@@ -143,8 +130,8 @@ pub fn GamePeriodPage(
                         Timeline {
                             game_identifier: identifier.clone(),
                             messages: filtered,
-                            filter: filter_mode.clone(),
-                            tribute_filter: tribute_filter.clone(),
+                            filter: filter_mode().clone(),
+                            tribute_filter: tribute_filter().clone(),
                         }
                     }
                 }

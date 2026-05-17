@@ -8,6 +8,7 @@ use dioxus_query::prelude::*;
 use game::areas::AreaDetails;
 use shared::DisplayGame;
 
+#[allow(dead_code)]
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) struct GameAreasQ;
 
@@ -34,6 +35,7 @@ impl QueryCapability for GameAreasQ {
     }
 }
 
+#[allow(dead_code)]
 #[component]
 pub fn GameAreaList(game: DisplayGame) -> Element {
     let identifier = game.identifier.clone();

@@ -74,6 +74,7 @@ pub static GAMES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
         )
         .route("/{game_identifier}/display", get(game_display))
         .route("/{game_identifier}/log/{day}", get(game_day_logs))
+        .route("/{game_identifier}/log", get(game_logs))
         .route(
             "/{game_identifier}/log/{day}/{tribute_identifier}",
             get(tribute_logs),
@@ -1311,6 +1312,32 @@ async fn game_day_logs(
         )
         .bind(("identifier", game_identifier))
         .bind(("day", day))
+        .await
+    {
+        Ok(mut logs) => {
+            let rows: Vec<GameLog> = logs.take(0).unwrap_or_else(|err| {
+                eprintln!("Error taking logs: {err:?}");
+                vec![]
+            });
+            let logs: Vec<GameMessage> = rows.into_iter().map(GameMessage::from).collect();
+            Ok(Json(logs))
+        }
+        Err(err) => Err(AppError::NotFound(format!("Failed to get logs: {err:?}"))),
+    }
+}
+
+async fn game_logs(
+    Path(game_identifier): Path<Uuid>,
+    Extension(AuthDb(db)): Extension<AuthDb>,
+) -> Result<Json<Vec<GameMessage>>, AppError> {
+    let game_identifier = game_identifier.to_string();
+    match db
+        .query(
+            r#"SELECT * FROM message
+            WHERE string::starts_with(subject, $identifier)
+            ORDER BY game_day, phase, tick, emit_index;"#,
+        )
+        .bind(("identifier", game_identifier))
         .await
     {
         Ok(mut logs) => {

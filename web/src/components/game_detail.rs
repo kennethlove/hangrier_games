@@ -1,13 +1,8 @@
 use crate::LoadingState;
 use crate::cache::{MutationError, QueryError};
-use crate::components::game_areas::GameAreaList;
 use crate::components::game_edit::GameEdit;
-use crate::components::game_tributes::GameTributes;
 use crate::components::games_list::GamesListQ;
-use crate::components::info_detail::InfoDetail;
-use crate::components::period_grid::PeriodGrid;
 use crate::components::period_timeline::PeriodTimeline;
-use crate::components::recap_card::RecapCard;
 use crate::components::timeline::PeriodFilters;
 use crate::components::ui::{Button, ButtonVariant};
 use crate::hooks::use_timeline_summary::use_timeline_summary;
@@ -17,6 +12,7 @@ use crate::routes::Routes;
 use dioxus::prelude::*;
 use dioxus_query::prelude::*;
 use reqwest::StatusCode;
+use shared::messages::GameMessage;
 use shared::messages::MessagePayload;
 use shared::{DisplayGame, GameStatus};
 
@@ -149,8 +145,6 @@ pub fn GamePage(identifier: String) -> Element {
         }
     });
 
-    let events = ws_events.read();
-
     rsx! {
         div {
             class: r#"
@@ -175,23 +169,13 @@ pub fn GamePage(identifier: String) -> Element {
                 },
             }}
 
-            if events.iter().any(|m| has_visible_content(&m.content)) {
-                div {
-                    class: "bg-surface p-4 rounded-lg max-h-64 overflow-y-auto",
-                    h3 { class: "font-bold mb-2", "Live Events" }
-                    for msg in events.iter().filter(|m| has_visible_content(&m.content)) {
-                        div { class: "text-sm py-1 border-b border-border",
-                            "{msg.content}"
-                        }
-                    }
-                }
-            }
+            PeriodTimeline { identifier: identifier.clone() }
 
             PeriodTimeline { identifier: identifier.clone() }
 
             GameState { identifier: identifier.clone() }
             GameStats { identifier: identifier.clone() }
-            GameDetails { identifier: identifier.clone() }
+            GameLog { identifier: identifier.clone(), ws_events }
         }
     }
 }
@@ -544,68 +528,88 @@ fn GameStats(identifier: String) -> Element {
     }
 }
 
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub(crate) struct GameLogQ;
+
+impl QueryCapability for GameLogQ {
+    type Ok = Vec<GameMessage>;
+    type Err = QueryError;
+    type Keys = String;
+
+    async fn run(&self, identifier: &String) -> Result<Vec<GameMessage>, QueryError> {
+        let url = crate::api_url::api_url(&format!("/api/games/{identifier}/log"));
+        let resp = reqwest::Client::new()
+            .get(&url)
+            .with_credentials()
+            .send()
+            .await;
+        match resp {
+            Ok(resp) => match resp.status() {
+                StatusCode::OK => match resp.json::<Vec<GameMessage>>().await {
+                    Ok(v) => Ok(v),
+                    Err(_) => Err(QueryError::BadJson),
+                },
+                StatusCode::UNAUTHORIZED => Err(QueryError::Unauthorized),
+                StatusCode::NOT_FOUND => Err(QueryError::GameNotFound(identifier.clone())),
+                _ => Err(QueryError::Unknown),
+            },
+            Err(_) => Err(QueryError::ServerNotFound),
+        }
+    }
+}
+
 #[component]
-fn GameDetails(identifier: String) -> Element {
-    let display_game_query = use_query(Query::new(identifier.clone(), DisplayGameQ));
-    let reader = display_game_query.read();
-    let state = reader.state();
+fn GameLog(identifier: String, ws_events: Signal<Vec<GameMessage>>) -> Element {
+    let log_q = use_query(Query::new(identifier.clone(), GameLogQ));
 
-    match &*state {
-        QueryStateData::Settled { res: Ok(game), .. } => {
-            let display_game = (**game).clone();
-            let day = display_game.clone().day.unwrap_or(0);
-
-            let xl_display = match day {
-                0 => "xl:grid-cols-[1fr_1fr]".to_string(),
-                _ => "xl:grid-cols-[1fr_1fr_22rem]".to_string(),
-            };
-
-            let class: String = format!(
-                r#"
-            grid
-            gap-4
-            grid-cols-1
-            lg:grid-cols-2
-            {}
-            "#,
-                xl_display
-            );
-
-            rsx! {
-                div {
-                    class,
-
-                    InfoDetail {
-                        title: "Areas",
-                        open: false,
-                        GameAreaList { game: display_game.clone() }
-                    }
-
-                    InfoDetail {
-                        title: "Tributes",
-                        open: false,
-                        GameTributes { game: display_game.clone() }
-                    }
-
-                    if display_game.status == GameStatus::Finished {
-                        RecapCard { game: display_game.clone() }
-                    }
-
-                    PeriodGrid { game_identifier: display_game.identifier.clone() }
-                }
+    let messages = use_memo(move || {
+        let historical = {
+            let reader = log_q.read();
+            let state = reader.state();
+            match &*state {
+                QueryStateData::Settled { res: Ok(msgs), .. } => msgs.clone(),
+                _ => vec![],
             }
-        }
-        QueryStateData::Settled { res: Err(_), .. } => {
-            rsx! {}
-        }
-        _ => {
-            rsx! {
-                p {
-                    class: r#"
-                    text-center
+        };
+        let live = ws_events.read().clone();
 
-                    "#,
-                    "Loading..."
+        let mut seen: std::collections::HashMap<String, GameMessage> =
+            std::collections::HashMap::new();
+        for msg in historical {
+            seen.insert(msg.identifier.clone(), msg);
+        }
+        for msg in live {
+            seen.insert(msg.identifier.clone(), msg);
+        }
+
+        let mut merged_msgs: Vec<GameMessage> = seen.into_values().collect();
+        merged_msgs.sort_by(|a, b| {
+            a.game_day
+                .cmp(&b.game_day)
+                .then(a.phase.cmp(&b.phase))
+                .then(a.tick.cmp(&b.tick))
+                .then(a.emit_index.cmp(&b.emit_index))
+        });
+
+        merged_msgs
+    });
+
+    rsx! {
+        div {
+            class: "bg-surface p-4 rounded-lg",
+            h3 { class: "font-bold mb-2", "Game Log" }
+            div {
+                class: "max-h-96 overflow-y-auto space-y-1",
+                if messages.is_empty() {
+                    p { class: "text-sm text-muted", "No events yet" }
+                } else {
+                    for msg in messages.iter() {
+                        if has_visible_content(&msg.content) {
+                            div { class: "text-sm py-1 border-b border-border",
+                                "{msg.content}"
+                            }
+                        }
+                    }
                 }
             }
         }

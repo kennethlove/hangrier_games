@@ -6,6 +6,7 @@ use crate::components::game_tributes::GameTributes;
 use crate::components::games_list::GamesListQ;
 use crate::components::info_detail::InfoDetail;
 use crate::components::period_grid::PeriodGrid;
+use crate::components::period_timeline::PeriodTimeline;
 use crate::components::recap_card::RecapCard;
 use crate::components::timeline::PeriodFilters;
 use crate::components::ui::{Button, ButtonVariant};
@@ -18,6 +19,11 @@ use dioxus_query::prelude::*;
 use reqwest::StatusCode;
 use shared::messages::MessagePayload;
 use shared::{DisplayGame, GameStatus};
+
+/// Returns true if `s` contains any non-whitespace character.
+fn has_visible_content(s: &str) -> bool {
+    !s.chars().all(char::is_whitespace)
+}
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) struct DisplayGameQ;
@@ -143,6 +149,8 @@ pub fn GamePage(identifier: String) -> Element {
         }
     });
 
+    let events = ws_events.read();
+
     rsx! {
         div {
             class: r#"
@@ -167,17 +175,19 @@ pub fn GamePage(identifier: String) -> Element {
                 },
             }}
 
-            if !ws_events.read().is_empty() {
+            if events.iter().any(|m| has_visible_content(&m.content)) {
                 div {
                     class: "bg-surface p-4 rounded-lg max-h-64 overflow-y-auto",
                     h3 { class: "font-bold mb-2", "Live Events" }
-                    for msg in ws_events.read().iter() {
+                    for msg in events.iter().filter(|m| has_visible_content(&m.content)) {
                         div { class: "text-sm py-1 border-b border-border",
                             "{msg.content}"
                         }
                     }
                 }
             }
+
+            PeriodTimeline { identifier: identifier.clone() }
 
             GameState { identifier: identifier.clone() }
             GameStats { identifier: identifier.clone() }

@@ -19,10 +19,6 @@ pub struct TributeFilterChipsProps {
 pub fn TributeFilterChips(props: TributeFilterChipsProps) -> Element {
     let mut filters: Signal<PeriodFilters> = use_context();
     let game_id = props.game_identifier.clone();
-    {
-        let mut f = filters.write();
-        f.hydrate(&game_id);
-    }
     let current = filters.read().tribute_filter(&game_id);
 
     let q = use_query(Query::new(game_id.clone(), GameTributesQ));

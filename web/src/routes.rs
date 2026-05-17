@@ -25,13 +25,13 @@ pub enum Routes {
                 GamesList {},
                 #[route("/:identifier")]
                 GamePage { identifier: String },
-                #[route("/:identifier/day/:day/:phase?:filter&:tribute")]
+                #[route("/:identifier/day/:day/:phase")]
                 GamePeriodPage {
                     identifier: String,
                     day: u32,
                     phase: shared::messages::Phase,
-                    filter: String,
-                    tribute: String,
+                    filter: Option<String>,
+                    tribute: Option<String>,
                 },
                 #[route("/:game_identifier/tributes/:tribute_identifier")]
                 TributeDetail { game_identifier: String, tribute_identifier: String },

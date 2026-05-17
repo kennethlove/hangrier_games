@@ -50,8 +50,8 @@ pub fn PeriodCard(props: PeriodCardProps) -> Element {
         identifier: props.game_identifier.clone(),
         day: props.day,
         phase: props.phase,
-        filter: String::new(),
-        tribute: String::new(),
+        filter: None,
+        tribute: None,
     };
 
     rsx! {

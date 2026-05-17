@@ -27,10 +27,6 @@ const CATEGORIES: &[(MessageKind, &str)] = &[
 pub fn FilterChips(props: FilterChipsProps) -> Element {
     let mut filters: Signal<PeriodFilters> = use_context();
     let game_id = props.game_identifier.clone();
-    {
-        let mut f = filters.write();
-        f.hydrate(&game_id);
-    }
     let current = filters.read().filter_for(&game_id);
 
     let chip_class = |active: bool| -> &'static str {

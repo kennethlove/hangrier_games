@@ -580,6 +580,7 @@ impl Game {
         );
 
         // PhaseStarted: four-phase day substrate (spec §4 step 4).
+        // Reuse the same message — no duplicate content string.
         let phase_payload = crate::messages::MessagePayload::PhaseStarted {
             day: current_day,
             phase,
@@ -588,7 +589,7 @@ impl Game {
         self.push_message(
             crate::messages::MessageSource::Game(game_id),
             subject,
-            content,
+            String::new(),
             phase_payload,
             tick,
         );

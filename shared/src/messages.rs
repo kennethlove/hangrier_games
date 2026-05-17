@@ -632,7 +632,12 @@ pub fn summarize_periods(messages: &[GameMessage], current: (u32, Phase)) -> Vec
     for m in messages {
         let key = (m.game_day, m.phase.ord());
         let entry = bucket.entry(key).or_insert((0, 0));
-        entry.1 += 1;
+        if !matches!(
+            m.payload,
+            MessagePayload::PhaseStarted { .. } | MessagePayload::PhaseEnded { .. }
+        ) {
+            entry.1 += 1;
+        }
         if matches!(m.payload, MessagePayload::TributeKilled { .. })
             || matches!(
                 &m.payload,

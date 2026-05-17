@@ -291,6 +291,10 @@ pub enum MessagePayload {
         attacker: Option<TributeRef>,
         hp_lost: u32,
     },
+    TributeAttacked {
+        victim: TributeRef,
+        attacker: Option<TributeRef>,
+    },
 
     Combat(CombatEngagement),
     /// One physical-combat swing in fully typed form (see `CombatBeat`).
@@ -469,6 +473,7 @@ impl MessagePayload {
         match self {
             TributeKilled { .. } => MessageKind::Death,
             Combat(_) => MessageKind::Combat,
+            TributeAttacked { .. } => MessageKind::Combat,
             CombatSwing(_) => MessageKind::CombatSwing,
             AllianceFormed { .. }
             | AllianceProposed { .. }
@@ -514,7 +519,8 @@ impl MessagePayload {
             TributeKilled { victim, killer, .. } => r(victim) || killer.as_ref().is_some_and(r),
             TributeWounded {
                 victim, attacker, ..
-            } => r(victim) || attacker.as_ref().is_some_and(r),
+            }
+            | TributeAttacked { victim, attacker } => r(victim) || attacker.as_ref().is_some_and(r),
             Combat(engagement) => r(&engagement.attacker) || r(&engagement.target),
             CombatSwing(beat) => r(&beat.attacker) || r(&beat.target),
             AllianceFormed { members } | AllianceDissolved { members, .. } => members.iter().any(r),

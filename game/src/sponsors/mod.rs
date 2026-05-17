@@ -98,9 +98,18 @@ pub fn translate(
                 victim: victim.clone(),
             });
         }
+        MessagePayload::TributeAttacked {
+            victim,
+            attacker: Some(attacker),
+        } => {
+            out.push(AudienceEvent::AttackTrapped {
+                actor: attacker.clone(),
+                victim: victim.clone(),
+            });
+        }
         // Other variants intentionally not mapped in PR1.
-        // Future affliction specs add: TributeAttacked → AttackTrapped,
-        // TrappedEscaped → RescueAlly, AfflictionAcquired → AfflictionAcquired,
+        // Future affliction specs add: TrappedEscaped → RescueAlly,
+        // AfflictionAcquired → AfflictionAcquired,
         // surviving-AreaEvent → SurvivedAreaEvent.
         _ => {}
     }

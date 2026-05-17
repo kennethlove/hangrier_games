@@ -176,9 +176,7 @@ process_turn_phase()
     │       └─> Apply status damage (wounded, frozen, sick, etc.)
     │           └─> Check for death from status
     │
-    ├─> 3. receive_patron_gift() → add item to inventory
-    │
-    ├─> 4. Nighttime effects → misses_home() (sanity damage)
+    ├─> 3. Nighttime effects → misses_home() (sanity damage)
     │
     ├─> 5. brain.act() → determine action
     │       ├─> Check preferred action (e.g., forced by game master)
@@ -297,7 +295,6 @@ Brain::act()
 - `Attribute`: Enum of attributes items can affect (Health, Sanity, Movement, etc.)
 - `OwnsItems` trait: Shared inventory management
 - **Flow**:
-  - `receive_patron_gift()` → creates random consumable
   - `take_nearby_item()` → transfers item from area to tribute
   - `try_use_consumable()` → applies item effect and removes from inventory
 

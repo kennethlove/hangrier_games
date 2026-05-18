@@ -1,34 +1,29 @@
-//! Trauma affliction acquisition and reinforcement logic (spec §4, PR2).
+//! Trauma affliction acquisition and reinforcement logic (spec §4).
 //!
-//! Trauma is a special affliction that can be acquired from witnessing traumatic
-//! events and reinforced by subsequent events. Unlike regular afflictions, trauma
-//! does not cascade or cure — it can only be reinforced to higher severity or
-//! gradually reduced through shelter recovery.
+//! This module provides:
+//! - `Tribute::try_acquire_trauma` — single-instance acquisition/reinforcement (PR1)
+//! - `process_traumas` — per-cycle flashback/observer/decay processing (PR3)
+//!
+//! Producer pipeline (PR2) calls `try_acquire_trauma` for each traumatic event.
+//! PR3 wires the decay tick and flashback roll.
+//!
+//! Trauma is a special affliction that does not cascade or cure — it can only
+//! be reinforced to higher severity or gradually reduced through decay.
 
 use rand::RngExt;
-use shared::afflictions::{AfflictionKind, Severity, TraumaSource};
+use shared::afflictions::{
+    Affliction, AfflictionKey, AfflictionKind, AfflictionSource, Severity, TraumaMetadata,
+    TraumaSource,
+};
 use shared::messages::MessagePayload;
 
 use crate::tributes::Tribute;
 
 use super::effects::flashback_chance;
 
-/// Result of attempting to acquire or reinforce trauma.
-#[derive(Debug, Clone, PartialEq)]
-pub enum TraumaAcquisition {
-    /// New trauma acquired at the given severity.
-    Acquired {
-        severity: Severity,
-        source: TraumaSource,
-    },
-    /// Existing trauma reinforced to a higher severity.
-    Reinforced {
-        from_severity: Severity,
-        to_severity: Severity,
-        /// True if the severity was bumped up from a floor (e.g. Mild → Moderate).
-        floor_bumped: bool,
-    },
-}
+// ────────────────────────────────────────────────────────────────────────────
+// Per-cycle processing (flashback roll, observer tracking, decay tick)
+// ────────────────────────────────────────────────────────────────────────────
 
 /// Result of per-cycle trauma processing for a single tribute.
 #[derive(Debug, Clone, Default)]
@@ -42,7 +37,7 @@ pub struct TraumaCycleResult {
 /// For each trauma on the tribute:
 /// 1. Roll flashback chance (0.05/0.10/0.20 per severity tier)
 /// 2. If flashback hits at Moderate+: track observers
-/// 3. Increment cycles_since_last_fire (decay counter)
+/// 3. Increment cycles_since_last_event (decay counter)
 /// 4. If decay threshold (10 cycles) met: step severity down
 ///
 /// Returns messages for events that occurred.
@@ -84,7 +79,12 @@ pub fn process_traumas(
         // ── Flashback roll ────────────────────────────────────────
         let chance = flashback_chance(aff.severity);
         if rng.random_bool(chance) {
-            let source_str = format_trauma_source(&meta.source);
+            let source_str = meta
+                .sources
+                .iter()
+                .next()
+                .map(|s| format_trauma_source(s))
+                .unwrap_or_default();
 
             result.messages.push(MessagePayload::TraumaFlashback {
                 tribute: tribute.identifier.clone(),
@@ -113,12 +113,12 @@ pub fn process_traumas(
         }
 
         // ── Decay (increment idle counter) ────────────────────────
-        meta.cycles_since_last_fire = meta.cycles_since_last_fire.saturating_add(1);
+        meta.cycles_since_last_event = meta.cycles_since_last_event.saturating_add(1);
 
         // ── Check decay threshold (10 cycles) ─────────────────────
-        if meta.cycles_since_last_fire >= 10 {
+        if meta.cycles_since_last_event >= 10 {
             let outcome =
-                shared::afflictions::tick_decay(aff.severity, meta.cycles_since_last_fire, 10);
+                shared::afflictions::tick_decay(aff.severity, meta.cycles_since_last_event, 10);
             if outcome.decayed {
                 if let Some(new_sev) = outcome.new_severity {
                     result.messages.push(MessagePayload::TraumaHabituated {
@@ -127,7 +127,7 @@ pub fn process_traumas(
                         to_severity: Some(new_sev.to_string()),
                     });
                     aff.severity = new_sev;
-                    meta.cycles_since_last_fire = 0;
+                    meta.cycles_since_last_event = 0;
                 } else {
                     // Cured — Mild decayed off entirely.
                     result.messages.push(MessagePayload::TraumaHabituated {
@@ -155,3 +155,132 @@ fn format_trauma_source(source: &TraumaSource) -> String {
         TraumaSource::MassCasualty { .. } => "mass casualties".to_string(),
     }
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Acquisition outcome (shared by both the PR1 entry-point and the PR3
+// escalation helper; PR2's producer pipeline maps this to MessagePayload).
+// ────────────────────────────────────────────────────────────────────────────
+
+/// Outcome of `Tribute::try_acquire_trauma`. Distinguishes fresh acquisition
+/// from reinforcement (counter reset) so the producer pipeline (PR2) can emit
+/// the correct `MessagePayload::TraumaAcquired` vs `MessagePayload::TraumaReinforced`
+/// later. PR1 returns the outcome but emits nothing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TraumaAcquisition {
+    /// First Trauma on this tribute. Severity = producer's first-occurrence severity.
+    Acquired {
+        severity: Severity,
+        source: TraumaSource,
+    },
+    /// Existing Trauma was reinforced. Counter reset; source merged into the set;
+    /// severity floor-bumped if producer severity exceeded current; metadata preserved.
+    /// `floor_bumped` indicates whether the bump actually changed severity.
+    Reinforced {
+        from_severity: Severity,
+        to_severity: Severity,
+        floor_bumped: bool,
+    },
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Tribute method — single-instance Trauma acquisition / reinforcement (spec §5.1)
+// ────────────────────────────────────────────────────────────────────────────
+
+impl Tribute {
+    /// Acquire or reinforce the tribute's Trauma affliction (spec §5.1).
+    ///
+    /// `producer_severity` is the producer's first-occurrence severity from the
+    /// table in spec §5: Mild for (a)/(b), Moderate for (c)/(d), Moderate/Severe
+    /// for (f) depending on death count.
+    ///
+    /// Single-instance semantics: at most one Trauma per tribute. Subsequent
+    /// calls reinforce the existing one (counter reset, source merge,
+    /// severity floor bump if applicable). Escalation rolls (spec §6.1 step 4)
+    /// happen elsewhere — PR3 will call `try_acquire_trauma` then run the
+    /// shared reinforcement helper.
+    pub fn try_acquire_trauma(
+        &mut self,
+        source: TraumaSource,
+        producer_severity: Severity,
+    ) -> TraumaAcquisition {
+        let key: AfflictionKey = (AfflictionKind::Trauma, None);
+
+        if let Some(existing) = self.afflictions.get_mut(&key) {
+            // Reinforcement path: mutate existing affliction in place.
+            let from_severity = existing.severity;
+            let floor_bumped = producer_severity > from_severity;
+            if floor_bumped {
+                existing.severity = producer_severity;
+                existing.last_progressed_cycle = self.game_day.unwrap_or(0) as u32;
+            }
+
+            let metadata = existing
+                .trauma_metadata
+                .get_or_insert_with(TraumaMetadata::default);
+            metadata.sources.insert(source);
+            metadata.cycles_since_last_event = 0;
+
+            TraumaAcquisition::Reinforced {
+                from_severity,
+                to_severity: existing.severity,
+                floor_bumped,
+            }
+        } else {
+            // Fresh acquisition path: build the affliction directly so we can
+            // attach trauma_metadata, then insert. We bypass try_acquire_affliction
+            // here because that helper does not know how to construct trauma_metadata.
+            let cycle = self.game_day.unwrap_or(0) as u32;
+            let mut metadata = TraumaMetadata::default();
+            metadata.sources.insert(source.clone());
+            metadata.cycles_since_last_event = 0;
+
+            let affliction = Affliction {
+                kind: AfflictionKind::Trauma,
+                body_part: None,
+                severity: producer_severity,
+                acquired_cycle: cycle,
+                last_progressed_cycle: cycle,
+                source: trauma_source_to_affliction_source(&source),
+                trauma_metadata: Some(metadata),
+                phobia_metadata: None,
+                fixation_metadata: None,
+            };
+            self.afflictions.insert(key, affliction);
+
+            TraumaAcquisition::Acquired {
+                severity: producer_severity,
+                source,
+            }
+        }
+    }
+}
+
+/// Map a `TraumaSource` to the generic `AfflictionSource` field that lives on
+/// every `Affliction`. The detailed trauma source list is preserved in
+/// `TraumaMetadata.sources`; the generic source on the `Affliction` itself is
+/// the coarsest-fit `AfflictionSource` variant for cascade tracking.
+fn trauma_source_to_affliction_source(s: &TraumaSource) -> AfflictionSource {
+    match s {
+        // Trauma from witnessing/surviving combat keys to the canonical attacker
+        // when one is identifiable; otherwise falls through to Cascade::Unknown.
+        TraumaSource::Betrayal { by } => AfflictionSource::Combat {
+            attacker_id: by.clone(),
+        },
+        TraumaSource::NearDeath {
+            cause: shared::afflictions::DeathCause::Tribute(id),
+        } => AfflictionSource::Combat {
+            attacker_id: id.clone(),
+        },
+        // Witnessed deaths and mass casualties are environmental cascades from
+        // the originating event chain. PR2's producer will populate the precise
+        // event reference when it has access to the message stream; PR1 stamps
+        // the coarsest-fit source so the wire field is well-formed.
+        _ => AfflictionSource::Cascade {
+            from: (AfflictionKind::Trauma, None),
+        },
+    }
+}
+
+#[cfg(test)]
+#[path = "trauma_tests.rs"]
+mod trauma_tests;

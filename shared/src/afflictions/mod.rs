@@ -15,5 +15,7 @@ pub use mechanics::{
 };
 pub use phobia::{PhobiaMetadata, PhobiaOrigin};
 pub use severity::Severity;
-pub use source::{AfflictionKey, AfflictionSource, CauseClass, DeathCause, TraumaSource};
+pub use source::{
+    AfflictionKey, AfflictionSource, BeastKind, CauseClass, DeathCause, HazardKind, TraumaSource,
+};
 pub use trauma::TraumaMetadata;

@@ -21,11 +21,7 @@ pub use combat::inflict_table::{
 pub use combat::{attack_contest, update_stats};
 pub use movement::TravelResult;
 
-pub mod helpers;
-use helpers::*;
-pub use helpers::{AfflictionDraft, calculate_stamina_cost};
-
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use crate::areas::{Area, AreaDetails};
 use crate::items::Item;
@@ -41,13 +37,82 @@ use fake::locales::*;
 use rand::RngExt;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeSeq};
 use shared::afflictions::{
-    Affliction, AfflictionKey, AfflictionKind, PhobiaTrigger, Severity, TraumaMetadata,
-    TraumaSource,
+    Affliction, AfflictionKey, AfflictionKind, AfflictionSource, BodyPart, Severity,
 };
 use statuses::TributeStatus;
 use uuid::Uuid;
+
+/// Serialize `Vec<Uuid>` as `Vec<String>` for SurrealDB compatibility.
+/// The Surreal Rust SDK's bespoke serializer wires `uuid::Uuid` as raw bytes,
+/// which Surreal then renders as base64 and rejects against `array<uuid>`
+/// constraints. Storing as strings on the wire (and as `array<string>` in
+/// the schema) follows the same convention as `message.event_id`.
+fn serialize_uuids_as_strings<S>(uuids: &[Uuid], serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut seq = serializer.serialize_seq(Some(uuids.len()))?;
+    for u in uuids {
+        seq.serialize_element(&u.to_string())?;
+    }
+    seq.end()
+}
+
+/// Deserialize `Vec<Uuid>` from either a sequence of strings (the wire format
+/// we write) or a sequence of native uuid values (test fixtures, JSON read
+/// back through serde's standard Uuid impl).
+fn deserialize_uuids_lenient<'de, D>(deserializer: D) -> Result<Vec<Uuid>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrUuid {
+        S(String),
+        U(Uuid),
+    }
+
+    let raw: Vec<StringOrUuid> = Vec::deserialize(deserializer)?;
+    raw.into_iter()
+        .map(|item| match item {
+            StringOrUuid::S(s) => Uuid::parse_str(&s).map_err(serde::de::Error::custom),
+            StringOrUuid::U(u) => Ok(u),
+        })
+        .collect()
+}
+
+/// Serialize a single `Uuid` as a string for the same reasons as
+/// `serialize_uuids_as_strings`.
+fn serialize_uuid_as_string<S>(uuid: &Uuid, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&uuid.to_string())
+}
+
+/// Deserialize a single `Uuid` from either a string (our wire format) or the
+/// SDK's native uuid bytes representation.
+fn deserialize_uuid_lenient<'de, D>(deserializer: D) -> Result<Uuid, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrUuid {
+        S(String),
+        U(Uuid),
+    }
+
+    match StringOrUuid::deserialize(deserializer)? {
+        StringOrUuid::S(s) => Uuid::parse_str(&s).map_err(serde::de::Error::custom),
+        StringOrUuid::U(u) => Ok(u),
+    }
+}
+
+/// Consts
+const SANITY_BREAK_LEVEL: u32 = 9;
 
 #[derive(Clone, Debug)]
 pub struct ActionSuggestion {
@@ -208,16 +273,13 @@ pub struct Tribute {
     /// `WakeReason::Rested`.
     #[serde(default)]
     pub sleep_remaining: u8,
-    /// Active afflictions keyed by (kind, body_part). Empty by default.
-    /// Serialized as a Vec<Affliction> because the tuple key type can't be a
-    /// JSON map key. Reconstructed via key() on deserialization.
-    #[serde(
-        default,
-        skip_serializing_if = "BTreeMap::is_empty",
-        serialize_with = "crate::tributes::helpers::serialize_affliction_map",
-        deserialize_with = "crate::tributes::helpers::deserialize_affliction_map"
-    )]
+    /// Active afflictions keyed by (kind, body_part). Empty by default;
+    /// serde skips serialization when empty to keep payloads lean.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub afflictions: BTreeMap<AfflictionKey, Affliction>,
+    /// Current game day (cycle). Used for affliction cycle tracking.
+    #[serde(default)]
+    pub game_day: Option<i64>,
 }
 
 impl Default for Tribute {
@@ -228,25 +290,7 @@ impl Default for Tribute {
 
 impl Tribute {
     /// Creates a new Tribute with full health, sanity, and movement.
-    /// Seeded from system entropy. For deterministic construction in tests,
-    /// use [`new_with_rng()`].
     pub fn new(name: String, district: Option<u32>, avatar: Option<String>) -> Self {
-        let mut rng = SmallRng::from_rng(&mut rand::rng());
-        let mut tribute = Self::new_with_rng(name, district, avatar, &mut rng);
-        crate::tributes::afflictions::fixation::roll_spawn_fixations(&mut tribute, &mut rng);
-        tribute
-    }
-
-    /// Construct a tribute using a caller-provided RNG for deterministic
-    /// results (useful in tests, game-seeded worlds, etc.).
-    /// Does NOT roll for spawn-time fixations — call
-    /// [`roll_spawn_fixations`] separately if needed.
-    pub(crate) fn new_with_rng(
-        name: String,
-        district: Option<u32>,
-        avatar: Option<String>,
-        rng: &mut SmallRng,
-    ) -> Self {
         let district = district.unwrap_or(0);
         let attributes = Attributes::new();
         let statistics = Statistics::default();
@@ -255,15 +299,16 @@ impl Tribute {
         let id: String = id_uuid.to_string();
 
         // Assign terrain affinity, traits, and personality based on district
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
         let terrain_affinity = if (1..=12).contains(&district) {
-            crate::districts::assign_terrain_affinity(district as u8, rng)
+            crate::districts::assign_terrain_affinity(district as u8, &mut rng)
         } else {
             vec![]
         };
-        let traits = traits::generate_traits(district as u8, rng);
-        let brain = Brain::from_traits(&traits, rng);
+        let traits = traits::generate_traits(district as u8, &mut rng);
+        let brain = Brain::from_traits(&traits, &mut rng);
 
-        let tribute = Self {
+        Self {
             identifier: id,
             id: id_uuid,
             area: Area::Cornucopia,
@@ -296,11 +341,8 @@ impl Tribute {
             sleeping: false,
             sleep_remaining: 0,
             afflictions: BTreeMap::new(),
-        };
-
-        // ~5% chance to spawn with an innate fixation.
-
-        tribute
+            game_day: None,
+        }
     }
 
     pub fn random() -> Self {
@@ -480,14 +522,6 @@ impl Tribute {
             | Action::DrinkItem(_) => {}
             Action::Sleep { duration_phases } => {
                 self.act_sleep(duration_phases, environment_details.phase, events);
-            }
-            Action::Frozen => {
-                // Tribute is frozen by phobia — skip this cycle.
-                // Event emitted by the brain pipeline caller.
-            }
-            Action::Flashback { .. } | Action::Avoidance => {
-                // Flashback and avoidance are handled by the brain layer
-                // (trauma_override) which emits the event. No action needed here.
             }
         }
     }
@@ -761,58 +795,6 @@ impl Tribute {
             .filter(|t| t.allies.len() < MAX_ALLIES)
             .filter(|t| passes_gate(&self.traits, &t.traits))
             .collect();
-
-        // Phobia veto (qqqx PR3 spec §12):
-        // Hard veto: cannot propose alliance if you have Phobia(Tribute).
-        if self
-            .afflictions
-            .values()
-            .any(|aff| matches!(aff.kind, AfflictionKind::Phobia(PhobiaTrigger::Tribute)))
-        {
-            return;
-        }
-
-        // Soft penalty: Phobia(TraitGroup) reduces formation chance.
-        let phobia_penalty: f64 = self
-            .afflictions
-            .values()
-            .filter_map(|aff| {
-                if matches!(aff.kind, AfflictionKind::Phobia(PhobiaTrigger::TraitGroup)) {
-                    Some(aff.severity.ordinal() as f64 * 0.15)
-                } else {
-                    None
-                }
-            })
-            .max_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap_or(0.0);
-
-        // Trauma penalty (5477 PR3 spec §12):
-        // Soft penalty: each trauma reduces formation chance by -0.15 per severity tier.
-        let trauma_penalty: f64 = self
-            .afflictions
-            .values()
-            .filter(|aff| matches!(aff.kind, AfflictionKind::Trauma))
-            .map(|aff| aff.severity.ordinal() as f64 * 0.15)
-            .sum::<f64>()
-            .min(1.0); // Cap at 1.0 so chance can't go below 0
-
-        // Hard veto: Severe trauma with Betrayal source hard-blocks alliance.
-        let has_betrayal_veto = self.afflictions.values().any(|aff| {
-            if !matches!(aff.kind, AfflictionKind::Trauma) {
-                return false;
-            }
-            if aff.severity < Severity::Severe {
-                return false;
-            }
-            matches!(
-                aff.trauma_metadata,
-                Some(ref m) if matches!(m.source, TraumaSource::Betrayal { .. })
-            )
-        });
-        if has_betrayal_veto {
-            return;
-        }
-
         if candidates.is_empty() {
             return;
         }
@@ -834,21 +816,6 @@ impl Tribute {
             },
         ));
 
-        // Sympathetic bond (5477 PR3 spec §12):
-        // If target has observed a flashback, +0.10 bonus offsetting trauma penalty.
-        let trauma_observer_bonus: f64 = if self.afflictions.values().any(|aff| {
-            if !matches!(aff.kind, AfflictionKind::Trauma) {
-                return false;
-            }
-            aff.trauma_metadata
-                .as_ref()
-                .is_some_and(|m| m.observed_by.contains(&target.identifier))
-        }) {
-            0.10
-        } else {
-            0.0
-        };
-
         let same_district = self.district == target.district;
         let formed = try_form_alliance(
             &self.traits,
@@ -856,8 +823,6 @@ impl Tribute {
             same_district,
             self.allies.len(),
             target.allies.len(),
-            phobia_penalty,
-            trauma_penalty - trauma_observer_bonus,
             rng,
         );
         if formed {
@@ -1008,13 +973,14 @@ impl Tribute {
     /// Attempt to acquire a new affliction, resolving against existing afflictions.
     /// Returns the resolution (Insert, Upgrade, Supersede, or Reject).
     pub fn try_acquire_affliction(&mut self, draft: AfflictionDraft) -> AcquireResolution {
+        let cycle = self.game_day.unwrap_or(0) as u32;
         let provisional = Affliction {
-            kind: draft.kind.clone(),
+            kind: draft.kind,
             body_part: draft.body_part,
             severity: draft.severity,
             source: draft.source.clone(),
-            acquired_cycle: 0,
-            last_progressed_cycle: 0,
+            acquired_cycle: cycle,
+            last_progressed_cycle: cycle,
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
@@ -1048,90 +1014,24 @@ impl Tribute {
                     self.afflictions.remove(&wounded_key);
                 }
 
-                let insert_key = (draft.kind.clone(), draft.body_part);
                 let affliction = Affliction {
                     kind: draft.kind,
                     body_part: draft.body_part,
                     severity: draft.severity,
                     source: draft.source,
-                    acquired_cycle: 0,
-                    last_progressed_cycle: 0,
+                    acquired_cycle: cycle,
+                    last_progressed_cycle: cycle,
                     trauma_metadata: None,
                     phobia_metadata: None,
                     fixation_metadata: None,
                 };
-                let is_fixation = matches!(affliction.kind, AfflictionKind::Fixation(_));
-                self.afflictions.insert(insert_key.clone(), affliction);
-
-                // Set default fixation metadata for Fixation kinds inserted
-                // through this pathway (used by generic affliction acquisition).
-                if is_fixation && let Some(aff) = self.afflictions.get_mut(&insert_key) {
-                    aff.fixation_metadata = Some(shared::afflictions::FixationMetadata {
-                        origin: shared::afflictions::FixationOrigin::Innate,
-                        observed_by: BTreeSet::new(),
-                        observer_seen_cycle: BTreeMap::new(),
-                        cycles_since_last_contact: 0,
-                    });
-                }
+                self.afflictions
+                    .insert((draft.kind, draft.body_part), affliction);
             }
             AcquireResolution::Reject(_) => {}
         }
 
         resolution
-    }
-
-    /// Attempt to acquire or reinforce trauma on this tribute.
-    ///
-    /// If the tribute already has trauma, it is reinforced to the higher
-    /// severity (or stays the same if already at that severity). If not,
-    /// new trauma is acquired.
-    pub fn try_acquire_trauma(
-        &mut self,
-        source: shared::afflictions::TraumaSource,
-        severity: shared::afflictions::Severity,
-    ) -> crate::tributes::afflictions::TraumaAcquisition {
-        use crate::tributes::afflictions::TraumaAcquisition;
-        use shared::afflictions::{AfflictionKind, AfflictionSource};
-
-        let key = (AfflictionKind::Trauma, None);
-        if let Some(existing) = self.afflictions.get_mut(&key) {
-            let from = existing.severity;
-            let to = std::cmp::max(from, severity);
-            let floor_bumped = to > from;
-            if floor_bumped {
-                existing.severity = to;
-                existing.trauma_metadata = Some(TraumaMetadata {
-                    source,
-                    cycles_since_last_fire: 0,
-                    observed_by: BTreeSet::new(),
-                    observer_seen_cycle: BTreeMap::new(),
-                });
-            }
-            TraumaAcquisition::Reinforced {
-                from_severity: from,
-                to_severity: to,
-                floor_bumped,
-            }
-        } else {
-            let aff = shared::afflictions::Affliction {
-                kind: AfflictionKind::Trauma,
-                body_part: None,
-                severity,
-                source: AfflictionSource::Environmental,
-                acquired_cycle: 0,
-                last_progressed_cycle: 0,
-                trauma_metadata: Some(TraumaMetadata {
-                    source: source.clone(),
-                    cycles_since_last_fire: 0,
-                    observed_by: BTreeSet::new(),
-                    observer_seen_cycle: BTreeMap::new(),
-                }),
-                phobia_metadata: None,
-                fixation_metadata: None,
-            };
-            self.afflictions.insert(key, aff);
-            TraumaAcquisition::Acquired { severity, source }
-        }
     }
 
     /// Apply affliction-based hard gates to an action at execution time.
@@ -1161,35 +1061,71 @@ impl Tribute {
             destination_terrain,
         )
     }
+}
 
-    /// Compute visible stat modifiers for this tribute, combining
-    /// affliction penalties with phobia stat penalties.
-    ///
-    /// Returns a `StatModifiers` struct with all penalties composed.
-    /// Phobia penalties are additive with affliction penalties, capped
-    /// at -10 total for phobias (applied to atk and def).
-    pub fn visible_modifiers(
-        &self,
-        config: &crate::config::GameConfig,
-        phobia_ctx: Option<&crate::tributes::brains::phobia_override::PhobiaBrainContext<'_>>,
-    ) -> afflictions::StatModifiers {
-        let mut mods = afflictions::compute_stat_modifiers(
-            &self.afflictions.values().cloned().collect::<Vec<_>>(),
-        );
+/// A draft affliction ready for acquisition resolution.
+#[derive(Clone)]
+pub struct AfflictionDraft {
+    pub kind: AfflictionKind,
+    pub body_part: Option<BodyPart>,
+    pub severity: Severity,
+    pub source: AfflictionSource,
+}
 
-        // Compose phobia penalties if enabled and context available.
-        if config.phobias_enabled
-            && !self.afflictions.is_empty()
-            && let Some(ctx) = phobia_ctx
-        {
-            let phobia_penalty =
-                crate::tributes::brains::phobia_override::phobia_stat_penalty(self, ctx);
-            mods.atk += phobia_penalty;
-            mods.def += phobia_penalty;
-        }
+/// Calculates the stamina cost for a tribute action based on:
+/// - Base action cost
+/// - Terrain movement multiplier
+/// - Terrain affinity modifier (0.8 if tribute has affinity, 1.0 otherwise)
+/// - Desperation multiplier based on health (1.0 + 0.5 * (1.0 - health%))
+pub fn calculate_stamina_cost(
+    action: &Action,
+    terrain: &crate::terrain::TerrainType,
+    tribute: &Tribute,
+) -> u32 {
+    // Base costs for each action type
+    let base_cost: f32 = match action {
+        Action::Move(_) => 20.0,
+        Action::Hide => 15.0,
+        Action::TakeItem => 10.0,
+        Action::Attack => 25.0,
+        Action::Rest | Action::None => 0.0,
+        Action::UseItem(_) => 10.0,
+        // Proposing an alliance is a low-cost social action.
+        Action::ProposeAlliance => 5.0,
+        // Survival actions: foraging/seeking shelter cost some stamina;
+        // eating and drinking are essentially free overhead.
+        Action::SeekShelter => 10.0,
+        Action::Forage => 15.0,
+        Action::DrinkFromTerrain => 5.0,
+        Action::Eat(_) | Action::DrinkItem(_) => 0.0,
+        // Sleep is free at the action layer; phase scheduler handles it.
+        Action::Sleep { .. } => 0.0,
+    };
 
-        mods
+    // If base cost is 0, no need to calculate multipliers
+    if base_cost == 0.0 {
+        return 0;
     }
+
+    // Terrain multiplier from movement_cost
+    let terrain_multiplier = terrain.base.movement_cost();
+
+    // Affinity modifier: 0.8 if tribute has affinity for this terrain, else 1.0
+    let affinity_modifier = if tribute.terrain_affinity.contains(&terrain.base) {
+        0.8
+    } else {
+        1.0
+    };
+
+    // Desperation multiplier: 1.0 + (0.5 × (1.0 - health%))
+    let health_percent = tribute.attributes.health as f32 / 100.0;
+    let desperation_multiplier = 1.0 + (0.5 * (1.0 - health_percent));
+
+    // Calculate final cost with all multipliers
+    let final_cost = base_cost * terrain_multiplier * affinity_modifier * desperation_multiplier;
+
+    // Round to nearest integer
+    final_cost.round() as u32
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
@@ -1230,8 +1166,6 @@ pub struct Attributes {
     pub persuasion: u32,
     /// Are they likely to get gifts or come out slightly ahead?
     pub luck: u32,
-    /// How quickly they react in a turn.
-    pub agility: u32,
     /// Can other tributes see them?
     pub is_hidden: bool,
 }
@@ -1249,7 +1183,6 @@ impl Default for Attributes {
             intelligence: 100,
             persuasion: 100,
             luck: 100,
-            agility: 50,
             is_hidden: false,
         }
     }
@@ -1271,11 +1204,697 @@ impl Attributes {
             intelligence: rng.random_range(1..=config.max_intelligence),
             persuasion: rng.random_range(1..=config.max_persuasion),
             luck: rng.random_range(1..=config.max_luck),
-            agility: rng.random_range(1..=config.max_agility),
             is_hidden: false,
         }
     }
 }
 
 #[cfg(test)]
-mod tests;
+mod tests {
+
+    use crate::messages::TaggedEvent;
+    use crate::tributes::Tribute;
+    use crate::tributes::brains::Brain;
+    use rand::SeedableRng;
+    use rand::rngs::SmallRng;
+    use rstest::*;
+
+    #[fixture]
+    fn tribute() -> Tribute {
+        Tribute::new("Katniss".to_string(), None, None)
+    }
+
+    #[fixture]
+    fn target() -> Tribute {
+        Tribute::new("Peeta".to_string(), None, None)
+    }
+
+    #[fixture]
+    fn small_rng() -> SmallRng {
+        SmallRng::seed_from_u64(0)
+    }
+
+    #[rstest]
+    fn default() {
+        let tribute = Tribute::default();
+        assert_eq!(tribute.name, "Default Tribute");
+    }
+
+    #[rstest]
+    fn serde_roundtrip_alliance_fields() {
+        use crate::tributes::traits::Trait;
+        use uuid::Uuid;
+
+        let mut tribute = Tribute::new("Rue".to_string(), None, None);
+        let ally = Uuid::new_v4();
+        tribute.allies.push(ally);
+        tribute.traits.clear();
+        tribute.traits.push(Trait::Loyal);
+        tribute.traits.push(Trait::Treacherous);
+        tribute.turns_since_last_betrayal = 7;
+        tribute.pending_trust_shock = true;
+
+        let json = serde_json::to_string(&tribute).expect("serialize");
+        assert!(json.contains("\"allies\""));
+        assert!(json.contains("\"traits\""));
+        assert!(json.contains("\"Loyal\""));
+        assert!(json.contains("\"turns_since_last_betrayal\":7"));
+        assert!(json.contains("\"pending_trust_shock\":true"));
+
+        let restored: Tribute = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(restored.allies, vec![ally]);
+        assert_eq!(restored.traits, vec![Trait::Loyal, Trait::Treacherous]);
+        assert_eq!(restored.turns_since_last_betrayal, 7);
+        assert!(restored.pending_trust_shock);
+    }
+
+    #[rstest]
+    fn serde_defaults_for_missing_alliance_fields() {
+        // Persisted tribute records written before the alliance fields existed
+        // must still deserialize. Simulate this by serialising a fresh tribute,
+        // stripping the new fields, then round-tripping.
+        let baseline = Tribute::new("Legacy".to_string(), None, None);
+        let mut value: serde_json::Value = serde_json::to_value(&baseline).expect("to_value");
+        let obj = value.as_object_mut().expect("object");
+        obj.remove("allies");
+        obj.remove("traits");
+        obj.remove("turns_since_last_betrayal");
+        obj.remove("pending_trust_shock");
+
+        let restored: Tribute = serde_json::from_value(value).expect("legacy deserialize");
+        assert!(restored.allies.is_empty());
+        assert!(restored.traits.is_empty());
+        assert_eq!(restored.turns_since_last_betrayal, 0);
+        assert!(!restored.pending_trust_shock);
+    }
+
+    #[rstest]
+    fn brain_roundtrips_psychotic_break_state() {
+        use crate::tributes::brains::PsychoticBreakType;
+
+        let mut tribute = Tribute::new("Cato".to_string(), None, None);
+        tribute.brain.psychotic_break = Some(PsychoticBreakType::Berserk);
+
+        let json = serde_json::to_string(&tribute).expect("serialize");
+        assert!(json.contains("\"brain\""));
+        assert!(json.contains("\"Berserk\""));
+
+        let restored: Tribute = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(
+            restored.brain.psychotic_break,
+            Some(PsychoticBreakType::Berserk),
+        );
+    }
+
+    #[rstest]
+    fn brain_preferred_action_is_not_persisted() {
+        // preferred_action is transient AI state recomputed each cycle, so the
+        // field is `skip_serializing` and `deserialize_optional_enum_lenient`
+        // (which absorbs both null and the {} corruption left over from the
+        // SDK's enum-collapse bug). A roundtrip therefore intentionally drops
+        // any preferred_action that was set in memory.
+        use crate::tributes::actions::Action;
+
+        let mut tribute = Tribute::new("Foxface".to_string(), None, None);
+        tribute.brain.preferred_action = Some(Action::Hide);
+        tribute.brain.preferred_action_percentage = 0.75;
+
+        let json = serde_json::to_string(&tribute).expect("serialize");
+
+        let restored: Tribute = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(restored.brain.preferred_action, None);
+        // Non-skipped fields still round-trip normally.
+        assert!((restored.brain.preferred_action_percentage - 0.75).abs() < f64::EPSILON);
+    }
+
+    #[rstest]
+    fn brain_tolerates_corrupt_preferred_action_object() {
+        // SurrealDB rows written before the bug-5 fix have preferred_action: {}
+        // because the SDK's bespoke serializer collapsed the externally-tagged
+        // Action enum. The lenient deserializer must read those rows as None.
+        // Round-trip a real Brain to get a valid base JSON, then swap
+        // preferred_action's value to {} to simulate the corruption.
+        use crate::tributes::brains::Brain;
+
+        let brain = Brain {
+            preferred_action_percentage: 0.5,
+            ..Brain::default()
+        };
+        let mut value = serde_json::to_value(&brain).expect("serialize brain");
+        value["preferred_action"] = serde_json::json!({});
+        let restored: Brain = serde_json::from_value(value).expect("deserialize legacy row");
+        assert_eq!(restored.preferred_action, None);
+    }
+
+    #[rstest]
+    fn brain_missing_field_defaults() {
+        // Pre-fix tribute rows persisted before #[serde(default)] was added
+        // omit the `brain` column entirely. They must still deserialize, with
+        // brain hydrated via `Brain::default()`.
+        let baseline = Tribute::new("Legacy".to_string(), None, None);
+        let mut value: serde_json::Value = serde_json::to_value(&baseline).expect("to_value");
+        value.as_object_mut().expect("object").remove("brain");
+
+        let restored: Tribute = serde_json::from_value(value).expect("legacy deserialize");
+        assert_eq!(restored.brain, Brain::default());
+        assert!(restored.brain.psychotic_break.is_none());
+        assert!(restored.brain.preferred_action.is_none());
+    }
+
+    #[rstest]
+    fn new() {
+        let tribute = Tribute::new("Katniss".to_string(), Some(12), None);
+        assert_eq!(tribute.name, "Katniss");
+        assert_eq!(tribute.district, 12);
+        // Attributes::new() randomizes health in 50..=max_health.
+        assert!(
+            (50..=100).contains(&tribute.attributes.health),
+            "health {} out of range",
+            tribute.attributes.health
+        );
+    }
+
+    #[rstest]
+    fn random() {
+        let tribute = Tribute::random();
+        assert!(!tribute.name.is_empty());
+        assert!(tribute.district >= 1 && tribute.district <= 12);
+    }
+
+    #[rstest]
+    fn new_tribute_has_empty_alliance_state() {
+        let tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        assert!(tribute.allies.is_empty());
+        assert_eq!(tribute.turns_since_last_betrayal, 0);
+        // `id` mirrors `identifier`.
+        assert_eq!(tribute.id.to_string(), tribute.identifier);
+    }
+
+    #[rstest]
+    fn new_tribute_has_no_pending_trust_shock() {
+        let tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        assert!(!tribute.pending_trust_shock);
+    }
+
+    #[test]
+    fn tribute_default_survival_fields_are_zero_and_none() {
+        let t = Tribute::new("Test".to_string(), None, None);
+        assert_eq!(t.hunger, 0, "hunger starts at 0 (Sated)");
+        assert_eq!(t.thirst, 0, "thirst starts at 0 (Sated)");
+        assert_eq!(t.sheltered_until, None, "starts exposed");
+        assert_eq!(t.starvation_drain_step, 0);
+        assert_eq!(t.dehydration_drain_step, 0);
+    }
+
+    #[test]
+    fn tribute_legacy_json_loads_with_defaults() {
+        // JSON missing the new survival fields entirely (simulates a saved
+        // game from before this feature landed). serde(default) must
+        // populate them.
+        let mut t = Tribute::new("Legacy".to_string(), Some(1), None);
+        t.hunger = 0;
+        t.thirst = 0;
+        t.sheltered_until = None;
+        t.starvation_drain_step = 0;
+        t.dehydration_drain_step = 0;
+        let mut json: serde_json::Value = serde_json::to_value(&t).unwrap();
+        // strip the survival fields to mimic a pre-feature save
+        let obj = json.as_object_mut().unwrap();
+        obj.remove("hunger");
+        obj.remove("thirst");
+        obj.remove("sheltered_until");
+        obj.remove("starvation_drain_step");
+        obj.remove("dehydration_drain_step");
+        let loaded: Tribute = serde_json::from_value(json).expect("legacy load must succeed");
+        assert_eq!(loaded.hunger, 0);
+        assert_eq!(loaded.thirst, 0);
+        assert_eq!(loaded.sheltered_until, None);
+        assert_eq!(loaded.starvation_drain_step, 0);
+        assert_eq!(loaded.dehydration_drain_step, 0);
+    }
+
+    #[test]
+    fn tribute_legacy_json_loads_with_sleep_defaults() {
+        // JSON missing the new sleep fields must default to zero/false.
+        let t = Tribute::new("Legacy".to_string(), Some(1), None);
+        let mut json: serde_json::Value = serde_json::to_value(&t).unwrap();
+        let obj = json.as_object_mut().unwrap();
+        obj.remove("cycles_awake");
+        obj.remove("sleeping");
+        obj.remove("sleep_remaining");
+        let loaded: Tribute = serde_json::from_value(json).expect("legacy load must succeed");
+        assert_eq!(loaded.cycles_awake, 0);
+        assert!(!loaded.sleeping);
+        assert_eq!(loaded.sleep_remaining, 0);
+    }
+
+    #[rstest]
+    fn tribute_drain_alliance_events_returns_and_clears_buffer() {
+        use crate::tributes::alliances::AllianceEvent;
+        use uuid::Uuid;
+        let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        let other = Uuid::new_v4();
+        tribute
+            .alliance_events
+            .push(AllianceEvent::BetrayalRecorded {
+                betrayer: tribute.id,
+                victim: other,
+            });
+        let drained = tribute.drain_alliance_events();
+        assert_eq!(drained.len(), 1);
+        assert!(tribute.alliance_events.is_empty());
+    }
+
+    #[rstest]
+    fn consume_pending_trust_shock_resets_flag_when_not_set() {
+        // No flag → no rolls, flag stays false, allies untouched.
+        let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        let ally = uuid::Uuid::new_v4();
+        tribute.allies.push(ally);
+        let mut events: Vec<TaggedEvent> = vec![];
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(53);
+        tribute.consume_pending_trust_shock(&mut rng, &mut events);
+        assert!(!tribute.pending_trust_shock);
+        assert_eq!(tribute.allies, vec![ally]);
+        assert!(events.is_empty());
+    }
+
+    #[rstest]
+    fn consume_pending_trust_shock_breaks_allies_on_success_and_clears_flag() {
+        // Force trust_shock to fire deterministically: sanity=0, threshold>0
+        // gives p = 0.5 + 0.5 * 1.0 = 1.0 → always true.
+        let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        tribute.attributes.sanity = 0;
+        tribute.brain.thresholds.extreme_low_sanity = 50;
+        let ally1 = uuid::Uuid::new_v4();
+        let ally2 = uuid::Uuid::new_v4();
+        tribute.allies.push(ally1);
+        tribute.allies.push(ally2);
+        tribute.pending_trust_shock = true;
+
+        let mut events: Vec<TaggedEvent> = vec![];
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(211);
+        tribute.consume_pending_trust_shock(&mut rng, &mut events);
+
+        assert!(!tribute.pending_trust_shock, "flag must reset");
+        assert!(
+            tribute.allies.is_empty(),
+            "all allies broken on guaranteed success"
+        );
+        assert_eq!(events.len(), 2, "one message per broken ally");
+    }
+
+    #[rstest]
+    fn consume_pending_trust_shock_no_break_when_sanity_above_threshold() {
+        // Sanity at/above threshold → trust_shock_roll returns false → no break.
+        let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        tribute.attributes.sanity = 100;
+        tribute.brain.thresholds.extreme_low_sanity = 50;
+        let ally = uuid::Uuid::new_v4();
+        tribute.allies.push(ally);
+        tribute.pending_trust_shock = true;
+
+        let mut events: Vec<TaggedEvent> = vec![];
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(89);
+        tribute.consume_pending_trust_shock(&mut rng, &mut events);
+
+        assert!(!tribute.pending_trust_shock, "flag must reset");
+        assert_eq!(tribute.allies, vec![ally], "ally retained");
+        assert!(events.is_empty());
+    }
+
+    #[rstest]
+    fn new_tribute_has_traits_for_valid_district() {
+        let tribute = Tribute::new("Katniss".to_string(), Some(12), None);
+        // generate_traits rolls 2..=6 traits from the district pool.
+        assert!((2..=6).contains(&tribute.traits.len()));
+    }
+
+    #[rstest]
+    fn pick_target_skips_allies() {
+        // An ally is in the same area but must not be picked as a target.
+        let mut me = Tribute::new("Katniss".to_string(), Some(12), None);
+        me.attributes.sanity = 100; // not suicidal
+        let ally = Tribute::new("Peeta".to_string(), Some(12), None);
+        me.allies.push(ally.id);
+
+        let mut events: Vec<TaggedEvent> = vec![];
+        let target = me.pick_target(vec![ally.clone()], 5, &mut events);
+        // Only candidate was an ally and we're not in final confrontation.
+        assert!(target.is_none());
+    }
+
+    #[rstest]
+    fn pick_target_allows_same_district_when_not_ally() {
+        // Same-district tributes can now be targeted unless they're allies.
+        let me = Tribute::new("Katniss".to_string(), Some(12), None);
+        let same_district = Tribute::new("Peeta".to_string(), Some(12), None);
+
+        let mut events: Vec<TaggedEvent> = vec![];
+        let target = me.pick_target(vec![same_district.clone()], 5, &mut events);
+        assert!(target.is_some());
+        assert_eq!(target.unwrap().id, same_district.id);
+    }
+
+    #[rstest]
+    fn pick_target_final_confrontation_overrides_alliance() {
+        // When only two tributes remain alive, even an ally is a valid target.
+        let mut me = Tribute::new("Katniss".to_string(), Some(12), None);
+        me.attributes.sanity = 100;
+        let ally = Tribute::new("Peeta".to_string(), Some(12), None);
+        me.allies.push(ally.id);
+
+        let mut events: Vec<TaggedEvent> = vec![];
+        let target = me.pick_target(vec![ally.clone()], 2, &mut events);
+        assert!(target.is_some());
+        assert_eq!(target.unwrap().id, ally.id);
+    }
+
+    #[rstest]
+    fn tick_alliance_timers_increments_betrayal_counter() {
+        // Living tribute: counter increments by exactly one per tick.
+        let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        assert_eq!(tribute.turns_since_last_betrayal, 0);
+        tribute.tick_alliance_timers();
+        assert_eq!(tribute.turns_since_last_betrayal, 1);
+        tribute.tick_alliance_timers();
+        assert_eq!(tribute.turns_since_last_betrayal, 2);
+    }
+
+    #[rstest]
+    fn tick_alliance_timers_saturates_does_not_overflow() {
+        // u8 saturating add: never panics, never wraps to zero.
+        let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        tribute.turns_since_last_betrayal = u8::MAX;
+        tribute.tick_alliance_timers();
+        assert_eq!(tribute.turns_since_last_betrayal, u8::MAX);
+    }
+
+    #[rstest]
+    fn tick_alliance_timers_skips_dead_tributes() {
+        // Dead tributes don't accumulate betrayal cooldown.
+        let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
+        tribute.attributes.health = 0;
+        tribute.status = crate::tributes::TributeStatus::RecentlyDead;
+        tribute.tick_alliance_timers();
+        assert_eq!(tribute.turns_since_last_betrayal, 0);
+    }
+
+    #[rstest]
+    fn pick_target_picks_ex_ally_after_trust_shock_breaks_bond() {
+        // End-to-end break-then-attack (spec §7.3c1 + §7.5):
+        // Once a trust shock fires and removes the betrayer from the
+        // victim's `allies`, the victim's next `pick_target` call must
+        // consider that ex-ally a valid target.
+        let mut victim = Tribute::new("Glimmer".to_string(), Some(1), None);
+        victim.attributes.sanity = 100; // not suicidal
+        let ex_ally = Tribute::new("Cato".to_string(), Some(2), None);
+        // Pre-condition: bonded.
+        victim.allies.push(ex_ally.id);
+
+        // Simulate the bond breaking (what process_alliance_events does
+        // for BetrayalRecorded, plus what consume_pending_trust_shock
+        // does on the victim's side: drop the ex-ally locally).
+        victim.allies.retain(|id| *id != ex_ally.id);
+
+        let mut events: Vec<TaggedEvent> = vec![];
+        let target = victim.pick_target(vec![ex_ally.clone()], 5, &mut events);
+        assert!(
+            target.is_some(),
+            "ex-ally must be targetable after the bond breaks"
+        );
+        assert_eq!(target.unwrap().id, ex_ally.id);
+    }
+
+    #[rstest]
+    fn consume_pending_trust_shock_leaves_asymmetric_back_edge() {
+        // Spec §7.3c1 explicitly defers the symmetric back-edge cleanup
+        // for trust-shock breaks: only `self` is mutated. This regression
+        // test pins that contract so any future tightening is intentional.
+        let mut victim = Tribute::new("Glimmer".to_string(), Some(1), None);
+        victim.attributes.sanity = 0; // force a break
+        victim.brain.thresholds.extreme_low_sanity = 100;
+        let betrayer_id = uuid::Uuid::new_v4();
+        victim.allies.push(betrayer_id);
+        victim.pending_trust_shock = true;
+
+        let mut rng = SmallRng::seed_from_u64(419);
+        let mut events: Vec<TaggedEvent> = vec![];
+        victim.consume_pending_trust_shock(&mut rng, &mut events);
+
+        // Victim's side cleaned.
+        assert!(
+            !victim.allies.contains(&betrayer_id),
+            "victim must drop the broken ally"
+        );
+        // The flag is consumed regardless of roll outcome.
+        assert!(
+            !victim.pending_trust_shock,
+            "pending flag is reset after the call"
+        );
+        // Asymmetric back-edge stays — `consume_pending_trust_shock` only
+        // touches `self`. The next cycle's event drain (or follow-up
+        // events) is responsible for the betrayer's side.
+        // We can't observe the betrayer here (different tribute instance);
+        // the documented contract is what matters and is asserted by the
+        // single-side mutation: the function signature takes `&mut self`
+        // and returns nothing, with no reference to the broken ally.
+    }
+
+    #[test]
+    fn wake_interrupted_returns_false_when_not_sleeping() {
+        use crate::messages::TributeRef;
+        let mut t = Tribute::new("Foxface".to_string(), Some(1), None);
+        let mut events: Vec<TaggedEvent> = Vec::new();
+        let woke = t.wake_interrupted(
+            shared::messages::InterruptionKind::Ambush {
+                attacker: TributeRef {
+                    identifier: "x".to_string(),
+                    name: "X".to_string(),
+                },
+            },
+            shared::messages::Phase::Day,
+            &mut events,
+        );
+        assert!(!woke);
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn wake_interrupted_resets_state_and_emits_tribute_woke() {
+        let mut t = Tribute::new("Foxface".to_string(), Some(1), None);
+        t.sleeping = true;
+        t.sleep_remaining = 3;
+        t.cycles_awake = 7;
+        let mut events: Vec<TaggedEvent> = Vec::new();
+        let woke = t.wake_interrupted(
+            shared::messages::InterruptionKind::AreaEvent {
+                kind: shared::messages::AreaEventKind::Fire,
+            },
+            shared::messages::Phase::Night,
+            &mut events,
+        );
+        assert!(woke);
+        assert!(!t.sleeping);
+        assert_eq!(t.sleep_remaining, 0);
+        assert_eq!(t.cycles_awake, 0);
+        assert_eq!(events.len(), 1);
+        match &events[0].payload {
+            crate::messages::MessagePayload::TributeWoke { reason, phase, .. } => {
+                assert_eq!(*phase, shared::messages::Phase::Night);
+                match reason {
+                    shared::messages::WakeReason::Interrupted {
+                        event:
+                            shared::messages::InterruptionKind::AreaEvent {
+                                kind: shared::messages::AreaEventKind::Fire,
+                            },
+                    } => {}
+                    other => panic!("unexpected reason: {:?}", other),
+                }
+            }
+            other => panic!("expected TributeWoke payload, got {:?}", other),
+        }
+    }
+
+    // --- Affliction tests ---
+
+    use crate::tributes::AfflictionDraft;
+    use crate::tributes::afflictions::{AcquireResolution, RejectReason};
+    use shared::afflictions::{AfflictionKind, AfflictionSource, BodyPart, Severity};
+
+    #[test]
+    fn test_afflictions_empty_by_default() {
+        let t = Tribute::new("Test".to_string(), None, None);
+        assert!(t.afflictions.is_empty());
+    }
+
+    #[test]
+    fn test_afflictions_skip_serialization_when_empty() {
+        let t = Tribute::new("Test".to_string(), None, None);
+        let json = serde_json::to_string(&t).unwrap();
+        assert!(!json.contains("\"afflictions\""));
+    }
+
+    #[test]
+    fn test_try_acquire_insert() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Wounded,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Mild,
+            source: AfflictionSource::Combat {
+                attacker_id: "tributes:test".into(),
+            },
+        };
+        let resolution = t.try_acquire_affliction(draft);
+        assert_eq!(resolution, AcquireResolution::Insert);
+        assert_eq!(t.afflictions.len(), 1);
+        assert!(
+            t.afflictions
+                .contains_key(&(AfflictionKind::Wounded, Some(BodyPart::Arm)))
+        );
+    }
+
+    #[test]
+    fn test_try_acquire_upgrade() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        // Insert mild wound
+        t.try_acquire_affliction(AfflictionDraft {
+            kind: AfflictionKind::Wounded,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Mild,
+            source: AfflictionSource::Combat {
+                attacker_id: "tributes:test".into(),
+            },
+        });
+        // Upgrade to moderate
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Wounded,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Moderate,
+            source: AfflictionSource::Combat {
+                attacker_id: "tributes:test".into(),
+            },
+        };
+        let resolution = t.try_acquire_affliction(draft);
+        assert_eq!(
+            resolution,
+            AcquireResolution::Upgrade((AfflictionKind::Wounded, Some(BodyPart::Arm)))
+        );
+        assert_eq!(t.afflictions.len(), 1);
+        let affl = t
+            .afflictions
+            .get(&(AfflictionKind::Wounded, Some(BodyPart::Arm)))
+            .unwrap();
+        assert_eq!(affl.severity, Severity::Moderate);
+    }
+
+    #[test]
+    fn test_try_acquire_supersede() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        // Insert wounded on arm
+        t.try_acquire_affliction(AfflictionDraft {
+            kind: AfflictionKind::Wounded,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Mild,
+            source: AfflictionSource::Combat {
+                attacker_id: "tributes:test".into(),
+            },
+        });
+        // Infected supersedes wounded at same body part
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Infected,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Mild,
+            source: AfflictionSource::Combat {
+                attacker_id: "tributes:test".into(),
+            },
+        };
+        let resolution = t.try_acquire_affliction(draft);
+        assert_eq!(resolution, AcquireResolution::Insert);
+        // Wounded removed, Infected present
+        assert!(
+            !t.afflictions
+                .contains_key(&(AfflictionKind::Wounded, Some(BodyPart::Arm)))
+        );
+        assert!(
+            t.afflictions
+                .contains_key(&(AfflictionKind::Infected, Some(BodyPart::Arm)))
+        );
+    }
+
+    #[test]
+    fn test_try_acquire_reject_limb_missing() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        // Missing arm
+        t.try_acquire_affliction(AfflictionDraft {
+            kind: AfflictionKind::MissingArm,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Severe,
+            source: AfflictionSource::Combat {
+                attacker_id: "tributes:test".into(),
+            },
+        });
+        // Can't wound a missing limb
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Wounded,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Mild,
+            source: AfflictionSource::Combat {
+                attacker_id: "tributes:test".into(),
+            },
+        };
+        let resolution = t.try_acquire_affliction(draft);
+        assert_eq!(
+            resolution,
+            AcquireResolution::Reject(RejectReason::LimbAlreadyMissing)
+        );
+    }
+
+    #[test]
+    fn test_try_acquire_reject_no_wounded_ancestor() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        // Infected without prior Wounded on same part
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Infected,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Mild,
+            source: AfflictionSource::Combat {
+                attacker_id: "tributes:test".into(),
+            },
+        };
+        let resolution = t.try_acquire_affliction(draft);
+        assert_eq!(
+            resolution,
+            AcquireResolution::Reject(RejectReason::InfectedRequiresWoundedAncestor)
+        );
+    }
+
+    #[test]
+    fn test_try_acquire_reject_same_severity() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        // Insert mild wound
+        t.try_acquire_affliction(AfflictionDraft {
+            kind: AfflictionKind::Wounded,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Mild,
+            source: AfflictionSource::Combat {
+                attacker_id: "tributes:test".into(),
+            },
+        });
+        // Same severity rejected
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Wounded,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Mild,
+            source: AfflictionSource::Combat {
+                attacker_id: "tributes:test".into(),
+            },
+        };
+        let resolution = t.try_acquire_affliction(draft);
+        assert_eq!(
+            resolution,
+            AcquireResolution::Reject(RejectReason::NotStrictlyHigherSeverity)
+        );
+    }
+}

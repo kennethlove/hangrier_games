@@ -141,25 +141,22 @@ mod tests {
     use shared::afflictions::{Affliction, AfflictionSource, BodyPart};
 
     fn make_affliction(kind: AfflictionKind, severity: Severity) -> Affliction {
-        let bp = Some(match &kind {
-            AfflictionKind::MissingArm => BodyPart::Arm,
-            AfflictionKind::MissingLeg => BodyPart::Leg,
-            AfflictionKind::Blind => BodyPart::Eye,
-            AfflictionKind::Deaf => BodyPart::Ear,
-            _ => BodyPart::Rib,
-        });
         Affliction {
             kind,
-            body_part: bp,
+            body_part: Some(match kind {
+                AfflictionKind::MissingArm => BodyPart::Arm,
+                AfflictionKind::MissingLeg => BodyPart::Leg,
+                AfflictionKind::Blind => BodyPart::Eye,
+                AfflictionKind::Deaf => BodyPart::Ear,
+                _ => BodyPart::Rib,
+            }),
             severity,
             source: AfflictionSource::Combat {
-                attacker_id: String::new(),
+                attacker_id: "tributes:test".into(),
             },
-            acquired_cycle: 0,
-            last_progressed_cycle: 0,
+            acquired_cycle: 1,
+            last_progressed_cycle: 1,
             trauma_metadata: None,
-            phobia_metadata: None,
-            fixation_metadata: None,
         }
     }
 
@@ -254,10 +251,7 @@ mod tests {
 
     #[test]
     fn affliction_bias_neutral_without_afflictions() {
-        use rand::SeedableRng;
-        use rand::rngs::SmallRng;
-        let mut rng = SmallRng::seed_from_u64(42);
-        let tribute = Tribute::new_with_rng("Test".to_string(), None, None, &mut rng);
+        let tribute = Tribute::new("Test".to_string(), None, None);
         let bias = affliction_bias(&tribute);
         assert_eq!(bias.combat_avoid, 1.0);
         assert_eq!(bias.rest_preference, 1.0);

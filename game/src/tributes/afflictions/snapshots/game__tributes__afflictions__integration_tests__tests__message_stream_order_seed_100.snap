@@ -1,0 +1,7 @@
+---
+source: game/src/tributes/afflictions/integration_tests.rs
+expression: payload_kinds
+---
+- State
+- Combat
+- CombatSwing

@@ -6,11 +6,16 @@
 //! - Violence stress calculations
 //! - Statistics updates
 
+pub mod inflict_table;
+
 use crate::items::{Item, OwnsItems};
 use crate::messages::{CombatEngagement, CombatOutcome, MessagePayload, TaggedEvent, TributeRef};
 use crate::output::GameOutput;
 use crate::tributes::Tribute;
 use crate::tributes::actions::{AttackOutcome, AttackResult};
+use crate::tributes::combat::inflict_table::{
+    HitSeverity, WeaponKind, lookup_break_mid_swing_inflict, lookup_inflicts,
+};
 use rand::RngExt;
 use rand::prelude::*;
 use shared::combat_beat::{CombatBeat, StressReport, SwingOutcome};
@@ -199,6 +204,8 @@ impl Tribute {
         let contest = attack_contest(self, target, rng, &mut sub_events, tuning);
         let result = contest.result;
         let wear_records = contest.wear;
+        let target_inflicts = contest.inflicts;
+        let attacker_inflicts = contest.attacker_inflicts;
         // Stress applied to the swing's winner via apply_violence_stress; set
         // by each branch below before mk_beat is invoked. Initialised to 0
         // because Miss / fumble paths never apply stress.
@@ -410,6 +417,45 @@ impl Tribute {
             }
         };
 
+        // Phase 3: apply affliction inflicts from the inflict table.
+        // Target inflicts go to the target; attacker inflicts (BreakMidSwing recoil) go to self.
+        for draft in &target_inflicts {
+            let resolution = target.try_acquire_affliction(draft.clone());
+            if matches!(
+                resolution,
+                crate::tributes::afflictions::AcquireResolution::Insert
+                    | crate::tributes::afflictions::AcquireResolution::Upgrade(_)
+                    | crate::tributes::afflictions::AcquireResolution::Supersede(_)
+            ) {
+                events.push(TaggedEvent::new(
+                    String::new(),
+                    MessagePayload::AfflictionAcquired {
+                        tribute_id: target.identifier.clone(),
+                        affliction: draft.kind.to_string(),
+                        severity: draft.severity.to_string(),
+                    },
+                ));
+            }
+        }
+        for draft in &attacker_inflicts {
+            let resolution = self.try_acquire_affliction(draft.clone());
+            if matches!(
+                resolution,
+                crate::tributes::afflictions::AcquireResolution::Insert
+                    | crate::tributes::afflictions::AcquireResolution::Upgrade(_)
+                    | crate::tributes::afflictions::AcquireResolution::Supersede(_)
+            ) {
+                events.push(TaggedEvent::new(
+                    String::new(),
+                    MessagePayload::AfflictionAcquired {
+                        tribute_id: self.identifier.clone(),
+                        affliction: draft.kind.to_string(),
+                        severity: draft.severity.to_string(),
+                    },
+                ));
+            }
+        }
+
         // Capture damage applied this swing for the typed beat. Computed from
         // the resolved branch so the beat's damage matches what was applied.
         let swing_damage: u32 = match result {
@@ -598,6 +644,10 @@ pub struct AttackContestOutcome {
     /// Wear records emitted in attack-roll order: weapon (if equipped) then
     /// shield (if equipped). Items that were `Pristine` are omitted.
     pub wear: Vec<shared::combat_beat::WearReport>,
+    /// Affliction drafts to apply to the target (loser of the contest).
+    pub inflicts: Vec<crate::tributes::AfflictionDraft>,
+    /// Affliction drafts to apply to the attacker (e.g. BreakMidSwing recoil).
+    pub attacker_inflicts: Vec<crate::tributes::AfflictionDraft>,
 }
 
 pub fn attack_contest(
@@ -626,6 +676,10 @@ pub fn attack_contest(
 
     let mut wear: Vec<WearReport> = Vec::new();
 
+    // Track weapon kind and whether it broke for inflict table lookup.
+    let mut weapon_kind = WeaponKind::Unarmed;
+    let mut weapon_broken = false;
+
     // If the attacker has a weapon, use it
     let weapon_outcome = if let Some(weapon) = attacker.equipped_weapon_mut() {
         attack_roll += weapon.effect; // Add weapon damage
@@ -639,6 +693,7 @@ pub fn attack_contest(
         None
     };
     if let Some((weapon, outcome)) = weapon_outcome {
+        weapon_kind = classify_weapon(&weapon);
         let attacker_ref = tref(attacker);
         let item_ref = shared::messages::ItemRef {
             identifier: weapon.identifier.clone(),
@@ -665,6 +720,7 @@ pub fn attack_contest(
                 });
             }
             crate::items::WearOutcome::Broken => {
+                weapon_broken = true;
                 let content = GameOutput::WeaponBreak(attacker.name.as_str(), weapon.name.as_str())
                     .to_string();
                 events.push(TaggedEvent::new(
@@ -848,7 +904,67 @@ pub fn attack_contest(
         report.mid_action_penalty = None;
     }
 
-    AttackContestOutcome { result, wear }
+    // Phase 3: affliction inflict table lookup.
+    let hit_severity = result_to_hit_severity(&result);
+    let attacker_id = attacker.identifier.as_str();
+    let (inflicts, attacker_inflicts) =
+        if matches!(result, AttackResult::Miss | AttackResult::CriticalFumble) {
+            (Vec::new(), Vec::new())
+        } else {
+            let target_inflicts = lookup_inflicts(weapon_kind, hit_severity, attacker_id, rng);
+            // BreakMidSwing follow-through: when weapon shatters, attacker suffers
+            // a recoil injury in addition to any target inflicts.
+            let attacker_inflicts = if weapon_broken {
+                lookup_break_mid_swing_inflict(weapon_kind, attacker_id, rng)
+                    .into_iter()
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            (target_inflicts, attacker_inflicts)
+        };
+
+    AttackContestOutcome {
+        result,
+        wear,
+        inflicts,
+        attacker_inflicts,
+    }
+}
+
+/// Map an AttackResult to the inflict table's severity band.
+fn result_to_hit_severity(result: &AttackResult) -> HitSeverity {
+    match result {
+        AttackResult::CriticalHit => HitSeverity::Critical,
+        AttackResult::AttackerWinsDecisively
+        | AttackResult::DefenderWinsDecisively
+        | AttackResult::PerfectBlock => HitSeverity::Heavy,
+        AttackResult::AttackerWins | AttackResult::DefenderWins => HitSeverity::Normal,
+        AttackResult::CriticalFumble | AttackResult::Miss => HitSeverity::Normal,
+    }
+}
+
+/// Classify an Item into a WeaponKind for the inflict table.
+fn classify_weapon(item: &Item) -> WeaponKind {
+    let name_lower = item.name.to_lowercase();
+    if name_lower.contains("bow") || name_lower.contains("arrow") || name_lower.contains("spear") {
+        WeaponKind::Ranged
+    } else if name_lower.contains("knife")
+        || name_lower.contains("sword")
+        || name_lower.contains("blade")
+        || name_lower.contains("dagger")
+        || name_lower.contains("axe")
+    {
+        WeaponKind::Bladed
+    } else if name_lower.contains("club")
+        || name_lower.contains("hammer")
+        || name_lower.contains("mace")
+        || name_lower.contains("bat")
+    {
+        WeaponKind::Blunt
+    } else {
+        WeaponKind::Bladed // Default for unknown weapons
+    }
 }
 
 /// Apply the results of a combat encounter.

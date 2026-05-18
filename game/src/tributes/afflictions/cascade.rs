@@ -340,7 +340,12 @@ mod tests {
 
         for seed in 0..trials {
             let mut rng = SmallRng::seed_from_u64(seed);
-            let r = tick_cascade(std::slice::from_ref(&aff_sheltered), true, &tuning, &mut rng);
+            let r = tick_cascade(
+                std::slice::from_ref(&aff_sheltered),
+                true,
+                &tuning,
+                &mut rng,
+            );
             if matches!(r.outcomes[0].1, CascadeOutcome::SteppedDown { .. }) {
                 shelter_stepped += 1;
             }

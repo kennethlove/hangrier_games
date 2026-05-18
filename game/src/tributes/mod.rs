@@ -519,6 +519,10 @@ impl Tribute {
             Action::Sleep { duration_phases } => {
                 self.act_sleep(duration_phases, environment_details.phase, events);
             }
+            Action::Frozen => {
+                // Tribute is frozen by phobia — skip this cycle.
+                // Event emitted by the brain pipeline caller.
+            }
         }
     }
 
@@ -1097,6 +1101,35 @@ impl Tribute {
             destination_terrain,
         )
     }
+
+    /// Compute visible stat modifiers for this tribute, combining
+    /// affliction penalties with phobia stat penalties.
+    ///
+    /// Returns a `StatModifiers` struct with all penalties composed.
+    /// Phobia penalties are additive with affliction penalties, capped
+    /// at -10 total for phobias (applied to atk and def).
+    pub fn visible_modifiers(
+        &self,
+        config: &crate::config::GameConfig,
+        phobia_ctx: Option<&crate::tributes::brains::phobia_override::PhobiaBrainContext<'_>>,
+    ) -> afflictions::StatModifiers {
+        let mut mods = afflictions::compute_stat_modifiers(
+            &self.afflictions.values().cloned().collect::<Vec<_>>(),
+        );
+
+        // Compose phobia penalties if enabled and context available.
+        if config.phobias_enabled
+            && !self.afflictions.is_empty()
+            && let Some(ctx) = phobia_ctx
+        {
+            let phobia_penalty =
+                crate::tributes::brains::phobia_override::phobia_stat_penalty(self, ctx);
+            mods.atk += phobia_penalty;
+            mods.def += phobia_penalty;
+        }
+
+        mods
+    }
 }
 
 /// A draft affliction ready for acquisition resolution.
@@ -1136,6 +1169,8 @@ pub fn calculate_stamina_cost(
         Action::Eat(_) | Action::DrinkItem(_) => 0.0,
         // Sleep is free at the action layer; phase scheduler handles it.
         Action::Sleep { .. } => 0.0,
+        // Frozen tribute takes no action — no stamina cost.
+        Action::Frozen => 0.0,
     };
 
     // If base cost is 0, no need to calculate multipliers

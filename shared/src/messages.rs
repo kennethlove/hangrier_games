@@ -280,6 +280,16 @@ pub enum InterruptionKind {
     AllianceSummons { ally: TributeRef },
 }
 
+/// Effect category for a `PhobiaTriggered` event. Mirrors the game-layer
+/// `PhobiaEffect` enum so the wire format is self-contained.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PhobiaEffect {
+    Penalty,
+    Flee,
+    Freeze,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum MessagePayload {
@@ -502,6 +512,20 @@ pub enum MessagePayload {
         to_severity: String,
         floor_bumped: bool,
     },
+
+    // Phobia events (phobia brain layer PR2).
+    PhobiaAcquired {
+        tribute: String,
+        trigger: String,
+        severity: String,
+        origin: String,
+    },
+    PhobiaTriggered {
+        tribute: String,
+        trigger: String,
+        severity: String,
+        effect: PhobiaEffect,
+    },
 }
 
 impl MessagePayload {
@@ -546,7 +570,9 @@ impl MessagePayload {
             | AfflictionHealed { .. }
             | AfflictionCascaded { .. }
             | TraumaAcquired { .. }
-            | TraumaReinforced { .. } => MessageKind::State,
+            | TraumaReinforced { .. }
+            | PhobiaAcquired { .. }
+            | PhobiaTriggered { .. } => MessageKind::State,
         }
     }
 
@@ -597,6 +623,14 @@ impl MessagePayload {
                 ..
             }
             | TraumaReinforced {
+                tribute: tribute_id,
+                ..
+            }
+            | PhobiaAcquired {
+                tribute: tribute_id,
+                ..
+            }
+            | PhobiaTriggered {
                 tribute: tribute_id,
                 ..
             } => tribute_id == id,
@@ -1364,5 +1398,50 @@ mod survival_event_tests {
         assert!(!slept.involves("other"));
         assert!(woke.involves("t1"));
         assert!(!woke.involves("other"));
+    }
+
+    #[test]
+    fn phobia_acquired_round_trips_and_kind() {
+        let p = MessagePayload::PhobiaAcquired {
+            tribute: "t1".into(),
+            trigger: "fire".into(),
+            severity: "mild".into(),
+            origin: "innate".into(),
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        let back: MessagePayload = serde_json::from_str(&json).unwrap();
+        assert_eq!(format!("{:?}", p), format!("{:?}", back));
+        assert_eq!(p.kind(), MessageKind::State);
+        assert!(p.involves("t1"));
+        assert!(!p.involves("other"));
+    }
+
+    #[test]
+    fn phobia_triggered_round_trips_and_kind() {
+        let p = MessagePayload::PhobiaTriggered {
+            tribute: "t1".into(),
+            trigger: "heights".into(),
+            severity: "severe".into(),
+            effect: PhobiaEffect::Freeze,
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        let back: MessagePayload = serde_json::from_str(&json).unwrap();
+        assert_eq!(format!("{:?}", p), format!("{:?}", back));
+        assert_eq!(p.kind(), MessageKind::State);
+        assert!(p.involves("t1"));
+        assert!(!p.involves("other"));
+    }
+
+    #[test]
+    fn phobia_effect_serde_roundtrip() {
+        for effect in [
+            PhobiaEffect::Penalty,
+            PhobiaEffect::Flee,
+            PhobiaEffect::Freeze,
+        ] {
+            let s = serde_json::to_string(&effect).unwrap();
+            let back: PhobiaEffect = serde_json::from_str(&s).unwrap();
+            assert_eq!(effect, back);
+        }
     }
 }

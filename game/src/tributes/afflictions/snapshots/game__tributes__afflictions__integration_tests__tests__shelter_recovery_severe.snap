@@ -1,0 +1,11 @@
+---
+source: game/src/tributes/afflictions/integration_tests.rs
+expression: "message_log.join(\"\\n\")"
+---
+cycle 3: wounded severe → moderate
+cycle 4: wounded moderate → mild
+cycle 8: wounded mild → mild
+cycle 12: infected severe → moderate
+cycle 14: infected moderate → mild
+cycle 17: infected mild → mild
+cycle 18: all afflictions cured

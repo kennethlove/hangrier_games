@@ -1214,6 +1214,128 @@ impl Game {
                     .sheltered_until
                     .is_some_and(|until| until > phase_index);
 
+                // Affliction cascade tick (spec §5). Runs once per phase per
+                // living tribute. Sheltered tributes may recover; exposed may
+                // worsen. Severe + exposed can spawn successors or kill.
+                {
+                    use crate::tributes::afflictions::tuning::AfflictionTuning;
+                    use crate::tributes::afflictions::{
+                        CascadeOutcome, apply_cascade, tick_cascade,
+                    };
+                    use shared::afflictions::Severity;
+
+                    let affliction_list: Vec<_> = tribute.afflictions.values().cloned().collect();
+                    if !affliction_list.is_empty() {
+                        let tuning = AfflictionTuning::default();
+                        let cascade_result =
+                            tick_cascade(&affliction_list, sheltered, &tuning, rng);
+                        let successors = apply_cascade(&mut tribute.afflictions, &cascade_result);
+
+                        for succ in &successors {
+                            tribute.afflictions.insert(succ.key(), succ.clone());
+                        }
+
+                        let tref = TributeRef {
+                            identifier: tribute.identifier.clone(),
+                            name: tribute.name.clone(),
+                        };
+
+                        for (kind, outcome) in &cascade_result.outcomes {
+                            match outcome {
+                                CascadeOutcome::SteppedDown { from, to } => {
+                                    if matches!(to, Severity::Mild)
+                                        && matches!(from, Severity::Mild)
+                                    {
+                                        let line = format!("{}'s {} healed.", tribute.name, kind);
+                                        collected_events.push((
+                                            tribute.identifier.clone(),
+                                            tribute.name.clone(),
+                                            line,
+                                            Some(MessagePayload::AfflictionHealed {
+                                                tribute_id: tref.identifier.clone(),
+                                                affliction: kind.to_string(),
+                                            }),
+                                            None,
+                                        ));
+                                    } else {
+                                        let line = format!(
+                                            "{}'s {} improved: {} → {}.",
+                                            tribute.name, kind, from, to
+                                        );
+                                        collected_events.push((
+                                            tribute.identifier.clone(),
+                                            tribute.name.clone(),
+                                            line,
+                                            Some(MessagePayload::AfflictionProgressed {
+                                                tribute_id: tref.identifier.clone(),
+                                                affliction: kind.to_string(),
+                                                from_severity: from.to_string(),
+                                                to_severity: to.to_string(),
+                                            }),
+                                            None,
+                                        ));
+                                    }
+                                }
+                                CascadeOutcome::SteppedUp { from, to } => {
+                                    let line = format!(
+                                        "{}'s {} worsened: {} → {}.",
+                                        tribute.name, kind, from, to
+                                    );
+                                    collected_events.push((
+                                        tribute.identifier.clone(),
+                                        tribute.name.clone(),
+                                        line,
+                                        Some(MessagePayload::AfflictionProgressed {
+                                            tribute_id: tref.identifier.clone(),
+                                            affliction: kind.to_string(),
+                                            from_severity: from.to_string(),
+                                            to_severity: to.to_string(),
+                                        }),
+                                        None,
+                                    ));
+                                }
+                                CascadeOutcome::SpawnedSuccessor { from, to } => {
+                                    let line = format!(
+                                        "{}'s {} cascaded into {}.",
+                                        tribute.name, from, to
+                                    );
+                                    collected_events.push((
+                                        tribute.identifier.clone(),
+                                        tribute.name.clone(),
+                                        line,
+                                        Some(MessagePayload::AfflictionCascaded {
+                                            tribute_id: tref.identifier.clone(),
+                                            from_affliction: from.to_string(),
+                                            to_affliction: to.to_string(),
+                                        }),
+                                        None,
+                                    ));
+                                }
+                                CascadeOutcome::DeathRoll { survived: false } => {
+                                    let line = format!("{} succumbs to {}.", tribute.name, kind);
+                                    collected_events.push((
+                                        tribute.identifier.clone(),
+                                        tribute.name.clone(),
+                                        line,
+                                        Some(MessagePayload::TributeKilled {
+                                            victim: tref.clone(),
+                                            killer: None,
+                                            cause: kind.to_string(),
+                                        }),
+                                        None,
+                                    ));
+                                    tribute.status = TributeStatus::RecentlyDead;
+                                }
+                                _ => {}
+                            }
+                        }
+
+                        if cascade_result.tribute_died {
+                            continue;
+                        }
+                    }
+                }
+
                 let prior_hunger = hunger_band(tribute.hunger);
                 let prior_thirst = thirst_band(tribute.thirst);
 
@@ -1377,10 +1499,14 @@ impl Game {
                     }
                 }
 
-                let blocked = matches!(
-                    tribute.status,
-                    TributeStatus::Wounded | TributeStatus::Infected | TributeStatus::Sick
-                );
+                let blocked = tribute.afflictions.keys().any(|(kind, _)| {
+                    matches!(
+                        kind,
+                        shared::afflictions::AfflictionKind::Wounded
+                            | shared::afflictions::AfflictionKind::Infected
+                            | shared::afflictions::AfflictionKind::Sick
+                    )
+                });
                 let prior_stamina = tribute.stamina;
                 let prior_hp = tribute.attributes.health;
                 tribute.stamina = tribute
@@ -3413,11 +3539,20 @@ mod tests {
     #[test]
     fn sleeping_wounded_tribute_does_not_regen_hp() {
         use crate::messages::Phase;
+        use shared::afflictions::{Affliction, AfflictionKind, AfflictionSource, Severity};
         let mut t = create_tribute("Sleeper", true);
         t.sleeping = true;
         t.sleep_remaining = 3;
         t.attributes.health = 40;
-        t.status = TributeStatus::Wounded;
+        t.afflictions.insert(
+            (AfflictionKind::Wounded, None),
+            Affliction {
+                kind: AfflictionKind::Wounded,
+                body_part: None,
+                severity: Severity::Moderate,
+                source: AfflictionSource::Combat,
+            },
+        );
         let prior_hp = t.attributes.health;
         let mut game = create_test_game_with_tributes(vec![t.clone()]);
         let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);

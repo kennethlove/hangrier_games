@@ -26,6 +26,10 @@ pub enum AfflictionKind {
     Frozen,
     Overheated,
     Burned,
+    Sick,
+    Electrocuted,
+    Drowned,
+    Buried,
 }
 
 impl fmt::Display for AfflictionKind {
@@ -44,6 +48,10 @@ impl fmt::Display for AfflictionKind {
             AfflictionKind::Frozen => write!(f, "frozen"),
             AfflictionKind::Overheated => write!(f, "overheated"),
             AfflictionKind::Burned => write!(f, "burned"),
+            AfflictionKind::Sick => write!(f, "sick"),
+            AfflictionKind::Electrocuted => write!(f, "electrocuted"),
+            AfflictionKind::Drowned => write!(f, "drowned"),
+            AfflictionKind::Buried => write!(f, "buried"),
         }
     }
 }
@@ -66,6 +74,10 @@ impl FromStr for AfflictionKind {
             "frozen" => Ok(AfflictionKind::Frozen),
             "overheated" => Ok(AfflictionKind::Overheated),
             "burned" => Ok(AfflictionKind::Burned),
+            "sick" => Ok(AfflictionKind::Sick),
+            "electrocuted" => Ok(AfflictionKind::Electrocuted),
+            "drowned" => Ok(AfflictionKind::Drowned),
+            "buried" => Ok(AfflictionKind::Buried),
             other => Err(format!("unknown AfflictionKind: {other}")),
         }
     }

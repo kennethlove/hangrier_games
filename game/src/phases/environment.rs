@@ -24,9 +24,9 @@
 use crate::areas::weather::Weather;
 use crate::messages::Phase;
 use crate::terrain::types::BaseTerrain;
-use crate::tributes::statuses::TributeStatus;
 use rand::{Rng, RngExt};
 use serde::{Deserialize, Serialize};
+use shared::afflictions::AfflictionKind;
 
 /// Three discrete light bands derived from `(phase, biome, weather)`. The
 /// brain reads this value to bias detection / ambush / movement weights;
@@ -51,12 +51,12 @@ pub enum LightLevel {
 /// metadata once the consumer is implemented.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AfflictionDraft {
-    pub status: TributeStatus,
+    pub kind: AfflictionKind,
 }
 
 impl AfflictionDraft {
-    pub fn new(status: TributeStatus) -> Self {
-        Self { status }
+    pub fn new(kind: AfflictionKind) -> Self {
+        Self { kind }
     }
 }
 
@@ -142,12 +142,13 @@ fn candidate_probabilities(
     phase: Phase,
     biome: BaseTerrain,
     weather: Weather,
-) -> Vec<(TributeStatus, f32)> {
+) -> Vec<(AfflictionKind, f32)> {
+    use AfflictionKind::*;
     use BaseTerrain::*;
     use Phase::*;
     use Weather::*;
 
-    let mut out: Vec<(TributeStatus, f32)> = Vec::new();
+    let mut out: Vec<(AfflictionKind, f32)> = Vec::new();
 
     // ---- Cold / Frozen pressure ------------------------------------
     let cold = match (phase, biome, weather) {
@@ -167,7 +168,7 @@ fn candidate_probabilities(
         _ => 0.0,
     };
     if cold > 0.0 {
-        out.push((TributeStatus::Frozen, cold));
+        out.push((Frozen, cold));
     }
 
     // ---- Heat / Overheated pressure --------------------------------
@@ -181,7 +182,7 @@ fn candidate_probabilities(
         _ => 0.0,
     };
     if heat > 0.0 {
-        out.push((TributeStatus::Overheated, heat));
+        out.push((Overheated, heat));
     }
 
     // ---- Sickness from exposure ------------------------------------
@@ -193,11 +194,11 @@ fn candidate_probabilities(
         _ => 0.0,
     };
     if sick > 0.0 {
-        out.push((TributeStatus::Sick, sick));
+        out.push((Sick, sick));
     }
 
     // Stable order independent of insertion paths above.
-    out.sort_by_key(|(s, _)| s.to_string());
+    out.sort_by_key(|(k, _)| format!("{k:?}"));
     out
 }
 
@@ -308,7 +309,7 @@ mod tests {
                 false,
                 &mut rng,
             );
-            if drafts.iter().any(|d| d.status == TributeStatus::Frozen) {
+            if drafts.iter().any(|d| d.kind == AfflictionKind::Frozen) {
                 saw_frozen = true;
                 break;
             }
@@ -328,7 +329,7 @@ mod tests {
                 false,
                 &mut rng,
             );
-            if drafts.iter().any(|d| d.status == TributeStatus::Overheated) {
+            if drafts.iter().any(|d| d.kind == AfflictionKind::Overheated) {
                 saw = true;
                 break;
             }
@@ -348,7 +349,7 @@ mod tests {
                 false,
                 &mut rng,
             );
-            if drafts.iter().any(|d| d.status == TributeStatus::Sick) {
+            if drafts.iter().any(|d| d.kind == AfflictionKind::Sick) {
                 saw = true;
                 break;
             }
@@ -377,7 +378,7 @@ mod tests {
 
     #[test]
     fn affliction_draft_serde_roundtrip() {
-        let d = AfflictionDraft::new(TributeStatus::Frozen);
+        let d = AfflictionDraft::new(AfflictionKind::Frozen);
         let s = serde_json::to_string(&d).unwrap();
         let back: AfflictionDraft = serde_json::from_str(&s).unwrap();
         assert_eq!(back, d);

@@ -221,7 +221,6 @@ impl Tribute {
         for event in &area_details.events {
             match event {
                 AreaEvent::Wildfire => {
-                    self.set_status(TributeStatus::Burned);
                     self.try_acquire_affliction(AfflictionDraft {
                         kind: AfflictionKind::Burned,
                         body_part: None,
@@ -229,11 +228,31 @@ impl Tribute {
                         source: AfflictionSource::Environmental,
                     });
                 }
-                AreaEvent::Flood => self.set_status(TributeStatus::Drowned),
-                AreaEvent::Earthquake => self.set_status(TributeStatus::Buried),
-                AreaEvent::Avalanche => self.set_status(TributeStatus::Buried),
+                AreaEvent::Flood => {
+                    self.try_acquire_affliction(AfflictionDraft {
+                        kind: AfflictionKind::Drowned,
+                        body_part: None,
+                        severity: Severity::Moderate,
+                        source: AfflictionSource::Environmental,
+                    });
+                }
+                AreaEvent::Earthquake => {
+                    self.try_acquire_affliction(AfflictionDraft {
+                        kind: AfflictionKind::Buried,
+                        body_part: None,
+                        severity: Severity::Severe,
+                        source: AfflictionSource::Environmental,
+                    });
+                }
+                AreaEvent::Avalanche => {
+                    self.try_acquire_affliction(AfflictionDraft {
+                        kind: AfflictionKind::Buried,
+                        body_part: None,
+                        severity: Severity::Severe,
+                        source: AfflictionSource::Environmental,
+                    });
+                }
                 AreaEvent::Blizzard => {
-                    self.set_status(TributeStatus::Frozen);
                     self.try_acquire_affliction(AfflictionDraft {
                         kind: AfflictionKind::Frozen,
                         body_part: None,
@@ -241,9 +260,15 @@ impl Tribute {
                         source: AfflictionSource::Environmental,
                     });
                 }
-                AreaEvent::Landslide => self.set_status(TributeStatus::Buried),
+                AreaEvent::Landslide => {
+                    self.try_acquire_affliction(AfflictionDraft {
+                        kind: AfflictionKind::Buried,
+                        body_part: None,
+                        severity: Severity::Severe,
+                        source: AfflictionSource::Environmental,
+                    });
+                }
                 AreaEvent::Heatwave => {
-                    self.set_status(TributeStatus::Overheated);
                     self.try_acquire_affliction(AfflictionDraft {
                         kind: AfflictionKind::Overheated,
                         body_part: None,
@@ -252,7 +277,6 @@ impl Tribute {
                     });
                 }
                 AreaEvent::Sandstorm => {
-                    self.set_status(TributeStatus::Burned); // Sand burns and abrades
                     self.try_acquire_affliction(AfflictionDraft {
                         kind: AfflictionKind::Wounded,
                         body_part: Some(BodyPart::Arm),
@@ -261,7 +285,6 @@ impl Tribute {
                     });
                 }
                 AreaEvent::Drought => {
-                    self.set_status(TributeStatus::Overheated); // Dehydration effect
                     self.try_acquire_affliction(AfflictionDraft {
                         kind: AfflictionKind::Dehydrated,
                         body_part: None,
@@ -269,7 +292,14 @@ impl Tribute {
                         source: AfflictionSource::Environmental,
                     });
                 }
-                AreaEvent::Rockslide => self.set_status(TributeStatus::Buried), // Similar to landslide
+                AreaEvent::Rockslide => {
+                    self.try_acquire_affliction(AfflictionDraft {
+                        kind: AfflictionKind::Buried,
+                        body_part: None,
+                        severity: Severity::Severe,
+                        source: AfflictionSource::Environmental,
+                    });
+                }
             }
         }
     }
@@ -285,68 +315,8 @@ impl Tribute {
         // First, apply any area events for the current area
         self.apply_area_effects(area_details);
 
-        match &self.status {
-            // TODO: Add more variation to effects.
-            TributeStatus::Wounded => {
-                self.takes_physical_damage(WOUNDED_DAMAGE);
-            }
-            TributeStatus::Sick => {
-                self.reduce_strength(SICK_STRENGTH_REDUCTION);
-                self.reduce_movement(SICK_MOVEMENT_REDUCTION);
-            }
-            TributeStatus::Electrocuted => {
-                self.takes_physical_damage(ELECTROCUTED_DAMAGE);
-            }
-            TributeStatus::Frozen => {
-                self.reduce_movement(FROZEN_MOVEMENT_REDUCTION);
-            }
-            TributeStatus::Overheated => {
-                self.reduce_movement(OVERHEATED_MOVEMENT_REDUCTION);
-            }
-            TributeStatus::Dehydrated => {
-                self.reduce_strength(DEHYDRATED_STRENGTH_REDUCTION);
-            }
-            TributeStatus::Starving => {
-                self.reduce_strength(STARVING_STRENGTH_REDUCTION);
-            }
-            TributeStatus::Poisoned => {
-                self.takes_mental_damage(POISONED_MENTAL_DAMAGE);
-            }
-            TributeStatus::Broken => {
-                // die roll for which bone breaks
-                let bone = rng.random_range(0..4);
-                match bone {
-                    // Leg
-                    0 => self.reduce_movement(BROKEN_BONE_LEG_MOVEMENT_REDUCTION),
-                    // Arm
-                    1 => self.reduce_strength(BROKEN_BONE_ARM_STRENGTH_REDUCTION),
-                    // Skull
-                    2 => self.reduce_intelligence(BROKEN_BONE_SKULL_INTELLIGENCE_REDUCTION),
-                    // Rib
-                    _ => self.takes_physical_damage(BROKEN_BONE_RIB_DAMAGE),
-                }
-            }
-            TributeStatus::Infected => {
-                self.takes_physical_damage(INFECTED_DAMAGE);
-                self.takes_mental_damage(INFECTED_MENTAL_DAMAGE);
-            }
-            TributeStatus::Drowned => {
-                self.takes_physical_damage(DROWNED_DAMAGE);
-                self.takes_mental_damage(DROWNED_MENTAL_DAMAGE);
-            }
-            TributeStatus::Mauled(animal) => {
-                let number_of_animals = rng.random_range(2..=5);
-                let damage = animal.damage() * number_of_animals;
-                self.takes_physical_damage(damage);
-            }
-            TributeStatus::Burned => {
-                self.takes_physical_damage(BURNED_DAMAGE);
-            }
-            TributeStatus::Buried => {
-                self.takes_physical_damage(BURIED_DAMAGE);
-            }
-            TributeStatus::Healthy | TributeStatus::RecentlyDead | TributeStatus::Dead => {}
-        }
+        // Apply per-cycle affliction effects
+        self.apply_affliction_cycle_effects(rng);
 
         self.events.clear();
 
@@ -369,11 +339,83 @@ impl Tribute {
             self.status = TributeStatus::RecentlyDead;
         }
     }
+
+    /// Apply per-cycle effects for each affliction the tribute carries.
+    /// Replaces the legacy TributeStatus-based damage loop.
+    fn apply_affliction_cycle_effects(&mut self, rng: &mut impl Rng) {
+        // Collect affliction kinds first to avoid borrow conflicts
+        let kinds: Vec<AfflictionKind> = self.afflictions.keys().map(|(k, _)| *k).collect();
+
+        for kind in &kinds {
+            match kind {
+                AfflictionKind::Wounded => {
+                    self.takes_physical_damage(WOUNDED_DAMAGE);
+                }
+                AfflictionKind::Sick => {
+                    self.reduce_strength(SICK_STRENGTH_REDUCTION);
+                    self.reduce_movement(SICK_MOVEMENT_REDUCTION);
+                }
+                AfflictionKind::Electrocuted => {
+                    self.takes_physical_damage(ELECTROCUTED_DAMAGE);
+                }
+                AfflictionKind::Frozen => {
+                    self.reduce_movement(FROZEN_MOVEMENT_REDUCTION);
+                }
+                AfflictionKind::Overheated => {
+                    self.reduce_movement(OVERHEATED_MOVEMENT_REDUCTION);
+                }
+                AfflictionKind::Dehydrated => {
+                    self.reduce_strength(DEHYDRATED_STRENGTH_REDUCTION);
+                }
+                AfflictionKind::Starving => {
+                    self.reduce_strength(STARVING_STRENGTH_REDUCTION);
+                }
+                AfflictionKind::Poisoned => {
+                    self.takes_mental_damage(POISONED_MENTAL_DAMAGE);
+                }
+                AfflictionKind::BrokenBone => {
+                    let bone = rng.random_range(0..4);
+                    match bone {
+                        0 => self.reduce_movement(BROKEN_BONE_LEG_MOVEMENT_REDUCTION),
+                        1 => self.reduce_strength(BROKEN_BONE_ARM_STRENGTH_REDUCTION),
+                        2 => self.reduce_intelligence(BROKEN_BONE_SKULL_INTELLIGENCE_REDUCTION),
+                        _ => self.takes_physical_damage(BROKEN_BONE_RIB_DAMAGE),
+                    }
+                }
+                AfflictionKind::Infected => {
+                    self.takes_physical_damage(INFECTED_DAMAGE);
+                    self.takes_mental_damage(INFECTED_MENTAL_DAMAGE);
+                }
+                AfflictionKind::Drowned => {
+                    self.takes_physical_damage(DROWNED_DAMAGE);
+                    self.takes_mental_damage(DROWNED_MENTAL_DAMAGE);
+                }
+                AfflictionKind::Burned => {
+                    self.takes_physical_damage(BURNED_DAMAGE);
+                }
+                AfflictionKind::Buried => {
+                    self.takes_physical_damage(BURIED_DAMAGE);
+                }
+                AfflictionKind::MissingArm
+                | AfflictionKind::MissingLeg
+                | AfflictionKind::Blind
+                | AfflictionKind::Deaf => {}
+            }
+        }
+
+        // Mauled status still applies (has Animal data payload)
+        if let TributeStatus::Mauled(animal) = &self.status {
+            let number_of_animals = rng.random_range(2..=5);
+            let damage = animal.damage() * number_of_animals;
+            self.takes_physical_damage(damage);
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::threats::animals::Animal;
     use crate::tributes::Tribute;
     use crate::tributes::statuses::TributeStatus;
     use rand::SeedableRng;
@@ -512,19 +554,7 @@ mod tests {
     }
 
     #[rstest]
-    #[case(TributeStatus::Wounded)]
-    #[case(TributeStatus::Sick)]
-    #[case(TributeStatus::Electrocuted)]
-    #[case(TributeStatus::Frozen)]
-    #[case(TributeStatus::Overheated)]
-    #[case(TributeStatus::Dehydrated)]
-    #[case(TributeStatus::Starving)]
-    #[case(TributeStatus::Poisoned)]
-    #[case(TributeStatus::Broken)]
-    #[case(TributeStatus::Infected)]
-    #[case(TributeStatus::Drowned)]
-    #[case(TributeStatus::Burned)]
-    #[case(TributeStatus::Buried)]
+    #[case(TributeStatus::Mauled(Animal::Bear))]
     fn process_status_no_effect(
         mut tribute: Tribute,
         mut small_rng: SmallRng,
@@ -540,7 +570,12 @@ mod tests {
     #[rstest]
     fn process_status_dies(mut tribute: Tribute, mut small_rng: SmallRng) {
         tribute.attributes.health = 1;
-        tribute.status = TributeStatus::Electrocuted;
+        tribute.try_acquire_affliction(AfflictionDraft {
+            kind: AfflictionKind::Electrocuted,
+            body_part: None,
+            severity: Severity::Severe,
+            source: AfflictionSource::Environmental,
+        });
         let area_details =
             AreaDetails::new(Some("Forest".to_string()), crate::areas::Area::Cornucopia);
         tribute.process_status(&area_details, &mut small_rng, &mut Vec::new());
@@ -562,20 +597,6 @@ mod tests {
         area_details.events.push(AreaEvent::Wildfire);
 
         tribute.process_status(&area_details, &mut small_rng, &mut Vec::new());
-        assert_eq!(tribute.status, TributeStatus::Burned);
-    }
-
-    #[rstest]
-    fn wildfire_sets_status_and_affliction(mut tribute: Tribute) {
-        use crate::areas::events::AreaEvent;
-
-        let mut area_details =
-            AreaDetails::new(Some("Forest".to_string()), crate::areas::Area::Cornucopia);
-        area_details.events.push(AreaEvent::Wildfire);
-
-        tribute.apply_area_effects(&area_details);
-
-        assert_eq!(tribute.status, TributeStatus::Burned);
         assert!(
             tribute
                 .afflictions
@@ -584,7 +605,24 @@ mod tests {
     }
 
     #[rstest]
-    fn blizzard_sets_status_and_affliction(mut tribute: Tribute) {
+    fn wildfire_sets_affliction(mut tribute: Tribute) {
+        use crate::areas::events::AreaEvent;
+
+        let mut area_details =
+            AreaDetails::new(Some("Forest".to_string()), crate::areas::Area::Cornucopia);
+        area_details.events.push(AreaEvent::Wildfire);
+
+        tribute.apply_area_effects(&area_details);
+
+        assert!(
+            tribute
+                .afflictions
+                .contains_key(&(AfflictionKind::Burned, None))
+        );
+    }
+
+    #[rstest]
+    fn blizzard_sets_affliction(mut tribute: Tribute) {
         use crate::areas::events::AreaEvent;
 
         let mut area_details =
@@ -593,7 +631,6 @@ mod tests {
 
         tribute.apply_area_effects(&area_details);
 
-        assert_eq!(tribute.status, TributeStatus::Frozen);
         assert!(
             tribute
                 .afflictions
@@ -602,7 +639,7 @@ mod tests {
     }
 
     #[rstest]
-    fn heatwave_sets_status_and_affliction(mut tribute: Tribute) {
+    fn heatwave_sets_affliction(mut tribute: Tribute) {
         use crate::areas::events::AreaEvent;
 
         let mut area_details =
@@ -611,7 +648,6 @@ mod tests {
 
         tribute.apply_area_effects(&area_details);
 
-        assert_eq!(tribute.status, TributeStatus::Overheated);
         assert!(
             tribute
                 .afflictions
@@ -620,7 +656,7 @@ mod tests {
     }
 
     #[rstest]
-    fn sandstorm_sets_status_and_affliction(mut tribute: Tribute) {
+    fn sandstorm_sets_affliction(mut tribute: Tribute) {
         use crate::areas::events::AreaEvent;
 
         let mut area_details =
@@ -629,7 +665,6 @@ mod tests {
 
         tribute.apply_area_effects(&area_details);
 
-        assert_eq!(tribute.status, TributeStatus::Burned);
         assert!(
             tribute
                 .afflictions
@@ -638,7 +673,7 @@ mod tests {
     }
 
     #[rstest]
-    fn drought_sets_status_and_affliction(mut tribute: Tribute) {
+    fn drought_sets_affliction(mut tribute: Tribute) {
         use crate::areas::events::AreaEvent;
 
         let mut area_details =
@@ -647,11 +682,44 @@ mod tests {
 
         tribute.apply_area_effects(&area_details);
 
-        assert_eq!(tribute.status, TributeStatus::Overheated);
         assert!(
             tribute
                 .afflictions
                 .contains_key(&(AfflictionKind::Dehydrated, None))
+        );
+    }
+
+    #[rstest]
+    fn flood_sets_drowned_affliction(mut tribute: Tribute) {
+        use crate::areas::events::AreaEvent;
+
+        let mut area_details =
+            AreaDetails::new(Some("River".to_string()), crate::areas::Area::Cornucopia);
+        area_details.events.push(AreaEvent::Flood);
+
+        tribute.apply_area_effects(&area_details);
+
+        assert!(
+            tribute
+                .afflictions
+                .contains_key(&(AfflictionKind::Drowned, None))
+        );
+    }
+
+    #[rstest]
+    fn earthquake_sets_buried_affliction(mut tribute: Tribute) {
+        use crate::areas::events::AreaEvent;
+
+        let mut area_details =
+            AreaDetails::new(Some("Cave".to_string()), crate::areas::Area::Cornucopia);
+        area_details.events.push(AreaEvent::Earthquake);
+
+        tribute.apply_area_effects(&area_details);
+
+        assert!(
+            tribute
+                .afflictions
+                .contains_key(&(AfflictionKind::Buried, None))
         );
     }
 

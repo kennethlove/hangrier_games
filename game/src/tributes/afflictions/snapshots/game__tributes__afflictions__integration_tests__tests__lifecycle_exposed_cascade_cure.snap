@@ -1,0 +1,22 @@
+---
+source: game/src/tributes/afflictions/integration_tests.rs
+expression: "message_log.join(\"\\n\")"
+---
+cycle 0: [wounded (moderate)]
+cycle 1: [wounded (moderate)]
+cycle 2: [wounded (moderate)]
+cycle 3: [wounded (moderate)]
+cycle 4: [wounded (moderate)]
+  AfflictionProgressed: wounded moderate → severe
+cycle 5: [wounded (severe)]
+cycle 6: [wounded (severe)]
+cycle 7: [wounded (severe)]
+cycle 8: [wounded (severe)]
+  AfflictionCascaded: wounded → infected
+cycle 9: [wounded (severe), infected (moderate)]
+  AfflictionCascaded: wounded → infected
+cycle 10: [wounded (severe), infected (moderate)]
+cycle 11: [wounded (severe), infected (moderate)]
+cycle 12: [wounded (severe), infected (moderate)]
+cycle 13: [wounded (severe), infected (moderate)]
+cycle 14: [wounded (severe), infected (moderate)]

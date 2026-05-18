@@ -7,10 +7,14 @@
 //! See `docs/superpowers/specs/2026-05-03-health-conditions-design.md`.
 
 pub mod anatomy;
+pub mod cascade;
+pub mod cure;
 pub mod effects;
 pub mod tuning;
 
 pub use anatomy::{AcquireResolution, RejectReason, can_acquire};
+pub use cascade::{CascadeOutcome, CascadeResult, apply_cascade, tick_cascade};
+pub use cure::{CureOutcome, apply_cure, cure_item_to_affliction, recovery_cycles};
 pub use effects::{BrainBias, StatModifiers, compute_brain_bias, compute_stat_modifiers};
 pub use tuning::AfflictionTuning;
 

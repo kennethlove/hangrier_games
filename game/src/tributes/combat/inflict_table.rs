@@ -123,7 +123,11 @@ fn select_body_part(kind: AfflictionKind, rng: &mut impl Rng) -> Option<BodyPart
         | AfflictionKind::Dehydrated
         | AfflictionKind::Frozen
         | AfflictionKind::Overheated
-        | AfflictionKind::Burned => None,
+        | AfflictionKind::Burned
+        | AfflictionKind::Sick
+        | AfflictionKind::Electrocuted
+        | AfflictionKind::Drowned
+        | AfflictionKind::Buried => None,
     }
 }
 

@@ -132,6 +132,9 @@ mod tests {
             body_part: part,
             severity: sev,
             source: AfflictionSource::Spawn,
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         }
     }
 
@@ -506,9 +509,13 @@ mod tests {
     fn arb_source() -> impl Strategy<Value = AfflictionSource> {
         prop_oneof![
             Just(AfflictionSource::Spawn),
-            Just(AfflictionSource::Combat),
+            Just(AfflictionSource::Combat {
+                attacker_id: String::new()
+            }),
             Just(AfflictionSource::Environmental),
-            Just(AfflictionSource::Cascade),
+            Just(AfflictionSource::Cascade {
+                from: (AfflictionKind::Wounded, None)
+            }),
             Just(AfflictionSource::Sponsor),
             Just(AfflictionSource::Gamemaker),
         ]
@@ -531,6 +538,9 @@ mod tests {
                     body_part,
                     severity,
                     source,
+                    acquired_cycle: 0,
+                    last_progressed_cycle: 0,
+                    trauma_metadata: None,
                 };
                 m.insert(a.key(), a);
             }
@@ -553,6 +563,9 @@ mod tests {
                 body_part,
                 severity,
                 source: AfflictionSource::Environmental,
+                acquired_cycle: 0,
+                last_progressed_cycle: 0,
+                trauma_metadata: None,
             };
             let result1 = can_acquire(&existing, &new);
             let result2 = can_acquire(&existing, &new);
@@ -577,7 +590,10 @@ mod tests {
                     kind: missing_kind,
                     body_part: Some(bp),
                     severity: Severity::Severe,
-                    source: AfflictionSource::Combat,
+                    source: AfflictionSource::Combat { attacker_id: String::new() },
+                    acquired_cycle: 0,
+                    last_progressed_cycle: 0,
+                    trauma_metadata: None,
                 };
                 m.insert(a.key(), a);
             }
@@ -586,7 +602,10 @@ mod tests {
                 kind: AfflictionKind::BrokenBone,
                 body_part: Some(bp),
                 severity: Severity::Moderate,
-                source: AfflictionSource::Combat,
+                source: AfflictionSource::Combat { attacker_id: String::new() },
+                acquired_cycle: 0,
+                last_progressed_cycle: 0,
+                trauma_metadata: None,
             };
             let result = can_acquire(&m, &new);
 
@@ -615,7 +634,10 @@ mod tests {
                     kind: missing_kind,
                     body_part: Some(bp),
                     severity: Severity::Severe,
-                    source: AfflictionSource::Combat,
+                    source: AfflictionSource::Combat { attacker_id: String::new() },
+                    acquired_cycle: 0,
+                    last_progressed_cycle: 0,
+                    trauma_metadata: None,
                 };
                 m.insert(a.key(), a);
             }
@@ -625,7 +647,10 @@ mod tests {
                 kind: AfflictionKind::Wounded,
                 body_part: Some(bp),
                 severity: Severity::Mild,
-                source: AfflictionSource::Combat,
+                source: AfflictionSource::Combat { attacker_id: String::new() },
+                acquired_cycle: 0,
+                last_progressed_cycle: 0,
+                trauma_metadata: None,
             };
             let result_wounded = can_acquire(&m, &new_wounded);
             if let AcquireResolution::Reject(reason) = result_wounded {
@@ -639,7 +664,10 @@ mod tests {
                 kind: AfflictionKind::Infected,
                 body_part: Some(bp),
                 severity: Severity::Moderate,
-                source: AfflictionSource::Combat,
+                source: AfflictionSource::Combat { attacker_id: String::new() },
+                acquired_cycle: 0,
+                last_progressed_cycle: 0,
+                trauma_metadata: None,
             };
             let result_infected = can_acquire(&m, &new_infected);
             // Infected also requires Wounded ancestor; either rejection reason is acceptable

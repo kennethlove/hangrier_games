@@ -399,7 +399,8 @@ impl Tribute {
                 AfflictionKind::MissingArm
                 | AfflictionKind::MissingLeg
                 | AfflictionKind::Blind
-                | AfflictionKind::Deaf => {}
+                | AfflictionKind::Deaf
+                | AfflictionKind::Trauma => {}
             }
         }
 

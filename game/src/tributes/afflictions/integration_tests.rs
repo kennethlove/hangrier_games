@@ -35,7 +35,12 @@ mod tests {
                 _ => BodyPart::Rib,
             }),
             severity,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         }
     }
 
@@ -714,7 +719,12 @@ mod tests {
                 kind: AfflictionKind::Wounded,
                 body_part: None,
                 severity: Severity::Severe,
-                source: AfflictionSource::Combat,
+                source: AfflictionSource::Combat {
+                    attacker_id: String::new(),
+                },
+                acquired_cycle: 0,
+                last_progressed_cycle: 0,
+                trauma_metadata: None,
             };
             afflictions.insert(wound.key(), wound);
 
@@ -784,7 +794,12 @@ mod tests {
             kind: AfflictionKind::Wounded,
             body_part: None,
             severity: Severity::Severe,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
 
@@ -828,13 +843,23 @@ mod tests {
             kind: AfflictionKind::Wounded,
             body_part: None,
             severity: Severity::Severe,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         };
         let infected = Affliction {
             kind: AfflictionKind::Infected,
             body_part: None,
             severity: Severity::Severe,
-            source: AfflictionSource::Cascade,
+            source: AfflictionSource::Cascade {
+                from: (AfflictionKind::Wounded, None),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
         afflictions.insert(infected.key(), infected);
@@ -906,13 +931,23 @@ mod tests {
             kind: AfflictionKind::Wounded,
             body_part: None,
             severity: Severity::Moderate,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         };
         let infected = Affliction {
             kind: AfflictionKind::Infected,
             body_part: None,
             severity: Severity::Moderate,
-            source: AfflictionSource::Cascade,
+            source: AfflictionSource::Cascade {
+                from: (AfflictionKind::Wounded, None),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
         afflictions.insert(infected.key(), infected);
@@ -953,13 +988,23 @@ mod tests {
             kind: AfflictionKind::Wounded,
             body_part: None,
             severity: Severity::Severe,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         };
         let infected = Affliction {
             kind: AfflictionKind::Infected,
             body_part: None,
             severity: Severity::Severe,
-            source: AfflictionSource::Cascade,
+            source: AfflictionSource::Cascade {
+                from: (AfflictionKind::Wounded, None),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
         afflictions.insert(infected.key(), infected);
@@ -1024,7 +1069,12 @@ mod tests {
             kind: AfflictionKind::Wounded,
             body_part: None,
             severity: Severity::Severe,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
 
@@ -1097,7 +1147,12 @@ mod tests {
                         kind: kinds[idx],
                         body_part: None,
                         severity,
-                        source: AfflictionSource::Combat,
+                        source: AfflictionSource::Combat {
+                            attacker_id: String::new(),
+                        },
+                        acquired_cycle: 0,
+                        last_progressed_cycle: 0,
+                        trauma_metadata: None,
                     })
                     .collect()
             },
@@ -1156,7 +1211,10 @@ mod tests {
                 kind: AfflictionKind::Wounded,
                 body_part: None,
                 severity: Severity::Severe,
-                source: AfflictionSource::Combat,
+                source: AfflictionSource::Combat { attacker_id: String::new() },
+                acquired_cycle: 0,
+                last_progressed_cycle: 0,
+                trauma_metadata: None,
             };
 
             let mut rng = SmallRng::seed_from_u64(seed);
@@ -1194,7 +1252,10 @@ mod tests {
                     kind,
                     body_part: None,
                     severity: Severity::Severe,
-                    source: AfflictionSource::Combat,
+                    source: AfflictionSource::Combat { attacker_id: String::new() },
+                    acquired_cycle: 0,
+                    last_progressed_cycle: 0,
+                    trauma_metadata: None,
                 };
                 let result = tick_cascade(&[aff], is_sheltered, &tuning, &mut rng);
                 prop_assert!(
@@ -1260,7 +1321,12 @@ mod tests {
             kind: AfflictionKind::Wounded,
             body_part: None,
             severity: Severity::Moderate,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
 
@@ -1344,13 +1410,23 @@ mod tests {
             kind: AfflictionKind::Wounded,
             body_part: None,
             severity: Severity::Severe,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         };
         let infected = Affliction {
             kind: AfflictionKind::Infected,
             body_part: None,
             severity: Severity::Moderate,
-            source: AfflictionSource::Cascade,
+            source: AfflictionSource::Cascade {
+                from: (AfflictionKind::Wounded, None),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
         afflictions.insert(infected.key(), infected);

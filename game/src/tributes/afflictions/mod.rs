@@ -10,12 +10,15 @@ pub mod anatomy;
 pub mod cascade;
 pub mod cure;
 pub mod effects;
+pub mod trauma;
+pub mod trauma_producers;
 pub mod tuning;
 
 pub use anatomy::{AcquireResolution, RejectReason, can_acquire};
 pub use cascade::{CascadeOutcome, CascadeResult, apply_cascade, tick_cascade};
 pub use cure::{CureOutcome, apply_cure, cure_item_to_affliction, recovery_cycles};
 pub use effects::{BrainBias, StatModifiers, compute_brain_bias, compute_stat_modifiers};
+pub use trauma::TraumaAcquisition;
 pub use tuning::AfflictionTuning;
 
 use crate::tributes::Tribute;
@@ -78,7 +81,12 @@ mod visibility_tests {
                 _ => BodyPart::Rib,
             }),
             severity,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         }
     }
 

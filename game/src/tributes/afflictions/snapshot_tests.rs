@@ -22,7 +22,12 @@ mod tests {
                 kind: AfflictionKind::Wounded,
                 body_part: Some(BodyPart::Arm),
                 severity: Severity::Moderate,
-                source: AfflictionSource::Combat,
+                source: AfflictionSource::Combat {
+                    attacker_id: String::new(),
+                },
+                acquired_cycle: 0,
+                last_progressed_cycle: 0,
+                trauma_metadata: None,
             },
         );
         map.insert(
@@ -31,7 +36,12 @@ mod tests {
                 kind: AfflictionKind::MissingLeg,
                 body_part: None,
                 severity: Severity::Severe,
-                source: AfflictionSource::Combat,
+                source: AfflictionSource::Combat {
+                    attacker_id: String::new(),
+                },
+                acquired_cycle: 0,
+                last_progressed_cycle: 0,
+                trauma_metadata: None,
             },
         );
         map.insert(
@@ -41,6 +51,9 @@ mod tests {
                 body_part: None,
                 severity: Severity::Severe,
                 source: AfflictionSource::Environmental,
+                acquired_cycle: 0,
+                last_progressed_cycle: 0,
+                trauma_metadata: None,
             },
         );
 
@@ -52,9 +65,9 @@ mod tests {
                 severity: affl.severity.to_string(),
                 source: match affl.source {
                     AfflictionSource::Spawn => "spawn",
-                    AfflictionSource::Combat => "combat",
+                    AfflictionSource::Combat { .. } => "combat",
                     AfflictionSource::Environmental => "environmental",
-                    AfflictionSource::Cascade => "cascade",
+                    AfflictionSource::Cascade { .. } => "cascade",
                     AfflictionSource::Sponsor => "sponsor",
                     AfflictionSource::Gamemaker => "gamemaker",
                 }

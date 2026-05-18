@@ -73,6 +73,7 @@ fn message_kind_slug(kind: MessageKind) -> Option<&'static str> {
         MessageKind::Movement => "movement",
         MessageKind::Item => "item",
         MessageKind::SponsorGift => "sponsor-gift",
+        MessageKind::Trauma => "trauma",
         MessageKind::CombatSwing | MessageKind::State => return None,
     })
 }
@@ -85,6 +86,7 @@ fn message_kind_from_slug(slug: &str) -> Option<MessageKind> {
         "movement" => MessageKind::Movement,
         "item" => MessageKind::Item,
         "sponsor-gift" => MessageKind::SponsorGift,
+        "trauma" => MessageKind::Trauma,
         _ => return None,
     })
 }

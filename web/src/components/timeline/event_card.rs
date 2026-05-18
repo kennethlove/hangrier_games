@@ -82,6 +82,7 @@ pub fn EventCard(props: EventCardProps) -> Element {
                     } }
                 } else { rsx! {} }
             }
+            MessageKind::Trauma => rsx! { StateCard { message: props.message.clone() } },
         }
     }
 }

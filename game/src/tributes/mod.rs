@@ -973,7 +973,10 @@ impl Tribute {
             kind: draft.kind,
             body_part: draft.body_part,
             severity: draft.severity,
-            source: draft.source,
+            source: draft.source.clone(),
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         };
         let resolution = can_acquire(&self.afflictions, &provisional);
 
@@ -1009,6 +1012,9 @@ impl Tribute {
                     body_part: draft.body_part,
                     severity: draft.severity,
                     source: draft.source,
+                    acquired_cycle: 0,
+                    last_progressed_cycle: 0,
+                    trauma_metadata: None,
                 };
                 self.afflictions
                     .insert((draft.kind, draft.body_part), affliction);
@@ -1017,6 +1023,48 @@ impl Tribute {
         }
 
         resolution
+    }
+
+    /// Attempt to acquire or reinforce trauma on this tribute.
+    ///
+    /// If the tribute already has trauma, it is reinforced to the higher
+    /// severity (or stays the same if already at that severity). If not,
+    /// new trauma is acquired.
+    pub fn try_acquire_trauma(
+        &mut self,
+        source: shared::afflictions::TraumaSource,
+        severity: shared::afflictions::Severity,
+    ) -> crate::tributes::afflictions::TraumaAcquisition {
+        use crate::tributes::afflictions::TraumaAcquisition;
+        use shared::afflictions::{AfflictionKind, AfflictionSource};
+
+        let key = (AfflictionKind::Trauma, None);
+        if let Some(existing) = self.afflictions.get_mut(&key) {
+            let from = existing.severity;
+            let to = std::cmp::max(from, severity);
+            let floor_bumped = to > from;
+            if floor_bumped {
+                existing.severity = to;
+                existing.trauma_metadata = Some(source);
+            }
+            TraumaAcquisition::Reinforced {
+                from_severity: from,
+                to_severity: to,
+                floor_bumped,
+            }
+        } else {
+            let aff = shared::afflictions::Affliction {
+                kind: AfflictionKind::Trauma,
+                body_part: None,
+                severity,
+                source: AfflictionSource::Environmental,
+                acquired_cycle: 0,
+                last_progressed_cycle: 0,
+                trauma_metadata: Some(source.clone()),
+            };
+            self.afflictions.insert(key, aff);
+            TraumaAcquisition::Acquired { severity, source }
+        }
     }
 
     /// Apply affliction-based hard gates to an action at execution time.
@@ -1727,7 +1775,9 @@ mod tests {
             kind: AfflictionKind::Wounded,
             body_part: Some(BodyPart::Arm),
             severity: Severity::Mild,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
         };
         let resolution = t.try_acquire_affliction(draft);
         assert_eq!(resolution, AcquireResolution::Insert);
@@ -1746,14 +1796,18 @@ mod tests {
             kind: AfflictionKind::Wounded,
             body_part: Some(BodyPart::Arm),
             severity: Severity::Mild,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
         });
         // Upgrade to moderate
         let draft = AfflictionDraft {
             kind: AfflictionKind::Wounded,
             body_part: Some(BodyPart::Arm),
             severity: Severity::Moderate,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
         };
         let resolution = t.try_acquire_affliction(draft);
         assert_eq!(
@@ -1776,14 +1830,18 @@ mod tests {
             kind: AfflictionKind::Wounded,
             body_part: Some(BodyPart::Arm),
             severity: Severity::Mild,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
         });
         // Infected supersedes wounded at same body part
         let draft = AfflictionDraft {
             kind: AfflictionKind::Infected,
             body_part: Some(BodyPart::Arm),
             severity: Severity::Mild,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
         };
         let resolution = t.try_acquire_affliction(draft);
         assert_eq!(resolution, AcquireResolution::Insert);
@@ -1806,14 +1864,18 @@ mod tests {
             kind: AfflictionKind::MissingArm,
             body_part: Some(BodyPart::Arm),
             severity: Severity::Severe,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
         });
         // Can't wound a missing limb
         let draft = AfflictionDraft {
             kind: AfflictionKind::Wounded,
             body_part: Some(BodyPart::Arm),
             severity: Severity::Mild,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
         };
         let resolution = t.try_acquire_affliction(draft);
         assert_eq!(
@@ -1830,7 +1892,9 @@ mod tests {
             kind: AfflictionKind::Infected,
             body_part: Some(BodyPart::Arm),
             severity: Severity::Mild,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
         };
         let resolution = t.try_acquire_affliction(draft);
         assert_eq!(
@@ -1847,14 +1911,18 @@ mod tests {
             kind: AfflictionKind::Wounded,
             body_part: Some(BodyPart::Arm),
             severity: Severity::Mild,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
         });
         // Same severity rejected
         let draft = AfflictionDraft {
             kind: AfflictionKind::Wounded,
             body_part: Some(BodyPart::Arm),
             severity: Severity::Mild,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
         };
         let resolution = t.try_acquire_affliction(draft);
         assert_eq!(

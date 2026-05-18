@@ -133,7 +133,12 @@ mod tests {
             kind,
             body_part: None,
             severity,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         }
     }
 
@@ -318,7 +323,12 @@ mod tests {
             kind: AfflictionKind::Wounded,
             body_part: Some(BodyPart::Arm),
             severity: Severity::Moderate,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         }];
         let result = apply_cure(&mut affs, "bandage");
         assert!(matches!(result, CureOutcome::Cured { .. }));

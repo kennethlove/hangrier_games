@@ -187,7 +187,10 @@ pub fn apply_cascade(
                     kind: *to,
                     body_part: None,
                     severity: Severity::Moderate,
-                    source: AfflictionSource::Cascade,
+                    source: AfflictionSource::Cascade { from: key },
+                    acquired_cycle: 0,
+                    last_progressed_cycle: 0,
+                    trauma_metadata: None,
                 };
                 successors.push(new_aff);
             }
@@ -209,7 +212,12 @@ mod tests {
             kind,
             body_part: None,
             severity,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         }
     }
 
@@ -440,7 +448,10 @@ mod tests {
         assert_eq!(successors.len(), 1);
         assert_eq!(successors[0].kind, AfflictionKind::Infected);
         assert_eq!(successors[0].severity, Severity::Moderate);
-        assert_eq!(successors[0].source, AfflictionSource::Cascade);
+        assert!(matches!(
+            successors[0].source,
+            AfflictionSource::Cascade { .. }
+        ));
     }
 
     #[test]

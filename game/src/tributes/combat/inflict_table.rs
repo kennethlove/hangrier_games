@@ -73,7 +73,9 @@ pub fn lookup_inflicts(
                 kind: entry.kind,
                 body_part,
                 severity: sev,
-                source: AfflictionSource::Combat,
+                source: AfflictionSource::Combat {
+                    attacker_id: String::new(),
+                },
             });
         }
     }
@@ -94,7 +96,9 @@ pub fn lookup_break_mid_swing_inflict(
             kind: entry.kind,
             body_part,
             severity: Severity::Moderate,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
         }
     })
 }
@@ -127,7 +131,8 @@ fn select_body_part(kind: AfflictionKind, rng: &mut impl Rng) -> Option<BodyPart
         | AfflictionKind::Sick
         | AfflictionKind::Electrocuted
         | AfflictionKind::Drowned
-        | AfflictionKind::Buried => None,
+        | AfflictionKind::Buried
+        | AfflictionKind::Trauma => None,
     }
 }
 

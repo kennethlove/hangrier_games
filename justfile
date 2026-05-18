@@ -119,7 +119,7 @@ check:
 
 # Run clippy linter on all crates
 clippy:
-    cargo clippy --workspace -- -D warnings
+    cargo clippy --workspace --tests -- -D warnings
 
 # Run full quality gate (format, check, clippy, test)
 quality: fmt check clippy test

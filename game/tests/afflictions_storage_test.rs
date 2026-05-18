@@ -14,7 +14,9 @@ fn test_full_acquisition_flow() {
         kind: AfflictionKind::Wounded,
         body_part: Some(BodyPart::Arm),
         severity: Severity::Mild,
-        source: AfflictionSource::Combat,
+        source: AfflictionSource::Combat {
+            attacker_id: String::new(),
+        },
     });
     assert!(matches!(resolution, AcquireResolution::Insert));
     assert_eq!(tribute.afflictions.len(), 1);
@@ -24,7 +26,9 @@ fn test_full_acquisition_flow() {
         kind: AfflictionKind::Wounded,
         body_part: Some(BodyPart::Arm),
         severity: Severity::Moderate,
-        source: AfflictionSource::Combat,
+        source: AfflictionSource::Combat {
+            attacker_id: String::new(),
+        },
     });
     assert!(matches!(resolution, AcquireResolution::Upgrade(_)));
     assert_eq!(tribute.afflictions.len(), 1); // Still 1, upgraded in place
@@ -34,7 +38,9 @@ fn test_full_acquisition_flow() {
         kind: AfflictionKind::BrokenBone,
         body_part: Some(BodyPart::Leg),
         severity: Severity::Severe,
-        source: AfflictionSource::Combat,
+        source: AfflictionSource::Combat {
+            attacker_id: String::new(),
+        },
     });
     assert!(matches!(resolution, AcquireResolution::Insert));
     assert_eq!(tribute.afflictions.len(), 2);
@@ -50,7 +56,9 @@ fn test_affliction_serde_round_trip() {
         kind: AfflictionKind::Wounded,
         body_part: Some(BodyPart::Arm),
         severity: Severity::Moderate,
-        source: AfflictionSource::Combat,
+        source: AfflictionSource::Combat {
+            attacker_id: String::new(),
+        },
     });
     tribute.try_acquire_affliction(AfflictionDraft {
         kind: AfflictionKind::Burned,

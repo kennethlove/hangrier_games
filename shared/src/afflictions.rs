@@ -30,6 +30,7 @@ pub enum AfflictionKind {
     Electrocuted,
     Drowned,
     Buried,
+    Trauma,
 }
 
 impl fmt::Display for AfflictionKind {
@@ -52,6 +53,7 @@ impl fmt::Display for AfflictionKind {
             AfflictionKind::Electrocuted => write!(f, "electrocuted"),
             AfflictionKind::Drowned => write!(f, "drowned"),
             AfflictionKind::Buried => write!(f, "buried"),
+            AfflictionKind::Trauma => write!(f, "trauma"),
         }
     }
 }
@@ -78,6 +80,7 @@ impl FromStr for AfflictionKind {
             "electrocuted" => Ok(AfflictionKind::Electrocuted),
             "drowned" => Ok(AfflictionKind::Drowned),
             "buried" => Ok(AfflictionKind::Buried),
+            "trauma" => Ok(AfflictionKind::Trauma),
             other => Err(format!("unknown AfflictionKind: {other}")),
         }
     }
@@ -178,15 +181,56 @@ impl FromStr for Severity {
 /// same kind on the same part collapses to one slot.
 pub type AfflictionKey = (AfflictionKind, Option<BodyPart>);
 
+/// Classification of trauma cause for mass casualty events.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CauseClass {
+    Combat,
+    Environmental,
+    Mixed,
+}
+
+/// Specific cause of death, used in trauma source metadata.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeathCause {
+    Tribute(String),
+    Fire,
+    Drowning,
+    Starvation,
+    Dehydration,
+    Unknown,
+}
+
+/// Source of a trauma affliction, capturing the triggering event.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TraumaSource {
+    WitnessedAllyDeath {
+        ally: String,
+        cause: Option<DeathCause>,
+    },
+    NearDeath {
+        cause: DeathCause,
+    },
+    Betrayal {
+        by: String,
+    },
+    MassCasualty {
+        cause_class: CauseClass,
+        deaths_this_cycle: u32,
+    },
+}
+
 /// Origin of an affliction. `Sponsor` and `Gamemaker` variants are reserved
 /// for future systems but ship in v1 to avoid enum churn (per spec §3).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AfflictionSource {
     Spawn,
-    Combat,
+    Combat { attacker_id: String },
     Environmental,
-    Cascade,
+    Cascade { from: AfflictionKey },
     Sponsor,
     Gamemaker,
 }
@@ -198,6 +242,12 @@ pub struct Affliction {
     pub body_part: Option<BodyPart>,
     pub severity: Severity,
     pub source: AfflictionSource,
+    /// Cycle number when this affliction was acquired.
+    pub acquired_cycle: u32,
+    /// Last cycle this affliction progressed (stepped up or spawned successor).
+    pub last_progressed_cycle: u32,
+    /// Optional trauma-specific metadata (source, reinforcement history).
+    pub trauma_metadata: Option<TraumaSource>,
 }
 
 impl Affliction {
@@ -233,7 +283,12 @@ mod tests {
             kind: AfflictionKind::Wounded,
             body_part: Some(BodyPart::Arm),
             severity: Severity::Mild,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         };
         assert_eq!(a.key(), (AfflictionKind::Wounded, Some(BodyPart::Arm)));
     }
@@ -244,7 +299,12 @@ mod tests {
             kind: AfflictionKind::MissingArm,
             body_part: Some(BodyPart::Arm),
             severity: Severity::Severe,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         };
         assert!(a.is_permanent());
     }
@@ -256,6 +316,9 @@ mod tests {
             body_part: None,
             severity: Severity::Mild,
             source: AfflictionSource::Spawn,
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         };
         assert!(a.is_reversible());
     }

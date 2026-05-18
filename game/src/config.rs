@@ -19,6 +19,8 @@ pub struct GameConfig {
     pub night_event_frequency: f64,
     /// Enable instant death outcomes for catastrophic events
     pub instant_death_enabled: bool,
+    /// Enable the trauma producer pipeline (acquire/reinforce trauma afflictions)
+    pub trauma_enabled: bool,
     /// Global multiplier for event severity (1.0 = normal, 2.0 = double damage)
     pub catastrophic_severity_multiplier: f64,
 
@@ -70,6 +72,7 @@ impl Default for GameConfig {
             day_event_frequency: 1.0 / 4.0,
             night_event_frequency: 1.0 / 8.0,
             instant_death_enabled: true,
+            trauma_enabled: true,
             catastrophic_severity_multiplier: 1.0,
 
             // Tribute AI

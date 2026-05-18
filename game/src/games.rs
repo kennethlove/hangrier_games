@@ -376,7 +376,7 @@ impl Game {
     /// caller because some sites (cycle announcements, area events)
     /// emit at the phase boundary (`tick = 0`) while per-tribute
     /// action emissions advance the tick counter.
-    fn push_message(
+    pub(crate) fn push_message(
         &mut self,
         source: crate::messages::MessageSource,
         subject: String,
@@ -875,6 +875,7 @@ impl Game {
         self.prepare_cycle(phase)?;
         self.announce_cycle_start(phase)?;
         self.do_a_cycle(phase)?;
+        self.run_trauma_producers(phase);
         self.announce_cycle_end(phase)?;
 
         // Clean up any deaths
@@ -896,6 +897,13 @@ impl Game {
             self.run_phase(p)?;
         }
         Ok(())
+    }
+
+    /// Run the trauma producer pipeline for the given phase.
+    /// Scans the current phase's messages and acquires/reinforces trauma
+    /// afflictions on living tributes who witnessed or survived traumatic events.
+    fn run_trauma_producers(&mut self, _phase: crate::messages::Phase) {
+        crate::tributes::afflictions::trauma_producers::run_trauma_producers(self);
     }
 
     /// Announce events in closed areas.
@@ -3550,7 +3558,12 @@ mod tests {
                 kind: AfflictionKind::Wounded,
                 body_part: None,
                 severity: Severity::Moderate,
-                source: AfflictionSource::Combat,
+                source: AfflictionSource::Combat {
+                    attacker_id: String::new(),
+                },
+                acquired_cycle: 0,
+                last_progressed_cycle: 0,
+                trauma_metadata: None,
             },
         );
         let prior_hp = t.attributes.health;

@@ -169,6 +169,8 @@ pub enum MessageKind {
     State,
     /// Sponsor gift delivery.
     SponsorGift,
+    /// Trauma acquisition or reinforcement.
+    Trauma,
 }
 
 /// Visible fatigue band derived from a tribute's stamina/max_stamina ratio.
@@ -487,6 +489,19 @@ pub enum MessagePayload {
         from_affliction: String,
         to_affliction: String,
     },
+
+    // Trauma events (trauma producer pipeline PR2).
+    TraumaAcquired {
+        tribute: String,
+        severity: String,
+        source: String,
+    },
+    TraumaReinforced {
+        tribute: String,
+        from_severity: String,
+        to_severity: String,
+        floor_bumped: bool,
+    },
 }
 
 impl MessagePayload {
@@ -529,7 +544,9 @@ impl MessagePayload {
             | AfflictionAcquired { .. }
             | AfflictionProgressed { .. }
             | AfflictionHealed { .. }
-            | AfflictionCascaded { .. } => MessageKind::State,
+            | AfflictionCascaded { .. }
+            | TraumaAcquired { .. }
+            | TraumaReinforced { .. } => MessageKind::State,
         }
     }
 
@@ -574,7 +591,15 @@ impl MessagePayload {
             AfflictionAcquired { tribute_id, .. }
             | AfflictionProgressed { tribute_id, .. }
             | AfflictionHealed { tribute_id, .. }
-            | AfflictionCascaded { tribute_id, .. } => tribute_id == id,
+            | AfflictionCascaded { tribute_id, .. }
+            | TraumaAcquired {
+                tribute: tribute_id,
+                ..
+            }
+            | TraumaReinforced {
+                tribute: tribute_id,
+                ..
+            } => tribute_id == id,
             SponsorGift { recipient, .. } => r(recipient),
             AreaClosed { .. } | AreaEvent { .. } => false,
             CycleStart { .. } | CycleEnd { .. } | PhaseStarted { .. } | PhaseEnded { .. } => false,

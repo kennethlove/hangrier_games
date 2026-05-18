@@ -101,7 +101,8 @@ fn base_penalties(kind: AfflictionKind) -> (i32, i32, i32, i32, i32, f64, i32, i
         | AfflictionKind::Sick
         | AfflictionKind::Electrocuted
         | AfflictionKind::Drowned
-        | AfflictionKind::Buried => (0, 0, 0, 0, 0, 0.0, 0, 0),
+        | AfflictionKind::Buried
+        | AfflictionKind::Trauma => (0, 0, 0, 0, 0, 0.0, 0, 0),
     }
 }
 
@@ -193,7 +194,8 @@ fn base_bias(kind: AfflictionKind) -> (f64, f64, f64, f64, f64) {
         | AfflictionKind::Sick
         | AfflictionKind::Electrocuted
         | AfflictionKind::Drowned
-        | AfflictionKind::Buried => (1.0, 1.0, 1.0, 1.0, 1.0),
+        | AfflictionKind::Buried
+        | AfflictionKind::Trauma => (1.0, 1.0, 1.0, 1.0, 1.0),
     }
 }
 
@@ -207,7 +209,12 @@ mod tests {
             kind,
             body_part: None,
             severity,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         }
     }
 
@@ -216,7 +223,12 @@ mod tests {
             kind,
             body_part: Some(part),
             severity,
-            source: AfflictionSource::Combat,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
         }
     }
 

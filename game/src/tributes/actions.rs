@@ -55,6 +55,10 @@ pub enum Action {
     Sleep {
         duration_phases: u8,
     },
+    /// Tribute is frozen by a severe phobia reaction — skips this cycle
+    /// entirely. Emits `MessagePayload::PhobiaTriggered { effect: Freeze }`.
+    /// See spec §5 (phobia brain layer).
+    Frozen,
 }
 
 impl Display for Action {
@@ -74,6 +78,7 @@ impl Display for Action {
             Action::Eat(_) => write!(f, "eat"),
             Action::DrinkItem(_) => write!(f, "drink item"),
             Action::Sleep { .. } => write!(f, "sleep"),
+            Action::Frozen => write!(f, "frozen"),
         }
     }
 }
@@ -97,6 +102,7 @@ impl FromStr for Action {
             "eat" => Ok(Action::Eat(None)),
             "drink item" => Ok(Action::DrinkItem(None)),
             "sleep" => Ok(Action::Sleep { duration_phases: 0 }),
+            "frozen" => Ok(Action::Frozen),
             _ => Err(()),
         }
     }
@@ -157,6 +163,12 @@ mod tests {
     }
 
     #[test]
+    fn frozen_action_display_and_fromstr() {
+        assert_eq!(Action::Frozen.to_string(), "frozen");
+        assert_eq!(Action::from_str("frozen").unwrap(), Action::Frozen);
+    }
+
+    #[test]
     fn tribute_action_new() {
         assert_eq!(
             TributeAction::new(Action::None, None),
@@ -180,6 +192,7 @@ mod survival_action_tests {
             Action::DrinkFromTerrain,
             Action::Eat(None),
             Action::DrinkItem(None),
+            Action::Frozen,
         ] {
             let json = serde_json::to_string(&a).unwrap();
             let back: Action = serde_json::from_str(&json).unwrap();
@@ -194,6 +207,7 @@ mod survival_action_tests {
         assert_eq!(Action::DrinkFromTerrain.to_string(), "drink from terrain");
         assert_eq!(Action::Eat(None).to_string(), "eat");
         assert_eq!(Action::DrinkItem(None).to_string(), "drink item");
+        assert_eq!(Action::Frozen.to_string(), "frozen");
         assert!(matches!(
             "seek shelter".parse::<Action>(),
             Ok(Action::SeekShelter)
@@ -208,5 +222,6 @@ mod survival_action_tests {
             "drink item".parse::<Action>(),
             Ok(Action::DrinkItem(None))
         ));
+        assert!(matches!("frozen".parse::<Action>(), Ok(Action::Frozen)));
     }
 }

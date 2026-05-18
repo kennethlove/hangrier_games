@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub mod affliction_override;
+pub mod phobia_override;
 
 const LOW_ENEMY_LIMIT: u32 = 6;
 
@@ -248,9 +249,16 @@ impl Brain {
         phase: shared::messages::Phase,
         rng: &mut impl Rng,
     ) -> Action {
-        if let Some(early) =
-            self.run_pre_decision_overrides(tribute, nearby_tributes, None, Some(phase), rng)
-        {
+        let area = all_areas.iter().find(|a| a.area == Some(tribute.area));
+        if let Some(early) = self.run_pre_decision_overrides(
+            tribute,
+            nearby_tributes,
+            None,
+            Some(phase),
+            area,
+            &crate::config::GameConfig::default(),
+            rng,
+        ) {
             return early;
         }
 
@@ -447,6 +455,8 @@ impl Brain {
             nearby_tributes,
             Some(terrain.base),
             Some(phase),
+            None,
+            &crate::config::GameConfig::default(),
             rng,
         ) {
             return early;
@@ -558,21 +568,25 @@ impl Brain {
     /// 2. Psychotic break
     /// 3. Survival override (terrain-dependent; skipped when `terrain` is `None`)
     /// 4. Stamina override (terrain-dependent for parity with survival)
-    /// 5. Affliction override (hard gates + brain bias; spec §11)
-    /// 6. Preferred action
-    /// 7. Alliance proposal
-    /// 8. Consumable
+    /// 5. Phobia override (spec §5 — fires freeze reactions, stat penalties)
+    /// 6. Affliction override (hard gates + brain bias; spec §11)
+    /// 7. Preferred action
+    /// 8. Alliance proposal
+    /// 9. Consumable
     ///
     /// Layers 3 and 4 are gated on `terrain.is_some()` because the legacy
     /// `act` entry point does not yet receive the tribute's current terrain
     /// — those overrides depend on terrain for water/forage richness and
     /// would be unsafe to fire blind.
+    #[allow(clippy::too_many_arguments)]
     fn run_pre_decision_overrides(
         &self,
         tribute: &Tribute,
         nearby_tributes: u32,
         terrain: Option<BaseTerrain>,
-        _phase: Option<shared::messages::Phase>,
+        phase: Option<shared::messages::Phase>,
+        area: Option<&AreaDetails>,
+        config: &crate::config::GameConfig,
         rng: &mut impl Rng,
     ) -> Option<Action> {
         if !tribute.is_alive() {
@@ -625,6 +639,21 @@ impl Brain {
                 false,
                 &crate::tributes::combat_tuning::CombatTuning::default(),
             ) {
+                return Some(action);
+            }
+        }
+
+        // Phobia override (spec §5): freeze reactions and stat penalties.
+        // Gated on config.phobias_enabled.
+        if config.phobias_enabled {
+            let is_night = phase.is_some_and(|p| matches!(p, shared::messages::Phase::Night));
+            let phobia_ctx = phobia_override::PhobiaBrainContext {
+                area,
+                terrain,
+                is_night,
+                nearby_tributes,
+            };
+            if let Some(action) = phobia_override::phobia_override(tribute, &phobia_ctx, rng) {
                 return Some(action);
             }
         }

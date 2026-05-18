@@ -2,26 +2,15 @@ use crate::icons::NarrativeIcon;
 use dioxus::prelude::*;
 use game::tributes::statuses::TributeStatus;
 
-/// Maps tribute status to icon names
+/// Maps tribute status to icon names.
+/// Note: Most status effects are now represented as afflictions.
+/// This component only handles the core life-state statuses.
 pub(crate) fn icon_name_for_status(status: &TributeStatus) -> String {
     match status {
-        TributeStatus::Broken => "broken_bone",
-        TributeStatus::Buried => "falling_rocks",
-        TributeStatus::Burned => "burned",
-        TributeStatus::Dead => "dead",
-        TributeStatus::Dehydrated => "dehydrated",
-        TributeStatus::Drowned => "drowning",
-        TributeStatus::Electrocuted => "electrocuted",
-        TributeStatus::Frozen => "frozen_body",
         TributeStatus::Healthy => "hearts",
-        TributeStatus::Infected => "infection",
-        TributeStatus::Overheated => "heat_haze",
-        TributeStatus::Mauled(_) => "mauled",
-        TributeStatus::Poisoned => "poison_bottle",
         TributeStatus::RecentlyDead => "recently_dead",
-        TributeStatus::Starving => "starving",
-        TributeStatus::Sick => "vomiting",
-        TributeStatus::Wounded => "wounded",
+        TributeStatus::Dead => "dead",
+        TributeStatus::Mauled(_) => "mauled",
     }
     .to_string()
 }
@@ -47,37 +36,9 @@ mod tests {
     fn known_statuses_map_to_icons() {
         assert_eq!(icon_name_for_status(&TributeStatus::Healthy), "hearts");
         assert_eq!(icon_name_for_status(&TributeStatus::Dead), "dead");
-        assert_eq!(icon_name_for_status(&TributeStatus::Drowned), "drowning");
-        assert_eq!(icon_name_for_status(&TributeStatus::Sick), "vomiting");
-        assert_eq!(
-            icon_name_for_status(&TributeStatus::Buried),
-            "falling_rocks"
-        );
-        assert_eq!(icon_name_for_status(&TributeStatus::Wounded), "wounded");
         assert_eq!(
             icon_name_for_status(&TributeStatus::RecentlyDead),
             "recently_dead"
-        );
-        assert_eq!(icon_name_for_status(&TributeStatus::Burned), "burned");
-        assert_eq!(icon_name_for_status(&TributeStatus::Frozen), "frozen_body");
-        assert_eq!(
-            icon_name_for_status(&TributeStatus::Overheated),
-            "heat_haze"
-        );
-        assert_eq!(icon_name_for_status(&TributeStatus::Broken), "broken_bone");
-        assert_eq!(icon_name_for_status(&TributeStatus::Infected), "infection");
-        assert_eq!(
-            icon_name_for_status(&TributeStatus::Poisoned),
-            "poison_bottle"
-        );
-        assert_eq!(icon_name_for_status(&TributeStatus::Starving), "starving");
-        assert_eq!(
-            icon_name_for_status(&TributeStatus::Electrocuted),
-            "electrocuted"
-        );
-        assert_eq!(
-            icon_name_for_status(&TributeStatus::Dehydrated),
-            "dehydrated"
         );
     }
 }

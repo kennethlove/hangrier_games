@@ -97,7 +97,11 @@ fn base_penalties(kind: AfflictionKind) -> (i32, i32, i32, i32, i32, f64, i32, i
         | AfflictionKind::Dehydrated
         | AfflictionKind::Frozen
         | AfflictionKind::Overheated
-        | AfflictionKind::Burned => (0, 0, 0, 0, 0, 0.0, 0, 0),
+        | AfflictionKind::Burned
+        | AfflictionKind::Sick
+        | AfflictionKind::Electrocuted
+        | AfflictionKind::Drowned
+        | AfflictionKind::Buried => (0, 0, 0, 0, 0, 0.0, 0, 0),
     }
 }
 
@@ -185,7 +189,11 @@ fn base_bias(kind: AfflictionKind) -> (f64, f64, f64, f64, f64) {
         | AfflictionKind::Dehydrated
         | AfflictionKind::Frozen
         | AfflictionKind::Overheated
-        | AfflictionKind::Burned => (1.0, 1.0, 1.0, 1.0, 1.0),
+        | AfflictionKind::Burned
+        | AfflictionKind::Sick
+        | AfflictionKind::Electrocuted
+        | AfflictionKind::Drowned
+        | AfflictionKind::Buried => (1.0, 1.0, 1.0, 1.0, 1.0),
     }
 }
 

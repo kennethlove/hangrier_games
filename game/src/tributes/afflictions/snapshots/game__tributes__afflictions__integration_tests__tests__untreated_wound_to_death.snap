@@ -1,0 +1,10 @@
+---
+source: game/src/tributes/afflictions/integration_tests.rs
+expression: "message_log.join(\"\\n\")"
+---
+cycle 0: cascaded wounded → infected
+cycle 3: infected moderate → severe
+cycle 5: cascaded wounded → infected
+cycle 8: cascaded wounded → infected
+cycle 14: infected moderate → severe
+cycle 16: death roll survived=false

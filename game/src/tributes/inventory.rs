@@ -10,6 +10,7 @@
 use crate::areas::AreaDetails;
 use crate::items::{Attribute, Item, ItemError, OwnsItems};
 use crate::tributes::Tribute;
+use crate::tributes::afflictions::apply_cure;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
 
@@ -112,6 +113,23 @@ impl Tribute {
             Attribute::Strength => self.increase_strength(item.effect as u32),
             _ => return Err(ItemError::InvalidAttribute),
         }
+
+        // Apply cure effect if item is a cure item (bandage, splint, antibiotic).
+        let afflictions: Vec<_> = self.afflictions.values().cloned().collect();
+        let mut affliction_vec = afflictions;
+        let cure_result = apply_cure(&mut affliction_vec, &item.name);
+        // Update the tribute's affliction map with the cured state.
+        self.afflictions = affliction_vec.into_iter().map(|a| (a.key(), a)).collect();
+
+        match cure_result {
+            crate::tributes::afflictions::CureOutcome::Cured { .. } => {
+                // Cure applied successfully; afflictions map already updated.
+            }
+            crate::tributes::afflictions::CureOutcome::NoEffect { .. } => {
+                // No matching affliction; not an error, just no cure effect.
+            }
+        }
+
         Ok(())
     }
 

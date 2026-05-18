@@ -977,6 +977,7 @@ impl Tribute {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         };
         let resolution = can_acquire(&self.afflictions, &provisional);
 
@@ -1015,6 +1016,7 @@ impl Tribute {
                     acquired_cycle: 0,
                     last_progressed_cycle: 0,
                     trauma_metadata: None,
+                    phobia_metadata: None,
                 };
                 self.afflictions
                     .insert((draft.kind, draft.body_part), affliction);
@@ -1061,6 +1063,7 @@ impl Tribute {
                 acquired_cycle: 0,
                 last_progressed_cycle: 0,
                 trauma_metadata: Some(source.clone()),
+                phobia_metadata: None,
             };
             self.afflictions.insert(key, aff);
             TraumaAcquisition::Acquired { severity, source }

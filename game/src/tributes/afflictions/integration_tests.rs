@@ -41,6 +41,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         }
     }
 
@@ -725,6 +726,7 @@ mod tests {
                 acquired_cycle: 0,
                 last_progressed_cycle: 0,
                 trauma_metadata: None,
+                phobia_metadata: None,
             };
             afflictions.insert(wound.key(), wound);
 
@@ -800,6 +802,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
 
@@ -849,6 +852,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         };
         let infected = Affliction {
             kind: AfflictionKind::Infected,
@@ -860,6 +864,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
         afflictions.insert(infected.key(), infected);
@@ -937,6 +942,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         };
         let infected = Affliction {
             kind: AfflictionKind::Infected,
@@ -948,6 +954,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
         afflictions.insert(infected.key(), infected);
@@ -994,6 +1001,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         };
         let infected = Affliction {
             kind: AfflictionKind::Infected,
@@ -1005,6 +1013,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
         afflictions.insert(infected.key(), infected);
@@ -1075,6 +1084,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
 
@@ -1153,6 +1163,7 @@ mod tests {
                         acquired_cycle: 0,
                         last_progressed_cycle: 0,
                         trauma_metadata: None,
+                        phobia_metadata: None,
                     })
                     .collect()
             },
@@ -1215,6 +1226,7 @@ mod tests {
                 acquired_cycle: 0,
                 last_progressed_cycle: 0,
                 trauma_metadata: None,
+                    phobia_metadata: None,
             };
 
             let mut rng = SmallRng::seed_from_u64(seed);
@@ -1256,6 +1268,7 @@ mod tests {
                     acquired_cycle: 0,
                     last_progressed_cycle: 0,
                     trauma_metadata: None,
+                    phobia_metadata: None,
                 };
                 let result = tick_cascade(&[aff], is_sheltered, &tuning, &mut rng);
                 prop_assert!(
@@ -1327,6 +1340,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
 
@@ -1416,6 +1430,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         };
         let infected = Affliction {
             kind: AfflictionKind::Infected,
@@ -1427,6 +1442,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
         afflictions.insert(infected.key(), infected);

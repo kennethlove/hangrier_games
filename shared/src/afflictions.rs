@@ -4,12 +4,96 @@
 //! See `docs/superpowers/specs/2026-05-03-health-conditions-design.md` §9.
 
 use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::str::FromStr;
 
 /// Categories of afflictions a tribute can carry. Permanent kinds
 /// (`MissingArm`, `MissingLeg`, `Blind`, `Deaf`) cannot be cured in v1;
 /// reversible kinds progress / heal via the cascade and cure paths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum PhobiaTrigger {
+    Fire,
+    Water,
+    Dark,
+    Blood,
+    Heights,
+    Enclosed,
+    Open,
+    Animal,
+    Tribute,
+    TraitGroup,
+}
+
+impl fmt::Display for PhobiaTrigger {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PhobiaTrigger::Fire => write!(f, "fire"),
+            PhobiaTrigger::Water => write!(f, "water"),
+            PhobiaTrigger::Dark => write!(f, "dark"),
+            PhobiaTrigger::Blood => write!(f, "blood"),
+            PhobiaTrigger::Heights => write!(f, "heights"),
+            PhobiaTrigger::Enclosed => write!(f, "enclosed"),
+            PhobiaTrigger::Open => write!(f, "open"),
+            PhobiaTrigger::Animal => write!(f, "animal"),
+            PhobiaTrigger::Tribute => write!(f, "tribute"),
+            PhobiaTrigger::TraitGroup => write!(f, "trait_group"),
+        }
+    }
+}
+
+impl FromStr for PhobiaTrigger {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "fire" => Ok(PhobiaTrigger::Fire),
+            "water" => Ok(PhobiaTrigger::Water),
+            "dark" => Ok(PhobiaTrigger::Dark),
+            "blood" => Ok(PhobiaTrigger::Blood),
+            "heights" => Ok(PhobiaTrigger::Heights),
+            "enclosed" => Ok(PhobiaTrigger::Enclosed),
+            "open" => Ok(PhobiaTrigger::Open),
+            "animal" => Ok(PhobiaTrigger::Animal),
+            "tribute" => Ok(PhobiaTrigger::Tribute),
+            "trait_group" => Ok(PhobiaTrigger::TraitGroup),
+            other => Err(format!("unknown PhobiaTrigger: {other}")),
+        }
+    }
+}
+
+/// Origin of a phobia affliction. Innate phobias are lifelong dispositions;
+/// Traumatic phobias are learned through adverse events.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PhobiaOrigin {
+    Innate,
+    Traumatic { event_ref: String },
+}
+
+/// Metadata attached to Phobia afflictions. Tracks observer state,
+/// reinforcement history, and origin. Only populated for Phobia kinds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PhobiaMetadata {
+    pub origin: PhobiaOrigin,
+    /// Tributes who have observed this phobia firing.
+    pub observed_by: BTreeSet<String>,
+    /// Last cycle each observer saw this phobia fire.
+    pub observer_seen_cycle: BTreeMap<String, u32>,
+    /// Cycles since this phobia last fired (for decay tracking).
+    pub cycles_since_last_fire: u32,
+}
+
+impl Default for PhobiaMetadata {
+    fn default() -> Self {
+        Self {
+            origin: PhobiaOrigin::Innate,
+            observed_by: BTreeSet::new(),
+            observer_seen_cycle: BTreeMap::new(),
+            cycles_since_last_fire: 0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AfflictionKind {
@@ -31,6 +115,7 @@ pub enum AfflictionKind {
     Drowned,
     Buried,
     Trauma,
+    Phobia(PhobiaTrigger),
 }
 
 impl fmt::Display for AfflictionKind {
@@ -54,6 +139,7 @@ impl fmt::Display for AfflictionKind {
             AfflictionKind::Drowned => write!(f, "drowned"),
             AfflictionKind::Buried => write!(f, "buried"),
             AfflictionKind::Trauma => write!(f, "trauma"),
+            AfflictionKind::Phobia(trigger) => write!(f, "phobia:{trigger}"),
         }
     }
 }
@@ -81,6 +167,11 @@ impl FromStr for AfflictionKind {
             "drowned" => Ok(AfflictionKind::Drowned),
             "buried" => Ok(AfflictionKind::Buried),
             "trauma" => Ok(AfflictionKind::Trauma),
+            rest if rest.starts_with("phobia:") => {
+                let trigger_str = rest.strip_prefix("phobia:").unwrap();
+                let trigger = PhobiaTrigger::from_str(trigger_str)?;
+                Ok(AfflictionKind::Phobia(trigger))
+            }
             other => Err(format!("unknown AfflictionKind: {other}")),
         }
     }
@@ -248,6 +339,10 @@ pub struct Affliction {
     pub last_progressed_cycle: u32,
     /// Optional trauma-specific metadata (source, reinforcement history).
     pub trauma_metadata: Option<TraumaSource>,
+    /// Optional phobia-specific metadata (origin, observer state).
+    /// Only `Some` for `AfflictionKind::Phobia` variants.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phobia_metadata: Option<PhobiaMetadata>,
 }
 
 impl Affliction {
@@ -289,6 +384,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         };
         assert_eq!(a.key(), (AfflictionKind::Wounded, Some(BodyPart::Arm)));
     }
@@ -305,6 +401,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         };
         assert!(a.is_permanent());
     }
@@ -319,6 +416,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         };
         assert!(a.is_reversible());
     }
@@ -330,5 +428,96 @@ mod tests {
         assert_eq!(Severity::Severe.ordinal(), 2);
         assert!(Severity::Mild < Severity::Moderate);
         assert!(Severity::Moderate < Severity::Severe);
+    }
+
+    #[test]
+    fn phobia_trigger_display_roundtrip() {
+        for trigger in [
+            PhobiaTrigger::Fire,
+            PhobiaTrigger::Water,
+            PhobiaTrigger::Dark,
+            PhobiaTrigger::Blood,
+            PhobiaTrigger::Heights,
+            PhobiaTrigger::Enclosed,
+            PhobiaTrigger::Open,
+            PhobiaTrigger::Animal,
+            PhobiaTrigger::Tribute,
+            PhobiaTrigger::TraitGroup,
+        ] {
+            let s = trigger.to_string();
+            let parsed: PhobiaTrigger = s.parse().unwrap();
+            assert_eq!(trigger, parsed);
+        }
+    }
+
+    #[test]
+    fn phobia_trigger_from_str_invalid() {
+        assert!(PhobiaTrigger::from_str("spiders").is_err());
+    }
+
+    #[test]
+    fn affliction_kind_phobia_display() {
+        let kind = AfflictionKind::Phobia(PhobiaTrigger::Fire);
+        assert_eq!(kind.to_string(), "phobia:fire");
+
+        let kind = AfflictionKind::Phobia(PhobiaTrigger::Heights);
+        assert_eq!(kind.to_string(), "phobia:heights");
+    }
+
+    #[test]
+    fn affliction_kind_phobia_from_str() {
+        let kind: AfflictionKind = "phobia:fire".parse().unwrap();
+        assert_eq!(kind, AfflictionKind::Phobia(PhobiaTrigger::Fire));
+
+        let kind: AfflictionKind = "phobia:dark".parse().unwrap();
+        assert_eq!(kind, AfflictionKind::Phobia(PhobiaTrigger::Dark));
+    }
+
+    #[test]
+    fn affliction_kind_phobia_from_str_invalid() {
+        assert!(AfflictionKind::from_str("phobia:unknown").is_err());
+    }
+
+    #[test]
+    fn phobia_metadata_default_is_innate() {
+        let meta = PhobiaMetadata::default();
+        assert!(matches!(meta.origin, PhobiaOrigin::Innate));
+        assert!(meta.observed_by.is_empty());
+        assert!(meta.observer_seen_cycle.is_empty());
+        assert_eq!(meta.cycles_since_last_fire, 0);
+    }
+
+    #[test]
+    fn phobia_affliction_serialization_roundtrip() {
+        let aff = Affliction {
+            kind: AfflictionKind::Phobia(PhobiaTrigger::Fire),
+            body_part: None,
+            severity: Severity::Mild,
+            source: AfflictionSource::Spawn,
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
+            phobia_metadata: Some(PhobiaMetadata::default()),
+        };
+        let json = serde_json::to_string(&aff).unwrap();
+        let restored: Affliction = serde_json::from_str(&json).unwrap();
+        assert_eq!(aff, restored);
+    }
+
+    #[test]
+    fn phobia_metadata_none_for_non_phobia() {
+        let aff = Affliction {
+            kind: AfflictionKind::Wounded,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Moderate,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
+            phobia_metadata: None,
+        };
+        assert!(aff.phobia_metadata.is_none());
     }
 }

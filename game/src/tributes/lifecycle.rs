@@ -400,7 +400,8 @@ impl Tribute {
                 | AfflictionKind::MissingLeg
                 | AfflictionKind::Blind
                 | AfflictionKind::Deaf
-                | AfflictionKind::Trauma => {}
+                | AfflictionKind::Trauma
+                | AfflictionKind::Phobia(_) => {}
             }
         }
 

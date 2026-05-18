@@ -102,7 +102,8 @@ fn base_penalties(kind: AfflictionKind) -> (i32, i32, i32, i32, i32, f64, i32, i
         | AfflictionKind::Electrocuted
         | AfflictionKind::Drowned
         | AfflictionKind::Buried
-        | AfflictionKind::Trauma => (0, 0, 0, 0, 0, 0.0, 0, 0),
+        | AfflictionKind::Trauma
+        | AfflictionKind::Phobia(_) => (0, 0, 0, 0, 0, 0.0, 0, 0),
     }
 }
 
@@ -195,7 +196,8 @@ fn base_bias(kind: AfflictionKind) -> (f64, f64, f64, f64, f64) {
         | AfflictionKind::Electrocuted
         | AfflictionKind::Drowned
         | AfflictionKind::Buried
-        | AfflictionKind::Trauma => (1.0, 1.0, 1.0, 1.0, 1.0),
+        | AfflictionKind::Trauma
+        | AfflictionKind::Phobia(_) => (1.0, 1.0, 1.0, 1.0, 1.0),
     }
 }
 
@@ -215,6 +217,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         }
     }
 
@@ -229,6 +232,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         }
     }
 

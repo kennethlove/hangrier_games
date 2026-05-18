@@ -23,6 +23,7 @@ DEFINE FIELD OVERWRITE thirst ON tribute TYPE int DEFAULT 0;
 DEFINE FIELD OVERWRITE sheltered_until ON tribute TYPE option<int>;
 DEFINE FIELD OVERWRITE starvation_drain_step ON tribute TYPE int DEFAULT 0;
 DEFINE FIELD OVERWRITE dehydration_drain_step ON tribute TYPE int DEFAULT 0;
+DEFINE FIELD OVERWRITE afflictions ON tribute TYPE option<array<object>>;
 DEFINE FIELD OVERWRITE created_by ON tribute VALUE $auth READONLY;
 
 DEFINE INDEX OVERWRITE tribute_identifier ON tribute FIELDS identifier UNIQUE;

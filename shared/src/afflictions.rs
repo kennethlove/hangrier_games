@@ -243,6 +243,24 @@ impl Severity {
             Severity::Severe => 2,
         }
     }
+
+    /// Steps up one severity tier. `Severe` caps at `Severe`.
+    pub fn next_tier(&self) -> Self {
+        match self {
+            Severity::Mild => Severity::Moderate,
+            Severity::Moderate => Severity::Severe,
+            Severity::Severe => Severity::Severe,
+        }
+    }
+
+    /// Steps down one severity tier. `Mild` returns `None` (cured).
+    pub fn prev_tier(&self) -> Option<Self> {
+        match self {
+            Severity::Severe => Some(Severity::Moderate),
+            Severity::Moderate => Some(Severity::Mild),
+            Severity::Mild => None,
+        }
+    }
 }
 
 impl fmt::Display for Severity {
@@ -265,6 +283,81 @@ impl FromStr for Severity {
             "severe" => Ok(Severity::Severe),
             other => Err(format!("unknown Severity: {other}")),
         }
+    }
+}
+
+/// Outcome of a traumatic reinforcement roll.
+/// `escalated` is true only when severity actually increased.
+pub struct ReinforcementOutcome {
+    pub escalated: bool,
+    pub new_severity: Severity,
+}
+
+/// Outcome of a decay tick.
+/// `new_severity` is `None` when the affliction is cured (dropped off the bottom).
+pub struct DecayOutcome {
+    pub decayed: bool,
+    pub new_severity: Option<Severity>,
+}
+
+/// Apply traumatic reinforcement to an affliction severity.
+///
+/// Rolls against `escalation_chance` (0.0–1.0). On success the severity
+/// steps up one tier; `Severe` is the cap and never rolls.
+///
+/// # Arguments
+/// * `current_severity` — the affliction's current severity tier.
+/// * `escalation_chance` — probability of stepping up (e.g. 0.12 for 12%).
+/// * `rng` — any type implementing `rand::Rng`.
+pub fn apply_traumatic_reinforcement(
+    current_severity: Severity,
+    escalation_chance: f64,
+    rng: &mut impl rand::Rng,
+) -> ReinforcementOutcome {
+    if current_severity == Severity::Severe {
+        return ReinforcementOutcome {
+            escalated: false,
+            new_severity: Severity::Severe,
+        };
+    }
+    if rng.random_bool(escalation_chance) {
+        ReinforcementOutcome {
+            escalated: true,
+            new_severity: current_severity.next_tier(),
+        }
+    } else {
+        ReinforcementOutcome {
+            escalated: false,
+            new_severity: current_severity,
+        }
+    }
+}
+
+/// Tick decay for a tier-scaled affliction.
+///
+/// If `cycles_since_last` has not reached `decay_threshold` the affliction
+/// holds. Once the threshold is met the severity steps down one tier;
+/// `Mild` decays to `None` (cured).
+///
+/// # Arguments
+/// * `current_severity` — the affliction's current severity tier.
+/// * `cycles_since_last` — cycles elapsed since the affliction last fired.
+/// * `decay_threshold` — cycles required before decay triggers (5 for
+///   phobia/fixation, 10 for trauma).
+pub fn tick_decay(
+    current_severity: Severity,
+    cycles_since_last: u32,
+    decay_threshold: u32,
+) -> DecayOutcome {
+    if cycles_since_last < decay_threshold {
+        return DecayOutcome {
+            decayed: false,
+            new_severity: Some(current_severity),
+        };
+    }
+    DecayOutcome {
+        decayed: true,
+        new_severity: current_severity.prev_tier(),
     }
 }
 
@@ -519,5 +612,142 @@ mod tests {
             phobia_metadata: None,
         };
         assert!(aff.phobia_metadata.is_none());
+    }
+
+    // ── Severity tier helpers ──────────────────────────────────────────
+
+    #[test]
+    fn severity_next_tier_steps_up_correctly() {
+        assert_eq!(Severity::Mild.next_tier(), Severity::Moderate);
+        assert_eq!(Severity::Moderate.next_tier(), Severity::Severe);
+        assert_eq!(Severity::Severe.next_tier(), Severity::Severe);
+    }
+
+    #[test]
+    fn severity_prev_tier_steps_down_correctly() {
+        assert_eq!(Severity::Severe.prev_tier(), Some(Severity::Moderate));
+        assert_eq!(Severity::Moderate.prev_tier(), Some(Severity::Mild));
+        assert_eq!(Severity::Mild.prev_tier(), None);
+    }
+
+    // ── Traumatic reinforcement ────────────────────────────────────────
+
+    /// Deterministic RNG that always yields the same `u64`.
+    struct FixedRng(u64);
+    impl rand::RngCore for FixedRng {
+        fn next_u32(&mut self) -> u32 {
+            self.next_u64() as u32
+        }
+        fn next_u64(&mut self) -> u64 {
+            self.0
+        }
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            for chunk in dest.chunks_mut(8) {
+                let bytes = self.0.to_le_bytes();
+                chunk.copy_from_slice(&bytes[..chunk.len()]);
+            }
+        }
+    }
+
+    #[test]
+    fn reinforcement_mild_to_moderate_on_success() {
+        let mut rng = FixedRng(u64::MAX);
+        let outcome = apply_traumatic_reinforcement(Severity::Mild, 1.0, &mut rng);
+        assert!(outcome.escalated);
+        assert_eq!(outcome.new_severity, Severity::Moderate);
+    }
+
+    #[test]
+    fn reinforcement_mild_stays_mild_on_failure() {
+        // Use 50% chance; FixedRng(0) produces f64 ≈ 0.0 which is < 0.5 → true.
+        // To force false, use a chance the fixed value beats.
+        // FixedRng(u64::MAX) → f64 ≈ 1.0, so random_bool(0.5) → 1.0 < 0.5 = false.
+        let mut rng = FixedRng(u64::MAX);
+        let outcome = apply_traumatic_reinforcement(Severity::Mild, 0.5, &mut rng);
+        assert!(!outcome.escalated);
+        assert_eq!(outcome.new_severity, Severity::Mild);
+    }
+
+    #[test]
+    fn reinforcement_moderate_to_severe_on_success() {
+        let mut rng = FixedRng(0); // f64 ≈ 0.0, < 1.0 → true
+        let outcome = apply_traumatic_reinforcement(Severity::Moderate, 1.0, &mut rng);
+        assert!(outcome.escalated);
+        assert_eq!(outcome.new_severity, Severity::Severe);
+    }
+
+    #[test]
+    fn reinforcement_severe_stays_severe_capped() {
+        let mut rng = FixedRng(0);
+        let outcome = apply_traumatic_reinforcement(Severity::Severe, 1.0, &mut rng);
+        assert!(!outcome.escalated);
+        assert_eq!(outcome.new_severity, Severity::Severe);
+    }
+
+    #[test]
+    fn reinforcement_chance_zero_never_esculates() {
+        let mut rng = FixedRng(0);
+        let outcome = apply_traumatic_reinforcement(Severity::Mild, 0.0, &mut rng);
+        assert!(!outcome.escalated);
+        assert_eq!(outcome.new_severity, Severity::Mild);
+    }
+
+    #[test]
+    fn reinforcement_chance_one_always_esculates() {
+        let mut rng = FixedRng(u64::MAX);
+        let outcome = apply_traumatic_reinforcement(Severity::Moderate, 1.0, &mut rng);
+        assert!(outcome.escalated);
+        assert_eq!(outcome.new_severity, Severity::Severe);
+    }
+
+    // ── Decay ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn decay_below_threshold_no_decay() {
+        let outcome = tick_decay(Severity::Severe, 3, 5);
+        assert!(!outcome.decayed);
+        assert_eq!(outcome.new_severity, Some(Severity::Severe));
+    }
+
+    #[test]
+    fn decay_at_threshold_severe_to_moderate() {
+        let outcome = tick_decay(Severity::Severe, 5, 5);
+        assert!(outcome.decayed);
+        assert_eq!(outcome.new_severity, Some(Severity::Moderate));
+    }
+
+    #[test]
+    fn decay_at_threshold_moderate_to_mild() {
+        let outcome = tick_decay(Severity::Moderate, 5, 5);
+        assert!(outcome.decayed);
+        assert_eq!(outcome.new_severity, Some(Severity::Mild));
+    }
+
+    #[test]
+    fn decay_at_threshold_mild_to_cured() {
+        let outcome = tick_decay(Severity::Mild, 5, 5);
+        assert!(outcome.decayed);
+        assert!(outcome.new_severity.is_none());
+    }
+
+    #[test]
+    fn decay_above_threshold_same_as_at_threshold() {
+        let outcome_severe = tick_decay(Severity::Severe, 100, 5);
+        assert!(outcome_severe.decayed);
+        assert_eq!(outcome_severe.new_severity, Some(Severity::Moderate));
+
+        let outcome_mild = tick_decay(Severity::Mild, 100, 5);
+        assert!(outcome_mild.decayed);
+        assert!(outcome_mild.new_severity.is_none());
+    }
+
+    #[test]
+    fn decay_trauma_threshold_10() {
+        let outcome = tick_decay(Severity::Severe, 9, 10);
+        assert!(!outcome.decayed);
+
+        let outcome = tick_decay(Severity::Severe, 10, 10);
+        assert!(outcome.decayed);
+        assert_eq!(outcome.new_severity, Some(Severity::Moderate));
     }
 }

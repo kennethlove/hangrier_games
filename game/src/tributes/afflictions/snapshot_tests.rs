@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod snapshot_tests {
+mod tests {
     use serde::Serialize;
     use shared::afflictions::{Affliction, AfflictionKind, AfflictionSource, BodyPart, Severity};
     use std::collections::BTreeMap;

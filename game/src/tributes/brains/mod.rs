@@ -9,6 +9,8 @@ use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+pub mod affliction_override;
+
 const LOW_ENEMY_LIMIT: u32 = 6;
 
 /// Sleep gating thresholds (PR2c.1, bd-9sjj). See `Brain::should_sleep`.
@@ -556,9 +558,10 @@ impl Brain {
     /// 2. Psychotic break
     /// 3. Survival override (terrain-dependent; skipped when `terrain` is `None`)
     /// 4. Stamina override (terrain-dependent for parity with survival)
-    /// 5. Preferred action
-    /// 6. Alliance proposal
-    /// 7. Consumable
+    /// 5. Affliction override (hard gates + brain bias; spec §11)
+    /// 6. Preferred action
+    /// 7. Alliance proposal
+    /// 8. Consumable
     ///
     /// Layers 3 and 4 are gated on `terrain.is_some()` because the legacy
     /// `act` entry point does not yet receive the tribute's current terrain
@@ -624,6 +627,13 @@ impl Brain {
             ) {
                 return Some(action);
             }
+        }
+
+        // Affliction override (spec §11): hard gates + brain bias.
+        // Terrain-dependent gates (MissingLeg → cliff/swamp) are deferred
+        // to action-execution time via `Tribute::affliction_action_gate`.
+        if let Some(action) = affliction_override::affliction_override(tribute, &Action::None) {
+            return Some(action);
         }
 
         // Preferred action

@@ -15,6 +15,9 @@ pub mod survival;
 pub mod traits;
 
 // Re-export key items from sub-modules
+pub use combat::inflict_table::{
+    HitSeverity, WeaponKind, lookup_break_mid_swing_inflict, lookup_inflicts,
+};
 pub use combat::{attack_contest, update_stats};
 pub use movement::TravelResult;
 
@@ -1015,9 +1018,38 @@ impl Tribute {
 
         resolution
     }
+
+    /// Apply affliction-based hard gates to an action at execution time.
+    ///
+    /// This is the terrain-aware complement to the pre-decision
+    /// `affliction_override` layer. Some gates (MissingLeg → cliff/swamp
+    /// terrain) require knowledge of the destination area's terrain, which
+    /// is only available after the brain has decided on a Move action.
+    ///
+    /// Returns `Some(fallback)` if the action is blocked, `None` if allowed.
+    ///
+    /// Gates (spec §11):
+    /// - MissingLeg (Moderate+) + cliff/swamp destination → Rest
+    /// - Blind (Moderate+) + ranged attack → Move(None)
+    ///   (Action::Attack covers both melee+ranged; gated when distinct
+    ///   ranged variant exists.)
+    /// - MissingArm (Moderate+) + 2H weapon → fallback
+    ///   (Weapon info not in Action yet; enforced at combat resolution.)
+    pub fn affliction_action_gate(
+        &self,
+        action: &Action,
+        destination_terrain: Option<crate::terrain::BaseTerrain>,
+    ) -> Option<Action> {
+        crate::tributes::brains::affliction_override::hard_gates_with_terrain(
+            self,
+            action,
+            destination_terrain,
+        )
+    }
 }
 
 /// A draft affliction ready for acquisition resolution.
+#[derive(Clone)]
 pub struct AfflictionDraft {
     pub kind: AfflictionKind,
     pub body_part: Option<BodyPart>,

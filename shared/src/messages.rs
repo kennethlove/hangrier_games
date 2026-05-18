@@ -465,6 +465,28 @@ pub enum MessagePayload {
     GameEnded {
         winner: Option<TributeRef>,
     },
+
+    // Affliction events (health conditions PR2).
+    AfflictionAcquired {
+        tribute_id: String,
+        affliction: String,
+        severity: String,
+    },
+    AfflictionProgressed {
+        tribute_id: String,
+        affliction: String,
+        from_severity: String,
+        to_severity: String,
+    },
+    AfflictionHealed {
+        tribute_id: String,
+        affliction: String,
+    },
+    AfflictionCascaded {
+        tribute_id: String,
+        from_affliction: String,
+        to_affliction: String,
+    },
 }
 
 impl MessagePayload {
@@ -503,7 +525,11 @@ impl MessagePayload {
             | Drank { .. }
             | Ate { .. }
             | TributeSlept { .. }
-            | TributeWoke { .. } => MessageKind::State,
+            | TributeWoke { .. }
+            | AfflictionAcquired { .. }
+            | AfflictionProgressed { .. }
+            | AfflictionHealed { .. }
+            | AfflictionCascaded { .. } => MessageKind::State,
         }
     }
 
@@ -545,6 +571,10 @@ impl MessagePayload {
             | Ate { tribute, .. }
             | TributeSlept { tribute, .. }
             | TributeWoke { tribute, .. } => r(tribute),
+            AfflictionAcquired { tribute_id, .. }
+            | AfflictionProgressed { tribute_id, .. }
+            | AfflictionHealed { tribute_id, .. }
+            | AfflictionCascaded { tribute_id, .. } => tribute_id == id,
             SponsorGift { recipient, .. } => r(recipient),
             AreaClosed { .. } | AreaEvent { .. } => false,
             CycleStart { .. } | CycleEnd { .. } | PhaseStarted { .. } | PhaseEnded { .. } => false,

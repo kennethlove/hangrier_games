@@ -46,9 +46,6 @@ pub enum GameOutput<'a> {
     TributeDehydrated(&'a str),
     TributeStarving(&'a str),
     TributePoisoned(&'a str),
-    TributeBrokenArm(&'a str),
-    TributeBrokenLeg(&'a str),
-    TributeInfected(&'a str),
     TributeDrowned(&'a str),
     TributeMauled(&'a str, u32, &'a str, u32),
     TributeBurned(&'a str),
@@ -228,19 +225,6 @@ impl<'a> Display for GameOutput<'a> {
             }
             GameOutput::TributePoisoned(tribute) => {
                 write!(f, "🧪 {} eats something poisonous, loses sanity", tribute)
-            }
-            GameOutput::TributeBrokenArm(tribute) => {
-                write!(f, "🦴 {} injures their arm, loses strength.", tribute)
-            }
-            GameOutput::TributeBrokenLeg(tribute) => {
-                write!(f, "🦴 {} injures their leg, loses speed.", tribute)
-            }
-            GameOutput::TributeInfected(tribute) => {
-                write!(
-                    f,
-                    "🤢 {} gets an infection, loses health and sanity",
-                    tribute
-                )
             }
             GameOutput::TributeDrowned(tribute) => {
                 write!(

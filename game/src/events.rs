@@ -171,18 +171,6 @@ pub enum GameEvent {
         tribute_id: Uuid,
         tribute_name: String,
     },
-    TributeBrokenArm {
-        tribute_id: Uuid,
-        tribute_name: String,
-    },
-    TributeBrokenLeg {
-        tribute_id: Uuid,
-        tribute_name: String,
-    },
-    TributeInfected {
-        tribute_id: Uuid,
-        tribute_name: String,
-    },
     TributeDrowned {
         tribute_id: Uuid,
         tribute_name: String,
@@ -600,19 +588,6 @@ impl Display for GameEvent {
                 write!(
                     f,
                     "🧪 {} eats something poisonous, loses sanity",
-                    tribute_name
-                )
-            }
-            GameEvent::TributeBrokenArm { tribute_name, .. } => {
-                write!(f, "🦴 {} injures their arm, loses strength.", tribute_name)
-            }
-            GameEvent::TributeBrokenLeg { tribute_name, .. } => {
-                write!(f, "🦴 {} injures their leg, loses speed.", tribute_name)
-            }
-            GameEvent::TributeInfected { tribute_name, .. } => {
-                write!(
-                    f,
-                    "🤢 {} gets an infection, loses health and sanity",
                     tribute_name
                 )
             }
@@ -1184,27 +1159,6 @@ mod tests {
                 GameOutput::TributePoisoned("Alice"),
             ),
             (
-                GameEvent::TributeBrokenArm {
-                    tribute_id: uid_a(),
-                    tribute_name: "Alice".into(),
-                },
-                GameOutput::TributeBrokenArm("Alice"),
-            ),
-            (
-                GameEvent::TributeBrokenLeg {
-                    tribute_id: uid_a(),
-                    tribute_name: "Alice".into(),
-                },
-                GameOutput::TributeBrokenLeg("Alice"),
-            ),
-            (
-                GameEvent::TributeInfected {
-                    tribute_id: uid_a(),
-                    tribute_name: "Alice".into(),
-                },
-                GameOutput::TributeInfected("Alice"),
-            ),
-            (
                 GameEvent::TributeDrowned {
                     tribute_id: uid_a(),
                     tribute_name: "Alice".into(),
@@ -1547,8 +1501,8 @@ mod tests {
     #[test]
     fn parity_table_covers_every_variant() {
         // Bumps any time a variant is added without a parity row.
-        // 77 = current count of GameOutput variants in output.rs.
-        assert_eq!(parity_table().len(), 77);
+        // 74 = current count of GameOutput variants in output.rs.
+        assert_eq!(parity_table().len(), 74);
     }
 
     #[test]

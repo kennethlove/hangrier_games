@@ -1164,46 +1164,54 @@ mod tests {
         assert_eq!(target.stamina, 0);
     }
 
-    #[rstest]
+    #[test]
     fn attacker_winded_takes_attack_roll_penalty() {
-        // With identical seed, a Winded attacker should produce a different
-        // outcome from a Fresh attacker because of the band penalty alone.
+        // Find a seed where the Winded penalty produces a different outcome
+        // from a Fresh attacker with otherwise identical setup.
         let tuning = CombatTuning::default();
-        let mut a_fresh = Tribute::new("AF".to_string(), None, None);
-        a_fresh.stamina = 100;
-        a_fresh.max_stamina = 100;
-        let mut a_winded = Tribute::new("AW".to_string(), None, None);
-        a_winded.stamina = 70; // post-cost: 45 → Winded
-        a_winded.max_stamina = 100;
-        let mut t1 = Tribute::new("T1".to_string(), None, None);
-        t1.stamina = 100;
-        t1.max_stamina = 100;
-        let mut t2 = Tribute::new("T2".to_string(), None, None);
-        t2.stamina = 100;
-        t2.max_stamina = 100;
+        for seed in 0..200u64 {
+            let mut a_fresh = Tribute::new("AF".to_string(), None, None);
+            a_fresh.stamina = 100;
+            a_fresh.max_stamina = 100;
+            a_fresh.attributes.strength = 5;
+            let mut a_winded = Tribute::new("AW".to_string(), None, None);
+            a_winded.stamina = 70; // post-cost: 45 → Winded
+            a_winded.max_stamina = 100;
+            a_winded.attributes.strength = 5;
+            let mut t1 = Tribute::new("T1".to_string(), None, None);
+            t1.stamina = 100;
+            t1.max_stamina = 100;
+            t1.attributes.health = 100;
+            t1.attributes.defense = 10;
+            let mut t2 = Tribute::new("T2".to_string(), None, None);
+            t2.stamina = 100;
+            t2.max_stamina = 100;
+            t2.attributes.health = 100;
+            t2.attributes.defense = 10;
 
-        let mut rng_a = SmallRng::seed_from_u64(42);
-        let mut rng_b = SmallRng::seed_from_u64(42);
-        let out_a = a_fresh.attacks(
-            &mut t1,
-            &mut rng_a,
-            &mut Vec::new(),
-            shared::messages::Phase::Day,
-            &tuning,
-        );
-        let out_b = a_winded.attacks(
-            &mut t2,
-            &mut rng_b,
-            &mut Vec::new(),
-            shared::messages::Phase::Day,
-            &tuning,
-        );
+            let mut rng_a = SmallRng::seed_from_u64(seed);
+            let mut rng_b = SmallRng::seed_from_u64(seed);
+            let out_a = a_fresh.attacks(
+                &mut t1,
+                &mut rng_a,
+                &mut Vec::new(),
+                shared::messages::Phase::Day,
+                &tuning,
+            );
+            let out_b = a_winded.attacks(
+                &mut t2,
+                &mut rng_b,
+                &mut Vec::new(),
+                shared::messages::Phase::Day,
+                &tuning,
+            );
 
-        // Different bands → different outcomes from same seed (or at minimum,
-        // different post-state). Use Tribute hp loss as the witness.
-        assert_ne!(t1.attributes.health, t2.attributes.health);
-        // Silence unused warnings.
-        let _ = (out_a, out_b);
+            if t1.attributes.health != t2.attributes.health {
+                return; // Found a seed where penalty changes outcome
+            }
+            let _ = (out_a, out_b);
+        }
+        panic!("No seed in 0..200 produced different outcomes for fresh vs winded attacker");
     }
 
     #[rstest]

@@ -1,4 +1,5 @@
 pub mod actions;
+pub mod afflictions;
 pub mod alliances;
 pub mod brains;
 pub mod combat;
@@ -17,10 +18,13 @@ pub mod traits;
 pub use combat::{attack_contest, update_stats};
 pub use movement::TravelResult;
 
+use std::collections::BTreeMap;
+
 use crate::areas::{Area, AreaDetails};
 use crate::items::Item;
 use crate::messages::{AreaRef, ItemRef, MessagePayload, TaggedEvent, TributeRef};
 use crate::output::GameOutput;
+use crate::tributes::afflictions::{AcquireResolution, can_acquire};
 use crate::tributes::events::TributeEvent;
 use actions::{Action, AttackOutcome};
 use brains::Brain;
@@ -31,6 +35,9 @@ use rand::RngExt;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeSeq};
+use shared::afflictions::{
+    Affliction, AfflictionKey, AfflictionKind, AfflictionSource, BodyPart, Severity,
+};
 use statuses::TributeStatus;
 use uuid::Uuid;
 
@@ -263,6 +270,10 @@ pub struct Tribute {
     /// `WakeReason::Rested`.
     #[serde(default)]
     pub sleep_remaining: u8,
+    /// Active afflictions keyed by (kind, body_part). Empty by default;
+    /// serde skips serialization when empty to keep payloads lean.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub afflictions: BTreeMap<AfflictionKey, Affliction>,
 }
 
 impl Default for Tribute {
@@ -323,6 +334,7 @@ impl Tribute {
             cycles_awake: 0,
             sleeping: false,
             sleep_remaining: 0,
+            afflictions: BTreeMap::new(),
         }
     }
 
@@ -950,6 +962,67 @@ impl Tribute {
         }
         self.pending_trust_shock = false;
     }
+
+    /// Attempt to acquire a new affliction, resolving against existing afflictions.
+    /// Returns the resolution (Insert, Upgrade, Supersede, or Reject).
+    pub fn try_acquire_affliction(&mut self, draft: AfflictionDraft) -> AcquireResolution {
+        let provisional = Affliction {
+            kind: draft.kind,
+            body_part: draft.body_part,
+            severity: draft.severity,
+            source: draft.source,
+        };
+        let resolution = can_acquire(&self.afflictions, &provisional);
+
+        match &resolution {
+            AcquireResolution::Insert
+            | AcquireResolution::Upgrade(_)
+            | AcquireResolution::Supersede(_) => {
+                // Handle Supersede: remove superseded afflictions
+                if let AcquireResolution::Supersede(_) = resolution {
+                    // MissingArm/MissingLeg supersedes all afflictions on that body part
+                    let part = draft.body_part;
+                    let keys_to_remove: Vec<_> = self
+                        .afflictions
+                        .keys()
+                        .filter(|(_, bp)| bp == &part)
+                        .cloned()
+                        .collect();
+                    for key in keys_to_remove {
+                        self.afflictions.remove(&key);
+                    }
+                }
+
+                // Infected supersedes Wounded at same body part (cascade rule).
+                // can_acquire returns Insert for this case, but we still need
+                // to remove the Wounded ancestor.
+                if draft.kind == AfflictionKind::Infected {
+                    let wounded_key = (AfflictionKind::Wounded, draft.body_part);
+                    self.afflictions.remove(&wounded_key);
+                }
+
+                let affliction = Affliction {
+                    kind: draft.kind,
+                    body_part: draft.body_part,
+                    severity: draft.severity,
+                    source: draft.source,
+                };
+                self.afflictions
+                    .insert((draft.kind, draft.body_part), affliction);
+            }
+            AcquireResolution::Reject(_) => {}
+        }
+
+        resolution
+    }
+}
+
+/// A draft affliction ready for acquisition resolution.
+pub struct AfflictionDraft {
+    pub kind: AfflictionKind,
+    pub body_part: Option<BodyPart>,
+    pub severity: Severity,
+    pub source: AfflictionSource,
 }
 
 /// Calculates the stamina cost for a tribute action based on:
@@ -1594,5 +1667,167 @@ mod tests {
             }
             other => panic!("expected TributeWoke payload, got {:?}", other),
         }
+    }
+
+    // --- Affliction tests ---
+
+    use crate::tributes::AfflictionDraft;
+    use crate::tributes::afflictions::{AcquireResolution, RejectReason};
+    use shared::afflictions::{AfflictionKind, AfflictionSource, BodyPart, Severity};
+
+    #[test]
+    fn test_afflictions_empty_by_default() {
+        let t = Tribute::new("Test".to_string(), None, None);
+        assert!(t.afflictions.is_empty());
+    }
+
+    #[test]
+    fn test_afflictions_skip_serialization_when_empty() {
+        let t = Tribute::new("Test".to_string(), None, None);
+        let json = serde_json::to_string(&t).unwrap();
+        assert!(!json.contains("\"afflictions\""));
+    }
+
+    #[test]
+    fn test_try_acquire_insert() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Wounded,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Mild,
+            source: AfflictionSource::Combat,
+        };
+        let resolution = t.try_acquire_affliction(draft);
+        assert_eq!(resolution, AcquireResolution::Insert);
+        assert_eq!(t.afflictions.len(), 1);
+        assert!(
+            t.afflictions
+                .contains_key(&(AfflictionKind::Wounded, Some(BodyPart::Arm)))
+        );
+    }
+
+    #[test]
+    fn test_try_acquire_upgrade() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        // Insert mild wound
+        t.try_acquire_affliction(AfflictionDraft {
+            kind: AfflictionKind::Wounded,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Mild,
+            source: AfflictionSource::Combat,
+        });
+        // Upgrade to moderate
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Wounded,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Moderate,
+            source: AfflictionSource::Combat,
+        };
+        let resolution = t.try_acquire_affliction(draft);
+        assert_eq!(
+            resolution,
+            AcquireResolution::Upgrade((AfflictionKind::Wounded, Some(BodyPart::Arm)))
+        );
+        assert_eq!(t.afflictions.len(), 1);
+        let affl = t
+            .afflictions
+            .get(&(AfflictionKind::Wounded, Some(BodyPart::Arm)))
+            .unwrap();
+        assert_eq!(affl.severity, Severity::Moderate);
+    }
+
+    #[test]
+    fn test_try_acquire_supersede() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        // Insert wounded on arm
+        t.try_acquire_affliction(AfflictionDraft {
+            kind: AfflictionKind::Wounded,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Mild,
+            source: AfflictionSource::Combat,
+        });
+        // Infected supersedes wounded at same body part
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Infected,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Mild,
+            source: AfflictionSource::Combat,
+        };
+        let resolution = t.try_acquire_affliction(draft);
+        assert_eq!(resolution, AcquireResolution::Insert);
+        // Wounded removed, Infected present
+        assert!(
+            !t.afflictions
+                .contains_key(&(AfflictionKind::Wounded, Some(BodyPart::Arm)))
+        );
+        assert!(
+            t.afflictions
+                .contains_key(&(AfflictionKind::Infected, Some(BodyPart::Arm)))
+        );
+    }
+
+    #[test]
+    fn test_try_acquire_reject_limb_missing() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        // Missing arm
+        t.try_acquire_affliction(AfflictionDraft {
+            kind: AfflictionKind::MissingArm,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Severe,
+            source: AfflictionSource::Combat,
+        });
+        // Can't wound a missing limb
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Wounded,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Mild,
+            source: AfflictionSource::Combat,
+        };
+        let resolution = t.try_acquire_affliction(draft);
+        assert_eq!(
+            resolution,
+            AcquireResolution::Reject(RejectReason::LimbAlreadyMissing)
+        );
+    }
+
+    #[test]
+    fn test_try_acquire_reject_no_wounded_ancestor() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        // Infected without prior Wounded on same part
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Infected,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Mild,
+            source: AfflictionSource::Combat,
+        };
+        let resolution = t.try_acquire_affliction(draft);
+        assert_eq!(
+            resolution,
+            AcquireResolution::Reject(RejectReason::InfectedRequiresWoundedAncestor)
+        );
+    }
+
+    #[test]
+    fn test_try_acquire_reject_same_severity() {
+        let mut t = Tribute::new("Test".to_string(), None, None);
+        // Insert mild wound
+        t.try_acquire_affliction(AfflictionDraft {
+            kind: AfflictionKind::Wounded,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Mild,
+            source: AfflictionSource::Combat,
+        });
+        // Same severity rejected
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Wounded,
+            body_part: Some(BodyPart::Arm),
+            severity: Severity::Mild,
+            source: AfflictionSource::Combat,
+        };
+        let resolution = t.try_acquire_affliction(draft);
+        assert_eq!(
+            resolution,
+            AcquireResolution::Reject(RejectReason::NotStrictlyHigherSeverity)
+        );
     }
 }

@@ -11,11 +11,13 @@ use crate::areas::AreaDetails;
 use crate::areas::events::AreaEvent;
 use crate::messages::{MessagePayload, TaggedEvent, TributeRef};
 use crate::output::GameOutput;
+use crate::tributes::AfflictionDraft;
 use crate::tributes::Tribute;
 use crate::tributes::statuses::TributeStatus;
 use rand::RngExt;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
+use shared::afflictions::{AfflictionKind, AfflictionSource, BodyPart, Severity};
 
 /// Attribute maximums
 const MAX_HEALTH: u32 = 100;
@@ -218,15 +220,55 @@ impl Tribute {
     pub(crate) fn apply_area_effects(&mut self, area_details: &AreaDetails) {
         for event in &area_details.events {
             match event {
-                AreaEvent::Wildfire => self.set_status(TributeStatus::Burned),
+                AreaEvent::Wildfire => {
+                    self.set_status(TributeStatus::Burned);
+                    self.try_acquire_affliction(AfflictionDraft {
+                        kind: AfflictionKind::Burned,
+                        body_part: None,
+                        severity: Severity::Severe,
+                        source: AfflictionSource::Environmental,
+                    });
+                }
                 AreaEvent::Flood => self.set_status(TributeStatus::Drowned),
                 AreaEvent::Earthquake => self.set_status(TributeStatus::Buried),
                 AreaEvent::Avalanche => self.set_status(TributeStatus::Buried),
-                AreaEvent::Blizzard => self.set_status(TributeStatus::Frozen),
+                AreaEvent::Blizzard => {
+                    self.set_status(TributeStatus::Frozen);
+                    self.try_acquire_affliction(AfflictionDraft {
+                        kind: AfflictionKind::Frozen,
+                        body_part: None,
+                        severity: Severity::Moderate,
+                        source: AfflictionSource::Environmental,
+                    });
+                }
                 AreaEvent::Landslide => self.set_status(TributeStatus::Buried),
-                AreaEvent::Heatwave => self.set_status(TributeStatus::Overheated),
-                AreaEvent::Sandstorm => self.set_status(TributeStatus::Burned), // Sand burns and abrades
-                AreaEvent::Drought => self.set_status(TributeStatus::Overheated), // Dehydration effect
+                AreaEvent::Heatwave => {
+                    self.set_status(TributeStatus::Overheated);
+                    self.try_acquire_affliction(AfflictionDraft {
+                        kind: AfflictionKind::Overheated,
+                        body_part: None,
+                        severity: Severity::Moderate,
+                        source: AfflictionSource::Environmental,
+                    });
+                }
+                AreaEvent::Sandstorm => {
+                    self.set_status(TributeStatus::Burned); // Sand burns and abrades
+                    self.try_acquire_affliction(AfflictionDraft {
+                        kind: AfflictionKind::Wounded,
+                        body_part: Some(BodyPart::Arm),
+                        severity: Severity::Mild,
+                        source: AfflictionSource::Environmental,
+                    });
+                }
+                AreaEvent::Drought => {
+                    self.set_status(TributeStatus::Overheated); // Dehydration effect
+                    self.try_acquire_affliction(AfflictionDraft {
+                        kind: AfflictionKind::Dehydrated,
+                        body_part: None,
+                        severity: Severity::Moderate,
+                        source: AfflictionSource::Environmental,
+                    });
+                }
                 AreaEvent::Rockslide => self.set_status(TributeStatus::Buried), // Similar to landslide
             }
         }
@@ -521,6 +563,96 @@ mod tests {
 
         tribute.process_status(&area_details, &mut small_rng, &mut Vec::new());
         assert_eq!(tribute.status, TributeStatus::Burned);
+    }
+
+    #[rstest]
+    fn wildfire_sets_status_and_affliction(mut tribute: Tribute) {
+        use crate::areas::events::AreaEvent;
+
+        let mut area_details =
+            AreaDetails::new(Some("Forest".to_string()), crate::areas::Area::Cornucopia);
+        area_details.events.push(AreaEvent::Wildfire);
+
+        tribute.apply_area_effects(&area_details);
+
+        assert_eq!(tribute.status, TributeStatus::Burned);
+        assert!(
+            tribute
+                .afflictions
+                .contains_key(&(AfflictionKind::Burned, None))
+        );
+    }
+
+    #[rstest]
+    fn blizzard_sets_status_and_affliction(mut tribute: Tribute) {
+        use crate::areas::events::AreaEvent;
+
+        let mut area_details =
+            AreaDetails::new(Some("Tundra".to_string()), crate::areas::Area::Cornucopia);
+        area_details.events.push(AreaEvent::Blizzard);
+
+        tribute.apply_area_effects(&area_details);
+
+        assert_eq!(tribute.status, TributeStatus::Frozen);
+        assert!(
+            tribute
+                .afflictions
+                .contains_key(&(AfflictionKind::Frozen, None))
+        );
+    }
+
+    #[rstest]
+    fn heatwave_sets_status_and_affliction(mut tribute: Tribute) {
+        use crate::areas::events::AreaEvent;
+
+        let mut area_details =
+            AreaDetails::new(Some("Desert".to_string()), crate::areas::Area::Cornucopia);
+        area_details.events.push(AreaEvent::Heatwave);
+
+        tribute.apply_area_effects(&area_details);
+
+        assert_eq!(tribute.status, TributeStatus::Overheated);
+        assert!(
+            tribute
+                .afflictions
+                .contains_key(&(AfflictionKind::Overheated, None))
+        );
+    }
+
+    #[rstest]
+    fn sandstorm_sets_status_and_affliction(mut tribute: Tribute) {
+        use crate::areas::events::AreaEvent;
+
+        let mut area_details =
+            AreaDetails::new(Some("Desert".to_string()), crate::areas::Area::Cornucopia);
+        area_details.events.push(AreaEvent::Sandstorm);
+
+        tribute.apply_area_effects(&area_details);
+
+        assert_eq!(tribute.status, TributeStatus::Burned);
+        assert!(
+            tribute
+                .afflictions
+                .contains_key(&(AfflictionKind::Wounded, Some(BodyPart::Arm)))
+        );
+    }
+
+    #[rstest]
+    fn drought_sets_status_and_affliction(mut tribute: Tribute) {
+        use crate::areas::events::AreaEvent;
+
+        let mut area_details =
+            AreaDetails::new(Some("Desert".to_string()), crate::areas::Area::Cornucopia);
+        area_details.events.push(AreaEvent::Drought);
+
+        tribute.apply_area_effects(&area_details);
+
+        assert_eq!(tribute.status, TributeStatus::Overheated);
+        assert!(
+            tribute
+                .afflictions
+                .contains_key(&(AfflictionKind::Dehydrated, None))
+        );
     }
 
     mod recovery {

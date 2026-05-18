@@ -1,0 +1,25 @@
+---
+source: game/src/tributes/afflictions/snapshot_tests.rs
+assertion_line: 66
+expression: json
+---
+[
+  {
+    "key_kind": "wounded",
+    "key_body_part": "arm",
+    "severity": "moderate",
+    "source": "combat"
+  },
+  {
+    "key_kind": "missing_leg",
+    "key_body_part": null,
+    "severity": "severe",
+    "source": "combat"
+  },
+  {
+    "key_kind": "burned",
+    "key_body_part": null,
+    "severity": "severe",
+    "source": "environmental"
+  }
+]

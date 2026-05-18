@@ -132,7 +132,8 @@ fn select_body_part(kind: AfflictionKind, rng: &mut impl Rng) -> Option<BodyPart
         | AfflictionKind::Electrocuted
         | AfflictionKind::Drowned
         | AfflictionKind::Buried
-        | AfflictionKind::Trauma => None,
+        | AfflictionKind::Trauma
+        | AfflictionKind::Phobia(_) => None,
     }
 }
 

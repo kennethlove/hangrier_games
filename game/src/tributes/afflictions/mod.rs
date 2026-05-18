@@ -10,6 +10,7 @@ pub mod anatomy;
 pub mod cascade;
 pub mod cure;
 pub mod effects;
+pub mod phobia;
 pub mod trauma;
 pub mod trauma_producers;
 pub mod tuning;
@@ -87,6 +88,7 @@ mod visibility_tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         }
     }
 

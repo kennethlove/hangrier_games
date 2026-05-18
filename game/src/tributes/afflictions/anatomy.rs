@@ -135,6 +135,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         }
     }
 
@@ -541,6 +542,7 @@ mod tests {
                     acquired_cycle: 0,
                     last_progressed_cycle: 0,
                     trauma_metadata: None,
+                    phobia_metadata: None,
                 };
                 m.insert(a.key(), a);
             }
@@ -566,6 +568,7 @@ mod tests {
                 acquired_cycle: 0,
                 last_progressed_cycle: 0,
                 trauma_metadata: None,
+                phobia_metadata: None,
             };
             let result1 = can_acquire(&existing, &new);
             let result2 = can_acquire(&existing, &new);
@@ -594,6 +597,7 @@ mod tests {
                     acquired_cycle: 0,
                     last_progressed_cycle: 0,
                     trauma_metadata: None,
+                    phobia_metadata: None,
                 };
                 m.insert(a.key(), a);
             }
@@ -606,6 +610,7 @@ mod tests {
                 acquired_cycle: 0,
                 last_progressed_cycle: 0,
                 trauma_metadata: None,
+                phobia_metadata: None,
             };
             let result = can_acquire(&m, &new);
 
@@ -638,6 +643,7 @@ mod tests {
                     acquired_cycle: 0,
                     last_progressed_cycle: 0,
                     trauma_metadata: None,
+                    phobia_metadata: None,
                 };
                 m.insert(a.key(), a);
             }
@@ -651,6 +657,7 @@ mod tests {
                 acquired_cycle: 0,
                 last_progressed_cycle: 0,
                 trauma_metadata: None,
+                phobia_metadata: None,
             };
             let result_wounded = can_acquire(&m, &new_wounded);
             if let AcquireResolution::Reject(reason) = result_wounded {
@@ -668,6 +675,7 @@ mod tests {
                 acquired_cycle: 0,
                 last_progressed_cycle: 0,
                 trauma_metadata: None,
+                phobia_metadata: None,
             };
             let result_infected = can_acquire(&m, &new_infected);
             // Infected also requires Wounded ancestor; either rejection reason is acceptable

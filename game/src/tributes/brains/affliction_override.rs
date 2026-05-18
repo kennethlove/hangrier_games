@@ -157,6 +157,7 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: None,
+            phobia_metadata: None,
         }
     }
 

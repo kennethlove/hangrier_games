@@ -3,6 +3,8 @@
 //!
 //! See `docs/superpowers/specs/2026-05-03-health-conditions-design.md` §9.
 
+use rand::Rng;
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -83,6 +85,89 @@ pub struct PhobiaMetadata {
     pub cycles_since_last_fire: u32,
 }
 
+/// Target of a fixation affliction. The `AfflictionKey` uses the variant tag
+/// (not the inner ID) so a second `Fixation(Tribute(_))` collides with the
+/// first — enforcing the per-kind cap of max 1 per target kind.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "id", rename_all = "snake_case")]
+pub enum FixationTarget {
+    Tribute(String),
+    Item(String),
+    Area(String),
+}
+
+impl FixationTarget {
+    /// Returns the variant tag used for key collision (per-kind cap).
+    pub fn kind_tag(&self) -> &'static str {
+        match self {
+            FixationTarget::Tribute(_) => "tribute",
+            FixationTarget::Item(_) => "item",
+            FixationTarget::Area(_) => "area",
+        }
+    }
+
+    /// Returns the inner ID string.
+    pub fn id(&self) -> &str {
+        match self {
+            FixationTarget::Tribute(id) | FixationTarget::Item(id) | FixationTarget::Area(id) => id,
+        }
+    }
+}
+
+impl fmt::Display for FixationTarget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FixationTarget::Tribute(id) => write!(f, "tribute:{id}"),
+            FixationTarget::Item(id) => write!(f, "item:{id}"),
+            FixationTarget::Area(id) => write!(f, "area:{id}"),
+        }
+    }
+}
+
+/// Origin of a fixation affliction. Innate fixations are permanent
+/// dispositions; Acquired fixations decay after contact-free cycles.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FixationOrigin {
+    Innate,
+    Acquired { event_ref: String },
+}
+
+impl fmt::Display for FixationOrigin {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FixationOrigin::Innate => write!(f, "innate"),
+            FixationOrigin::Acquired { event_ref } => write!(f, "acquired:{event_ref}"),
+        }
+    }
+}
+
+/// Metadata attached to Fixation afflictions. Tracks observer state,
+/// contact history, and origin for reinforcement/decay logic.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FixationMetadata {
+    pub origin: FixationOrigin,
+    /// Tributes who have observed this fixation.
+    pub observed_by: BTreeSet<String>,
+    /// Last cycle each observer saw this fixation fire.
+    pub observer_seen_cycle: BTreeMap<String, u32>,
+    /// Cycles since last contact with fixation target.
+    pub cycles_since_contact: u32,
+    /// Last cycle this fixation was reinforced (contact occurred).
+    pub last_reinforced_cycle: Option<u32>,
+}
+
+impl Default for FixationMetadata {
+    fn default() -> Self {
+        Self {
+            origin: FixationOrigin::Innate,
+            observed_by: BTreeSet::new(),
+            observer_seen_cycle: BTreeMap::new(),
+            cycles_since_contact: 0,
+            last_reinforced_cycle: None,
+        }
+    }
+}
+
 impl Default for PhobiaMetadata {
     fn default() -> Self {
         Self {
@@ -94,7 +179,7 @@ impl Default for PhobiaMetadata {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AfflictionKind {
     Wounded,
@@ -116,6 +201,7 @@ pub enum AfflictionKind {
     Buried,
     Trauma,
     Phobia(PhobiaTrigger),
+    Fixation(FixationTarget),
 }
 
 impl fmt::Display for AfflictionKind {
@@ -140,6 +226,7 @@ impl fmt::Display for AfflictionKind {
             AfflictionKind::Buried => write!(f, "buried"),
             AfflictionKind::Trauma => write!(f, "trauma"),
             AfflictionKind::Phobia(trigger) => write!(f, "phobia:{trigger}"),
+            AfflictionKind::Fixation(target) => write!(f, "fixation:{target}"),
         }
     }
 }
@@ -171,6 +258,24 @@ impl FromStr for AfflictionKind {
                 let trigger_str = rest.strip_prefix("phobia:").unwrap();
                 let trigger = PhobiaTrigger::from_str(trigger_str)?;
                 Ok(AfflictionKind::Phobia(trigger))
+            }
+            rest if rest.starts_with("fixation:") => {
+                let rest = rest.strip_prefix("fixation:").unwrap();
+                if let Some(id) = rest.strip_prefix("tribute:") {
+                    Ok(AfflictionKind::Fixation(FixationTarget::Tribute(
+                        id.to_string(),
+                    )))
+                } else if let Some(id) = rest.strip_prefix("item:") {
+                    Ok(AfflictionKind::Fixation(FixationTarget::Item(
+                        id.to_string(),
+                    )))
+                } else if let Some(id) = rest.strip_prefix("area:") {
+                    Ok(AfflictionKind::Fixation(FixationTarget::Area(
+                        id.to_string(),
+                    )))
+                } else {
+                    Err(format!("unknown FixationTarget variant: {rest}"))
+                }
             }
             other => Err(format!("unknown AfflictionKind: {other}")),
         }
@@ -436,12 +541,16 @@ pub struct Affliction {
     /// Only `Some` for `AfflictionKind::Phobia` variants.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub phobia_metadata: Option<PhobiaMetadata>,
+    /// Optional fixation-specific metadata (origin, observer state, contact tracking).
+    /// Only `Some` for `AfflictionKind::Fixation` variants.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fixation_metadata: Option<FixationMetadata>,
 }
 
 impl Affliction {
     /// Returns the storage key for this affliction.
     pub fn key(&self) -> AfflictionKey {
-        (self.kind, self.body_part)
+        (self.kind.clone(), self.body_part)
     }
 
     /// Returns true if this affliction kind is permanent and cannot be cured in v1.
@@ -461,6 +570,112 @@ impl Affliction {
     }
 }
 
+/// Result of applying traumatic reinforcement to an affliction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReinforcementResult {
+    /// Whether the severity was escalated.
+    pub escalated: bool,
+    /// The severity before reinforcement.
+    pub from: Severity,
+    /// The severity after reinforcement.
+    pub to: Severity,
+}
+
+/// Apply traumatic reinforcement to an affliction: reset contact-free counter
+/// and optionally escalate severity. Returns `Some(ReinforcementResult)` if
+/// the affliction was reinforced, `None` if it has no metadata to track.
+///
+/// The `escalation_chance` parameter controls the probability of stepping up
+/// severity (e.g. 0.12 for ~12% chance). Innate afflictions do not escalate.
+pub fn apply_traumatic_reinforcement(
+    aff: &mut Affliction,
+    escalation_chance: f64,
+    current_cycle: u32,
+    rng: &mut impl Rng,
+) -> Option<ReinforcementResult> {
+    let from = aff.severity;
+
+    // Fixation reinforcement
+    if let Some(meta) = &mut aff.fixation_metadata {
+        meta.cycles_since_contact = 0;
+        meta.last_reinforced_cycle = Some(current_cycle);
+
+        if matches!(meta.origin, FixationOrigin::Acquired { .. })
+            && from != Severity::Severe
+            && rng.random_bool(escalation_chance)
+        {
+            aff.severity = match from {
+                Severity::Mild => Severity::Moderate,
+                Severity::Moderate => Severity::Severe,
+                Severity::Severe => Severity::Severe,
+            };
+            return Some(ReinforcementResult {
+                escalated: true,
+                from,
+                to: aff.severity,
+            });
+        }
+        return Some(ReinforcementResult {
+            escalated: false,
+            from,
+            to: aff.severity,
+        });
+    }
+
+    // Phobia reinforcement
+    if let Some(meta) = &mut aff.phobia_metadata {
+        meta.cycles_since_last_fire = 0;
+
+        if matches!(meta.origin, PhobiaOrigin::Traumatic { .. })
+            && from != Severity::Severe
+            && rng.random_bool(escalation_chance)
+        {
+            aff.severity = match from {
+                Severity::Mild => Severity::Moderate,
+                Severity::Moderate => Severity::Severe,
+                Severity::Severe => Severity::Severe,
+            };
+            return Some(ReinforcementResult {
+                escalated: true,
+                from,
+                to: aff.severity,
+            });
+        }
+        return Some(ReinforcementResult {
+            escalated: false,
+            from,
+            to: aff.severity,
+        });
+    }
+
+    None
+}
+
+/// Tick decay for an acquired affliction. Increments the contact-free counter
+/// and returns `true` if the affliction should be removed (exceeded threshold).
+/// Innate afflictions never decay.
+///
+/// Returns `Some(true)` if decayed (should be removed), `Some(false)` if
+/// ticked but not yet decayed, `None` if not a decaying affliction.
+pub fn tick_decay(aff: &mut Affliction, decay_threshold: u32) -> Option<bool> {
+    if let Some(meta) = &mut aff.fixation_metadata {
+        if matches!(meta.origin, FixationOrigin::Innate) {
+            return Some(false);
+        }
+        meta.cycles_since_contact += 1;
+        return Some(meta.cycles_since_contact >= decay_threshold);
+    }
+
+    if let Some(meta) = &mut aff.phobia_metadata {
+        if matches!(meta.origin, PhobiaOrigin::Innate) {
+            return Some(false);
+        }
+        meta.cycles_since_last_fire += 1;
+        return Some(meta.cycles_since_last_fire >= decay_threshold);
+    }
+
+    None
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -478,6 +693,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         assert_eq!(a.key(), (AfflictionKind::Wounded, Some(BodyPart::Arm)));
     }
@@ -495,6 +711,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         assert!(a.is_permanent());
     }
@@ -510,6 +727,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         assert!(a.is_reversible());
     }
@@ -591,6 +809,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: Some(PhobiaMetadata::default()),
+            fixation_metadata: None,
         };
         let json = serde_json::to_string(&aff).unwrap();
         let restored: Affliction = serde_json::from_str(&json).unwrap();
@@ -610,6 +829,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         assert!(aff.phobia_metadata.is_none());
     }

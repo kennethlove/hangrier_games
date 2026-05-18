@@ -142,12 +142,12 @@ mod tests {
 
     fn make_affliction(kind: AfflictionKind, severity: Severity) -> Affliction {
         Affliction {
-            kind,
-            body_part: Some(match kind {
-                AfflictionKind::MissingArm => BodyPart::Arm,
-                AfflictionKind::MissingLeg => BodyPart::Leg,
-                AfflictionKind::Blind => BodyPart::Eye,
-                AfflictionKind::Deaf => BodyPart::Ear,
+            kind: kind.clone(),
+            body_part: Some(match &kind {
+                &AfflictionKind::MissingArm => BodyPart::Arm,
+                &AfflictionKind::MissingLeg => BodyPart::Leg,
+                &AfflictionKind::Blind => BodyPart::Eye,
+                &AfflictionKind::Deaf => BodyPart::Ear,
                 _ => BodyPart::Rib,
             }),
             severity,
@@ -158,6 +158,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         }
     }
 

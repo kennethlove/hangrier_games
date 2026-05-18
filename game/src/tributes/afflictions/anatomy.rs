@@ -53,12 +53,12 @@ pub fn can_acquire(
         }
 
         // 2. Reject if trying to re-miss an already-missing limb.
-        if is_missing_kind(new.kind) && existing.contains_key(&(new.kind, Some(part))) {
+        if is_missing_kind(&new.kind) && existing.contains_key(&(new.kind.clone(), Some(part))) {
             return AcquireResolution::Reject(RejectReason::LimbAlreadyMissing);
         }
 
         // 3. MissingArm/MissingLeg supersedes wound-state on the same part.
-        if is_missing_kind(new.kind) {
+        if is_missing_kind(&new.kind) {
             let supersede: Vec<AfflictionKey> = existing
                 .keys()
                 .filter(|(k, p)| {
@@ -70,7 +70,7 @@ pub fn can_acquire(
                                 | AfflictionKind::Infected
                         )
                 })
-                .copied()
+                .cloned()
                 .collect();
             if !supersede.is_empty() {
                 return AcquireResolution::Supersede(supersede);
@@ -113,7 +113,7 @@ fn is_limb_missing(existing: &BTreeMap<AfflictionKey, Affliction>, part: BodyPar
 }
 
 /// Check if an affliction kind represents a missing limb.
-fn is_missing_kind(kind: AfflictionKind) -> bool {
+fn is_missing_kind(kind: &AfflictionKind) -> bool {
     matches!(
         kind,
         AfflictionKind::MissingArm | AfflictionKind::MissingLeg
@@ -136,6 +136,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         }
     }
 
@@ -543,6 +544,7 @@ mod tests {
                     last_progressed_cycle: 0,
                     trauma_metadata: None,
                     phobia_metadata: None,
+                    fixation_metadata: None,
                 };
                 m.insert(a.key(), a);
             }
@@ -569,6 +571,7 @@ mod tests {
                 last_progressed_cycle: 0,
                 trauma_metadata: None,
                 phobia_metadata: None,
+            fixation_metadata: None,
             };
             let result1 = can_acquire(&existing, &new);
             let result2 = can_acquire(&existing, &new);
@@ -587,10 +590,10 @@ mod tests {
             };
 
             let mut m = existing.clone();
-            let key = (missing_kind, Some(bp));
+            let key = (missing_kind.clone(), Some(bp));
             if !m.contains_key(&key) {
                 let a = Affliction {
-                    kind: missing_kind,
+                    kind: missing_kind.clone(),
                     body_part: Some(bp),
                     severity: Severity::Severe,
                     source: AfflictionSource::Combat { attacker_id: String::new() },
@@ -598,6 +601,7 @@ mod tests {
                     last_progressed_cycle: 0,
                     trauma_metadata: None,
                     phobia_metadata: None,
+            fixation_metadata: None,
                 };
                 m.insert(a.key(), a);
             }
@@ -611,6 +615,7 @@ mod tests {
                 last_progressed_cycle: 0,
                 trauma_metadata: None,
                 phobia_metadata: None,
+            fixation_metadata: None,
             };
             let result = can_acquire(&m, &new);
 
@@ -633,10 +638,10 @@ mod tests {
             };
 
             let mut m = existing.clone();
-            let key = (missing_kind, Some(bp));
+            let key = (missing_kind.clone(), Some(bp));
             if !m.contains_key(&key) {
                 let a = Affliction {
-                    kind: missing_kind,
+                    kind: missing_kind.clone(),
                     body_part: Some(bp),
                     severity: Severity::Severe,
                     source: AfflictionSource::Combat { attacker_id: String::new() },
@@ -644,6 +649,7 @@ mod tests {
                     last_progressed_cycle: 0,
                     trauma_metadata: None,
                     phobia_metadata: None,
+            fixation_metadata: None,
                 };
                 m.insert(a.key(), a);
             }
@@ -658,6 +664,7 @@ mod tests {
                 last_progressed_cycle: 0,
                 trauma_metadata: None,
                 phobia_metadata: None,
+            fixation_metadata: None,
             };
             let result_wounded = can_acquire(&m, &new_wounded);
             if let AcquireResolution::Reject(reason) = result_wounded {
@@ -676,6 +683,7 @@ mod tests {
                 last_progressed_cycle: 0,
                 trauma_metadata: None,
                 phobia_metadata: None,
+            fixation_metadata: None,
             };
             let result_infected = can_acquire(&m, &new_infected);
             // Infected also requires Wounded ancestor; either rejection reason is acceptable

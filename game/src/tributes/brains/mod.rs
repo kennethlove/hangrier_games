@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub mod affliction_override;
+pub mod fixation_override;
 pub mod phobia_override;
 
 const LOW_ENEMY_LIMIT: u32 = 6;
@@ -644,6 +645,23 @@ impl Brain {
         }
 
         // Phobia override (spec §5): freeze reactions and stat penalties.
+        // Fixation override (spec §6): pursuit bias and hard overrides.
+        // Runs before phobia — fixations take precedence per spec design.
+        // Gated on config.fixations_enabled.
+        if config.fixations_enabled {
+            let is_night = phase.is_some_and(|p| matches!(p, shared::messages::Phase::Night));
+            let fixation_ctx = fixation_override::FixationBrainContext {
+                all_areas: &[],
+                is_night,
+                nearby_tributes,
+                current_area: area.and_then(|a| a.area),
+            };
+            if let Some(action) = fixation_override::fixation_override(tribute, &fixation_ctx, rng)
+            {
+                return Some(action);
+            }
+        }
+
         // Gated on config.phobias_enabled.
         if config.phobias_enabled {
             let is_night = phase.is_some_and(|p| matches!(p, shared::messages::Phase::Night));

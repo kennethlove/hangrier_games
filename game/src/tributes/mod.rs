@@ -974,7 +974,7 @@ impl Tribute {
     /// Returns the resolution (Insert, Upgrade, Supersede, or Reject).
     pub fn try_acquire_affliction(&mut self, draft: AfflictionDraft) -> AcquireResolution {
         let provisional = Affliction {
-            kind: draft.kind,
+            kind: draft.kind.clone(),
             body_part: draft.body_part,
             severity: draft.severity,
             source: draft.source.clone(),
@@ -982,6 +982,7 @@ impl Tribute {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         let resolution = can_acquire(&self.afflictions, &provisional);
 
@@ -1013,7 +1014,7 @@ impl Tribute {
                 }
 
                 let affliction = Affliction {
-                    kind: draft.kind,
+                    kind: draft.kind.clone(),
                     body_part: draft.body_part,
                     severity: draft.severity,
                     source: draft.source,
@@ -1021,9 +1022,10 @@ impl Tribute {
                     last_progressed_cycle: 0,
                     trauma_metadata: None,
                     phobia_metadata: None,
+                    fixation_metadata: None,
                 };
                 self.afflictions
-                    .insert((draft.kind, draft.body_part), affliction);
+                    .insert((draft.kind.clone(), draft.body_part), affliction);
             }
             AcquireResolution::Reject(_) => {}
         }
@@ -1068,6 +1070,7 @@ impl Tribute {
                 last_progressed_cycle: 0,
                 trauma_metadata: Some(source.clone()),
                 phobia_metadata: None,
+                fixation_metadata: None,
             };
             self.afflictions.insert(key, aff);
             TraumaAcquisition::Acquired { severity, source }

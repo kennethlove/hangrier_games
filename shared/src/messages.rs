@@ -526,6 +526,39 @@ pub enum MessagePayload {
         severity: String,
         effect: PhobiaEffect,
     },
+
+    // Fixation events (fixation brain layer PR2).
+    FixationAcquired {
+        tribute: String,
+        target: String,
+        severity: String,
+        origin: String,
+    },
+    FixationContact {
+        tribute: String,
+        target: String,
+        severity: String,
+    },
+    FixationEscalated {
+        tribute: String,
+        target: String,
+        from_severity: String,
+        to_severity: String,
+    },
+    FixationConsummated {
+        tribute: String,
+        target: String,
+    },
+    FixationHabituated {
+        tribute: String,
+        target: String,
+        from_severity: String,
+        to_severity: String,
+    },
+    FixationFaded {
+        tribute: String,
+        target: String,
+    },
 }
 
 impl MessagePayload {
@@ -572,7 +605,13 @@ impl MessagePayload {
             | TraumaAcquired { .. }
             | TraumaReinforced { .. }
             | PhobiaAcquired { .. }
-            | PhobiaTriggered { .. } => MessageKind::State,
+            | PhobiaTriggered { .. }
+            | FixationAcquired { .. }
+            | FixationContact { .. }
+            | FixationEscalated { .. }
+            | FixationConsummated { .. }
+            | FixationHabituated { .. }
+            | FixationFaded { .. } => MessageKind::State,
         }
     }
 
@@ -631,6 +670,30 @@ impl MessagePayload {
                 ..
             }
             | PhobiaTriggered {
+                tribute: tribute_id,
+                ..
+            } => tribute_id == id,
+            FixationAcquired {
+                tribute: tribute_id,
+                ..
+            }
+            | FixationContact {
+                tribute: tribute_id,
+                ..
+            }
+            | FixationEscalated {
+                tribute: tribute_id,
+                ..
+            }
+            | FixationConsummated {
+                tribute: tribute_id,
+                ..
+            }
+            | FixationHabituated {
+                tribute: tribute_id,
+                ..
+            }
+            | FixationFaded {
                 tribute: tribute_id,
                 ..
             } => tribute_id == id,

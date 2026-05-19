@@ -3,6 +3,8 @@ extern crate core;
 use api::auth::AUTH_ROUTER;
 use api::cleanup::start_cleanup_scheduler;
 use api::games::GAMES_ROUTER;
+use api::templates::base_layout;
+use api::templates::game_detail;
 use api::templates::pages;
 use api::users::{USERS_PROTECTED_ROUTER, USERS_PUBLIC_ROUTER};
 use api::{AppState, AuthDb};
@@ -18,6 +20,7 @@ use axum::response::Html;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, Router, middleware};
 use base64_url::decode;
+use maud::html;
 use serde_json::Value;
 use shared::ListDisplayGame;
 use std::collections::hash_map::DefaultHasher;
@@ -289,6 +292,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .route("/", axum::routing::get(home_handler))
         .route("/games", axum::routing::get(games_list_handler))
+        .route("/games/{id}", axum::routing::get(game_detail_handler))
+        .route(
+            "/games/{id}/tributes",
+            axum::routing::get(game_tributes_handler),
+        )
+        .route("/games/{id}/areas", axum::routing::get(game_areas_handler))
+        .route("/games/{id}/log", axum::routing::get(game_log_handler))
         .route(
             "/health",
             axum::routing::get(|State(state): State<AppState>| async move {
@@ -541,4 +551,122 @@ async fn games_list_handler(
     };
 
     Html(pages::games_list_page(&games))
+}
+
+// ── Game detail HTMX handlers ─────────────────────────────────────────
+
+async fn game_detail_handler(
+    State(state): State<AppState>,
+    axum::extract::Path(game_identifier): axum::extract::Path<uuid::Uuid>,
+) -> Html<maud::Markup> {
+    let identifier = game_identifier.to_string();
+    let result = state
+        .db
+        .query("SELECT * FROM fn::get_display_game($identifier);")
+        .bind(("identifier", identifier.clone()))
+        .await;
+
+    let game = match result {
+        Ok(mut result) => {
+            let game: Option<shared::DisplayGame> = result.take(0).unwrap_or_default();
+            game
+        }
+        Err(_) => None,
+    };
+
+    match game {
+        Some(game) => Html(game_detail::game_detail_page(&game)),
+        None => Html(base_layout(
+            "Not Found",
+            html! {
+                div class="text-center py-12" {
+                    h1 class="text-2xl font-bold text-red-400" { "Game Not Found" }
+                    a href="/games" class="text-amber-400 hover:text-amber-300 mt-4 inline-block" {
+                        "Back to Games"
+                    }
+                }
+            },
+        )),
+    }
+}
+
+async fn game_tributes_handler(
+    State(state): State<AppState>,
+    axum::extract::Path(game_identifier): axum::extract::Path<uuid::Uuid>,
+) -> Html<maud::Markup> {
+    let identifier = game_identifier.to_string();
+    let result = state
+        .db
+        .query("SELECT * FROM fn::get_tributes_by_game($identifier);")
+        .bind(("identifier", identifier.clone()))
+        .await;
+
+    let tributes = match result {
+        Ok(mut result) => {
+            let tributes: Vec<Vec<game::tributes::Tribute>> =
+                result.take("tributes").unwrap_or_default();
+            tributes.into_iter().next().unwrap_or_default()
+        }
+        Err(_) => vec![],
+    };
+
+    Html(game_detail::tributes_page(&identifier, &tributes))
+}
+
+async fn game_areas_handler(
+    State(state): State<AppState>,
+    axum::extract::Path(game_identifier): axum::extract::Path<uuid::Uuid>,
+) -> Html<maud::Markup> {
+    let identifier = game_identifier.to_string();
+    let result = state
+        .db
+        .query(
+            r#"
+SELECT (
+    SELECT *, ->items->item[*] AS items
+    FROM ->areas->area
+) AS areas FROM game WHERE identifier = $identifier;
+"#,
+        )
+        .bind(("identifier", identifier.clone()))
+        .await;
+
+    let areas = match result {
+        Ok(mut result) => {
+            let areas: Vec<Vec<game::areas::AreaDetails>> =
+                result.take("areas").unwrap_or_default();
+            areas.into_iter().next().unwrap_or_default()
+        }
+        Err(_) => vec![],
+    };
+
+    Html(game_detail::areas_page(&identifier, &areas))
+}
+
+async fn game_log_handler(
+    State(state): State<AppState>,
+    axum::extract::Path(game_identifier): axum::extract::Path<uuid::Uuid>,
+) -> Html<maud::Markup> {
+    let identifier = game_identifier.to_string();
+    let result = state
+        .db
+        .query(
+            r#"SELECT * FROM message
+            WHERE string::starts_with(subject, $identifier)
+            ORDER BY game_day, phase, tick, emit_index;"#,
+        )
+        .bind(("identifier", identifier.clone()))
+        .await;
+
+    let messages = match result {
+        Ok(mut logs) => {
+            let rows: Vec<api::games::GameLog> = logs.take(0).unwrap_or_default();
+            rows.into_iter()
+                .map(shared::messages::GameMessage::from)
+                .collect()
+        }
+        Err(_) => vec![],
+    };
+
+    Html(game_detail::log_page(&identifier, &messages))
 }

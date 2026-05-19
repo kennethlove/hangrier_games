@@ -71,7 +71,7 @@ fn game_card(game: &ListDisplayGame) -> maud::Markup {
     }
 }
 
-fn status_color(status: &str) -> &'static str {
+pub fn status_color(status: &str) -> &'static str {
     match status {
         "NotStarted" => "text-gray-400",
         "InProgress" => "text-green-400",

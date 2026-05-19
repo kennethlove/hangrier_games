@@ -219,6 +219,7 @@ dependencies = [
  "time",
  "tokio",
  "tokio-cron-scheduler",
+ "tokio-stream",
  "tokio-tungstenite 0.29.0",
  "tower",
  "tower-http",
@@ -7196,6 +7197,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]

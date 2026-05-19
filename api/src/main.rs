@@ -290,6 +290,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 middleware::from_fn_with_state(app_state.clone(), surreal_jwt),
             ),
         )
+        .route(
+            "/api/games/{game_id}/events",
+            axum::routing::get(api::sse::sse_handler).layer(middleware::from_fn_with_state(
+                app_state.clone(),
+                surreal_jwt,
+            )),
+        )
         .route("/", axum::routing::get(home_handler))
         .route("/games", axum::routing::get(games_list_handler))
         .route("/games/{id}", axum::routing::get(game_detail_handler))

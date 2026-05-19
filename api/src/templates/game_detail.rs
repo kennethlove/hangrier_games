@@ -9,7 +9,7 @@ pub fn game_detail_page(game: &DisplayGame) -> maud::Markup {
     base_layout(
         &game.name,
         html! {
-            div {
+            div hx-ext="sse" sse-connect=(format!("/api/games/{}/events", game.identifier)) {
                 // Header section
                 div class="mb-6" {
                     div class="flex items-center justify-between" {
@@ -20,7 +20,7 @@ pub fn game_detail_page(game: &DisplayGame) -> maud::Markup {
                                 " · "
                                 span class=(status_color(&game.status.to_string())) { (game.status) }
                                 " · "
-                                (game.living_count) "/" (game.tribute_count) " alive"
+                                span id="living-count" { (game.living_count) } "/" (game.tribute_count) " alive"
                             }
                         }
                         @if game.is_mine {
@@ -294,12 +294,26 @@ fn area_card(area: &game::areas::AreaDetails) -> maud::Markup {
     }
 }
 
-/// Game log page — scrollable message list.
+/// Game log page — scrollable message list with SSE real-time updates.
 pub fn log_page(game_id: &str, messages: &[shared::messages::GameMessage]) -> maud::Markup {
+    // All MessagePayload variant names for SSE event filtering
+    let sse_events = "TributeKilled,TributeWounded,TributeAttacked,Combat,CombatSwing,\
+        AllianceFormed,AllianceProposed,AllianceDissolved,BetrayalTriggered,TrustShockBreak,\
+        TributeMoved,TributeHidden,AreaClosed,AreaEvent,\
+        ItemFound,ItemUsed,ItemDropped,SponsorGift,\
+        TributeRested,TributeStarved,TributeDehydrated,SanityBreak,\
+        HungerBandChanged,ThirstBandChanged,StaminaBandChanged,\
+        ShelterSought,Foraged,Drank,Ate,\
+        CycleStart,CycleEnd,PhaseStarted,PhaseEnded,\
+        TributeSlept,TributeWoke,GameEnded,\
+        AfflictionAcquired,AfflictionProgressed,AfflictionHealed,AfflictionCascaded,\
+        TraumaAcquired,TraumaReinforced,\
+        PhobiaAcquired,PhobiaTriggered";
+
     base_layout(
         "Log",
         html! {
-            div {
+            div hx-ext="sse" sse-connect=(format!("/api/games/{}/events", game_id)) {
                 a href=(format!("/games/{}", game_id))
                     class="text-sm text-gray-400 hover:text-white mb-4 inline-block" {
                     (icon("arrow-left"))
@@ -310,7 +324,12 @@ pub fn log_page(game_id: &str, messages: &[shared::messages::GameMessage]) -> ma
                 @if messages.is_empty() {
                     p class="text-gray-500" { "No messages yet." }
                 } @else {
-                    div class="max-h-[70vh] overflow-y-auto space-y-2 pr-2" {
+                    div id="log-entries"
+                        class="max-h-[70vh] overflow-y-auto space-y-2 pr-2"
+                        hx-trigger=(format!("sse:{}", sse_events))
+                        hx-get=(format!("/games/{}/log", game_id))
+                        hx-target="#log-entries"
+                        hx-swap="innerHTML" {
                         @for msg in messages {
                             (log_entry(msg))
                         }

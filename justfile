@@ -6,26 +6,17 @@ default:
 # Development recipes
 # ==================
 
-# Run the API server (requires SurrealDB running)
+# Run the API server (serves HTMX pages + REST API)
 api:
     cargo run --package api
-
-# Run the frontend dev server (requires Dioxus CLI and Tailwind CSS built)
-web:
-    cd web && dx serve --addr 0.0.0.0
 
 # Start SurrealDB with persistent on-disk storage for local development
 db:
     surreal start --log trace --user root --pass root --bind 0.0.0.0:8000 surrealkv://.surrealdb
 
-# Start full development environment (DB, API, and web frontend)
+# Start full development environment (DB, API, and Tailwind watcher)
 dev:
     #!/usr/bin/env bash
-    REQUIRED_DX="0.7.7"
-    if ! command -v dx >/dev/null 2>&1 || ! dx --version 2>/dev/null | grep -q "$REQUIRED_DX"; then
-        echo "Installing dioxus-cli@$REQUIRED_DX (mismatched or missing)..."
-        cargo install dioxus-cli@$REQUIRED_DX --locked --force
-    fi
     echo "Starting SurrealDB..."
     surreal start --log info --user root --pass root --bind 0.0.0.0:8000 surrealkv://.surrealdb &
     DB_PID=$!
@@ -39,41 +30,25 @@ dev:
     echo "Starting Tailwind watcher..."
     (cd web/assets && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css --watch) &
     CSS_PID=$!
-    sleep 1
-    echo "Starting web frontend..."
-    cd web && dx serve --addr 0.0.0.0 &
-    WEB_PID=$!
     echo ""
     echo "Development environment running:"
     echo "  - SurrealDB: ws://localhost:8000"
-    echo "  - API: http://localhost:3000"
-    echo "  - Web: http://localhost:8080"
+    echo "  - API + HTMX pages: http://localhost:3000"
     echo "  - Tailwind: watching web/assets/src/main.css"
     echo ""
     echo "Press Ctrl+C to stop all services"
-    trap "kill $DB_PID $API_PID $WEB_PID $CSS_PID 2>/dev/null" EXIT
+    trap "kill $DB_PID $API_PID $CSS_PID 2>/dev/null" EXIT
     wait
 
 # Building recipes
 # ================
 
-# Build Tailwind CSS for the frontend
+# Build Tailwind CSS for HTMX pages
 build-css:
     #!/usr/bin/env bash
     cd web/assets
     npm install
     npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css
-
-# Build the web frontend (debug mode - faster)
-build-web-dev:
-    cd web
-    RUSTFLAGS='--cfg getrandom_backend="wasm_js"' dx build
-
-# Build the web frontend (CSS + Dioxus)
-build-web: build-css
-    #!/usr/bin/env bash
-    cd web
-    RUSTFLAGS='--cfg getrandom_backend="wasm_js"' dx build --release
 
 # Build the entire workspace
 build-all:
@@ -81,10 +56,7 @@ build-all:
 
 # Build for production (optimized)
 build-prod: build-css
-    #!/usr/bin/env bash
     cargo build --workspace --release
-    cd web
-    RUSTFLAGS='--cfg getrandom_backend="wasm_js"' dx build --release
 
 # Quality recipes
 # ==============
@@ -92,10 +64,6 @@ build-prod: build-css
 # Fast check - just verify compilation without building
 check-fast:
     cargo check --workspace --all-targets
-
-# Check web crate only (faster for frontend-only changes)
-check-web:
-    cargo check --package web --target wasm32-unknown-unknown
 
 # Check api crate only (faster for backend-only changes)
 check-api:
@@ -128,10 +96,6 @@ quality: fmt check clippy test
 # Setup recipes
 # ============
 
-# Install Dioxus CLI
-setup-dx:
-    cargo install dioxus-cli@0.7.7 --locked --force
-
 # Create Ollama announcer model
 setup-ollama:
     #!/usr/bin/env bash
@@ -147,7 +111,7 @@ setup-node:
     cd web/assets && npm install
 
 # Run all setup tasks
-setup: setup-wasm setup-dx setup-node setup-ollama
+setup: setup-wasm setup-node setup-ollama
     @echo "✓ Setup complete!"
     @echo ""
     @echo "Next steps:"
@@ -161,7 +125,6 @@ setup: setup-wasm setup-dx setup-node setup-ollama
 # Clean all build artifacts
 clean:
     cargo clean
-    rm -rf web/dist
     rm -rf web/assets/dist
     rm -rf web/assets/node_modules
 
@@ -211,16 +174,16 @@ env:
 tree:
     @echo "Workspace structure:"
     @echo "  game/       - Core simulation logic (pure Rust)"
-    @echo "  api/        - Axum REST API (SurrealDB backend)"
-    @echo "  web/        - Dioxus frontend (WASM)"
+    @echo "  api/        - Axum REST API + HTMX pages (SurrealDB backend)"
     @echo "  shared/     - Shared types"
     @echo "  announcers/ - Ollama LLM integration"
+    @echo "  web/        - Assets (Tailwind CSS, icons)"
 
 # Show helpful development tips
 tips:
     @echo "Development tips:"
-    @echo "  - Frontend requires RUSTFLAGS='--cfg getrandom_backend=\"wasm_js\"'"
-    @echo "  - Build Tailwind CSS before building web frontend"
+    @echo "  - API serves HTMX pages directly at http://localhost:3000"
+    @echo "  - Build Tailwind CSS before running the API"
     @echo "  - .env file must exist with APP_API_HOST, SURREAL_HOST, etc."
     @echo "  - Game crate tests can be slow; workspace tests may hang"
     @echo "  - Use 'just dev' to start all services at once"

@@ -5,7 +5,30 @@ pub mod game_detail;
 pub mod pages;
 pub mod timeline;
 
-pub fn base_layout(title: &str, content: Markup) -> Markup {
+/// Authentication state passed to templates for conditional rendering.
+#[derive(Clone, Default)]
+pub struct AuthState {
+    pub is_authenticated: bool,
+    pub username: Option<String>,
+}
+
+impl AuthState {
+    pub fn authenticated(username: impl Into<String>) -> Self {
+        Self {
+            is_authenticated: true,
+            username: Some(username.into()),
+        }
+    }
+
+    pub fn guest() -> Self {
+        Self {
+            is_authenticated: false,
+            username: None,
+        }
+    }
+}
+
+pub fn base_layout(title: &str, auth: AuthState, content: Markup) -> Markup {
     html! {
         (DOCTYPE)
         html lang="en" {
@@ -24,15 +47,29 @@ pub fn base_layout(title: &str, content: Markup) -> Markup {
                 nav class="bg-gray-900 border-b border-gray-800 px-4 py-3" {
                     div class="max-w-6xl mx-auto flex items-center justify-between" {
                         a href="/" class="text-lg font-bold text-amber-400" { "Hangrier Games" }
-                        div class="flex items-center gap-4" {
-                            a href="/games" class="text-sm text-gray-300 hover:text-white" { "Games" }
-                            a href="/login" class="text-sm text-gray-300 hover:text-white" { "Login" }
-                        }
+                        (nav_links(&auth))
                     }
                 }
                 main class="max-w-6xl mx-auto px-4 py-6" {
                     (content)
                 }
+            }
+        }
+    }
+}
+
+/// Render navigation links based on authentication state.
+pub fn nav_links(auth: &AuthState) -> Markup {
+    html! {
+        div class="flex items-center gap-4" {
+            a href="/games" class="text-sm text-gray-300 hover:text-white" { "Games" }
+            @if auth.is_authenticated {
+                a href="/account" class="text-sm text-gray-300 hover:text-white" {
+                    (icon("user"))
+                    " " (auth.username.as_deref().unwrap_or("Account"))
+                }
+            } @else {
+                a href="/login" class="text-sm text-gray-300 hover:text-white" { "Login" }
             }
         }
     }

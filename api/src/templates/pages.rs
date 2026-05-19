@@ -1,11 +1,12 @@
 use maud::html;
 use shared::{ListDisplayGame, PaginatedGames};
 
-use super::base_layout;
+use super::{AuthState, base_layout};
 
-pub fn home_page() -> maud::Markup {
+pub fn home_page(auth: AuthState) -> maud::Markup {
     base_layout(
         "Home",
+        auth,
         html! {
             div class="text-center py-12" {
                 h1 class="text-3xl font-bold text-amber-400 mb-4" { "Hangrier Games" }
@@ -18,9 +19,10 @@ pub fn home_page() -> maud::Markup {
     )
 }
 
-pub fn games_list_page(paginated: &PaginatedGames) -> maud::Markup {
+pub fn games_list_page(auth: AuthState, paginated: &PaginatedGames) -> maud::Markup {
     base_layout(
         "Games",
+        auth,
         html! {
             h1 class="text-2xl font-bold text-amber-400 mb-6" { "Games" }
             @if paginated.games.is_empty() {
@@ -78,4 +80,44 @@ pub fn status_color(status: &str) -> &'static str {
         "Finished" => "text-amber-400",
         _ => "text-gray-500",
     }
+}
+
+/// 404 Not Found page.
+pub fn not_found_page(message: &str) -> maud::Markup {
+    base_layout(
+        "Not Found",
+        AuthState::guest(),
+        html! {
+            div class="text-center py-16" {
+                div class="mb-6" {
+                    span class="text-6xl font-bold text-amber-400" { "404" }
+                }
+                h1 class="text-2xl font-bold text-gray-100 mb-3" { "Not Found" }
+                p class="text-gray-400 mb-8" { (message) }
+                div class="flex items-center justify-center gap-4" {
+                    a href="/" class="text-amber-400 hover:text-amber-300" { "Go Home" }
+                    span class="text-gray-600" { "·" }
+                    a href="/games" class="text-amber-400 hover:text-amber-300" { "View Games" }
+                }
+            }
+        },
+    )
+}
+
+/// 500 Internal Server Error page.
+pub fn server_error_page(message: &str) -> maud::Markup {
+    base_layout(
+        "Server Error",
+        AuthState::guest(),
+        html! {
+            div class="text-center py-16" {
+                div class="mb-6" {
+                    span class="text-6xl font-bold text-red-400" { "500" }
+                }
+                h1 class="text-2xl font-bold text-gray-100 mb-3" { "Something Went Wrong" }
+                p class="text-gray-400 mb-8" { (message) }
+                a href="/" class="text-amber-400 hover:text-amber-300" { "Go Home" }
+            }
+        },
+    )
 }

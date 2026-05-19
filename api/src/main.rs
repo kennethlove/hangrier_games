@@ -4,8 +4,8 @@ use api::auth::AUTH_ROUTER;
 use api::cleanup::start_cleanup_scheduler;
 use api::cookies::{CSRF_COOKIE, SESSION_COOKIE, generate_csrf_token, read_cookie};
 use api::games::GAMES_ROUTER;
+use api::templates::AuthState;
 use api::templates::auth;
-use api::templates::base_layout;
 use api::templates::game_detail;
 use api::templates::pages;
 use api::users::{USERS_PROTECTED_ROUTER, USERS_PUBLIC_ROUTER};
@@ -23,7 +23,6 @@ use axum::response::Html;
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::{Json, Router, middleware};
 use base64_url::decode;
-use maud::html;
 use serde_json::Value;
 use shared::{ListDisplayGame, RegistrationUser, UserSession};
 use std::collections::hash_map::DefaultHasher;
@@ -520,8 +519,9 @@ impl KeyExtractor for CompoundKeyExtractor {
 
 // ── HTMX page handlers ──────────────────────────────────────────────
 
-async fn home_handler() -> Html<maud::Markup> {
-    Html(pages::home_page())
+async fn home_handler(headers: axum::http::HeaderMap) -> Html<maud::Markup> {
+    let auth = extract_auth(&headers);
+    Html(pages::home_page(auth))
 }
 
 #[derive(serde::Deserialize)]
@@ -538,8 +538,10 @@ fn default_limit() -> u32 {
 
 async fn games_list_handler(
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
     Query(params): Query<GamesListQuery>,
 ) -> Html<maud::Markup> {
+    let auth = extract_auth(&headers);
     let limit = params.limit.min(100);
     let offset = params.offset.min(10000);
 
@@ -574,15 +576,17 @@ async fn games_list_handler(
         },
     };
 
-    Html(pages::games_list_page(&games))
+    Html(pages::games_list_page(auth, &games))
 }
 
 // ── Game detail HTMX handlers ─────────────────────────────────────────
 
 async fn game_detail_handler(
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
     axum::extract::Path(game_identifier): axum::extract::Path<uuid::Uuid>,
 ) -> Html<maud::Markup> {
+    let auth = extract_auth(&headers);
     let identifier = game_identifier.to_string();
     let result = state
         .db
@@ -599,25 +603,19 @@ async fn game_detail_handler(
     };
 
     match game {
-        Some(game) => Html(game_detail::game_detail_page(&game)),
-        None => Html(base_layout(
-            "Not Found",
-            html! {
-                div class="text-center py-12" {
-                    h1 class="text-2xl font-bold text-red-400" { "Game Not Found" }
-                    a href="/games" class="text-amber-400 hover:text-amber-300 mt-4 inline-block" {
-                        "Back to Games"
-                    }
-                }
-            },
+        Some(game) => Html(game_detail::game_detail_page(auth, &game)),
+        None => Html(pages::not_found_page(
+            "The game you're looking for doesn't exist.",
         )),
     }
 }
 
 async fn game_tributes_handler(
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
     axum::extract::Path(game_identifier): axum::extract::Path<uuid::Uuid>,
 ) -> Html<maud::Markup> {
+    let auth = extract_auth(&headers);
     let identifier = game_identifier.to_string();
     let result = state
         .db
@@ -634,13 +632,15 @@ async fn game_tributes_handler(
         Err(_) => vec![],
     };
 
-    Html(game_detail::tributes_page(&identifier, &tributes))
+    Html(game_detail::tributes_page(auth, &identifier, &tributes))
 }
 
 async fn game_areas_handler(
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
     axum::extract::Path(game_identifier): axum::extract::Path<uuid::Uuid>,
 ) -> Html<maud::Markup> {
+    let auth = extract_auth(&headers);
     let identifier = game_identifier.to_string();
     let result = state
         .db
@@ -664,13 +664,15 @@ SELECT (
         Err(_) => vec![],
     };
 
-    Html(game_detail::areas_page(&identifier, &areas))
+    Html(game_detail::areas_page(auth, &identifier, &areas))
 }
 
 async fn game_log_handler(
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
     axum::extract::Path(game_identifier): axum::extract::Path<uuid::Uuid>,
 ) -> Html<maud::Markup> {
+    let auth = extract_auth(&headers);
     let identifier = game_identifier.to_string();
     let result = state
         .db
@@ -692,7 +694,7 @@ async fn game_log_handler(
         Err(_) => vec![],
     };
 
-    Html(game_detail::log_page(&identifier, &messages))
+    Html(game_detail::log_page(auth, &identifier, &messages))
 }
 
 // ── CSRF validation ─────────────────────────────────────────────────
@@ -736,7 +738,7 @@ struct CreateGameRequest {
 /// GET /login — render login form with CSRF token.
 async fn login_handler() -> impl IntoResponse {
     let csrf = generate_csrf_token();
-    let mut response = auth::login_page(None).into_response();
+    let mut response = auth::login_page(AuthState::guest(), None).into_response();
     api::cookies::set_csrf_cookie(&mut response, &csrf);
     // Inject CSRF token into the form via a hidden field override.
     // The template uses csrf_placeholder() which returns ""; we patch
@@ -1062,6 +1064,53 @@ async fn create_game_post_handler(
 }
 
 // ── Auth helpers ────────────────────────────────────────────────────
+
+/// Extract authentication state from request cookies.
+fn extract_auth(headers: &axum::http::HeaderMap) -> AuthState {
+    let token = match read_cookie(headers, SESSION_COOKIE) {
+        Some(t) => t.to_owned(),
+        None => return AuthState::guest(),
+    };
+
+    let token_parts: Vec<&str> = token.split('.').collect();
+    if token_parts.len() != 3 {
+        return AuthState::guest();
+    }
+
+    let payload_base64 = token_parts[1].trim_start_matches('=');
+    let payload_bytes = match base64_url::decode(payload_base64) {
+        Ok(b) => b,
+        Err(_) => return AuthState::guest(),
+    };
+
+    let payload_str = match String::from_utf8(payload_bytes) {
+        Ok(s) => s,
+        Err(_) => return AuthState::guest(),
+    };
+
+    let payload: Value = match serde_json::from_str(&payload_str) {
+        Ok(v) => v,
+        Err(_) => return AuthState::guest(),
+    };
+
+    let exp = payload.get("exp").and_then(|v| v.as_u64()).unwrap_or(0);
+    let now = OffsetDateTime::now_utc().unix_timestamp() as u64;
+    if exp < now {
+        return AuthState::guest();
+    }
+
+    let username = payload
+        .get("sub")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .unwrap_or_default();
+
+    if username.is_empty() {
+        AuthState::guest()
+    } else {
+        AuthState::authenticated(username)
+    }
+}
 
 /// Extract user ID from JWT payload without full validation.
 fn extract_user_id_from_jwt_raw(jwt: &str) -> Option<String> {

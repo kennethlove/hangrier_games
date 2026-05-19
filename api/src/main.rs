@@ -2,12 +2,15 @@ extern crate core;
 
 use api::auth::AUTH_ROUTER;
 use api::cleanup::start_cleanup_scheduler;
+use api::cookies::{CSRF_COOKIE, SESSION_COOKIE, generate_csrf_token, read_cookie};
 use api::games::GAMES_ROUTER;
+use api::templates::auth;
 use api::templates::base_layout;
 use api::templates::game_detail;
 use api::templates::pages;
 use api::users::{USERS_PROTECTED_ROUTER, USERS_PUBLIC_ROUTER};
 use api::{AppState, AuthDb};
+use axum::Form;
 use axum::extract::{Query, Request, State};
 use axum::http::StatusCode;
 use axum::http::header::{
@@ -17,12 +20,12 @@ use axum::http::header::{
 };
 use axum::middleware::Next;
 use axum::response::Html;
-use axum::response::{IntoResponse, Response};
+use axum::response::{IntoResponse, Redirect, Response};
 use axum::{Json, Router, middleware};
 use base64_url::decode;
 use maud::html;
 use serde_json::Value;
-use shared::ListDisplayGame;
+use shared::{ListDisplayGame, RegistrationUser, UserSession};
 use std::collections::hash_map::DefaultHasher;
 use std::env;
 use std::hash::{Hash, Hasher};
@@ -299,6 +302,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .route("/games/{id}/areas", axum::routing::get(game_areas_handler))
         .route("/games/{id}/log", axum::routing::get(game_log_handler))
+        .route(
+            "/login",
+            axum::routing::get(login_handler).post(login_post_handler),
+        )
+        .route(
+            "/register",
+            axum::routing::get(register_handler).post(register_post_handler),
+        )
+        .route("/logout", axum::routing::post(logout_handler))
+        .route("/account", axum::routing::get(account_handler))
+        .route(
+            "/games/new",
+            axum::routing::get(create_game_handler).post(create_game_post_handler),
+        )
         .route(
             "/health",
             axum::routing::get(|State(state): State<AppState>| async move {
@@ -669,4 +686,442 @@ async fn game_log_handler(
     };
 
     Html(game_detail::log_page(&identifier, &messages))
+}
+
+// ── CSRF validation ─────────────────────────────────────────────────
+
+fn validate_csrf(headers: &axum::http::HeaderMap, form_token: &str) -> bool {
+    let cookie_token = read_cookie(headers, CSRF_COOKIE);
+    cookie_token.is_some_and(|t| t == form_token)
+}
+
+// ── Auth form types ─────────────────────────────────────────────────
+
+#[derive(serde::Deserialize)]
+struct LoginRequest {
+    username: String,
+    password: String,
+    #[serde(default)]
+    csrf_token: String,
+}
+
+#[derive(serde::Deserialize)]
+struct RegisterRequest {
+    username: String,
+    password: String,
+    confirm_password: String,
+    #[serde(default)]
+    csrf_token: String,
+}
+
+#[derive(serde::Deserialize)]
+struct CreateGameRequest {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    private: Option<String>,
+    #[serde(default)]
+    csrf_token: String,
+}
+
+// ── Auth page handlers ──────────────────────────────────────────────
+
+/// GET /login — render login form with CSRF token.
+async fn login_handler() -> impl IntoResponse {
+    let csrf = generate_csrf_token();
+    let mut response = auth::login_page(None).into_response();
+    api::cookies::set_csrf_cookie(&mut response, &csrf);
+    // Inject CSRF token into the form via a hidden field override.
+    // The template uses csrf_placeholder() which returns ""; we patch
+    // the response body by re-rendering with the actual token.
+    let body = auth::login_page_with_csrf(&csrf);
+    (
+        [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
+        body,
+    )
+        .into_response()
+}
+
+/// POST /login — authenticate user, set cookies, redirect to /account.
+async fn login_post_handler(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Form(form): Form<LoginRequest>,
+) -> impl IntoResponse {
+    if !validate_csrf(&headers, &form.csrf_token) {
+        return Redirect::to("/login").into_response();
+    }
+
+    let user_db = (*state.db).clone();
+    if user_db
+        .use_ns(&state.namespace)
+        .use_db(&state.database)
+        .await
+        .is_err()
+    {
+        return Redirect::to("/login").into_response();
+    }
+
+    let result = user_db
+        .signin(surrealdb::opt::auth::Record {
+            access: "user",
+            namespace: &state.namespace,
+            database: &state.database,
+            params: RegistrationUser {
+                username: form.username.clone(),
+                password: form.password.clone(),
+            },
+        })
+        .await;
+
+    match result {
+        Ok(auth_result) => {
+            let jwt = auth_result.into_insecure_token();
+
+            // Build token pair (access + refresh)
+            use api::auth::{RefreshToken, TokenResponse, store_refresh_token};
+            use api::cookies::{set_refresh_cookie, set_session_cookie};
+            use surrealdb::sql::Thing;
+
+            let user_id: Thing = match surrealdb::sql::thing(
+                &extract_user_id_from_jwt_raw(&jwt).unwrap_or_default(),
+            ) {
+                Ok(id) => id,
+                Err(_) => return Redirect::to("/login").into_response(),
+            };
+
+            let refresh_token = RefreshToken::new(user_id, form.username);
+            if store_refresh_token(&user_db, &refresh_token).await.is_err() {
+                return Redirect::to("/login").into_response();
+            }
+
+            let pair = TokenResponse {
+                access_token: jwt.clone(),
+                refresh_token: refresh_token.token,
+            };
+
+            let mut response = Redirect::to("/account").into_response();
+            set_session_cookie(&mut response, &pair.access_token);
+            set_refresh_cookie(&mut response, &pair.refresh_token);
+            response
+        }
+        Err(_) => Redirect::to("/login").into_response(),
+    }
+}
+
+/// GET /register — render registration form with CSRF token.
+async fn register_handler() -> impl IntoResponse {
+    let csrf = generate_csrf_token();
+    let body = auth::register_page_with_csrf(&csrf);
+    (
+        [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
+        body,
+    )
+        .into_response()
+}
+
+/// POST /register — create user, set cookies, redirect to /account.
+async fn register_post_handler(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Form(form): Form<RegisterRequest>,
+) -> impl IntoResponse {
+    if !validate_csrf(&headers, &form.csrf_token) {
+        return Redirect::to("/register").into_response();
+    }
+
+    if form.password != form.confirm_password {
+        return Redirect::to("/register").into_response();
+    }
+
+    let user_db = (*state.db).clone();
+    if user_db
+        .use_ns(&state.namespace)
+        .use_db(&state.database)
+        .await
+        .is_err()
+    {
+        return Redirect::to("/register").into_response();
+    }
+
+    let result = user_db
+        .signup(surrealdb::opt::auth::Record {
+            access: "user",
+            namespace: &state.namespace,
+            database: &state.database,
+            params: RegistrationUser {
+                username: form.username.clone(),
+                password: form.password.clone(),
+            },
+        })
+        .await;
+
+    match result {
+        Ok(auth_result) => {
+            let jwt = auth_result.into_insecure_token();
+
+            use api::auth::{RefreshToken, TokenResponse, store_refresh_token};
+            use api::cookies::{set_refresh_cookie, set_session_cookie};
+            use surrealdb::sql::Thing;
+
+            let user_id: Thing = match surrealdb::sql::thing(
+                &extract_user_id_from_jwt_raw(&jwt).unwrap_or_default(),
+            ) {
+                Ok(id) => id,
+                Err(_) => return Redirect::to("/register").into_response(),
+            };
+
+            let refresh_token = RefreshToken::new(user_id, form.username);
+            if store_refresh_token(&user_db, &refresh_token).await.is_err() {
+                return Redirect::to("/register").into_response();
+            }
+
+            let pair = TokenResponse {
+                access_token: jwt.clone(),
+                refresh_token: refresh_token.token,
+            };
+
+            let mut response = Redirect::to("/account").into_response();
+            set_session_cookie(&mut response, &pair.access_token);
+            set_refresh_cookie(&mut response, &pair.refresh_token);
+            response
+        }
+        Err(_) => Redirect::to("/register").into_response(),
+    }
+}
+
+/// POST /logout — revoke refresh token, clear cookies, redirect to /login.
+async fn logout_handler(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Form(form): Form<LogoutRequest>,
+) -> impl IntoResponse {
+    if !validate_csrf(&headers, &form.csrf_token) {
+        return Redirect::to("/login").into_response();
+    }
+
+    let refresh = read_cookie(&headers, api::cookies::REFRESH_COOKIE).map(|s| s.to_owned());
+
+    if let Some(token) = refresh {
+        let user_db = (*state.db).clone();
+        if user_db
+            .use_ns(&state.namespace)
+            .use_db(&state.database)
+            .await
+            .is_ok()
+        {
+            let _ = api::auth::revoke_refresh_token(&user_db, &token).await;
+        }
+    }
+
+    let mut response = Redirect::to("/login").into_response();
+    api::cookies::clear_auth_cookies(&mut response);
+    api::cookies::clear_csrf_cookie(&mut response);
+    response
+}
+
+#[derive(serde::Deserialize)]
+struct LogoutRequest {
+    #[serde(default)]
+    csrf_token: String,
+}
+
+/// GET /account — account dashboard (requires auth).
+async fn account_handler(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+) -> Response {
+    let session = match require_auth(&state, &headers).await {
+        Ok(s) => s,
+        Err(_) => return Redirect::to("/login").into_response(),
+    };
+
+    let user_db = (*state.db).clone();
+    if user_db
+        .use_ns(&state.namespace)
+        .use_db(&state.database)
+        .await
+        .is_err()
+    {
+        return Redirect::to("/login").into_response();
+    }
+
+    let games: Vec<ListDisplayGame> = user_db
+        .query("SELECT * FROM fn::get_list_games(100, 0)")
+        .await
+        .ok()
+        .and_then(|mut r| r.take(0).ok())
+        .unwrap_or_default();
+
+    Html(auth::account_page(&session, &games)).into_response()
+}
+
+/// GET /games/new — create game form (requires auth).
+async fn create_game_handler(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+) -> impl IntoResponse {
+    if require_auth(&state, &headers).await.is_err() {
+        return Redirect::to("/login").into_response();
+    }
+
+    let csrf = generate_csrf_token();
+    let body = auth::create_game_page_with_csrf(&csrf);
+    (
+        [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
+        body,
+    )
+        .into_response()
+}
+
+/// POST /games/new — create game, redirect to /games/{id}.
+async fn create_game_post_handler(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Form(form): Form<CreateGameRequest>,
+) -> Response {
+    if !validate_csrf(&headers, &form.csrf_token) {
+        return Redirect::to("/login").into_response();
+    }
+
+    let token = match read_cookie(&headers, SESSION_COOKIE) {
+        Some(t) => t.to_owned(),
+        None => return Redirect::to("/login").into_response(),
+    };
+
+    let user_db = match authenticate_db(&state, &token).await {
+        Ok(db) => db,
+        Err(redirect) => return redirect.into_response(),
+    };
+
+    use game::games::Game;
+    let game = Game::default();
+    let game_identifier = uuid::Uuid::new_v4().to_string();
+    let game_name = form.name.filter(|n| !n.is_empty()).unwrap_or(game.name);
+    let is_private = form.private.is_some_and(|v| v == "true");
+
+    let new_game = Game {
+        identifier: game_identifier.clone(),
+        name: game_name,
+        status: shared::GameStatus::NotStarted,
+        day: None,
+        tributes: vec![],
+        areas: vec![],
+        private: is_private,
+        config: Default::default(),
+        messages: vec![],
+        alliance_events: vec![],
+        ..Default::default()
+    };
+
+    use surrealdb::RecordId;
+
+    let game_rid = RecordId::from(("game", game_identifier.as_str()));
+    let body = match serde_json::to_value(&new_game) {
+        Ok(b) => b,
+        Err(_) => return Redirect::to("/games/new").into_response(),
+    };
+
+    if user_db
+        .query("UPSERT $rid CONTENT $body")
+        .bind(("rid", game_rid.clone()))
+        .bind(("body", body))
+        .await
+        .is_err()
+    {
+        return Redirect::to("/games/new").into_response();
+    }
+
+    // Create tributes
+    let tribute_futures = (0..24)
+        .map(|idx| api::tributes::create_tribute(None, &game_identifier, &user_db, idx % 12));
+    let tribute_results = futures::future::join_all(tribute_futures).await;
+    if tribute_results.into_iter().any(|r| r.is_err()) {
+        return Redirect::to("/games/new").into_response();
+    }
+
+    // Create areas
+    use game::areas::Area;
+    use strum::IntoEnumIterator;
+    let base_item_count = shared::ItemQuantity::default().base_item_count();
+    let area_futures = Area::iter()
+        .map(|area| api::games::create_area(&game_identifier, area, base_item_count, &user_db));
+    let area_results = futures::future::join_all(area_futures).await;
+    if area_results.into_iter().any(|r| r.is_err()) {
+        return Redirect::to("/games/new").into_response();
+    }
+
+    Redirect::to(&format!("/games/{game_identifier}")).into_response()
+}
+
+// ── Auth helpers ────────────────────────────────────────────────────
+
+/// Extract user ID from JWT payload without full validation.
+fn extract_user_id_from_jwt_raw(jwt: &str) -> Option<String> {
+    let token_parts: Vec<&str> = jwt.split('.').collect();
+    if token_parts.len() != 3 {
+        return None;
+    }
+    let payload_base64 = token_parts[1].trim_start_matches('=');
+    let payload_bytes = base64_url::decode(payload_base64).ok()?;
+    let payload_str = String::from_utf8(payload_bytes).ok()?;
+    let payload: Value = serde_json::from_str(&payload_str).ok()?;
+    payload.get("id").and_then(|v| v.as_str()).map(String::from)
+}
+
+/// Check session cookie exists and is not expired.
+async fn require_auth(
+    _state: &AppState,
+    headers: &axum::http::HeaderMap,
+) -> Result<UserSession, ()> {
+    let token = read_cookie(headers, SESSION_COOKIE).ok_or(())?.to_owned();
+
+    let token_parts: Vec<&str> = token.split('.').collect();
+    if token_parts.len() != 3 {
+        return Err(());
+    }
+    let payload_base64 = token_parts[1].trim_start_matches('=');
+    let payload_bytes = base64_url::decode(payload_base64).map_err(|_| ())?;
+    let payload_str = String::from_utf8(payload_bytes).map_err(|_| ())?;
+    let payload: Value = serde_json::from_str(&payload_str).map_err(|_| ())?;
+
+    let exp = payload.get("exp").and_then(|v| v.as_u64()).unwrap_or(0);
+    let now = OffsetDateTime::now_utc().unix_timestamp() as u64;
+    if exp < now {
+        return Err(());
+    }
+
+    let username = payload
+        .get("sub")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .ok_or(())?;
+
+    let id = payload
+        .get("id")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .unwrap_or_default();
+
+    Ok(UserSession { id, username })
+}
+
+/// Clone the shared DB and authenticate with the given JWT.
+async fn authenticate_db(
+    state: &AppState,
+    token: &str,
+) -> Result<surrealdb::Surreal<Any>, Redirect> {
+    let user_db = (*state.db).clone();
+    if user_db
+        .use_ns(&state.namespace)
+        .use_db(&state.database)
+        .await
+        .is_err()
+    {
+        return Err(Redirect::to("/login"));
+    }
+    if user_db.authenticate(Jwt::from(token)).await.is_err() {
+        return Err(Redirect::to("/login"));
+    }
+    Ok(user_db)
 }

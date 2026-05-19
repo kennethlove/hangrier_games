@@ -830,7 +830,7 @@ async fn get_full_game(identifier: Uuid, db: &Surreal<Any>) -> Result<Json<Game>
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub(crate) struct GameLog {
+pub struct GameLog {
     pub id: RecordId,
     pub identifier: String,
     pub source: MessageSource,

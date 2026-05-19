@@ -1,5 +1,6 @@
 use maud::{DOCTYPE, Markup, PreEscaped, html};
 
+pub mod game_detail;
 pub mod pages;
 
 pub fn base_layout(title: &str, content: Markup) -> Markup {

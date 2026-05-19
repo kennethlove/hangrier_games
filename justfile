@@ -1,5 +1,4 @@
 # Hangrier Games - Rust Workspace Justfile
-# List all available recipes
 default:
     @just --list
 
@@ -26,15 +25,15 @@ dev:
     API_PID=$!
     sleep 2
     echo "Building Tailwind CSS..."
-    (cd web/assets && npm install --silent && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css)
+    (cd api/assets && npm install --silent && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css)
     echo "Starting Tailwind watcher..."
-    (cd web/assets && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css --watch) &
+    (cd api/assets && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css --watch) &
     CSS_PID=$!
     echo ""
     echo "Development environment running:"
     echo "  - SurrealDB: ws://localhost:8000"
     echo "  - API + HTMX pages: http://localhost:3000"
-    echo "  - Tailwind: watching web/assets/src/main.css"
+    echo "  - Tailwind: watching api/assets/src/main.css"
     echo ""
     echo "Press Ctrl+C to stop all services"
     trap "kill $DB_PID $API_PID $CSS_PID 2>/dev/null" EXIT
@@ -46,7 +45,7 @@ dev:
 # Build Tailwind CSS for HTMX pages
 build-css:
     #!/usr/bin/env bash
-    cd web/assets
+    cd api/assets
     npm install
     npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css
 
@@ -102,16 +101,12 @@ setup-ollama:
     cd announcers/src
     ollama create announcers -f Modelfile.qwen
 
-# Install wasm32 target for frontend builds
-setup-wasm:
-    rustup target add wasm32-unknown-unknown
-
 # Install Node dependencies for Tailwind CSS
 setup-node:
-    cd web/assets && npm install
+    cd api/assets && npm install
 
 # Run all setup tasks
-setup: setup-wasm setup-node setup-ollama
+setup: setup-node setup-ollama
     @echo "✓ Setup complete!"
     @echo ""
     @echo "Next steps:"
@@ -125,8 +120,8 @@ setup: setup-wasm setup-node setup-ollama
 # Clean all build artifacts
 clean:
     cargo clean
-    rm -rf web/assets/dist
-    rm -rf web/assets/node_modules
+    rm -rf api/assets/dist
+    rm -rf api/assets/node_modules
 
 # Clean and rebuild everything
 rebuild: clean build-all
@@ -177,14 +172,13 @@ tree:
     @echo "  api/        - Axum REST API + HTMX pages (SurrealDB backend)"
     @echo "  shared/     - Shared types"
     @echo "  announcers/ - Ollama LLM integration"
-    @echo "  web/        - Assets (Tailwind CSS, icons)"
 
 # Show helpful development tips
 tips:
     @echo "Development tips:"
     @echo "  - API serves HTMX pages directly at http://localhost:3000"
-    @echo "  - Build Tailwind CSS before running the API"
-    @echo "  - .env file must exist with APP_API_HOST, SURREAL_HOST, etc."
+    @echo "  - Build Tailwind CSS before running the API: just build-css"
+    @echo "  - .env file must exist with SURREAL_HOST, SURREAL_USER, SURREAL_PASS"
     @echo "  - Game crate tests can be slow; workspace tests may hang"
     @echo "  - Use 'just dev' to start all services at once"
     @echo ""

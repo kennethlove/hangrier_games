@@ -2,12 +2,9 @@
 /dist
 /.idea
 .aider*
-web/assets/node_modules
-web/assets/dist
 .DS_Store
 /.vscode
 **/node_modules
-web/src/env.rs
 .env
 
 # SurrealDB on-disk data (persistent dev database)

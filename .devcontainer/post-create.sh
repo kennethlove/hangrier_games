@@ -6,9 +6,9 @@ cd "$(dirname "$0")/.."
 echo "==> Fixing volume ownership (named volumes mount as root by default)"
 sudo chown -R vscode:vscode /usr/local/cargo/registry /workspaces/hangrier_games/target 2>/dev/null || true
 
-echo "==> Installing web/assets npm deps"
-if [ -d web/assets ]; then
-  (cd web/assets && npm install --no-audit --no-fund)
+echo "==> Installing api/assets npm deps"
+if [ -d api/assets ]; then
+  (cd api/assets && npm install --no-audit --no-fund)
 fi
 
 echo "==> Building Tailwind CSS"
@@ -18,12 +18,11 @@ echo "==> Ensuring .env exists"
 if [ ! -f .env ]; then
   cat > .env <<'EOF'
 ENV=development
-APP_API_HOST=http://127.0.0.1:3000
 SURREAL_HOST=ws://localhost:8000
 SURREAL_USER=root
 SURREAL_PASS=root
 EOF
-  echo "Created default .env (SurrealDB runs in-container at ws://localhost:8000)"
+  echo "Created default .env"
 fi
 
-echo "==> Done. Run 'just dev' (starts SurrealDB + API + web in one shell)."
+echo "==> Done. Run 'just dev' (starts SurrealDB + API + Tailwind in one shell)."

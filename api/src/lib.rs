@@ -16,6 +16,7 @@ pub mod cookies;
 pub mod games;
 // pub mod messages; // TODO: Module file missing
 pub mod storage;
+pub mod templates;
 pub mod tributes;
 pub mod users;
 pub mod websocket;

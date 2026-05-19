@@ -3,9 +3,10 @@ extern crate core;
 use api::auth::AUTH_ROUTER;
 use api::cleanup::start_cleanup_scheduler;
 use api::games::GAMES_ROUTER;
+use api::templates::pages;
 use api::users::{USERS_PROTECTED_ROUTER, USERS_PUBLIC_ROUTER};
 use api::{AppState, AuthDb};
-use axum::extract::{Request, State};
+use axum::extract::{Query, Request, State};
 use axum::http::StatusCode;
 use axum::http::header::{
     ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, ACCESS_CONTROL_ALLOW_METHODS,
@@ -13,10 +14,12 @@ use axum::http::header::{
     CONTENT_TYPE, EXPIRES, HeaderName,
 };
 use axum::middleware::Next;
+use axum::response::Html;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, Router, middleware};
 use base64_url::decode;
 use serde_json::Value;
+use shared::ListDisplayGame;
 use std::collections::hash_map::DefaultHasher;
 use std::env;
 use std::hash::{Hash, Hasher};
@@ -204,6 +207,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize storage backend
     use api::storage::LocalStorage;
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let storage_path = env::var("STORAGE_PATH").unwrap_or_else(|_| "uploads".to_string());
     let storage = Arc::new(LocalStorage::new(&storage_path, "/uploads"));
     storage.init().await?;
@@ -258,16 +262,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "/uploads",
             tower_http::services::ServeDir::new(&storage_path),
         )
+        .nest_service(
+            "/assets",
+            tower_http::services::ServeDir::new(
+                std::path::PathBuf::from(&manifest_dir)
+                    .parent()
+                    .unwrap()
+                    .join("web")
+                    .join("assets")
+                    .join("dist"),
+            ),
+        )
+        .nest_service(
+            "/icons",
+            tower_http::services::ServeDir::new(
+                std::path::PathBuf::from(&manifest_dir)
+                    .join("assets")
+                    .join("icons"),
+            ),
+        )
         .route(
             "/ws",
             axum::routing::get(api::websocket::websocket_handler).layer(
                 middleware::from_fn_with_state(app_state.clone(), surreal_jwt),
             ),
         )
-        .route(
-            "/",
-            axum::routing::get(move || async { Json(env!("CARGO_PKG_VERSION")) }),
-        )
+        .route("/", axum::routing::get(home_handler))
+        .route("/games", axum::routing::get(games_list_handler))
         .route(
             "/health",
             axum::routing::get(|State(state): State<AppState>| async move {
@@ -461,4 +482,63 @@ impl KeyExtractor for CompoundKeyExtractor {
         user_id.hash(&mut hasher);
         Ok(hasher.finish())
     }
+}
+
+// ── HTMX page handlers ──────────────────────────────────────────────
+
+async fn home_handler() -> Html<maud::Markup> {
+    Html(pages::home_page())
+}
+
+#[derive(serde::Deserialize)]
+struct GamesListQuery {
+    #[serde(default = "default_limit")]
+    limit: u32,
+    #[serde(default)]
+    offset: u32,
+}
+
+fn default_limit() -> u32 {
+    10
+}
+
+async fn games_list_handler(
+    State(state): State<AppState>,
+    Query(params): Query<GamesListQuery>,
+) -> Html<maud::Markup> {
+    let limit = params.limit.min(100);
+    let offset = params.offset.min(10000);
+
+    let result = state
+        .db
+        .query("SELECT * FROM fn::get_list_games($limit, $offset)")
+        .bind(("limit", limit))
+        .bind(("offset", offset))
+        .await;
+
+    let games = match result {
+        Ok(mut result) => {
+            let games: Vec<ListDisplayGame> = result.take(0).unwrap_or_default();
+            let total = games.len() as u32;
+            let has_more = (offset + limit) < total;
+            let pagination = shared::PaginationMetadata {
+                total,
+                limit,
+                offset,
+                has_more,
+            };
+            shared::PaginatedGames { games, pagination }
+        }
+        Err(_) => shared::PaginatedGames {
+            games: vec![],
+            pagination: shared::PaginationMetadata {
+                total: 0,
+                limit,
+                offset,
+                has_more: false,
+            },
+        },
+    };
+
+    Html(pages::games_list_page(&games))
 }

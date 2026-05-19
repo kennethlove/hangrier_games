@@ -7,12 +7,17 @@ fn main() {
     let out_dir = PathBuf::from(&manifest_dir).join("assets").join("icons");
     fs::create_dir_all(&out_dir).unwrap();
 
-    let icons_dir = PathBuf::from(&manifest_dir)
+    // Icon sources previously lived in web/assets/icons/. With the web crate
+    // removed, these directories no longer exist and sprites are generated empty.
+    // Move icon sources here (api/assets/icons/src/) if needed in the future.
+    let manifest_path = PathBuf::from(&manifest_dir);
+    let icons_dir = manifest_path
         .parent()
         .unwrap()
-        .join("web")
+        .join("api")
         .join("assets")
-        .join("icons");
+        .join("icons")
+        .join("src");
 
     generate_sprite(&icons_dir.join("ui"), &out_dir.join("sprite-ui.svg"), "ui");
     generate_sprite(
@@ -21,8 +26,8 @@ fn main() {
         "narrative",
     );
 
-    println!("cargo:rerun-if-changed=../web/assets/icons/ui/");
-    println!("cargo:rerun-if-changed=../web/assets/icons/narrative/");
+    println!("cargo:rerun-if-changed=assets/icons/src/ui/");
+    println!("cargo:rerun-if-changed=assets/icons/src/narrative/");
 }
 
 fn generate_sprite(input_dir: &Path, output_path: &Path, category: &str) {

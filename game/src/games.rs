@@ -112,10 +112,9 @@ impl TickCounter {
 /// `PartialEq` is implemented manually (identity-only via `identifier`) because
 /// the transient `messages` buffer holds `GameMessage`s carrying
 /// `MessagePayload`, which is not `PartialEq` (and adding it would require
-/// deriving across the entire payload graph). The web crate's
-/// `dioxus-query` cache enums require `PartialEq` on their variants; identity
-/// equality is sufficient for cache dedup since a game is uniquely keyed by
-/// its identifier.
+/// deriving across the entire payload graph). Cache consumers requiring
+/// `PartialEq` can rely on identity equality, which is sufficient for cache
+/// dedup since a game is uniquely keyed by its identifier.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Game {
     pub identifier: String,

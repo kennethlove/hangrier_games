@@ -13,10 +13,9 @@ For deep work on a specific folder, also read that folder's `codemap.md`.
 
 ## Project Structure
 
-Rust workspace with 5 crates:
+Rust workspace with 4 crates:
 - `game/` - Core simulation logic (pure Rust, no I/O)
 - `api/` - Axum REST API (SurrealDB backend)
-- `web/` - Dioxus frontend (compiles to WASM)
 - `shared/` - Shared types
 - `announcers/` - Ollama LLM integration for game commentary
 
@@ -25,13 +24,11 @@ Rust workspace with 5 crates:
 This project uses [just](https://github.com/casey/just) for common development tasks. Run `just` to see all available recipes.
 
 **Most useful commands:**
-- `just dev` - Start SurrealDB, API, and web frontend in one command
+- `just dev` - Start SurrealDB and API in one command
 - `just api` - Run API server only
-- `just web` - Run frontend dev server only
-- `just build-css` - Build Tailwind CSS
 - `just test` - Run game crate tests
 - `just fmt` - Format all code
-- `just setup` - Install all dependencies (Dioxus CLI, Node packages, Ollama model)
+- `just setup` - Install all dependencies (Ollama model)
 - `just quality` - Run all quality checks (format, check, clippy, test)
 
 See the `justfile` in the repository root for all available commands.
@@ -43,20 +40,6 @@ See the `justfile` in the repository root for all available commands.
 just api
 # OR: cargo run --package api
 # Requires: SurrealDB running on SURREAL_HOST, .env file present
-```
-
-**Build & run frontend** (requires Dioxus CLI):
-```bash
-just web
-# OR: cd web && dx serve
-# Install dx first: just setup-dx
-# Requires: APP_API_HOST in .env, Tailwind CSS built
-```
-
-**Build frontend CSS**:
-```bash
-just build-css
-# OR: cd web/assets && npm install && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css
 ```
 
 **Run tests** (game crate has ~60 inline tests using rstest):
@@ -77,19 +60,12 @@ just fmt
 Required `.env` at repo root (already exists):
 ```bash
 ENV=development
-APP_API_HOST=                          # Empty in dev: relative URLs go through dx serve proxy
 SURREAL_HOST=ws://localhost:8000       # API → SurrealDB
 SURREAL_USER=root
 SURREAL_PASS=root
 ```
 
-**Dev proxy**: `web/Dioxus.toml` declares `[[web.proxy]]` entries that forward `/api/*` and `/ws` from the dx dev server (`:8080`) to the API (`:3000`). This keeps frontend + backend same-origin so HttpOnly auth cookies aren't dropped as third-party. See bd-jgxd.
-
-**Frontend build.rs codegen**: Web crate reads `APP_*` env vars at build time and generates `src/env.rs`. When `APP_API_HOST` is empty, `crate::api_url::api_url()` derives the absolute URL from `window.location` at runtime (reqwest WASM requires absolute URLs).
-
 ## Critical Quirks
-
-**WASM build**: Frontend requires `RUSTFLAGS='--cfg getrandom_backend="wasm_js"'` and `wasm32-unknown-unknown` target.
 
 **SurrealDB migrations**: `schemas/*.surql` files + `migrations/definitions/_initial.json` define schema. Migrations run via `surrealdb-migrations` crate at API startup.
 
@@ -98,8 +74,6 @@ SURREAL_PASS=root
 cd announcers/src
 ollama create announcers -f Modelfile.qwen
 ```
-
-**Docker build order matters**: Frontend Dockerfile builds Tailwind first, then Dioxus. API Dockerfile uses build cache for faster rebuilds.
 
 ## Non-Interactive Shell Commands
 

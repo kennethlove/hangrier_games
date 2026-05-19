@@ -1,5 +1,5 @@
 [workspace]
-members = [ "game", "shared", "web", "api", "announcers"]
+members = [ "game", "shared", "api", "announcers"]
 resolver = "2"
 
 [profile]
@@ -9,10 +9,6 @@ opt-level = 1
 
 [profile.dev.package."*"]
 opt-level = 3
-
-[profile.wasm-dev]
-inherits = "dev"
-opt-level = 1
 
 [profile.server-dev]
 inherits = "dev"

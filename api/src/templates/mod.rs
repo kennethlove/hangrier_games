@@ -2,6 +2,7 @@ use maud::{DOCTYPE, Markup, PreEscaped, html};
 
 pub mod game_detail;
 pub mod pages;
+pub mod timeline;
 
 pub fn base_layout(title: &str, content: Markup) -> Markup {
     html! {

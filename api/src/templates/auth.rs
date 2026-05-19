@@ -2,12 +2,13 @@ use maud::html;
 use shared::{ListDisplayGame, UserSession};
 
 use super::pages::status_color;
-use super::{base_layout, icon};
+use super::{AuthState, base_layout, icon};
 
 /// Login form page.
-pub fn login_page(error: Option<&str>) -> maud::Markup {
+pub fn login_page(auth: AuthState, error: Option<&str>) -> maud::Markup {
     base_layout(
         "Login",
+        auth,
         html! {
             div class="max-w-md mx-auto py-12" {
                 h1 class="text-2xl font-bold text-amber-400 mb-6 text-center" { "Login" }
@@ -53,8 +54,12 @@ pub fn login_page(error: Option<&str>) -> maud::Markup {
 
                     button
                         type="submit"
-                        class="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-semibold px-4 py-2 rounded" {
+                        class="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-semibold px-4 py-2 rounded relative"
+                        hx-indicator="#login-spinner" {
                         "Login"
+                        span id="login-spinner" class="htmx-indicator absolute right-3 top-1/2 -translate-y-1/2" {
+                            (spinner_icon())
+                        }
                     }
                 }
 
@@ -68,9 +73,10 @@ pub fn login_page(error: Option<&str>) -> maud::Markup {
 }
 
 /// Registration form page.
-pub fn register_page(error: Option<&str>) -> maud::Markup {
+pub fn register_page(auth: AuthState, error: Option<&str>) -> maud::Markup {
     base_layout(
         "Register",
+        auth,
         html! {
             div class="max-w-md mx-auto py-12" {
                 h1 class="text-2xl font-bold text-amber-400 mb-6 text-center" { "Register" }
@@ -131,8 +137,12 @@ pub fn register_page(error: Option<&str>) -> maud::Markup {
 
                     button
                         type="submit"
-                        class="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-semibold px-4 py-2 rounded" {
+                        class="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-semibold px-4 py-2 rounded relative"
+                        hx-indicator="#register-spinner" {
                         "Create Account"
+                        span id="register-spinner" class="htmx-indicator absolute right-3 top-1/2 -translate-y-1/2" {
+                            (spinner_icon())
+                        }
                     }
                 }
 
@@ -147,8 +157,10 @@ pub fn register_page(error: Option<&str>) -> maud::Markup {
 
 /// Account dashboard page.
 pub fn account_page(session: &UserSession, games: &[ListDisplayGame]) -> maud::Markup {
+    let auth = AuthState::authenticated(&session.username);
     base_layout(
         &format!("Account — {}", session.username),
+        auth,
         html! {
             div {
                 // Account header
@@ -224,9 +236,10 @@ fn user_game_card(game: &ListDisplayGame) -> maud::Markup {
 }
 
 /// Create game form page.
-pub fn create_game_page(error: Option<&str>) -> maud::Markup {
+pub fn create_game_page(auth: AuthState, error: Option<&str>) -> maud::Markup {
     base_layout(
         "Create Game",
+        auth,
         html! {
             div class="max-w-lg mx-auto py-8" {
                 a href="/account" class="text-sm text-gray-400 hover:text-white mb-4 inline-block" {
@@ -286,8 +299,12 @@ pub fn create_game_page(error: Option<&str>) -> maud::Markup {
 
                     button
                         type="submit"
-                        class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded" {
+                        class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded relative"
+                        hx-indicator="#create-game-spinner" {
                         "Create Game"
+                        span id="create-game-spinner" class="htmx-indicator absolute right-3 top-1/2 -translate-y-1/2" {
+                            (spinner_icon())
+                        }
                     }
                 }
             }
@@ -296,9 +313,10 @@ pub fn create_game_page(error: Option<&str>) -> maud::Markup {
 }
 
 /// Generic error page.
-pub fn error_page(title: &str, message: &str) -> maud::Markup {
+pub fn error_page(auth: AuthState, title: &str, message: &str) -> maud::Markup {
     base_layout(
         title,
+        auth,
         html! {
             div class="text-center py-12" {
                 h1 class="text-2xl font-bold text-red-400 mb-4" { (title) }
@@ -309,6 +327,16 @@ pub fn error_page(title: &str, message: &str) -> maud::Markup {
     )
 }
 
+/// Inline SVG spinner for HTMX loading indicators.
+fn spinner_icon() -> maud::Markup {
+    maud::html! {
+        svg class="inline w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" {
+            circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" {}
+            path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" {}
+        }
+    }
+}
+
 /// Placeholder for CSRF token value in templates.
 /// The real token is injected by the handler via a form value override.
 fn csrf_placeholder() -> &'static str {
@@ -317,18 +345,18 @@ fn csrf_placeholder() -> &'static str {
 
 /// Login form page with CSRF token injected.
 pub fn login_page_with_csrf(csrf: &str) -> String {
-    let markup: String = login_page(None).into();
+    let markup: String = login_page(AuthState::guest(), None).into();
     markup.replace(csrf_placeholder(), csrf)
 }
 
 /// Registration form page with CSRF token injected.
 pub fn register_page_with_csrf(csrf: &str) -> String {
-    let markup: String = register_page(None).into();
+    let markup: String = register_page(AuthState::guest(), None).into();
     markup.replace(csrf_placeholder(), csrf)
 }
 
 /// Create game form page with CSRF token injected.
 pub fn create_game_page_with_csrf(csrf: &str) -> String {
-    let markup: String = create_game_page(None).into();
+    let markup: String = create_game_page(AuthState::guest(), None).into();
     markup.replace(csrf_placeholder(), csrf)
 }

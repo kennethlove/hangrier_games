@@ -2,10 +2,11 @@ use maud::html;
 use shared::messages::TributeRef;
 use shared::messages::{GameMessage, MessageKind, MessagePayload, PeriodSummary, TimelineSummary};
 
-use super::{base_layout, icon};
+use super::{AuthState, base_layout, icon};
 
 /// Context for rendering the timeline page.
 pub struct TimelineContext<'a> {
+    pub auth: AuthState,
     pub game_id: &'a str,
     pub game_name: &'a str,
     pub periods: &'a TimelineSummary,
@@ -23,6 +24,7 @@ pub struct TimelineContext<'a> {
 pub fn timeline_page(ctx: &TimelineContext<'_>) -> maud::Markup {
     base_layout(
         &format!("Timeline — {}", ctx.game_name),
+        ctx.auth.clone(),
         html! {
             div {
                 // Back link

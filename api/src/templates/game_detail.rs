@@ -2,12 +2,13 @@ use maud::html;
 use shared::{DisplayGame, GameStatus};
 
 use super::pages::status_color;
-use super::{base_layout, icon, narrative_icon};
+use super::{AuthState, base_layout, icon, narrative_icon};
 
 /// Full game detail page with navigation tabs.
-pub fn game_detail_page(game: &DisplayGame) -> maud::Markup {
+pub fn game_detail_page(auth: AuthState, game: &DisplayGame) -> maud::Markup {
     base_layout(
         &game.name,
+        auth,
         html! {
             div hx-ext="sse" sse-connect=(format!("/api/games/{}/events", game.identifier)) {
                 // Header section
@@ -27,21 +28,29 @@ pub fn game_detail_page(game: &DisplayGame) -> maud::Markup {
                             div class="flex gap-2" {
                                 @if game.status == GameStatus::NotStarted {
                                     button
-                                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold"
+                                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold relative"
                                         hx-put=(format!("/api/games/{}/next", game.identifier))
                                         hx-target="#game-status"
                                         hx-swap="innerHTML"
-                                        hx-disabled-elt="this" {
+                                        hx-disabled-elt="this"
+                                        hx-indicator="#start-spinner" {
                                         "Start Game"
+                                        span id="start-spinner" class="htmx-indicator ml-2" {
+                                            (spinner_icon())
+                                        }
                                     }
                                 } @else if game.status == GameStatus::InProgress {
                                     button
-                                        class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded font-semibold"
+                                        class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded font-semibold relative"
                                         hx-put=(format!("/api/games/{}/next", game.identifier))
                                         hx-target="#game-status"
                                         hx-swap="innerHTML"
-                                        hx-disabled-elt="this" {
+                                        hx-disabled-elt="this"
+                                        hx-indicator="#play-spinner" {
                                         "Play Day " (game.day.unwrap_or(0))
+                                        span id="play-spinner" class="htmx-indicator ml-2" {
+                                            (spinner_icon())
+                                        }
                                     }
                                 }
                             }
@@ -93,9 +102,14 @@ pub fn game_detail_page(game: &DisplayGame) -> maud::Markup {
 }
 
 /// Tribute list page — grid grouped by district.
-pub fn tributes_page(game_id: &str, tributes: &[game::tributes::Tribute]) -> maud::Markup {
+pub fn tributes_page(
+    auth: AuthState,
+    game_id: &str,
+    tributes: &[game::tributes::Tribute],
+) -> maud::Markup {
     base_layout(
         "Tributes",
+        auth,
         html! {
             div {
                 a href=(format!("/games/{}", game_id))
@@ -211,9 +225,14 @@ fn tribute_card(tribute: &game::tributes::Tribute) -> maud::Markup {
 }
 
 /// Areas list page.
-pub fn areas_page(game_id: &str, areas: &[game::areas::AreaDetails]) -> maud::Markup {
+pub fn areas_page(
+    auth: AuthState,
+    game_id: &str,
+    areas: &[game::areas::AreaDetails],
+) -> maud::Markup {
     base_layout(
         "Areas",
+        auth,
         html! {
             div {
                 a href=(format!("/games/{}", game_id))
@@ -295,7 +314,11 @@ fn area_card(area: &game::areas::AreaDetails) -> maud::Markup {
 }
 
 /// Game log page — scrollable message list with SSE real-time updates.
-pub fn log_page(game_id: &str, messages: &[shared::messages::GameMessage]) -> maud::Markup {
+pub fn log_page(
+    auth: AuthState,
+    game_id: &str,
+    messages: &[shared::messages::GameMessage],
+) -> maud::Markup {
     // All MessagePayload variant names for SSE event filtering
     let sse_events = "TributeKilled,TributeWounded,TributeAttacked,Combat,CombatSwing,\
         AllianceFormed,AllianceProposed,AllianceDissolved,BetrayalTriggered,TrustShockBreak,\
@@ -312,6 +335,7 @@ pub fn log_page(game_id: &str, messages: &[shared::messages::GameMessage]) -> ma
 
     base_layout(
         "Log",
+        auth,
         html! {
             div hx-ext="sse" sse-connect=(format!("/api/games/{}/events", game_id)) {
                 a href=(format!("/games/{}", game_id))
@@ -434,6 +458,18 @@ fn kind_color(payload: &shared::messages::MessagePayload) -> &'static str {
         MessageKind::Movement => "text-purple-400",
         MessageKind::Item | MessageKind::SponsorGift => "text-yellow-400",
         MessageKind::State | MessageKind::Trauma => "text-gray-400",
+    }
+}
+
+// ── Loading spinner ─────────────────────────────────────────────────
+
+/// Inline SVG spinner for HTMX loading indicators.
+fn spinner_icon() -> maud::Markup {
+    maud::html! {
+        svg class="inline w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" {
+            circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" {}
+            path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" {}
+        }
     }
 }
 

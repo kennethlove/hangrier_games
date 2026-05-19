@@ -12,52 +12,50 @@ pub fn game_detail_page(auth: AuthState, game: &DisplayGame) -> maud::Markup {
         html! {
             div hx-ext="sse" sse-connect=(format!("/api/games/{}/events", game.identifier)) {
                 // Header section
-                div class="mb-6" {
-                    div class="flex items-center justify-between" {
-                        div {
-                            h1 class="text-2xl font-bold text-amber-400" { (game.name) }
-                            p class="text-sm text-gray-400 mt-1" {
-                                "Day " (game.day.unwrap_or(0))
-                                " · "
-                                span class=(status_color(&game.status.to_string())) { (game.status) }
-                                " · "
-                                span id="living-count" { (game.living_count) } "/" (game.tribute_count) " alive"
-                            }
+                div class="detail-header" {
+                    div {
+                        h1 { (game.name) }
+                        p class="detail-meta" {
+                            "Day " (game.day.unwrap_or(0))
+                            " · "
+                            span class=(status_color(&game.status.to_string())) { (game.status) }
+                            " · "
+                            span id="living-count" class="num" { (game.living_count) } "/" (game.tribute_count) " alive"
                         }
-                        @if game.is_mine {
-                            div class="flex gap-2" {
-                                @if game.status == GameStatus::NotStarted {
-                                    button
-                                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold relative"
-                                        hx-put=(format!("/api/games/{}/next", game.identifier))
-                                        hx-target="#game-status"
-                                        hx-swap="innerHTML"
-                                        hx-disabled-elt="this"
-                                        hx-indicator="#start-spinner" {
-                                        "Start Game"
-                                        span id="start-spinner" class="htmx-indicator ml-2" {
-                                            (spinner_icon())
-                                        }
+                    }
+                    @if game.is_mine {
+                        div class="detail-actions" {
+                            @if game.status == GameStatus::NotStarted {
+                                button
+                                    class="btn btn-primary btn-sm"
+                                    hx-put=(format!("/api/games/{}/next", game.identifier))
+                                    hx-target="#game-status"
+                                    hx-swap="innerHTML"
+                                    hx-disabled-elt="this"
+                                    hx-indicator="#start-spinner" {
+                                    "Start Game"
+                                    span id="start-spinner" class="htmx-indicator" {
+                                        (spinner_icon())
                                     }
-                                } @else if game.status == GameStatus::InProgress {
-                                    button
-                                        class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded font-semibold relative"
-                                        hx-put=(format!("/api/games/{}/next", game.identifier))
-                                        hx-target="#game-status"
-                                        hx-swap="innerHTML"
-                                        hx-disabled-elt="this"
-                                        hx-indicator="#play-spinner" {
-                                        "Play Day " (game.day.unwrap_or(0))
-                                        span id="play-spinner" class="htmx-indicator ml-2" {
-                                            (spinner_icon())
-                                        }
+                                }
+                            } @else if game.status == GameStatus::InProgress {
+                                button
+                                    class="btn btn-ghost btn-sm"
+                                    hx-put=(format!("/api/games/{}/next", game.identifier))
+                                    hx-target="#game-status"
+                                    hx-swap="innerHTML"
+                                    hx-disabled-elt="this"
+                                    hx-indicator="#play-spinner" {
+                                    "Play Day " (game.day.unwrap_or(0))
+                                    span id="play-spinner" class="htmx-indicator" {
+                                        (spinner_icon())
                                     }
                                 }
                             }
-                        } @else {
-                            p class="text-sm text-gray-500" {
-                                "By " (game.created_by.username)
-                            }
+                        }
+                    } @else {
+                        p class="detail-meta" {
+                            "By " (game.created_by.username)
                         }
                     }
                 }
@@ -66,35 +64,33 @@ pub fn game_detail_page(auth: AuthState, game: &DisplayGame) -> maud::Markup {
                 div id="game-status" {
                     @if game.status == GameStatus::Finished {
                         @if let Some(winner) = &game.winner {
-                            div class="mb-4 p-3 bg-amber-900/30 border border-amber-700 rounded-lg" {
-                                p class="text-amber-300 font-semibold" {
-                                    (icon("trophy"))
-                                    " Winner: " (winner.name)
-                                }
+                            div class="winner-banner" {
+                                (icon("trophy"))
+                                span { "Winner: " (winner.name) }
                             }
                         }
                     }
                 }
 
                 // Navigation tabs
-                nav class="flex gap-4 border-b border-gray-800 mb-6" {
+                nav class="detail-tabs" {
                     a href=(format!("/games/{}/tributes", game.identifier))
-                        class="pb-2 px-1 text-sm font-medium text-gray-400 hover:text-white border-b-2 border-transparent hover:border-amber-500" {
+                        class="detail-tab" {
                         "Tributes"
                     }
                     a href=(format!("/games/{}/areas", game.identifier))
-                        class="pb-2 px-1 text-sm font-medium text-gray-400 hover:text-white border-b-2 border-transparent hover:border-amber-500" {
+                        class="detail-tab" {
                         "Areas"
                     }
                     a href=(format!("/games/{}/log", game.identifier))
-                        class="pb-2 px-1 text-sm font-medium text-gray-400 hover:text-white border-b-2 border-transparent hover:border-amber-500" {
+                        class="detail-tab" {
                         "Log"
                     }
                 }
 
                 // Content area — sub-pages load here via HTMX
                 div id="detail-content" {
-                    p class="text-gray-500" { "Select a tab above" }
+                    p class="empty-state" { "Select a tab above" }
                 }
             }
         },
@@ -111,16 +107,16 @@ pub fn tributes_page(
         "Tributes",
         auth,
         html! {
-            div {
+            div class="container" style="padding-block:var(--gap-lg);" {
                 a href=(format!("/games/{}", game_id))
-                    class="text-sm text-gray-400 hover:text-white mb-4 inline-block" {
+                    class="back-link" {
                     (icon("arrow-left"))
                     " Back to Game"
                 }
-                h2 class="text-xl font-bold text-amber-400 mb-4" { "Tributes" }
+                h2 style="font-family:var(--font-display);font-size:var(--fs-h3);font-weight:600;margin:0 0 var(--gap-md);" { "Tributes" }
 
                 @if tributes.is_empty() {
-                    p class="text-gray-500" { "No tributes yet." }
+                    p class="empty-state" { "No tributes yet." }
                 } @else {
                     // Group by district
                     @for district_num in 1..=12 {
@@ -128,11 +124,11 @@ pub fn tributes_page(
                             .filter(|t| t.district == district_num)
                             .collect();
                         @if !district_tributes.is_empty() {
-                            div class="mb-6" {
-                                h3 class="text-sm font-semibold text-gray-300 mb-2" {
+                            div {
+                                h3 class="section-header" {
                                     "District " (district_num)
                                 }
-                                div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" {
+                                div class="card-grid" {
                                     @for tribute in &district_tributes {
                                         (tribute_card(tribute))
                                     }
@@ -149,50 +145,46 @@ pub fn tributes_page(
 /// Single tribute card with stats strip.
 fn tribute_card(tribute: &game::tributes::Tribute) -> maud::Markup {
     let is_alive = tribute.is_alive();
-    let status_class = if is_alive {
-        "text-green-400"
-    } else {
-        "text-red-400"
-    };
+    let status_class = if is_alive { "alive" } else { "dead" };
     let status_icon = if is_alive { "check-circle" } else { "x-circle" };
 
     html! {
-        div class="bg-gray-900 border border-gray-800 rounded-lg p-3" {
-            div class="flex items-center justify-between mb-2" {
-                span class="font-semibold text-white text-sm" { (tribute.name) }
-                span class=(status_class) { (icon(status_icon)) }
+        div class="tribute-card" {
+            div class="card-top" {
+                span class="card-name" { (tribute.name) }
+                span class=(format!("card-status {}", status_class)) { (icon(status_icon)) }
             }
 
             // Stats strip
-            div class="space-y-1 text-xs" {
+            div class="card-stats" {
                 // Health
-                div class="flex items-center gap-1" {
+                div {
                     (icon("heart"))
-                    span class="text-gray-400" { "HP" }
-                    span class="text-gray-200 ml-auto" { (tribute.attributes.health) }
+                    " HP "
+                    span class="stat-val" { (tribute.attributes.health) }
                 }
                 // Sanity
-                div class="flex items-center gap-1" {
+                div {
                     (icon("brain"))
-                    span class="text-gray-400" { "SAN" }
-                    span class="text-gray-200 ml-auto" { (tribute.attributes.sanity) }
+                    " SAN "
+                    span class="stat-val" { (tribute.attributes.sanity) }
                 }
                 // Movement
-                div class="flex items-center gap-1" {
+                div {
                     (icon("zap"))
-                    span class="text-gray-400" { "MOV" }
-                    span class="text-gray-200 ml-auto" { (tribute.attributes.movement) }
+                    " MOV "
+                    span class="stat-val" { (tribute.attributes.movement) }
                 }
                 // Strength
-                div class="flex items-center gap-1" {
+                div {
                     (icon("sword"))
-                    span class="text-gray-400" { "STR" }
-                    span class="text-gray-200 ml-auto" { (tribute.attributes.strength) }
+                    " STR "
+                    span class="stat-val" { (tribute.attributes.strength) }
                 }
             }
 
             // Survival bands
-            div class="mt-2 pt-2 border-t border-gray-800 flex gap-2 text-xs" {
+            div class="card-bands" {
                 span class=(hunger_color(tribute.hunger)) { "H: " (hunger_label(tribute.hunger)) }
                 span class=(thirst_color(tribute.thirst)) { "T: " (thirst_label(tribute.thirst)) }
                 span class=(stamina_color(tribute.stamina, tribute.max_stamina)) {
@@ -201,21 +193,18 @@ fn tribute_card(tribute: &game::tributes::Tribute) -> maud::Markup {
             }
 
             // Area location
-            div class="mt-1 text-xs text-gray-500" {
+            div class="card-location" {
                 (icon("map-pin"))
                 " " (tribute.area)
             }
 
             // Inventory
             @if !tribute.items.is_empty() {
-                div class="mt-2 pt-2 border-t border-gray-800" {
-                    p class="text-xs text-gray-500 mb-1" { "Items:" }
-                    div class="flex flex-wrap gap-1" {
-                        @for item in &tribute.items {
-                            span class="text-xs bg-gray-800 text-gray-300 px-1.5 py-0.5 rounded" {
-                                (icon("backpack"))
-                                " " (item.name)
-                            }
+                div class="card-items" {
+                    @for item in &tribute.items {
+                        span class="item-tag" {
+                            (icon("backpack"))
+                            " " (item.name)
                         }
                     }
                 }
@@ -234,18 +223,18 @@ pub fn areas_page(
         "Areas",
         auth,
         html! {
-            div {
+            div class="container" style="padding-block:var(--gap-lg);" {
                 a href=(format!("/games/{}", game_id))
-                    class="text-sm text-gray-400 hover:text-white mb-4 inline-block" {
+                    class="back-link" {
                     (icon("arrow-left"))
                     " Back to Game"
                 }
-                h2 class="text-xl font-bold text-amber-400 mb-4" { "Areas" }
+                h2 style="font-family:var(--font-display);font-size:var(--fs-h3);font-weight:600;margin:0 0 var(--gap-md);" { "Areas" }
 
                 @if areas.is_empty() {
-                    p class="text-gray-500" { "No areas yet." }
+                    p class="empty-state" { "No areas yet." }
                 } @else {
-                    div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" {
+                    div class="card-grid" {
                         @for area in areas {
                             (area_card(area))
                         }
@@ -260,20 +249,16 @@ pub fn areas_page(
 fn area_card(area: &game::areas::AreaDetails) -> maud::Markup {
     let is_open = area.events.is_empty();
     let status_text = if is_open { "Open" } else { "Active Events" };
-    let status_class = if is_open {
-        "text-green-400"
-    } else {
-        "text-orange-400"
-    };
+    let status_class = if is_open { "open" } else { "active" };
 
     html! {
-        div class="bg-gray-900 border border-gray-800 rounded-lg p-3" {
-            div class="flex items-center justify-between mb-2" {
-                h3 class="font-semibold text-white text-sm" {
+        div class="area-card" {
+            div class="card-top" {
+                h3 class="card-name" {
                     (icon("map-pin"))
                     " " (area.name)
                 }
-                span class=(status_class) {
+                span class=(format!("card-status {}", status_class)) {
                     @if is_open {
                         (icon("unlock"))
                     } @else {
@@ -285,14 +270,11 @@ fn area_card(area: &game::areas::AreaDetails) -> maud::Markup {
 
             // Items
             @if !area.items.is_empty() {
-                div class="mt-2" {
-                    p class="text-xs text-gray-500 mb-1" { "Items:" }
-                    div class="flex flex-wrap gap-1" {
-                        @for item in &area.items {
-                            span class="text-xs bg-gray-800 text-gray-300 px-1.5 py-0.5 rounded" {
-                                (icon("backpack"))
-                                " " (item.name)
-                            }
+                div class="card-items" {
+                    @for item in &area.items {
+                        span class="item-tag" {
+                            (icon("backpack"))
+                            " " (item.name)
                         }
                     }
                 }
@@ -300,9 +282,9 @@ fn area_card(area: &game::areas::AreaDetails) -> maud::Markup {
 
             // Events
             @if !area.events.is_empty() {
-                div class="mt-2 pt-2 border-t border-gray-800" {
-                    p class="text-xs text-gray-500 mb-1" { "Events:" }
-                    ul class="text-xs text-gray-400 space-y-0.5" {
+                div class="card-events" {
+                    p style="font-weight:600;margin-bottom:4px;" { "Events:" }
+                    ul style="list-style:none;padding:0;" {
                         @for event in &area.events {
                             li { (narrative_icon("event")) " " (event) }
                         }
@@ -337,19 +319,19 @@ pub fn log_page(
         "Log",
         auth,
         html! {
-            div hx-ext="sse" sse-connect=(format!("/api/games/{}/events", game_id)) {
+            div class="container" style="padding-block:var(--gap-lg);" hx-ext="sse" sse-connect=(format!("/api/games/{}/events", game_id)) {
                 a href=(format!("/games/{}", game_id))
-                    class="text-sm text-gray-400 hover:text-white mb-4 inline-block" {
+                    class="back-link" {
                     (icon("arrow-left"))
                     " Back to Game"
                 }
-                h2 class="text-xl font-bold text-amber-400 mb-4" { "Game Log" }
+                h2 style="font-family:var(--font-display);font-size:var(--fs-h3);font-weight:600;margin:0 0 var(--gap-md);" { "Game Log" }
 
                 @if messages.is_empty() {
-                    p class="text-gray-500" { "No messages yet." }
+                    p class="empty-state" { "No messages yet." }
                 } @else {
                     div id="log-entries"
-                        class="max-h-[70vh] overflow-y-auto space-y-2 pr-2"
+                        class="log-container"
                         hx-trigger=(format!("sse:{}", sse_events))
                         hx-get=(format!("/games/{}/log", game_id))
                         hx-target="#log-entries"
@@ -372,8 +354,8 @@ fn log_entry(msg: &shared::messages::GameMessage) -> maud::Markup {
     let kind_clr = kind_color(&msg.payload);
 
     html! {
-        div class="bg-gray-900 border border-gray-800 rounded p-3" {
-            div class="flex items-center gap-2 text-xs text-gray-500 mb-1" {
+        div class="log-entry" {
+            div class="log-meta" {
                 span { "Day " (msg.game_day) }
                 span { "·" }
                 span class="capitalize" { (phase_label) }
@@ -381,9 +363,9 @@ fn log_entry(msg: &shared::messages::GameMessage) -> maud::Markup {
                 (kind_icon)
                 span class=(kind_clr) { (kind_label) }
             }
-            p class="text-sm text-gray-200" { (msg.content) }
+            p class="log-content" { (msg.content) }
             @if !msg.subject.is_empty() {
-                p class="text-xs text-gray-500 mt-1" { (msg.subject) }
+                p class="log-subject" { (msg.subject) }
             }
         }
     }
@@ -452,12 +434,12 @@ fn message_kind_icon(payload: &shared::messages::MessagePayload) -> maud::Markup
 fn kind_color(payload: &shared::messages::MessagePayload) -> &'static str {
     use shared::messages::MessageKind;
     match payload.kind() {
-        MessageKind::Death => "text-red-400",
-        MessageKind::Combat | MessageKind::CombatSwing => "text-orange-400",
-        MessageKind::Alliance => "text-blue-400",
-        MessageKind::Movement => "text-purple-400",
-        MessageKind::Item | MessageKind::SponsorGift => "text-yellow-400",
-        MessageKind::State | MessageKind::Trauma => "text-gray-400",
+        MessageKind::Death => "kind-death",
+        MessageKind::Combat | MessageKind::CombatSwing => "kind-combat",
+        MessageKind::Alliance => "kind-alliance",
+        MessageKind::Movement => "kind-movement",
+        MessageKind::Item | MessageKind::SponsorGift => "kind-item",
+        MessageKind::State | MessageKind::Trauma => "kind-state",
     }
 }
 
@@ -466,9 +448,9 @@ fn kind_color(payload: &shared::messages::MessagePayload) -> &'static str {
 /// Inline SVG spinner for HTMX loading indicators.
 fn spinner_icon() -> maud::Markup {
     maud::html! {
-        svg class="inline w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" {
-            circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" {}
-            path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" {}
+        svg class="spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" {
+            circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" stroke-opacity="0.25" {}
+            path fill="currentColor" fill-opacity="0.75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" {}
         }
     }
 }
@@ -486,10 +468,10 @@ fn hunger_label(hunger: u8) -> &'static str {
 
 fn hunger_color(hunger: u8) -> &'static str {
     match hunger {
-        0 => "text-green-400",
-        1..=2 => "text-yellow-400",
-        3..=4 => "text-orange-400",
-        _ => "text-red-400",
+        0 => "band-good",
+        1..=2 => "band-warn",
+        3..=4 => "band-warn",
+        _ => "band-danger",
     }
 }
 
@@ -504,10 +486,10 @@ fn thirst_label(thirst: u8) -> &'static str {
 
 fn thirst_color(thirst: u8) -> &'static str {
     match thirst {
-        0 => "text-green-400",
-        1..=2 => "text-yellow-400",
-        3..=4 => "text-orange-400",
-        _ => "text-red-400",
+        0 => "band-good",
+        1..=2 => "band-warn",
+        3..=4 => "band-warn",
+        _ => "band-danger",
     }
 }
 
@@ -527,14 +509,14 @@ fn stamina_label(stamina: u32, max_stamina: u32) -> &'static str {
 
 fn stamina_color(stamina: u32, max_stamina: u32) -> &'static str {
     if max_stamina == 0 {
-        return "text-gray-500";
+        return "band-none";
     }
     let ratio = stamina as f64 / max_stamina as f64;
     if ratio > 0.66 {
-        "text-green-400"
+        "band-good"
     } else if ratio > 0.33 {
-        "text-yellow-400"
+        "band-warn"
     } else {
-        "text-red-400"
+        "band-danger"
     }
 }

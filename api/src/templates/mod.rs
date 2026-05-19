@@ -35,41 +35,55 @@ pub fn base_layout(title: &str, auth: AuthState, content: Markup) -> Markup {
             head {
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1";
-                title { (title) " — Hangrier Games" }
+                title { (title) " — Hangry Games" }
+                link rel="preconnect" href="https://fonts.googleapis.com";
+                link rel="preconnect" href="https://fonts.gstatic.com" crossorigin;
+                link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,16..72,200..800;1,16..72,200..800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet";
                 link rel="stylesheet" href="/assets/main.css";
                 script src="https://unpkg.com/htmx.org@2.0.4" {}
                 script src="https://unpkg.com/htmx-ext-sse@2.2.3" {}
             }
-            body class="bg-gray-950 text-gray-100 min-h-screen" {
-                // SVG sprites served as static files — browser caches after first load
+            body {
+                // SVG sprites served as static files
                 (PreEscaped(r#"<svg xmlns="http://www.w3.org/2000/svg" style="display:none"><use href="/icons/sprite-ui.svg"/></svg>"#))
                 (PreEscaped(r#"<svg xmlns="http://www.w3.org/2000/svg" style="display:none"><use href="/icons/sprite-narrative.svg"/></svg>"#))
-                nav class="bg-gray-900 border-b border-gray-800 px-4 py-3" {
-                    div class="max-w-6xl mx-auto flex items-center justify-between" {
-                        a href="/" class="text-lg font-bold text-amber-400" { "Hangrier Games" }
-                        (nav_links(&auth))
+                header class="topnav" {
+                    div class="container topnav-inner" {
+                        div class="logo" {
+                            "Hangry "
+                            span { "Games" }
+                        }
+                        nav {
+                            a href="/games" class="active" { "Broadcast" }
+                            a href="#" { "Tributes" }
+                            a href="#" { "Arena" }
+                            a href="#" { "Odds" }
+                        }
+                        (auth_links(&auth))
                     }
                 }
-                main class="max-w-6xl mx-auto px-4 py-6" {
+                main {
                     (content)
+                }
+                footer class="pagefoot" {
+                    div class="container row-between" {
+                        span { "© Hangry Games" }
+                        span class="num" { "Server v0.1.15" }
+                    }
                 }
             }
         }
     }
 }
 
-/// Render navigation links based on authentication state.
-pub fn nav_links(auth: &AuthState) -> Markup {
+/// Render auth links based on authentication state.
+fn auth_links(auth: &AuthState) -> Markup {
     html! {
-        div class="flex items-center gap-4" {
-            a href="/games" class="text-sm text-gray-300 hover:text-white" { "Games" }
+        div class="auth-links" {
             @if auth.is_authenticated {
-                a href="/account" class="text-sm text-gray-300 hover:text-white" {
-                    (icon("user"))
-                    " " (auth.username.as_deref().unwrap_or("Account"))
-                }
+                a href="/account" { (auth.username.as_deref().unwrap_or("Account")) }
             } @else {
-                a href="/login" class="text-sm text-gray-300 hover:text-white" { "Login" }
+                a href="/login" { "Login" }
             }
         }
     }
@@ -77,7 +91,7 @@ pub fn nav_links(auth: &AuthState) -> Markup {
 
 pub fn icon(name: &str) -> Markup {
     html! {
-        svg class="inline w-4 h-4" {
+        svg class="icon" {
             use href=(format!("#icon_ui_{}", name)) {}
         }
     }
@@ -85,7 +99,7 @@ pub fn icon(name: &str) -> Markup {
 
 pub fn narrative_icon(name: &str) -> Markup {
     html! {
-        svg class="inline w-4 h-4" {
+        svg class="icon" {
             use href=(format!("#icon_narrative_{}", name)) {}
         }
     }

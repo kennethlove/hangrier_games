@@ -271,9 +271,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "/assets",
             tower_http::services::ServeDir::new(
                 std::path::PathBuf::from(&manifest_dir)
-                    .parent()
-                    .unwrap()
-                    .join("web")
                     .join("assets")
                     .join("dist"),
             ),
@@ -530,6 +527,8 @@ struct GamesListQuery {
     limit: u32,
     #[serde(default)]
     offset: u32,
+    #[serde(default)]
+    status: Option<String>,
 }
 
 fn default_limit() -> u32 {
@@ -552,31 +551,49 @@ async fn games_list_handler(
         .bind(("offset", offset))
         .await;
 
-    let games = match result {
-        Ok(mut result) => {
-            let games: Vec<ListDisplayGame> = result.take(0).unwrap_or_default();
-            let total = games.len() as u32;
-            let has_more = (offset + limit) < total;
-            let pagination = shared::PaginationMetadata {
-                total,
-                limit,
-                offset,
-                has_more,
-            };
-            shared::PaginatedGames { games, pagination }
-        }
-        Err(_) => shared::PaginatedGames {
-            games: vec![],
-            pagination: shared::PaginationMetadata {
-                total: 0,
-                limit,
-                offset,
-                has_more: false,
-            },
-        },
+    let all_games: Vec<ListDisplayGame> = match result {
+        Ok(mut result) => result.take(0).unwrap_or_default(),
+        Err(_) => vec![],
     };
 
-    Html(pages::games_list_page(auth, &games))
+    let games = filter_games_by_status(&all_games, params.status.as_deref());
+    let total = all_games.len() as u32;
+    let has_more = (offset + limit) < total;
+    let pagination = shared::PaginationMetadata {
+        total,
+        limit,
+        offset,
+        has_more,
+    };
+    let paginated = shared::PaginatedGames { games, pagination };
+    let stats = api::templates::pages::GameStats::from_games(&all_games);
+    let active_filter = params.status.as_deref().unwrap_or("");
+
+    Html(pages::games_list_page(auth, &paginated, &stats, active_filter))
+}
+
+fn filter_games_by_status(
+    games: &[ListDisplayGame],
+    status: Option<&str>,
+) -> Vec<ListDisplayGame> {
+    match status {
+        Some("running") => games
+            .iter()
+            .filter(|g| g.status == shared::GameStatus::InProgress)
+            .cloned()
+            .collect(),
+        Some("waiting") => games
+            .iter()
+            .filter(|g| g.status == shared::GameStatus::NotStarted)
+            .cloned()
+            .collect(),
+        Some("finished") => games
+            .iter()
+            .filter(|g| g.status == shared::GameStatus::Finished)
+            .cloned()
+            .collect(),
+        Some(_) | None => games.to_vec(),
+    }
 }
 
 // ── Game detail HTMX handlers ─────────────────────────────────────────

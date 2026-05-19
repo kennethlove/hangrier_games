@@ -22,9 +22,11 @@ use axum::response::Response;
 
 pub const SESSION_COOKIE: &str = "hg_session";
 pub const REFRESH_COOKIE: &str = "hg_refresh";
+pub const CSRF_COOKIE: &str = "hg_csrf";
 
 const SESSION_MAX_AGE: i64 = 3600; // 1 hour, matches generate_access_token
 const REFRESH_MAX_AGE: i64 = 7 * 24 * 3600; // 7 days, matches RefreshToken::new
+const CSRF_MAX_AGE: i64 = 3600; // 1 hour, matches session lifetime
 
 fn is_secure() -> bool {
     std::env::var("ENV")
@@ -82,4 +84,22 @@ pub fn read_cookie<'a>(headers: &'a axum::http::HeaderMap, name: &str) -> Option
         }
     }
     None
+}
+
+/// Generate a random CSRF token.
+pub fn generate_csrf_token() -> String {
+    uuid::Uuid::new_v4().to_string().replace('-', "")
+}
+
+/// Attach a CSRF cookie.
+pub fn set_csrf_cookie(response: &mut Response, token: &str) {
+    append_cookie(
+        response,
+        &build_cookie(CSRF_COOKIE, token, "/", CSRF_MAX_AGE),
+    );
+}
+
+/// Clear the CSRF cookie.
+pub fn clear_csrf_cookie(response: &mut Response) {
+    append_cookie(response, &build_clear_cookie(CSRF_COOKIE, "/"));
 }

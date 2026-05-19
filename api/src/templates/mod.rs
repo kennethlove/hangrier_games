@@ -1,5 +1,6 @@
 use maud::{DOCTYPE, Markup, PreEscaped, html};
 
+pub mod auth;
 pub mod game_detail;
 pub mod pages;
 pub mod timeline;

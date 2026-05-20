@@ -13,6 +13,17 @@ pub enum AuthTab {
     Reset,
 }
 
+impl AuthTab {
+    pub fn from_query(tab: Option<&str>) -> Self {
+        match tab {
+            Some("login") => AuthTab::Login,
+            Some("register") => AuthTab::Register,
+            Some("reset") => AuthTab::Reset,
+            _ => AuthTab::default(),
+        }
+    }
+}
+
 /// Unified tabbed auth page with login, register, and reset panels.
 pub fn auth_page(error: Option<&str>, default_tab: AuthTab) -> maud::Markup {
     auth_layout(
@@ -31,7 +42,8 @@ pub fn auth_page(error: Option<&str>, default_tab: AuthTab) -> maud::Markup {
                     div class="error-banner" { (err) }
                 }
 
-                form method="POST" action="/login" {
+                form method="POST" action="/auth" {
+                    input type="hidden" name="auth_action" value="login" {}
                     input type="hidden" name="csrf_token" value=(csrf_placeholder()) {}
 
                     div class="form-group" {
@@ -84,7 +96,8 @@ pub fn auth_page(error: Option<&str>, default_tab: AuthTab) -> maud::Markup {
                     div class="error-banner" { (err) }
                 }
 
-                form method="POST" action="/register" {
+                form method="POST" action="/auth" {
+                    input type="hidden" name="auth_action" value="register" {}
                     input type="hidden" name="csrf_token" value=(csrf_placeholder()) {}
 
                     div class="form-group" {
@@ -153,16 +166,6 @@ pub fn auth_page(error: Option<&str>, default_tab: AuthTab) -> maud::Markup {
             }
         },
     )
-}
-
-/// Login form page — delegates to unified auth_page.
-pub fn login_page(_auth: AuthState, error: Option<&str>) -> maud::Markup {
-    auth_page(error, AuthTab::Login)
-}
-
-/// Registration form page — delegates to unified auth_page.
-pub fn register_page(_auth: AuthState, error: Option<&str>) -> maud::Markup {
-    auth_page(error, AuthTab::Register)
 }
 
 /// Account dashboard page.
@@ -353,20 +356,10 @@ fn csrf_placeholder() -> &'static str {
     "__CSRF_TOKEN__"
 }
 
-/// Auth page with CSRF token injected (used by GET /login and GET /register).
+/// Auth page with CSRF token injected (used by GET /auth).
 pub fn auth_page_with_csrf(csrf: &str, default_tab: AuthTab) -> String {
     let markup: String = auth_page(None, default_tab).into();
     markup.replace(csrf_placeholder(), csrf)
-}
-
-/// Login form page with CSRF token injected — delegates to auth_page_with_csrf.
-pub fn login_page_with_csrf(csrf: &str) -> String {
-    auth_page_with_csrf(csrf, AuthTab::Login)
-}
-
-/// Registration form page with CSRF token injected — delegates to auth_page_with_csrf.
-pub fn register_page_with_csrf(csrf: &str) -> String {
-    auth_page_with_csrf(csrf, AuthTab::Register)
 }
 
 /// Create game form page with CSRF token injected.

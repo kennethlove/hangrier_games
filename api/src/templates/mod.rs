@@ -294,7 +294,7 @@ fn auth_links(auth: &AuthState) -> Markup {
             @if auth.is_authenticated {
                 a href="/account" { (auth.username.as_deref().unwrap_or("Account")) }
             } @else {
-                a href="/login" { "Login" }
+                a href="/auth" { "Login" }
             }
         }
     }

@@ -306,12 +306,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/games/{id}/areas", axum::routing::get(game_areas_handler))
         .route("/games/{id}/log", axum::routing::get(game_log_handler))
         .route(
-            "/login",
-            axum::routing::get(login_handler).post(login_post_handler),
-        )
-        .route(
-            "/register",
-            axum::routing::get(register_handler).post(register_post_handler),
+            "/auth",
+            axum::routing::get(auth_handler).post(auth_post_handler),
         )
         .route("/logout", axum::routing::post(logout_handler))
         .route("/account", axum::routing::get(account_handler))
@@ -726,17 +722,16 @@ fn validate_csrf(headers: &axum::http::HeaderMap, form_token: &str) -> bool {
 // ── Auth form types ─────────────────────────────────────────────────
 
 #[derive(serde::Deserialize)]
-struct LoginRequest {
-    username: String,
-    password: String,
-    #[serde(default)]
-    csrf_token: String,
+struct AuthTabQuery {
+    tab: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
-struct RegisterRequest {
+struct AuthPostRequest {
+    auth_action: String,
     username: String,
     password: String,
+    #[serde(default)]
     confirm_password: String,
     #[serde(default)]
     csrf_token: String,
@@ -754,15 +749,17 @@ struct CreateGameRequest {
 
 // ── Auth page handlers ──────────────────────────────────────────────
 
-/// GET /login — render login form with CSRF token.
-async fn login_handler() -> impl IntoResponse {
+/// GET /auth — render unified auth form with CSRF token.
+async fn auth_handler(
+    headers: axum::http::HeaderMap,
+    Query(params): Query<AuthTabQuery>,
+) -> impl IntoResponse {
+    let auth = extract_auth(&headers);
+    if auth.is_authenticated {
+        return Redirect::to("/games").into_response();
+    }
     let csrf = generate_csrf_token();
-    let mut response = auth::login_page(AuthState::guest(), None).into_response();
-    api::cookies::set_csrf_cookie(&mut response, &csrf);
-    // Inject CSRF token into the form via a hidden field override.
-    // The template uses csrf_placeholder() which returns ""; we patch
-    // the response body by re-rendering with the actual token.
-    let body = auth::login_page_with_csrf(&csrf);
+    let body = auth::auth_page_with_csrf(&csrf, auth::AuthTab::from_query(params.tab.as_deref()));
     (
         [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
         body,
@@ -770,14 +767,52 @@ async fn login_handler() -> impl IntoResponse {
         .into_response()
 }
 
-/// POST /login — authenticate user, set cookies, redirect to /account.
-async fn login_post_handler(
+/// POST /auth — dispatch to login or register based on auth_action field.
+async fn auth_post_handler(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
-    Form(form): Form<LoginRequest>,
+    Form(form): Form<AuthPostRequest>,
 ) -> impl IntoResponse {
-    if !validate_csrf(&headers, &form.csrf_token) {
-        return Redirect::to("/login").into_response();
+    let redirect_on_error = "/auth";
+    match form.auth_action.as_str() {
+        "login" => {
+            handle_login_post(
+                &state,
+                &headers,
+                form.username,
+                form.password,
+                form.csrf_token,
+                redirect_on_error,
+            )
+            .await
+        }
+        "register" => {
+            handle_register_post(
+                &state,
+                &headers,
+                form.username,
+                form.password,
+                form.confirm_password,
+                form.csrf_token,
+                redirect_on_error,
+            )
+            .await
+        }
+        _ => Redirect::to("/auth").into_response(),
+    }
+}
+
+/// Handle login POST logic.
+async fn handle_login_post(
+    state: &AppState,
+    headers: &axum::http::HeaderMap,
+    username: String,
+    password: String,
+    csrf_token: String,
+    redirect_on_error: &str,
+) -> Response {
+    if !validate_csrf(headers, &csrf_token) {
+        return Redirect::to(redirect_on_error).into_response();
     }
 
     let user_db = (*state.db).clone();
@@ -787,7 +822,7 @@ async fn login_post_handler(
         .await
         .is_err()
     {
-        return Redirect::to("/login").into_response();
+        return Redirect::to(redirect_on_error).into_response();
     }
 
     let result = user_db
@@ -796,8 +831,8 @@ async fn login_post_handler(
             namespace: &state.namespace,
             database: &state.database,
             params: RegistrationUser {
-                username: form.username.clone(),
-                password: form.password.clone(),
+                username: username.clone(),
+                password,
             },
         })
         .await;
@@ -806,7 +841,6 @@ async fn login_post_handler(
         Ok(auth_result) => {
             let jwt = auth_result.into_insecure_token();
 
-            // Build token pair (access + refresh)
             use api::auth::{RefreshToken, TokenResponse, store_refresh_token};
             use api::cookies::{set_refresh_cookie, set_session_cookie};
             use surrealdb::sql::Thing;
@@ -815,12 +849,12 @@ async fn login_post_handler(
                 &extract_user_id_from_jwt_raw(&jwt).unwrap_or_default(),
             ) {
                 Ok(id) => id,
-                Err(_) => return Redirect::to("/login").into_response(),
+                Err(_) => return Redirect::to(redirect_on_error).into_response(),
             };
 
-            let refresh_token = RefreshToken::new(user_id, form.username);
+            let refresh_token = RefreshToken::new(user_id, username);
             if store_refresh_token(&user_db, &refresh_token).await.is_err() {
-                return Redirect::to("/login").into_response();
+                return Redirect::to(redirect_on_error).into_response();
             }
 
             let pair = TokenResponse {
@@ -833,33 +867,26 @@ async fn login_post_handler(
             set_refresh_cookie(&mut response, &pair.refresh_token);
             response
         }
-        Err(_) => Redirect::to("/login").into_response(),
+        Err(_) => Redirect::to(redirect_on_error).into_response(),
     }
 }
 
-/// GET /register — render registration form with CSRF token.
-async fn register_handler() -> impl IntoResponse {
-    let csrf = generate_csrf_token();
-    let body = auth::register_page_with_csrf(&csrf);
-    (
-        [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
-        body,
-    )
-        .into_response()
-}
-
-/// POST /register — create user, set cookies, redirect to /account.
-async fn register_post_handler(
-    State(state): State<AppState>,
-    headers: axum::http::HeaderMap,
-    Form(form): Form<RegisterRequest>,
-) -> impl IntoResponse {
-    if !validate_csrf(&headers, &form.csrf_token) {
-        return Redirect::to("/register").into_response();
+/// Handle register POST logic.
+async fn handle_register_post(
+    state: &AppState,
+    headers: &axum::http::HeaderMap,
+    username: String,
+    password: String,
+    confirm_password: String,
+    csrf_token: String,
+    redirect_on_error: &str,
+) -> Response {
+    if !validate_csrf(headers, &csrf_token) {
+        return Redirect::to(redirect_on_error).into_response();
     }
 
-    if form.password != form.confirm_password {
-        return Redirect::to("/register").into_response();
+    if password != confirm_password {
+        return Redirect::to(redirect_on_error).into_response();
     }
 
     let user_db = (*state.db).clone();
@@ -869,7 +896,7 @@ async fn register_post_handler(
         .await
         .is_err()
     {
-        return Redirect::to("/register").into_response();
+        return Redirect::to(redirect_on_error).into_response();
     }
 
     let result = user_db
@@ -878,8 +905,8 @@ async fn register_post_handler(
             namespace: &state.namespace,
             database: &state.database,
             params: RegistrationUser {
-                username: form.username.clone(),
-                password: form.password.clone(),
+                username: username.clone(),
+                password,
             },
         })
         .await;
@@ -896,12 +923,12 @@ async fn register_post_handler(
                 &extract_user_id_from_jwt_raw(&jwt).unwrap_or_default(),
             ) {
                 Ok(id) => id,
-                Err(_) => return Redirect::to("/register").into_response(),
+                Err(_) => return Redirect::to(redirect_on_error).into_response(),
             };
 
-            let refresh_token = RefreshToken::new(user_id, form.username);
+            let refresh_token = RefreshToken::new(user_id, username);
             if store_refresh_token(&user_db, &refresh_token).await.is_err() {
-                return Redirect::to("/register").into_response();
+                return Redirect::to(redirect_on_error).into_response();
             }
 
             let pair = TokenResponse {
@@ -914,18 +941,18 @@ async fn register_post_handler(
             set_refresh_cookie(&mut response, &pair.refresh_token);
             response
         }
-        Err(_) => Redirect::to("/register").into_response(),
+        Err(_) => Redirect::to(redirect_on_error).into_response(),
     }
 }
 
-/// POST /logout — revoke refresh token, clear cookies, redirect to /login.
+/// POST /logout — revoke refresh token, clear cookies, redirect to /auth.
 async fn logout_handler(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
     Form(form): Form<LogoutRequest>,
 ) -> impl IntoResponse {
     if !validate_csrf(&headers, &form.csrf_token) {
-        return Redirect::to("/login").into_response();
+        return Redirect::to("/auth").into_response();
     }
 
     let refresh = read_cookie(&headers, api::cookies::REFRESH_COOKIE).map(|s| s.to_owned());
@@ -942,7 +969,7 @@ async fn logout_handler(
         }
     }
 
-    let mut response = Redirect::to("/login").into_response();
+    let mut response = Redirect::to("/auth").into_response();
     api::cookies::clear_auth_cookies(&mut response);
     api::cookies::clear_csrf_cookie(&mut response);
     response
@@ -961,7 +988,7 @@ async fn account_handler(
 ) -> Response {
     let session = match require_auth(&state, &headers).await {
         Ok(s) => s,
-        Err(_) => return Redirect::to("/login").into_response(),
+        Err(_) => return Redirect::to("/auth").into_response(),
     };
 
     let user_db = (*state.db).clone();
@@ -971,7 +998,7 @@ async fn account_handler(
         .await
         .is_err()
     {
-        return Redirect::to("/login").into_response();
+        return Redirect::to("/auth").into_response();
     }
 
     let games: Vec<ListDisplayGame> = user_db
@@ -990,7 +1017,7 @@ async fn create_game_handler(
     headers: axum::http::HeaderMap,
 ) -> impl IntoResponse {
     if require_auth(&state, &headers).await.is_err() {
-        return Redirect::to("/login").into_response();
+        return Redirect::to("/auth").into_response();
     }
 
     let csrf = generate_csrf_token();
@@ -1009,12 +1036,12 @@ async fn create_game_post_handler(
     Form(form): Form<CreateGameRequest>,
 ) -> Response {
     if !validate_csrf(&headers, &form.csrf_token) {
-        return Redirect::to("/login").into_response();
+        return Redirect::to("/auth").into_response();
     }
 
     let token = match read_cookie(&headers, SESSION_COOKIE) {
         Some(t) => t.to_owned(),
-        None => return Redirect::to("/login").into_response(),
+        None => return Redirect::to("/auth").into_response(),
     };
 
     let user_db = match authenticate_db(&state, &token).await {
@@ -1193,10 +1220,10 @@ async fn authenticate_db(
         .await
         .is_err()
     {
-        return Err(Redirect::to("/login"));
+        return Err(Redirect::to("/auth"));
     }
     if user_db.authenticate(Jwt::from(token)).await.is_err() {
-        return Err(Redirect::to("/login"));
+        return Err(Redirect::to("/auth"));
     }
     Ok(user_db)
 }

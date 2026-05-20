@@ -2,157 +2,167 @@ use maud::html;
 use shared::{ListDisplayGame, UserSession};
 
 use super::pages::status_color;
-use super::{AuthState, base_layout, icon};
+use super::{AuthState, auth_layout, base_layout, icon};
 
-/// Login form page.
-pub fn login_page(auth: AuthState, error: Option<&str>) -> maud::Markup {
-    base_layout(
-        "Login",
-        auth,
+/// Which tab to activate by default on the auth page.
+#[derive(Clone, Copy, Default)]
+pub enum AuthTab {
+    #[default]
+    Login,
+    Register,
+    Reset,
+}
+
+/// Unified tabbed auth page with login, register, and reset panels.
+pub fn auth_page(error: Option<&str>, default_tab: AuthTab) -> maud::Markup {
+    auth_layout(
+        "Auth",
         html! {
-            div class="max-w-md mx-auto py-12" {
-                h1 class="text-2xl font-bold text-amber-400 mb-6 text-center" { "Login" }
+            @let login_active = matches!(default_tab, AuthTab::Login);
+            @let register_active = matches!(default_tab, AuthTab::Register);
+            @let reset_active = matches!(default_tab, AuthTab::Reset);
+
+            // ── Login tab ──
+            div class=(if login_active { "tab-panel active" } else { "tab-panel" }) id="login" {
+                h2 class="auth-title" { "Welcome back" }
+                p class="auth-subtitle" { "Sign in to your account to continue." }
 
                 @if let Some(err) = error {
-                    div class="mb-4 p-3 bg-red-900/30 border border-red-700 rounded-lg text-red-300 text-sm" {
-                        (err)
-                    }
+                    div class="error-banner" { (err) }
                 }
 
-                form method="POST" action="/login" class="space-y-4" {
+                form method="POST" action="/login" {
                     input type="hidden" name="csrf_token" value=(csrf_placeholder()) {}
 
-                    div {
-                        label for="username" class="block text-sm font-medium text-gray-300 mb-1" {
-                            "Username"
-                        }
-                        input
-                            type="text"
-                            id="username"
-                            name="username"
-                            required
-                            minlength="3"
-                            maxlength="50"
-                            class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                    div class="form-group" {
+                        label for="username" { "Username" }
+                        input type="text" id="username" name="username"
+                            required minlength="3" maxlength="50"
                             placeholder="Your username";
                     }
 
-                    div {
-                        label for="password" class="block text-sm font-medium text-gray-300 mb-1" {
-                            "Password"
-                        }
-                        input
-                            type="password"
-                            id="password"
-                            name="password"
-                            required
-                            minlength="8"
-                            maxlength="72"
-                            class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                    div class="form-group" {
+                        label for="password" { "Password" }
+                        input type="password" id="password" name="password"
+                            required minlength="8" maxlength="72"
                             placeholder="Your password";
                     }
 
-                    button
-                        type="submit"
-                        class="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-semibold px-4 py-2 rounded relative"
+                    div class="form-row" {
+                        label {
+                            input type="checkbox" name="remember" value="true";
+                            " Remember me"
+                        }
+                        a href="#" onclick="switchTab('reset');return false;" {
+                            "Forgot password?"
+                        }
+                    }
+
+                    button type="submit" class="btn btn-primary"
                         hx-indicator="#login-spinner" {
-                        "Login"
-                        span id="login-spinner" class="htmx-indicator absolute right-3 top-1/2 -translate-y-1/2" {
+                        "Sign In"
+                        span id="login-spinner" class="htmx-indicator" {
                             (spinner_icon())
                         }
                     }
                 }
 
-                p class="mt-4 text-center text-sm text-gray-400" {
+                div class="auth-footer" {
                     "Don't have an account? "
-                    a href="/register" class="text-amber-400 hover:text-amber-300" { "Register" }
+                    a href="#" onclick="switchTab('register');return false;" {
+                        "Create one"
+                    }
+                }
+            }
+
+            // ── Register tab ──
+            div class=(if register_active { "tab-panel active" } else { "tab-panel" }) id="register" {
+                h2 class="auth-title" { "Create account" }
+                p class="auth-subtitle" { "Join the broadcast. No credit card required." }
+
+                @if let Some(err) = error {
+                    div class="error-banner" { (err) }
+                }
+
+                form method="POST" action="/register" {
+                    input type="hidden" name="csrf_token" value=(csrf_placeholder()) {}
+
+                    div class="form-group" {
+                        label for="reg-username" { "Username" }
+                        input type="text" id="reg-username" name="username"
+                            required minlength="3" maxlength="50"
+                            placeholder="3-50 characters";
+                    }
+
+                    div class="form-group" {
+                        label for="reg-password" { "Password" }
+                        input type="password" id="reg-password" name="password"
+                            required minlength="8" maxlength="72"
+                            placeholder="8-72 characters";
+                    }
+
+                    div class="form-group" {
+                        label for="reg-confirm" { "Confirm Password" }
+                        input type="password" id="reg-confirm" name="confirm_password"
+                            required minlength="8" maxlength="72"
+                            placeholder="Repeat your password";
+                    }
+
+                    button type="submit" class="btn btn-primary"
+                        hx-indicator="#register-spinner" {
+                        "Create Account"
+                        span id="register-spinner" class="htmx-indicator" {
+                            (spinner_icon())
+                        }
+                    }
+                }
+
+                div class="auth-footer" {
+                    "Already have an account? "
+                    a href="#" onclick="switchTab('login');return false;" {
+                        "Sign in"
+                    }
+                }
+            }
+
+            // ── Reset tab ──
+            div class=(if reset_active { "tab-panel active" } else { "tab-panel" }) id="reset" {
+                h2 class="auth-title" { "Reset password" }
+                p class="auth-subtitle" { "Enter your username and we'll send you a reset link." }
+
+                form method="POST" action="/auth/reset-password" {
+                    input type="hidden" name="csrf_token" value=(csrf_placeholder()) {}
+
+                    div class="form-group" {
+                        label for="reset-username" { "Username" }
+                        input type="text" id="reset-username" name="username"
+                            required placeholder="Your username";
+                    }
+
+                    button type="submit" class="btn btn-primary" {
+                        "Send Reset Link"
+                    }
+                }
+
+                div class="divider" { "or" }
+
+                button type="button" class="btn btn-ghost"
+                    onclick="switchTab('login')" {
+                    "Back to Sign In"
                 }
             }
         },
     )
 }
 
-/// Registration form page.
-pub fn register_page(auth: AuthState, error: Option<&str>) -> maud::Markup {
-    base_layout(
-        "Register",
-        auth,
-        html! {
-            div class="max-w-md mx-auto py-12" {
-                h1 class="text-2xl font-bold text-amber-400 mb-6 text-center" { "Register" }
+/// Login form page — delegates to unified auth_page.
+pub fn login_page(_auth: AuthState, error: Option<&str>) -> maud::Markup {
+    auth_page(error, AuthTab::Login)
+}
 
-                @if let Some(err) = error {
-                    div class="mb-4 p-3 bg-red-900/30 border border-red-700 rounded-lg text-red-300 text-sm" {
-                        (err)
-                    }
-                }
-
-                form method="POST" action="/register" class="space-y-4" {
-                    input type="hidden" name="csrf_token" value=(csrf_placeholder()) {}
-
-                    div {
-                        label for="username" class="block text-sm font-medium text-gray-300 mb-1" {
-                            "Username"
-                        }
-                        input
-                            type="text"
-                            id="username"
-                            name="username"
-                            required
-                            minlength="3"
-                            maxlength="50"
-                            class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-500"
-                            placeholder="3-50 characters";
-                    }
-
-                    div {
-                        label for="password" class="block text-sm font-medium text-gray-300 mb-1" {
-                            "Password"
-                        }
-                        input
-                            type="password"
-                            id="password"
-                            name="password"
-                            required
-                            minlength="8"
-                            maxlength="72"
-                            class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-500"
-                            placeholder="8-72 characters";
-                    }
-
-                    div {
-                        label for="confirm_password" class="block text-sm font-medium text-gray-300 mb-1" {
-                            "Confirm Password"
-                        }
-                        input
-                            type="password"
-                            id="confirm_password"
-                            name="confirm_password"
-                            required
-                            minlength="8"
-                            maxlength="72"
-                            class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-500"
-                            placeholder="Repeat your password";
-                    }
-
-                    button
-                        type="submit"
-                        class="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-semibold px-4 py-2 rounded relative"
-                        hx-indicator="#register-spinner" {
-                        "Create Account"
-                        span id="register-spinner" class="htmx-indicator absolute right-3 top-1/2 -translate-y-1/2" {
-                            (spinner_icon())
-                        }
-                    }
-                }
-
-                p class="mt-4 text-center text-sm text-gray-400" {
-                    "Already have an account? "
-                    a href="/login" class="text-amber-400 hover:text-amber-300" { "Login" }
-                }
-            }
-        },
-    )
+/// Registration form page — delegates to unified auth_page.
+pub fn register_page(_auth: AuthState, error: Option<&str>) -> maud::Markup {
+    auth_page(error, AuthTab::Register)
 }
 
 /// Account dashboard page.
@@ -340,19 +350,23 @@ fn spinner_icon() -> maud::Markup {
 /// Placeholder for CSRF token value in templates.
 /// The real token is injected by the handler via a form value override.
 fn csrf_placeholder() -> &'static str {
-    ""
+    "__CSRF_TOKEN__"
 }
 
-/// Login form page with CSRF token injected.
+/// Auth page with CSRF token injected (used by GET /login and GET /register).
+pub fn auth_page_with_csrf(csrf: &str, default_tab: AuthTab) -> String {
+    let markup: String = auth_page(None, default_tab).into();
+    markup.replace(csrf_placeholder(), csrf)
+}
+
+/// Login form page with CSRF token injected — delegates to auth_page_with_csrf.
 pub fn login_page_with_csrf(csrf: &str) -> String {
-    let markup: String = login_page(AuthState::guest(), None).into();
-    markup.replace(csrf_placeholder(), csrf)
+    auth_page_with_csrf(csrf, AuthTab::Login)
 }
 
-/// Registration form page with CSRF token injected.
+/// Registration form page with CSRF token injected — delegates to auth_page_with_csrf.
 pub fn register_page_with_csrf(csrf: &str) -> String {
-    let markup: String = register_page(AuthState::guest(), None).into();
-    markup.replace(csrf_placeholder(), csrf)
+    auth_page_with_csrf(csrf, AuthTab::Register)
 }
 
 /// Create game form page with CSRF token injected.

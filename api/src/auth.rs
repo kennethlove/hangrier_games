@@ -2,9 +2,9 @@ use crate::cookies::{
     REFRESH_COOKIE, clear_auth_cookies, read_cookie, set_refresh_cookie, set_session_cookie,
 };
 use crate::{AppError, AppState};
-use axum::extract::State;
+use axum::extract::{Form, State};
 use axum::http::{HeaderMap, StatusCode};
-use axum::response::{IntoResponse, Response};
+use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::post;
 use axum::{Json, Router};
 use chrono::Utc;
@@ -24,7 +24,16 @@ pub static AUTH_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
     Router::new()
         .route("/refresh", post(refresh_token))
         .route("/logout", post(logout))
+        .route("/reset-password", post(reset_password_stub))
 });
+
+#[derive(Deserialize)]
+struct ResetPasswordRequest {
+    username: String,
+    #[serde(default)]
+    #[allow(dead_code)] // accepted from form, not yet verified — see TODO below
+    csrf_token: String,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RefreshToken {
@@ -284,6 +293,22 @@ async fn logout(
     let mut response = StatusCode::NO_CONTENT.into_response();
     clear_auth_cookies(&mut response);
     Ok(response)
+}
+
+/// Stub handler for password reset requests.
+///
+/// TODO: Real password reset flow — see beads issue. For now, always
+/// redirects with a generic message so we never disclose whether a
+/// username exists. No DB lookup, no email, no token issued.
+async fn reset_password_stub(Form(req): Form<ResetPasswordRequest>) -> Redirect {
+    let sanitized: String = req
+        .username
+        .chars()
+        .filter(|c| c.is_alphanumeric() || matches!(*c, '_' | '-' | '.'))
+        .take(50)
+        .collect();
+    tracing::info!("password reset requested for username={}", sanitized);
+    Redirect::to("/auth?tab=login")
 }
 
 #[cfg(test)]

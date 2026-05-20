@@ -340,7 +340,7 @@ fn spinner_icon() -> maud::Markup {
 /// Placeholder for CSRF token value in templates.
 /// The real token is injected by the handler via a form value override.
 fn csrf_placeholder() -> &'static str {
-    ""
+    "__CSRF_TOKEN__"
 }
 
 /// Login form page with CSRF token injected.

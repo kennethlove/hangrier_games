@@ -337,10 +337,10 @@ fn compute_progress(day: Option<u32>) -> f64 {
 
 pub fn status_color(status: &str) -> &'static str {
     match status {
-        "NotStarted" => "band-warn",
-        "InProgress" => "band-good",
-        "Finished" => "band-none",
-        _ => "band-none",
+        "NotStarted" => "status-not-started",
+        "InProgress" => "status-in-progress",
+        "Finished" => "status-finished",
+        _ => "status-finished",
     }
 }
 

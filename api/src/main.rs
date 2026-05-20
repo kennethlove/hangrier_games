@@ -569,13 +569,15 @@ async fn games_list_handler(
     let stats = api::templates::pages::GameStats::from_games(&all_games);
     let active_filter = params.status.as_deref().unwrap_or("");
 
-    Html(pages::games_list_page(auth, &paginated, &stats, active_filter))
+    Html(pages::games_list_page(
+        auth,
+        &paginated,
+        &stats,
+        active_filter,
+    ))
 }
 
-fn filter_games_by_status(
-    games: &[ListDisplayGame],
-    status: Option<&str>,
-) -> Vec<ListDisplayGame> {
+fn filter_games_by_status(games: &[ListDisplayGame], status: Option<&str>) -> Vec<ListDisplayGame> {
     match status {
         Some("running") => games
             .iter()

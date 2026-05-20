@@ -511,7 +511,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
 }
 .tribute-card .card-status { font-size: var(--fs-meta); }
 .tribute-card .card-status.alive { color: var(--running); }
-.tribute-card .card-status.dead { color: oklch(55% 0.2 25); }
+.tribute-card .card-status.dead { color: oklch(48% 0.22 25); }
 .tribute-card .card-stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -678,7 +678,13 @@ h1, h2, h3, h4 { text-wrap: balance; }
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
-.htmx-indicator { display: none; }
+.htmx-indicator {
+  display: none;
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
 .htmx-request .htmx-indicator,
 .htmx-indicator.htmx-request { display: inline; }
 
@@ -690,3 +696,11 @@ h1, h2, h3, h4 { text-wrap: balance; }
   vertical-align: -0.125em;
   flex-shrink: 0;
 }
+
+/* Status classes */
+.status-not-started { color: var(--waiting); background: color-mix(in oklch, var(--waiting) 10%, var(--surface)); }
+.status-in-progress { color: var(--running); background: color-mix(in oklch, var(--running) 10%, var(--surface)); }
+.status-finished { color: var(--muted); background: color-mix(in oklch, var(--muted) 10%, var(--surface)); }
+
+/* Utilities */
+.text-center { text-align: center; }

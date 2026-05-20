@@ -345,10 +345,10 @@ pub fn status_color(status: &str) -> &'static str {
 }
 
 /// 404 Not Found page.
-pub fn not_found_page(message: &str) -> maud::Markup {
+pub fn not_found_page(auth: AuthState, message: &str) -> maud::Markup {
     base_layout(
         "Not Found",
-        AuthState::guest(),
+        auth,
         html! {
             div class="text-center py-16" {
                 div class="mb-6" {
@@ -367,10 +367,10 @@ pub fn not_found_page(message: &str) -> maud::Markup {
 }
 
 /// 500 Internal Server Error page.
-pub fn server_error_page(message: &str) -> maud::Markup {
+pub fn server_error_page(auth: AuthState, message: &str) -> maud::Markup {
     base_layout(
         "Server Error",
-        AuthState::guest(),
+        auth,
         html! {
             div class="text-center py-16" {
                 div class="mb-6" {

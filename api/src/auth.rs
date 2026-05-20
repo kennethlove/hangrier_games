@@ -164,8 +164,14 @@ pub async fn revoke_refresh_token(
     Ok(())
 }
 
-/// Generate a new access token for a user
-fn generate_access_token(
+/// Generate a new access token for a user.
+///
+/// Produces a JWT whose claims mirror SurrealDB's own format (same `iss`,
+/// `ns`, `db`, `ac`, `id`, HS512 + shared secret) so the SurrealDB SDK
+/// accepts it for record-level authentication, *plus* a `sub` claim
+/// carrying the username so display paths (`extract_auth_state`) can read
+/// it without a DB round-trip.
+pub fn generate_access_token(
     user_id: &Thing,
     username: &str,
     namespace: &str,

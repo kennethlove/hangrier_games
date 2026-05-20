@@ -1,8 +1,8 @@
-use maud::html;
+use maud::{PreEscaped, html};
 use shared::{ListDisplayGame, UserSession};
 
 use super::pages::status_color;
-use super::{AuthState, auth_layout, base_layout, icon};
+use super::{AuthState, base_layout, icon};
 
 /// Which tab to activate by default on the auth page.
 #[derive(Clone, Copy, Default)]
@@ -25,150 +25,186 @@ impl AuthTab {
 }
 
 /// Unified tabbed auth page with login, register, and reset panels.
-pub fn auth_page(error: Option<&str>, default_tab: AuthTab) -> maud::Markup {
-    auth_layout(
-        "Auth",
+pub fn auth_page(auth: AuthState, error: Option<&str>, default_tab: AuthTab) -> maud::Markup {
+    base_layout(
+        "Sign In",
+        auth,
         html! {
-            @let login_active = matches!(default_tab, AuthTab::Login);
-            @let register_active = matches!(default_tab, AuthTab::Register);
-            @let reset_active = matches!(default_tab, AuthTab::Reset);
-
-            // ── Login tab ──
-            div class=(if login_active { "tab-panel active" } else { "tab-panel" }) id="login" {
-                h2 class="auth-title" { "Welcome back" }
-                p class="auth-subtitle" { "Sign in to your account to continue." }
-
-                @if let Some(err) = error {
-                    div class="error-banner" { (err) }
+            div class="auth-card" {
+                div class="auth-logo" { "Hangry " span { "Games" } }
+                div class="tab-bar" {
+                    @let login_btn_active = matches!(default_tab, AuthTab::Login);
+                    @let register_btn_active = matches!(default_tab, AuthTab::Register);
+                    @let reset_btn_active = matches!(default_tab, AuthTab::Reset);
+                    button class=(if login_btn_active { "tab-btn active" } else { "tab-btn" }) data-tab="login" { "Sign In" }
+                    button class=(if register_btn_active { "tab-btn active" } else { "tab-btn" }) data-tab="register" { "Register" }
+                    button class=(if reset_btn_active { "tab-btn active" } else { "tab-btn" }) data-tab="reset" { "Reset Password" }
                 }
 
-                form method="POST" action="/login" {
-                    input type="hidden" name="csrf_token" value=(csrf_placeholder()) {}
+                @let login_active = matches!(default_tab, AuthTab::Login);
+                @let register_active = matches!(default_tab, AuthTab::Register);
+                @let reset_active = matches!(default_tab, AuthTab::Reset);
 
-                    div class="form-group" {
-                        label for="username" { "Username" }
-                        input type="text" id="username" name="username"
-                            required minlength="3" maxlength="50"
-                            placeholder="Your username";
-                    }
+                // ── Login tab ──
+                div class=(if login_active { "tab-panel active" } else { "tab-panel" }) id="login" {
+                    h2 class="auth-title" { "Welcome back" }
+                    p class="auth-subtitle" { "Sign in to your account to continue." }
 
-                    div class="form-group" {
-                        label for="password" { "Password" }
-                        input type="password" id="password" name="password"
-                            required minlength="8" maxlength="72"
-                            placeholder="Your password";
-                    }
-
-                    div class="form-row" {
-                        label {
-                            input type="checkbox" name="remember" value="true";
-                            " Remember me"
-                        }
-                        a href="#" onclick="switchTab('reset');return false;" {
-                            "Forgot password?"
+                    @if login_active {
+                        @if let Some(err) = error {
+                            div class="error-banner" { (err) }
                         }
                     }
 
-                    button type="submit" class="btn btn-primary"
-                        hx-indicator="#login-spinner" {
-                        "Sign In"
-                        span id="login-spinner" class="htmx-indicator" {
-                            (spinner_icon())
+                    form method="POST" action="/auth/login" {
+                        input type="hidden" name="csrf_token" value=(csrf_placeholder()) {}
+
+                        div class="form-group" {
+                            label for="username" { "Username" }
+                            input type="text" id="username" name="username"
+                                required minlength="3" maxlength="50"
+                                placeholder="Your username";
+                        }
+
+                        div class="form-group" {
+                            label for="password" { "Password" }
+                            input type="password" id="password" name="password"
+                                required minlength="8" maxlength="72"
+                                placeholder="Your password";
+                        }
+
+                        div class="form-row" {
+                            label {
+                                input type="checkbox" name="remember" value="true";
+                                " Remember me"
+                            }
+                            a href="#" onclick="switchTab('reset');return false;" {
+                                "Forgot password?"
+                            }
+                        }
+
+                        button type="submit" class="btn btn-primary"
+                            hx-indicator="#login-spinner" {
+                            "Sign In"
+                            span id="login-spinner" class="htmx-indicator" {
+                                (spinner_icon())
+                            }
+                        }
+                    }
+
+                    div class="auth-footer" {
+                        "Don't have an account? "
+                        a href="#" onclick="switchTab('register');return false;" {
+                            "Create one"
                         }
                     }
                 }
 
-                div class="auth-footer" {
-                    "Don't have an account? "
-                    a href="#" onclick="switchTab('register');return false;" {
-                        "Create one"
+                // ── Register tab ──
+                div class=(if register_active { "tab-panel active" } else { "tab-panel" }) id="register" {
+                    h2 class="auth-title" { "Create account" }
+                    p class="auth-subtitle" { "Join the broadcast. No credit card required." }
+
+                    @if register_active {
+                        @if let Some(err) = error {
+                            div class="error-banner" { (err) }
+                        }
+                    }
+
+                    form method="POST" action="/auth/register" {
+                        input type="hidden" name="csrf_token" value=(csrf_placeholder()) {}
+
+                        div class="form-group" {
+                            label for="reg-username" { "Username" }
+                            input type="text" id="reg-username" name="username"
+                                required minlength="3" maxlength="50"
+                                placeholder="3-50 characters";
+                        }
+
+                        div class="form-group" {
+                            label for="reg-password" { "Password" }
+                            input type="password" id="reg-password" name="password"
+                                required minlength="8" maxlength="72"
+                                placeholder="8-72 characters";
+                        }
+
+                        div class="form-group" {
+                            label for="reg-confirm" { "Confirm Password" }
+                            input type="password" id="reg-confirm" name="confirm_password"
+                                required minlength="8" maxlength="72"
+                                placeholder="Repeat your password";
+                        }
+
+                        button type="submit" class="btn btn-primary"
+                            hx-indicator="#register-spinner" {
+                            "Create Account"
+                            span id="register-spinner" class="htmx-indicator" {
+                                (spinner_icon())
+                            }
+                        }
+                    }
+
+                    div class="auth-footer" {
+                        "Already have an account? "
+                        a href="#" onclick="switchTab('login');return false;" {
+                            "Sign in"
+                        }
+                    }
+                }
+
+                // ── Reset tab ──
+                div class=(if reset_active { "tab-panel active" } else { "tab-panel" }) id="reset" {
+                    h2 class="auth-title" { "Reset password" }
+                    p class="auth-subtitle" { "Enter your username and we'll send you a reset link." }
+
+                    form method="POST" action="/auth/reset-password" {
+                        input type="hidden" name="csrf_token" value=(csrf_placeholder()) {}
+
+                        div class="form-group" {
+                            label for="reset-username" { "Username" }
+                            input type="text" id="reset-username" name="username"
+                                required placeholder="Your username";
+                        }
+
+                        button type="submit" class="btn btn-primary" {
+                            "Send Reset Link"
+                        }
+                    }
+
+                    div class="divider" { "or" }
+
+                    button type="button" class="btn btn-ghost"
+                        onclick="switchTab('login')" {
+                        "Back to Sign In"
                     }
                 }
             }
 
-            // ── Register tab ──
-            div class=(if register_active { "tab-panel active" } else { "tab-panel" }) id="register" {
-                h2 class="auth-title" { "Create account" }
-                p class="auth-subtitle" { "Join the broadcast. No credit card required." }
-
-                @if let Some(err) = error {
-                    div class="error-banner" { (err) }
-                }
-
-                form method="POST" action="/register" {
-                    input type="hidden" name="csrf_token" value=(csrf_placeholder()) {}
-
-                    div class="form-group" {
-                        label for="reg-username" { "Username" }
-                        input type="text" id="reg-username" name="username"
-                            required minlength="3" maxlength="50"
-                            placeholder="3-50 characters";
-                    }
-
-                    div class="form-group" {
-                        label for="reg-password" { "Password" }
-                        input type="password" id="reg-password" name="password"
-                            required minlength="8" maxlength="72"
-                            placeholder="8-72 characters";
-                    }
-
-                    div class="form-group" {
-                        label for="reg-confirm" { "Confirm Password" }
-                        input type="password" id="reg-confirm" name="confirm_password"
-                            required minlength="8" maxlength="72"
-                            placeholder="Repeat your password";
-                    }
-
-                    button type="submit" class="btn btn-primary"
-                        hx-indicator="#register-spinner" {
-                        "Create Account"
-                        span id="register-spinner" class="htmx-indicator" {
-                            (spinner_icon())
-                        }
-                    }
-                }
-
-                div class="auth-footer" {
-                    "Already have an account? "
-                    a href="#" onclick="switchTab('login');return false;" {
-                        "Sign in"
-                    }
-                }
-            }
-
-            // ── Reset tab ──
-            div class=(if reset_active { "tab-panel active" } else { "tab-panel" }) id="reset" {
-                h2 class="auth-title" { "Reset password" }
-                p class="auth-subtitle" { "Enter your username and we'll send you a reset link." }
-
-                form method="POST" action="/auth/reset-password" {
-                    input type="hidden" name="csrf_token" value=(csrf_placeholder()) {}
-
-                    div class="form-group" {
-                        label for="reset-username" { "Username" }
-                        input type="text" id="reset-username" name="username"
-                            required placeholder="Your username";
-                    }
-
-                    button type="submit" class="btn btn-primary" {
-                        "Send Reset Link"
-                    }
-                }
-
-                div class="divider" { "or" }
-
-                button type="button" class="btn btn-ghost"
-                    onclick="switchTab('login')" {
-                    "Back to Sign In"
-                }
+            script {
+                (PreEscaped(r#"
+function switchTab(id) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const btn = document.querySelector('[data-tab="'+id+'"]');
+  if (btn) btn.classList.add('active');
+  const panel = document.getElementById(id);
+  if (panel) panel.classList.add('active');
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+                "#))
             }
         },
     )
 }
 
 /// Account dashboard page.
-pub fn account_page(session: &UserSession, games: &[ListDisplayGame]) -> maud::Markup {
-    let auth = AuthState::authenticated(&session.username);
+pub fn account_page(
+    auth: AuthState,
+    session: &UserSession,
+    games: &[ListDisplayGame],
+) -> maud::Markup {
     base_layout(
         &format!("Account — {}", session.username),
         auth,
@@ -180,14 +216,6 @@ pub fn account_page(session: &UserSession, games: &[ListDisplayGame]) -> maud::M
                         div {
                             h1 class="text-xl font-bold text-amber-400" { (icon("user")) " " (session.username) }
                             p class="text-sm text-gray-400 mt-1" { "Account Dashboard" }
-                        }
-                        form method="POST" action="/logout" {
-                            input type="hidden" name="csrf_token" value=(csrf_placeholder()) {}
-                            button
-                                type="submit"
-                                class="text-sm text-gray-400 hover:text-red-400" {
-                                "Logout"
-                            }
                         }
                     }
                 }
@@ -355,13 +383,18 @@ fn csrf_placeholder() -> &'static str {
 }
 
 /// Auth page with CSRF token injected (used by GET /auth).
-pub fn auth_page_with_csrf(csrf: &str, default_tab: AuthTab) -> String {
-    let markup: String = auth_page(None, default_tab).into();
-    markup.replace(csrf_placeholder(), csrf)
+pub fn auth_page_with_csrf(
+    auth: AuthState,
+    csrf: &str,
+    error: Option<&str>,
+    default_tab: AuthTab,
+) -> maud::Markup {
+    let rendered: String = auth_page(auth, error, default_tab).into();
+    maud::PreEscaped(rendered.replace(csrf_placeholder(), csrf))
 }
 
 /// Create game form page with CSRF token injected.
-pub fn create_game_page_with_csrf(csrf: &str) -> String {
-    let markup: String = create_game_page(AuthState::guest(), None).into();
-    markup.replace(csrf_placeholder(), csrf)
+pub fn create_game_page_with_csrf(auth: AuthState, csrf: &str) -> maud::Markup {
+    let rendered: String = create_game_page(auth, None).into();
+    maud::PreEscaped(rendered.replace(csrf_placeholder(), csrf))
 }

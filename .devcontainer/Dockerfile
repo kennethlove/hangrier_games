@@ -13,7 +13,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 # Install SurrealDB into /usr/local/bin (must run as root for write access).
 # No '|| true' — fail the build if install fails so we don't end up with a
 # broken devcontainer that silently misses the binary.
-RUN curl -sSf https://install.surrealdb.com | sh -s -- --version v2.1.4 \
+RUN curl -sSf https://install.surrealdb.com | sh -s -- --version v2.3.2 \
     && surreal version
 
 # Add clippy and rustfmt as the vscode user

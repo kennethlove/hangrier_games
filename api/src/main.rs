@@ -1020,18 +1020,20 @@ async fn account_handler(
 async fn create_game_handler(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
-) -> impl IntoResponse {
+) -> Response {
     if require_auth(&state, &headers).await.is_err() {
         return Redirect::to("/auth").into_response();
     }
 
     let csrf = generate_csrf_token();
     let body = auth::create_game_page_with_csrf(&csrf);
-    (
+    let mut response = (
         [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
         body,
     )
-        .into_response()
+        .into_response();
+    api::cookies::set_csrf_cookie(&mut response, &csrf);
+    response
 }
 
 /// POST /games/new — create game, redirect to /games/{id}.

@@ -42,8 +42,7 @@ pub fn auth_page(error: Option<&str>, default_tab: AuthTab) -> maud::Markup {
                     div class="error-banner" { (err) }
                 }
 
-                form method="POST" action="/auth" {
-                    input type="hidden" name="auth_action" value="login" {}
+                form method="POST" action="/login" {
                     input type="hidden" name="csrf_token" value=(csrf_placeholder()) {}
 
                     div class="form-group" {
@@ -96,8 +95,7 @@ pub fn auth_page(error: Option<&str>, default_tab: AuthTab) -> maud::Markup {
                     div class="error-banner" { (err) }
                 }
 
-                form method="POST" action="/auth" {
-                    input type="hidden" name="auth_action" value="register" {}
+                form method="POST" action="/register" {
                     input type="hidden" name="csrf_token" value=(csrf_placeholder()) {}
 
                     div class="form-group" {

@@ -305,10 +305,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .route("/games/{id}/areas", axum::routing::get(game_areas_handler))
         .route("/games/{id}/log", axum::routing::get(game_log_handler))
-        .route(
-            "/auth",
-            axum::routing::get(auth_handler).post(auth_post_handler),
-        )
+        .route("/auth", axum::routing::get(auth_handler))
+        .route("/login", axum::routing::post(login_post_handler))
+        .route("/register", axum::routing::post(register_post_handler))
         .route("/logout", axum::routing::post(logout_handler))
         .route("/account", axum::routing::get(account_handler))
         .route(
@@ -727,11 +726,17 @@ struct AuthTabQuery {
 }
 
 #[derive(serde::Deserialize)]
-struct AuthPostRequest {
-    auth_action: String,
+struct LoginRequest {
     username: String,
     password: String,
     #[serde(default)]
+    csrf_token: String,
+}
+
+#[derive(serde::Deserialize)]
+struct RegisterRequest {
+    username: String,
+    password: String,
     confirm_password: String,
     #[serde(default)]
     csrf_token: String,
@@ -767,39 +772,39 @@ async fn auth_handler(
         .into_response()
 }
 
-/// POST /auth — dispatch to login or register based on auth_action field.
-async fn auth_post_handler(
+/// POST /login — authenticate user.
+async fn login_post_handler(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
-    Form(form): Form<AuthPostRequest>,
+    Form(form): Form<LoginRequest>,
 ) -> impl IntoResponse {
-    let redirect_on_error = "/auth";
-    match form.auth_action.as_str() {
-        "login" => {
-            handle_login_post(
-                &state,
-                &headers,
-                form.username,
-                form.password,
-                form.csrf_token,
-                redirect_on_error,
-            )
-            .await
-        }
-        "register" => {
-            handle_register_post(
-                &state,
-                &headers,
-                form.username,
-                form.password,
-                form.confirm_password,
-                form.csrf_token,
-                redirect_on_error,
-            )
-            .await
-        }
-        _ => Redirect::to("/auth").into_response(),
-    }
+    handle_login_post(
+        &state,
+        &headers,
+        form.username,
+        form.password,
+        form.csrf_token,
+        "/auth?tab=login",
+    )
+    .await
+}
+
+/// POST /register — create new user account.
+async fn register_post_handler(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Form(form): Form<RegisterRequest>,
+) -> impl IntoResponse {
+    handle_register_post(
+        &state,
+        &headers,
+        form.username,
+        form.password,
+        form.confirm_password,
+        form.csrf_token,
+        "/auth?tab=register",
+    )
+    .await
 }
 
 /// Handle login POST logic.

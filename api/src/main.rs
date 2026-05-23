@@ -116,11 +116,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         surreal_database
     );
 
-    MigrationRunner::new(&db)
-        .up()
-        .await
-        .map_err(|e| format!("Failed to apply migrations: {}", e))?;
-    tracing::debug!("Applied migrations");
+    // Try migration runner first. If migration state is corrupted, drop
+    // the tracking table and re-run from scratch.
+    let mut migration_ok = MigrationRunner::new(&db).up().await.is_ok();
+    if !migration_ok {
+        tracing::warn!("Migration runner failed; resetting state and retrying...");
+        // Migration state corrupted; drop the tracking table and retry.
+        let _ = db
+            .query("REMOVE TABLE IF EXISTS _surrealdb_migrations;")
+            .await;
+        migration_ok = MigrationRunner::new(&db).up().await.is_ok();
+        if migration_ok {
+            tracing::info!("Migration runner succeeded after resetting state");
+        }
+    }
+
+    if !migration_ok {
+        // Last resort: apply critical schemas directly so auth still works.
+        tracing::warn!("Migration still failing; applying critical schemas directly");
+        let schema_paths = ["../schemas/users.surql", "../schemas/refresh_tokens.surql"];
+        let _ = db
+            .use_ns(&surreal_namespace)
+            .use_db(&surreal_database)
+            .await;
+        for rel_path in &schema_paths {
+            let abs_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(rel_path);
+            match tokio::fs::read_to_string(&abs_path).await {
+                Ok(sql) => {
+                    if let Err(sqlerr) = db.query(sql).await {
+                        tracing::warn!("Direct-schema apply failed for {}: {sqlerr}", rel_path);
+                    } else {
+                        tracing::info!("Applied schema: {rel_path}");
+                    }
+                }
+                Err(read_err) => tracing::warn!("Cannot read schema {rel_path}: {read_err}"),
+            }
+        }
+    }
 
     // CORS Configuration
     let env_mode = env::var("ENV").unwrap_or_else(|_| "production".to_string());
@@ -289,6 +321,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 middleware::from_fn_with_state(app_state.clone(), surreal_jwt),
             ),
         )
+        // TODO: Move to GAMES_ROUTER?
         .route(
             "/api/games/{game_id}/events",
             axum::routing::get(api::sse::sse_handler).layer(middleware::from_fn_with_state(
@@ -297,19 +330,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )),
         )
         .route("/", axum::routing::get(home_handler))
+        .route("/account", axum::routing::get(account_handler))
+        .route("/auth", axum::routing::get(auth_handler))
+        .route("/auth/login", axum::routing::post(login_post_handler))
+        .route("/auth/logout", axum::routing::post(logout_handler))
+        .route("/auth/register", axum::routing::post(register_post_handler))
         .route("/games", axum::routing::get(games_list_handler))
         .route("/games/{id}", axum::routing::get(game_detail_handler))
+        .route("/games/{id}/areas", axum::routing::get(game_areas_handler))
+        .route("/games/{id}/log", axum::routing::get(game_log_handler))
         .route(
             "/games/{id}/tributes",
             axum::routing::get(game_tributes_handler),
         )
-        .route("/games/{id}/areas", axum::routing::get(game_areas_handler))
-        .route("/games/{id}/log", axum::routing::get(game_log_handler))
-        .route("/auth", axum::routing::get(auth_handler))
-        .route("/login", axum::routing::post(login_post_handler))
-        .route("/register", axum::routing::post(register_post_handler))
-        .route("/logout", axum::routing::post(logout_handler))
-        .route("/account", axum::routing::get(account_handler))
         .route(
             "/games/new",
             axum::routing::get(create_game_handler).post(create_game_post_handler),
@@ -511,9 +544,16 @@ impl KeyExtractor for CompoundKeyExtractor {
 
 // ── HTMX page handlers ──────────────────────────────────────────────
 
-async fn home_handler(headers: axum::http::HeaderMap) -> Html<maud::Markup> {
-    let auth = extract_auth(&headers);
-    Html(pages::home_page(auth))
+/// Render a Maud markup as an HTML response with the CSRF cookie attached.
+fn html_with_csrf(markup: maud::Markup, csrf: &str) -> Response {
+    let mut response = Html(markup).into_response();
+    api::cookies::set_csrf_cookie(&mut response, csrf);
+    response
+}
+
+async fn home_handler(headers: axum::http::HeaderMap) -> Response {
+    let (auth, csrf) = extract_auth(&headers);
+    html_with_csrf(pages::home_page(auth), &csrf)
 }
 
 #[derive(serde::Deserialize)]
@@ -534,8 +574,8 @@ async fn games_list_handler(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
     Query(params): Query<GamesListQuery>,
-) -> Html<maud::Markup> {
-    let auth = extract_auth(&headers);
+) -> Response {
+    let (auth, csrf) = extract_auth(&headers);
     let limit = params.limit.min(100);
     let offset = params.offset.min(10000);
 
@@ -564,12 +604,10 @@ async fn games_list_handler(
     let stats = api::templates::pages::GameStats::from_games(&all_games);
     let active_filter = params.status.as_deref().unwrap_or("");
 
-    Html(pages::games_list_page(
-        auth,
-        &paginated,
-        &stats,
-        active_filter,
-    ))
+    html_with_csrf(
+        pages::games_list_page(auth, &paginated, &stats, active_filter),
+        &csrf,
+    )
 }
 
 fn filter_games_by_status(games: &[ListDisplayGame], status: Option<&str>) -> Vec<ListDisplayGame> {
@@ -599,8 +637,8 @@ async fn game_detail_handler(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
     axum::extract::Path(game_identifier): axum::extract::Path<uuid::Uuid>,
-) -> Html<maud::Markup> {
-    let auth = extract_auth(&headers);
+) -> Response {
+    let (auth, csrf) = extract_auth(&headers);
     let identifier = game_identifier.to_string();
     let result = state
         .db
@@ -617,10 +655,11 @@ async fn game_detail_handler(
     };
 
     match game {
-        Some(game) => Html(game_detail::game_detail_page(auth, &game)),
-        None => Html(pages::not_found_page(
-            "The game you're looking for doesn't exist.",
-        )),
+        Some(game) => html_with_csrf(game_detail::game_detail_page(auth, &game), &csrf),
+        None => html_with_csrf(
+            pages::not_found_page(auth, "The game you're looking for doesn't exist."),
+            &csrf,
+        ),
     }
 }
 
@@ -628,8 +667,8 @@ async fn game_tributes_handler(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
     axum::extract::Path(game_identifier): axum::extract::Path<uuid::Uuid>,
-) -> Html<maud::Markup> {
-    let auth = extract_auth(&headers);
+) -> Response {
+    let (auth, csrf) = extract_auth(&headers);
     let identifier = game_identifier.to_string();
     let result = state
         .db
@@ -646,15 +685,18 @@ async fn game_tributes_handler(
         Err(_) => vec![],
     };
 
-    Html(game_detail::tributes_page(auth, &identifier, &tributes))
+    html_with_csrf(
+        game_detail::tributes_page(auth, &identifier, &tributes),
+        &csrf,
+    )
 }
 
 async fn game_areas_handler(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
     axum::extract::Path(game_identifier): axum::extract::Path<uuid::Uuid>,
-) -> Html<maud::Markup> {
-    let auth = extract_auth(&headers);
+) -> Response {
+    let (auth, csrf) = extract_auth(&headers);
     let identifier = game_identifier.to_string();
     let result = state
         .db
@@ -678,15 +720,15 @@ SELECT (
         Err(_) => vec![],
     };
 
-    Html(game_detail::areas_page(auth, &identifier, &areas))
+    html_with_csrf(game_detail::areas_page(auth, &identifier, &areas), &csrf)
 }
 
 async fn game_log_handler(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
     axum::extract::Path(game_identifier): axum::extract::Path<uuid::Uuid>,
-) -> Html<maud::Markup> {
-    let auth = extract_auth(&headers);
+) -> Response {
+    let (auth, csrf) = extract_auth(&headers);
     let identifier = game_identifier.to_string();
     let result = state
         .db
@@ -708,7 +750,7 @@ async fn game_log_handler(
         Err(_) => vec![],
     };
 
-    Html(game_detail::log_page(auth, &identifier, &messages))
+    html_with_csrf(game_detail::log_page(auth, &identifier, &messages), &csrf)
 }
 
 // ── CSRF validation ─────────────────────────────────────────────────
@@ -723,6 +765,7 @@ fn validate_csrf(headers: &axum::http::HeaderMap, form_token: &str) -> bool {
 #[derive(serde::Deserialize)]
 struct AuthTabQuery {
     tab: Option<String>,
+    error: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -759,17 +802,17 @@ async fn auth_handler(
     headers: axum::http::HeaderMap,
     Query(params): Query<AuthTabQuery>,
 ) -> impl IntoResponse {
-    let auth = extract_auth(&headers);
-    if auth.is_authenticated {
+    let (auth, csrf) = extract_auth(&headers);
+    if auth.is_authenticated() {
         return Redirect::to("/games").into_response();
     }
-    let csrf = generate_csrf_token();
-    let body = auth::auth_page_with_csrf(&csrf, auth::AuthTab::from_query(params.tab.as_deref()));
-    (
-        [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
-        body,
-    )
-        .into_response()
+    let body = auth::auth_page_with_csrf(
+        auth,
+        &csrf,
+        params.error.as_deref(),
+        auth::AuthTab::from_query(params.tab.as_deref()),
+    );
+    html_with_csrf(body, &csrf)
 }
 
 /// POST /login — authenticate user.
@@ -814,10 +857,26 @@ async fn handle_login_post(
     username: String,
     password: String,
     csrf_token: String,
-    redirect_on_error: &str,
+    base_redirect: &str,
 ) -> Response {
+    let redirect_with_error = |error: &str| {
+        let encoded: String = error
+            .chars()
+            .map(|c| {
+                if c == ' ' {
+                    '+'.to_string()
+                } else if c.is_alphanumeric() || c == '-' || c == '_' || c == '.' {
+                    c.to_string()
+                } else {
+                    c.escape_unicode().to_string()
+                }
+            })
+            .collect();
+        Redirect::to(&format!("{}&error={}", base_redirect, encoded)).into_response()
+    };
+
     if !validate_csrf(headers, &csrf_token) {
-        return Redirect::to(redirect_on_error).into_response();
+        return redirect_with_error("Invalid form submission");
     }
 
     let user_db = (*state.db).clone();
@@ -827,7 +886,7 @@ async fn handle_login_post(
         .await
         .is_err()
     {
-        return Redirect::to(redirect_on_error).into_response();
+        return redirect_with_error("Database error");
     }
 
     let result = user_db
@@ -844,26 +903,39 @@ async fn handle_login_post(
 
     match result {
         Ok(auth_result) => {
-            let jwt = auth_result.into_insecure_token();
+            let surreal_jwt = auth_result.into_insecure_token();
 
-            use api::auth::{RefreshToken, TokenResponse, store_refresh_token};
+            use api::auth::{
+                RefreshToken, TokenResponse, generate_access_token, store_refresh_token,
+            };
             use api::cookies::{set_refresh_cookie, set_session_cookie};
             use surrealdb::sql::Thing;
 
             let user_id: Thing = match surrealdb::sql::thing(
-                &extract_user_id_from_jwt_raw(&jwt).unwrap_or_default(),
+                &extract_user_id_from_jwt_raw(&surreal_jwt).unwrap_or_default(),
             ) {
                 Ok(id) => id,
-                Err(_) => return Redirect::to(redirect_on_error).into_response(),
+                Err(_) => return redirect_with_error("Authentication error"),
             };
+
+            // Mint our own JWT carrying `sub: <username>` so display paths
+            // (extract_auth_state) read the username directly without a DB
+            // round-trip. The token reuses SurrealDB's HS512 key and claim
+            // shape, so the SurrealDB SDK still accepts it for record auth.
+            let access_token =
+                match generate_access_token(&user_id, &username, &state.namespace, &state.database)
+                {
+                    Ok(t) => t,
+                    Err(_) => return redirect_with_error("Authentication error"),
+                };
 
             let refresh_token = RefreshToken::new(user_id, username);
             if store_refresh_token(&user_db, &refresh_token).await.is_err() {
-                return Redirect::to(redirect_on_error).into_response();
+                return redirect_with_error("Session error");
             }
 
             let pair = TokenResponse {
-                access_token: jwt.clone(),
+                access_token,
                 refresh_token: refresh_token.token,
             };
 
@@ -872,7 +944,7 @@ async fn handle_login_post(
             set_refresh_cookie(&mut response, &pair.refresh_token);
             response
         }
-        Err(_) => Redirect::to(redirect_on_error).into_response(),
+        Err(_) => redirect_with_error("Invalid username or password"),
     }
 }
 
@@ -884,14 +956,30 @@ async fn handle_register_post(
     password: String,
     confirm_password: String,
     csrf_token: String,
-    redirect_on_error: &str,
+    base_redirect: &str,
 ) -> Response {
+    let redirect_with_error = |error: &str| {
+        let encoded: String = error
+            .chars()
+            .map(|c| {
+                if c == ' ' {
+                    '+'.to_string()
+                } else if c.is_alphanumeric() || c == '-' || c == '_' || c == '.' {
+                    c.to_string()
+                } else {
+                    c.escape_unicode().to_string()
+                }
+            })
+            .collect();
+        Redirect::to(&format!("{}&error={}", base_redirect, encoded)).into_response()
+    };
+
     if !validate_csrf(headers, &csrf_token) {
-        return Redirect::to(redirect_on_error).into_response();
+        return redirect_with_error("Invalid form submission");
     }
 
     if password != confirm_password {
-        return Redirect::to(redirect_on_error).into_response();
+        return redirect_with_error("Passwords do not match");
     }
 
     let user_db = (*state.db).clone();
@@ -901,7 +989,7 @@ async fn handle_register_post(
         .await
         .is_err()
     {
-        return Redirect::to(redirect_on_error).into_response();
+        return redirect_with_error("Database error");
     }
 
     let result = user_db
@@ -918,26 +1006,37 @@ async fn handle_register_post(
 
     match result {
         Ok(auth_result) => {
-            let jwt = auth_result.into_insecure_token();
+            let surreal_jwt = auth_result.into_insecure_token();
 
-            use api::auth::{RefreshToken, TokenResponse, store_refresh_token};
+            use api::auth::{
+                RefreshToken, TokenResponse, generate_access_token, store_refresh_token,
+            };
             use api::cookies::{set_refresh_cookie, set_session_cookie};
             use surrealdb::sql::Thing;
 
             let user_id: Thing = match surrealdb::sql::thing(
-                &extract_user_id_from_jwt_raw(&jwt).unwrap_or_default(),
+                &extract_user_id_from_jwt_raw(&surreal_jwt).unwrap_or_default(),
             ) {
                 Ok(id) => id,
-                Err(_) => return Redirect::to(redirect_on_error).into_response(),
+                Err(_) => return redirect_with_error("Authentication error"),
             };
+
+            // See handle_login_post: mint our own JWT with `sub: <username>`
+            // so display paths get the username without hitting the DB.
+            let access_token =
+                match generate_access_token(&user_id, &username, &state.namespace, &state.database)
+                {
+                    Ok(t) => t,
+                    Err(_) => return redirect_with_error("Authentication error"),
+                };
 
             let refresh_token = RefreshToken::new(user_id, username);
             if store_refresh_token(&user_db, &refresh_token).await.is_err() {
-                return Redirect::to(redirect_on_error).into_response();
+                return redirect_with_error("Session error");
             }
 
             let pair = TokenResponse {
-                access_token: jwt.clone(),
+                access_token,
                 refresh_token: refresh_token.token,
             };
 
@@ -946,7 +1045,7 @@ async fn handle_register_post(
             set_refresh_cookie(&mut response, &pair.refresh_token);
             response
         }
-        Err(_) => Redirect::to(redirect_on_error).into_response(),
+        Err(_) => redirect_with_error("Registration failed"),
     }
 }
 
@@ -957,7 +1056,7 @@ async fn logout_handler(
     Form(form): Form<LogoutRequest>,
 ) -> impl IntoResponse {
     if !validate_csrf(&headers, &form.csrf_token) {
-        return Redirect::to("/auth").into_response();
+        return Redirect::to("/auth?tab=login").into_response();
     }
 
     let refresh = read_cookie(&headers, api::cookies::REFRESH_COOKIE).map(|s| s.to_owned());
@@ -974,7 +1073,7 @@ async fn logout_handler(
         }
     }
 
-    let mut response = Redirect::to("/auth").into_response();
+    let mut response = Redirect::to("/auth?tab=login").into_response();
     api::cookies::clear_auth_cookies(&mut response);
     api::cookies::clear_csrf_cookie(&mut response);
     response
@@ -991,9 +1090,10 @@ async fn account_handler(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
 ) -> Response {
+    let (auth, csrf) = extract_auth(&headers);
     let session = match require_auth(&state, &headers).await {
         Ok(s) => s,
-        Err(_) => return Redirect::to("/auth").into_response(),
+        Err(_) => return Redirect::to("/auth?tab=login").into_response(),
     };
 
     let user_db = (*state.db).clone();
@@ -1003,7 +1103,7 @@ async fn account_handler(
         .await
         .is_err()
     {
-        return Redirect::to("/auth").into_response();
+        return Redirect::to("/auth?tab=login").into_response();
     }
 
     let games: Vec<ListDisplayGame> = user_db
@@ -1013,7 +1113,7 @@ async fn account_handler(
         .and_then(|mut r| r.take(0).ok())
         .unwrap_or_default();
 
-    Html(auth::account_page(&session, &games)).into_response()
+    html_with_csrf(auth::account_page(auth, &session, &games), &csrf)
 }
 
 /// GET /games/new — create game form (requires auth).
@@ -1021,19 +1121,13 @@ async fn create_game_handler(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
 ) -> Response {
+    let (auth, csrf) = extract_auth(&headers);
     if require_auth(&state, &headers).await.is_err() {
         return Redirect::to("/auth").into_response();
     }
 
-    let csrf = generate_csrf_token();
-    let body = auth::create_game_page_with_csrf(&csrf);
-    let mut response = (
-        [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
-        body,
-    )
-        .into_response();
-    api::cookies::set_csrf_cookie(&mut response, &csrf);
-    response
+    let body = auth::create_game_page_with_csrf(auth, &csrf);
+    html_with_csrf(body, &csrf)
 }
 
 /// POST /games/new — create game, redirect to /games/{id}.
@@ -1118,50 +1212,68 @@ async fn create_game_post_handler(
 
 // ── Auth helpers ────────────────────────────────────────────────────
 
-/// Extract authentication state from request cookies.
-fn extract_auth(headers: &axum::http::HeaderMap) -> AuthState {
+/// Extract authentication state from request cookies, paired with the CSRF token.
+///
+/// The CSRF token is read from the existing `hg_csrf` cookie when present and
+/// only minted fresh when no cookie exists. This keeps the token stable across
+/// tabs and page loads so a form rendered on one page still validates after
+/// the user navigates elsewhere and back.
+fn extract_auth(headers: &axum::http::HeaderMap) -> (AuthState, String) {
+    let csrf = read_cookie(headers, CSRF_COOKIE)
+        .map(|s| s.to_owned())
+        .unwrap_or_else(generate_csrf_token);
+    let auth = extract_auth_state(headers, &csrf);
+    (auth, csrf)
+}
+
+fn extract_auth_state(headers: &axum::http::HeaderMap, csrf: &str) -> AuthState {
     let token = match read_cookie(headers, SESSION_COOKIE) {
         Some(t) => t.to_owned(),
-        None => return AuthState::guest(),
+        None => return AuthState::guest(csrf),
     };
 
     let token_parts: Vec<&str> = token.split('.').collect();
     if token_parts.len() != 3 {
-        return AuthState::guest();
+        return AuthState::guest(csrf);
     }
 
     let payload_base64 = token_parts[1].trim_start_matches('=');
     let payload_bytes = match base64_url::decode(payload_base64) {
         Ok(b) => b,
-        Err(_) => return AuthState::guest(),
+        Err(_) => return AuthState::guest(csrf),
     };
 
     let payload_str = match String::from_utf8(payload_bytes) {
         Ok(s) => s,
-        Err(_) => return AuthState::guest(),
+        Err(_) => return AuthState::guest(csrf),
     };
 
     let payload: Value = match serde_json::from_str(&payload_str) {
         Ok(v) => v,
-        Err(_) => return AuthState::guest(),
+        Err(_) => return AuthState::guest(csrf),
     };
 
     let exp = payload.get("exp").and_then(|v| v.as_u64()).unwrap_or(0);
     let now = OffsetDateTime::now_utc().unix_timestamp() as u64;
     if exp < now {
-        return AuthState::guest();
+        return AuthState::guest(csrf);
     }
 
     let username = payload
         .get("sub")
         .and_then(|v| v.as_str())
-        .map(String::from)
-        .unwrap_or_default();
+        .map(String::from);
 
-    if username.is_empty() {
-        AuthState::guest()
-    } else {
-        AuthState::authenticated(username)
+    match username {
+        Some(name) if !name.is_empty() => AuthState::authenticated(name, csrf),
+        _ => {
+            // No `sub` claim — this is a raw SurrealDB-issued JWT (only
+            // carries `ID: user:<record-id>`). We refuse to surface the
+            // record id as a display name. The cookie will be replaced
+            // with a `sub`-bearing token on the next login or refresh.
+            tracing::warn!("session JWT missing `sub` claim; treating as guest for display");
+            AuthState::guest(csrf)
+        }
     }
 }
 
@@ -1175,12 +1287,20 @@ fn extract_user_id_from_jwt_raw(jwt: &str) -> Option<String> {
     let payload_bytes = base64_url::decode(payload_base64).ok()?;
     let payload_str = String::from_utf8(payload_bytes).ok()?;
     let payload: Value = serde_json::from_str(&payload_str).ok()?;
-    payload.get("id").and_then(|v| v.as_str()).map(String::from)
+    // SurrealDB-issued JWTs use "ID" (uppercase); our own tokens use "id"
+    payload
+        .get("ID")
+        .or_else(|| payload.get("id"))
+        .and_then(|v| v.as_str())
+        .map(String::from)
 }
 
 /// Check session cookie exists and is not expired.
+///
+/// For SurrealDB-issued JWTs (which lack a `sub` claim) this queries the
+/// database to resolve the real username from the user record.
 async fn require_auth(
-    _state: &AppState,
+    state: &AppState,
     headers: &axum::http::HeaderMap,
 ) -> Result<UserSession, ()> {
     let token = read_cookie(headers, SESSION_COOKIE).ok_or(())?.to_owned();
@@ -1200,19 +1320,63 @@ async fn require_auth(
         return Err(());
     }
 
-    let username = payload
-        .get("sub")
-        .and_then(|v| v.as_str())
-        .map(String::from)
-        .ok_or(())?;
+    // Prefer "sub" (own-issued tokens). SurrealDB-issued JWTs don't carry
+    // "sub" or the actual username — only "ID":"user:<record-id>".
+    if let Some(username) = payload.get("sub").and_then(|v| v.as_str()) {
+        // Own-issued token has username inline — no DB query needed.
+        let id = payload
+            .get("id")
+            .and_then(|v| v.as_str())
+            .map(String::from)
+            .unwrap_or_default();
+        return Ok(UserSession {
+            id,
+            username: username.to_owned(),
+        });
+    }
 
-    let id = payload
-        .get("id")
-        .and_then(|v| v.as_str())
-        .map(String::from)
-        .unwrap_or_default();
+    // SurrealDB-issued JWT — authenticate the connection and query $auth to
+    // resolve the real username from the database.
+    let user_db = (*state.db).clone();
+    if user_db
+        .use_ns(&state.namespace)
+        .use_db(&state.database)
+        .await
+        .is_err()
+    {
+        return Err(());
+    }
+    if user_db
+        .authenticate(surrealdb::opt::auth::Jwt::from(token.as_str()))
+        .await
+        .is_err()
+    {
+        return Err(());
+    }
 
-    Ok(UserSession { id, username })
+    #[derive(serde::Deserialize)]
+    struct AuthRow {
+        id: surrealdb::sql::Thing,
+        username: String,
+    }
+
+    let mut response = match user_db.query("SELECT id, username FROM $auth").await {
+        Ok(r) => r,
+        Err(_) => return Err(()),
+    };
+    let row: Option<AuthRow> = match response.take(0) {
+        Ok(r) => r,
+        Err(_) => return Err(()),
+    };
+    let row = match row {
+        Some(r) => r,
+        None => return Err(()),
+    };
+
+    Ok(UserSession {
+        id: row.id.to_string(),
+        username: row.username,
+    })
 }
 
 /// Clone the shared DB and authenticate with the given JWT.

@@ -15,6 +15,7 @@ pub enum AuthState {
         csrf_token: String,
     },
     Authenticated {
+        id: String,
         username: String,
         csrf_token: String,
     },
@@ -27,8 +28,13 @@ impl AuthState {
         }
     }
 
-    pub fn authenticated(username: impl Into<String>, csrf: impl Into<String>) -> Self {
+    pub fn authenticated(
+        id: impl Into<String>,
+        username: impl Into<String>,
+        csrf: impl Into<String>,
+    ) -> Self {
         AuthState::Authenticated {
+            id: id.into(),
             username: username.into(),
             csrf_token: csrf.into(),
         }
@@ -50,14 +56,6 @@ impl AuthState {
         match self {
             AuthState::Authenticated { username, .. } => Some(username),
             AuthState::Guest { .. } => None,
-        }
-    }
-}
-
-impl Default for AuthState {
-    fn default() -> Self {
-        AuthState::Guest {
-            csrf_token: String::new(),
         }
     }
 }
@@ -115,7 +113,7 @@ fn auth_links(auth: &AuthState) -> Markup {
     html! {
         div class="auth-links" {
             @match auth {
-                AuthState::Authenticated { username, csrf_token } => {
+                AuthState::Authenticated { username, csrf_token, .. } => {
                     a href="/account" { (username) }
                     form class="logout-form" method="POST" action="/auth/logout" {
                         input type="hidden" name="csrf_token" value=(csrf_token) {}

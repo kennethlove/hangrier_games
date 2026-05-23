@@ -116,15 +116,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         surreal_database
     );
 
-    // Try migration runner first. If migration state is corrupted, drop
+    // Try migration runner. If migration state is corrupted, drop
     // the tracking table and re-run from scratch.
     let mut migration_ok = MigrationRunner::new(&db).up().await.is_ok();
     if !migration_ok {
         tracing::warn!("Migration runner failed; resetting state and retrying...");
-        // Migration state corrupted; drop the tracking table and retry.
-        let _ = db
+        if db
             .query("REMOVE TABLE IF EXISTS _surrealdb_migrations;")
-            .await;
+            .await
+            .is_err()
+        {
+            tracing::error!("Failed to remove corrupted migration tracking table");
+        }
         migration_ok = MigrationRunner::new(&db).up().await.is_ok();
         if migration_ok {
             tracing::info!("Migration runner succeeded after resetting state");
@@ -139,19 +142,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .use_ns(&surreal_namespace)
             .use_db(&surreal_database)
             .await;
+
+        let mut all_schemas_ok = true;
         for rel_path in &schema_paths {
-            let abs_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(rel_path);
+            // Use runtime env lookup for container safety (compile-time env!("...")
+            // embeds the build directory path, which breaks in deployed containers).
+            let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| String::from("."));
+            let abs_path = std::path::Path::new(&manifest_dir).join(rel_path);
             match tokio::fs::read_to_string(&abs_path).await {
                 Ok(sql) => {
                     if let Err(sqlerr) = db.query(sql).await {
-                        tracing::warn!("Direct-schema apply failed for {}: {sqlerr}", rel_path);
+                        tracing::error!("Direct-schema apply FAILED for {}: {sqlerr}", rel_path);
+                        all_schemas_ok = false;
                     } else {
                         tracing::info!("Applied schema: {rel_path}");
                     }
                 }
-                Err(read_err) => tracing::warn!("Cannot read schema {rel_path}: {read_err}"),
+                Err(read_err) => {
+                    tracing::error!("Cannot read schema {rel_path}: {read_err}");
+                    all_schemas_ok = false;
+                }
             }
         }
+
+        if !all_schemas_ok {
+            return Err("Failed to apply critical database schemas. \
+                 Server cannot start without auth tables. \
+                 Fix migration state or schema files and restart."
+                .into());
+        }
+
+        tracing::warn!(
+            "Server booting with directly-applied schemas only (users, refresh_tokens) — \
+             migration runner may have pending schemas (game, tribute, area, etc.) \
+             that were NOT applied"
+        );
     }
 
     // CORS Configuration
@@ -827,7 +852,7 @@ async fn login_post_handler(
         form.username,
         form.password,
         form.csrf_token,
-        "/auth?tab=login",
+        "/auth",
     )
     .await
 }
@@ -845,9 +870,36 @@ async fn register_post_handler(
         form.password,
         form.confirm_password,
         form.csrf_token,
-        "/auth?tab=register",
+        "/auth",
     )
     .await
+}
+
+/// Percent-encode a string for use in a query parameter value.
+/// Spaces become `+`, alphanumeric + `-_.` pass through, everything
+/// else is UTF-8 percent-encoded.
+fn url_encode_param(s: &str) -> String {
+    let mut encoded = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            ' ' => encoded.push('+'),
+            c if c.is_alphanumeric() || c == '-' || c == '_' || c == '.' => encoded.push(c),
+            c => {
+                let mut buf = [0u8; 4];
+                for &b in c.encode_utf8(&mut buf).as_bytes() {
+                    encoded.push_str(&format!("%{:02X}", b));
+                }
+            }
+        }
+    }
+    encoded
+}
+
+/// Redirect to an auth tab with an error message in the query string.
+/// Properly constructs the URL and percent-encodes the error message.
+fn redirect_with_error(path: &str, tab: &str, error: &str) -> Response {
+    let encoded = url_encode_param(error);
+    Redirect::to(&format!("{}?tab={}&error={}", path, tab, encoded)).into_response()
 }
 
 /// Handle login POST logic.
@@ -857,26 +909,10 @@ async fn handle_login_post(
     username: String,
     password: String,
     csrf_token: String,
-    base_redirect: &str,
+    base_path: &str,
 ) -> Response {
-    let redirect_with_error = |error: &str| {
-        let encoded: String = error
-            .chars()
-            .map(|c| {
-                if c == ' ' {
-                    '+'.to_string()
-                } else if c.is_alphanumeric() || c == '-' || c == '_' || c == '.' {
-                    c.to_string()
-                } else {
-                    c.escape_unicode().to_string()
-                }
-            })
-            .collect();
-        Redirect::to(&format!("{}&error={}", base_redirect, encoded)).into_response()
-    };
-
     if !validate_csrf(headers, &csrf_token) {
-        return redirect_with_error("Invalid form submission");
+        return redirect_with_error(base_path, "login", "Invalid form submission");
     }
 
     let user_db = (*state.db).clone();
@@ -886,7 +922,7 @@ async fn handle_login_post(
         .await
         .is_err()
     {
-        return redirect_with_error("Database error");
+        return redirect_with_error(base_path, "login", "Database error");
     }
 
     let result = user_db
@@ -915,7 +951,7 @@ async fn handle_login_post(
                 &extract_user_id_from_jwt_raw(&surreal_jwt).unwrap_or_default(),
             ) {
                 Ok(id) => id,
-                Err(_) => return redirect_with_error("Authentication error"),
+                Err(_) => return redirect_with_error(base_path, "login", "Authentication error"),
             };
 
             // Mint our own JWT carrying `sub: <username>` so display paths
@@ -926,12 +962,14 @@ async fn handle_login_post(
                 match generate_access_token(&user_id, &username, &state.namespace, &state.database)
                 {
                     Ok(t) => t,
-                    Err(_) => return redirect_with_error("Authentication error"),
+                    Err(_) => {
+                        return redirect_with_error(base_path, "login", "Authentication error");
+                    }
                 };
 
             let refresh_token = RefreshToken::new(user_id, username);
             if store_refresh_token(&user_db, &refresh_token).await.is_err() {
-                return redirect_with_error("Session error");
+                return redirect_with_error(base_path, "login", "Session error");
             }
 
             let pair = TokenResponse {
@@ -944,7 +982,7 @@ async fn handle_login_post(
             set_refresh_cookie(&mut response, &pair.refresh_token);
             response
         }
-        Err(_) => redirect_with_error("Invalid username or password"),
+        Err(_) => redirect_with_error(base_path, "login", "Invalid username or password"),
     }
 }
 
@@ -956,30 +994,14 @@ async fn handle_register_post(
     password: String,
     confirm_password: String,
     csrf_token: String,
-    base_redirect: &str,
+    base_path: &str,
 ) -> Response {
-    let redirect_with_error = |error: &str| {
-        let encoded: String = error
-            .chars()
-            .map(|c| {
-                if c == ' ' {
-                    '+'.to_string()
-                } else if c.is_alphanumeric() || c == '-' || c == '_' || c == '.' {
-                    c.to_string()
-                } else {
-                    c.escape_unicode().to_string()
-                }
-            })
-            .collect();
-        Redirect::to(&format!("{}&error={}", base_redirect, encoded)).into_response()
-    };
-
     if !validate_csrf(headers, &csrf_token) {
-        return redirect_with_error("Invalid form submission");
+        return redirect_with_error(base_path, "register", "Invalid form submission");
     }
 
     if password != confirm_password {
-        return redirect_with_error("Passwords do not match");
+        return redirect_with_error(base_path, "register", "Passwords do not match");
     }
 
     let user_db = (*state.db).clone();
@@ -989,7 +1011,7 @@ async fn handle_register_post(
         .await
         .is_err()
     {
-        return redirect_with_error("Database error");
+        return redirect_with_error(base_path, "register", "Database error");
     }
 
     let result = user_db
@@ -1018,7 +1040,9 @@ async fn handle_register_post(
                 &extract_user_id_from_jwt_raw(&surreal_jwt).unwrap_or_default(),
             ) {
                 Ok(id) => id,
-                Err(_) => return redirect_with_error("Authentication error"),
+                Err(_) => {
+                    return redirect_with_error(base_path, "register", "Authentication error");
+                }
             };
 
             // See handle_login_post: mint our own JWT with `sub: <username>`
@@ -1027,12 +1051,14 @@ async fn handle_register_post(
                 match generate_access_token(&user_id, &username, &state.namespace, &state.database)
                 {
                     Ok(t) => t,
-                    Err(_) => return redirect_with_error("Authentication error"),
+                    Err(_) => {
+                        return redirect_with_error(base_path, "register", "Authentication error");
+                    }
                 };
 
             let refresh_token = RefreshToken::new(user_id, username);
             if store_refresh_token(&user_db, &refresh_token).await.is_err() {
-                return redirect_with_error("Session error");
+                return redirect_with_error(base_path, "register", "Session error");
             }
 
             let pair = TokenResponse {
@@ -1045,7 +1071,7 @@ async fn handle_register_post(
             set_refresh_cookie(&mut response, &pair.refresh_token);
             response
         }
-        Err(_) => redirect_with_error("Registration failed"),
+        Err(_) => redirect_with_error(base_path, "register", "Registration failed"),
     }
 }
 
@@ -1118,11 +1144,11 @@ async fn account_handler(
 
 /// GET /games/new — create game form (requires auth).
 async fn create_game_handler(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
     headers: axum::http::HeaderMap,
 ) -> Response {
     let (auth, csrf) = extract_auth(&headers);
-    if require_auth(&state, &headers).await.is_err() {
+    if !auth.is_authenticated() {
         return Redirect::to("/auth").into_response();
     }
 
@@ -1264,8 +1290,14 @@ fn extract_auth_state(headers: &axum::http::HeaderMap, csrf: &str) -> AuthState 
         .and_then(|v| v.as_str())
         .map(String::from);
 
+    let user_id = payload
+        .get("id")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .unwrap_or_default();
+
     match username {
-        Some(name) if !name.is_empty() => AuthState::authenticated(name, csrf),
+        Some(name) if !name.is_empty() => AuthState::authenticated(user_id, name, csrf),
         _ => {
             // No `sub` claim — this is a raw SurrealDB-issued JWT (only
             // carries `ID: user:<record-id>`). We refuse to surface the
@@ -1295,12 +1327,16 @@ fn extract_user_id_from_jwt_raw(jwt: &str) -> Option<String> {
         .map(String::from)
 }
 
-/// Check session cookie exists and is not expired.
+/// Check session cookie exists, is not expired, and carries a `sub` claim.
 ///
-/// For SurrealDB-issued JWTs (which lack a `sub` claim) this queries the
-/// database to resolve the real username from the user record.
+/// Returns `UserSession` with id (from `id` claim) and username (from `sub` claim).
+/// JWTs without `sub` (legacy raw SurrealDB-issued tokens) return `Err`
+/// — the user needs to re-authenticate to get a properly-minted token.
+///
+/// This is intentionally synchronous JWT parsing only — no DB round-trip.
+/// Since PR #287, all new sessions carry our custom JWT with `sub`.
 async fn require_auth(
-    state: &AppState,
+    _state: &AppState,
     headers: &axum::http::HeaderMap,
 ) -> Result<UserSession, ()> {
     let token = read_cookie(headers, SESSION_COOKIE).ok_or(())?.to_owned();
@@ -1320,62 +1356,17 @@ async fn require_auth(
         return Err(());
     }
 
-    // Prefer "sub" (own-issued tokens). SurrealDB-issued JWTs don't carry
-    // "sub" or the actual username — only "ID":"user:<record-id>".
-    if let Some(username) = payload.get("sub").and_then(|v| v.as_str()) {
-        // Own-issued token has username inline — no DB query needed.
-        let id = payload
-            .get("id")
-            .and_then(|v| v.as_str())
-            .map(String::from)
-            .unwrap_or_default();
-        return Ok(UserSession {
-            id,
-            username: username.to_owned(),
-        });
-    }
+    let username = payload.get("sub").and_then(|v| v.as_str()).ok_or(())?;
 
-    // SurrealDB-issued JWT — authenticate the connection and query $auth to
-    // resolve the real username from the database.
-    let user_db = (*state.db).clone();
-    if user_db
-        .use_ns(&state.namespace)
-        .use_db(&state.database)
-        .await
-        .is_err()
-    {
-        return Err(());
-    }
-    if user_db
-        .authenticate(surrealdb::opt::auth::Jwt::from(token.as_str()))
-        .await
-        .is_err()
-    {
-        return Err(());
-    }
-
-    #[derive(serde::Deserialize)]
-    struct AuthRow {
-        id: surrealdb::sql::Thing,
-        username: String,
-    }
-
-    let mut response = match user_db.query("SELECT id, username FROM $auth").await {
-        Ok(r) => r,
-        Err(_) => return Err(()),
-    };
-    let row: Option<AuthRow> = match response.take(0) {
-        Ok(r) => r,
-        Err(_) => return Err(()),
-    };
-    let row = match row {
-        Some(r) => r,
-        None => return Err(()),
-    };
+    let id = payload
+        .get("id")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .unwrap_or_default();
 
     Ok(UserSession {
-        id: row.id.to_string(),
-        username: row.username,
+        id,
+        username: username.to_owned(),
     })
 }
 

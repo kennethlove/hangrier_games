@@ -1144,6 +1144,7 @@ mod tests {
     #[rstest]
     fn attacks_self(mut small_rng: SmallRng) {
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        attacker.attributes.strength = 25;
         attacker.attributes.sanity = 50;
         let sanity = 50;
         let mut target = attacker.clone();

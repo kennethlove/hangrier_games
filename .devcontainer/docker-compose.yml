@@ -13,6 +13,7 @@ services:
     ports:
       - "3000:3000"  # API
       - "8000:8000"  # SurrealDB
+      - "8025:8025"  # Mailpit UI
 
 volumes:
   cargo-cache:

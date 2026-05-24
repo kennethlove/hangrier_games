@@ -168,6 +168,18 @@ pub struct RegistrationUser {
     pub password: String,
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, Validate)]
+pub struct EmailRegistrationUser {
+    /// User-chosen display name (shown in header, game listings, etc.)
+    #[validate(length(min = 3, max = 50, message = "Display name must be 3-50 characters"))]
+    pub display_name: String,
+    /// Email address used for login and verification
+    #[validate(email(message = "Please enter a valid email address"))]
+    pub email: String,
+    #[validate(length(min = 8, max = 72, message = "Password must be 8-72 characters"))]
+    pub password: String,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct AuthenticatedUser {
     // The API returns this field as `access_token` (see api::auth::TokenResponse).

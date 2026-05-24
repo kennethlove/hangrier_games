@@ -171,6 +171,8 @@ pub enum MessageKind {
     SponsorGift,
     /// Trauma acquisition or reinforcement.
     Trauma,
+    /// Phobia acquired, triggered, observed, escalated, habituated, or forgotten.
+    Phobia,
     /// Affliction acquired, progressed, healed, or cascaded.
     Affliction,
 }
@@ -594,13 +596,13 @@ impl MessagePayload {
             | TributeSlept { .. }
             | TributeWoke { .. }
             | TraumaAcquired { .. }
-            | TraumaReinforced { .. }
-            | PhobiaAcquired { .. }
+            | TraumaReinforced { .. } => MessageKind::State,
+            PhobiaAcquired { .. }
             | PhobiaTriggered { .. }
             | PhobiaEscalated { .. }
             | PhobiaHabituated { .. }
             | PhobiaObserved { .. }
-            | PhobiaForgotten { .. } => MessageKind::State,
+            | PhobiaForgotten { .. } => MessageKind::Phobia,
             AfflictionAcquired { .. }
             | AfflictionProgressed { .. }
             | AfflictionHealed { .. }

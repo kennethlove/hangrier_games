@@ -183,6 +183,24 @@ fn tribute_card(tribute: &game::tributes::Tribute) -> maud::Markup {
                 }
             }
 
+            // Afflictions
+            @if !tribute.afflictions.is_empty() {
+                div class="card-afflictions" {
+                    @for (_key, affliction) in &tribute.afflictions {
+                        @let severity_class = match affliction.severity.to_string().as_str() {
+                            "severe" => "severity-severe",
+                            "moderate" => "severity-moderate",
+                            _ => "severity-mild",
+                        };
+                        @let body_part = affliction.body_part.map(|bp| format!(" ({bp})")).unwrap_or_default();
+                        span class=(format!("affliction-badge {}", severity_class)) {
+                            (icon("bandage"))
+                            " " (affliction.kind) (body_part)
+                        }
+                    }
+                }
+            }
+
             // Survival bands
             div class="card-bands" {
                 span class=(hunger_color(tribute.hunger)) { "H: " (hunger_label(tribute.hunger)) }
@@ -384,6 +402,7 @@ fn message_kind_label(payload: &shared::messages::MessagePayload) -> &'static st
         MessageKind::SponsorGift => "Sponsor",
         MessageKind::State => "State",
         MessageKind::Trauma => "Trauma",
+        MessageKind::Affliction => "Health",
     }
 }
 
@@ -440,6 +459,7 @@ fn kind_color(payload: &shared::messages::MessagePayload) -> &'static str {
         MessageKind::Movement => "kind-movement",
         MessageKind::Item | MessageKind::SponsorGift => "kind-item",
         MessageKind::State | MessageKind::Trauma => "kind-state",
+        MessageKind::Affliction => "kind-affliction",
     }
 }
 

@@ -309,6 +309,7 @@ pub fn event_card(msg: &GameMessage) -> maud::Markup {
         Item | SponsorGift => item_card(msg),
         State => state_card(msg),
         Trauma => trauma_card(msg),
+        Affliction => affliction_card(msg),
     }
 }
 
@@ -818,6 +819,77 @@ fn trauma_card(msg: &GameMessage) -> maud::Markup {
                 span { "Day " (msg.game_day) " " (msg.phase) }
             }
             p class="text-sm text-gray-200" { (content) }
+        }
+    }
+}
+
+/// Affliction event card.
+fn affliction_card(msg: &GameMessage) -> maud::Markup {
+    use shared::messages::MessagePayload::*;
+    let (severity, content) = match &msg.payload {
+        AfflictionAcquired {
+            tribute_id: _,
+            affliction,
+            severity,
+        } => {
+            (severity.as_str(), format!("acquired {affliction} ({severity})"))
+        }
+        AfflictionProgressed {
+            tribute_id: _,
+            affliction,
+            from_severity,
+            to_severity,
+        } => {
+            (to_severity.as_str(), format!("{affliction} worsened: {from_severity} → {to_severity}"))
+        }
+        AfflictionHealed {
+            tribute_id: _,
+            affliction,
+        } => {
+            ("", format!("healed from {affliction}"))
+        }
+        AfflictionCascaded {
+            tribute_id: _,
+            from_affliction,
+            to_affliction,
+        } => {
+            ("", format!("{from_affliction} cascaded to {to_affliction}"))
+        }
+        _ => return fallback_card(msg),
+    };
+    
+    let border_color = match severity {
+        "severe" | "Severe" => "border-red-900/50",
+        "moderate" | "Moderate" => "border-orange-900/50",
+        _ => "border-yellow-900/50",
+    };
+    let badge_color = match severity {
+        "severe" | "Severe" => "bg-red-500/20 text-red-300",
+        "moderate" | "Moderate" => "bg-orange-500/20 text-orange-300",
+        _ if severity.is_empty() => "",
+        _ => "bg-yellow-500/20 text-yellow-300",
+    };
+    
+    let badge = if !severity.is_empty() {
+        html! {
+            span class=(format!("text-xs px-1.5 py-0.5 rounded {}", badge_color)) { (severity) }
+        }
+    } else {
+        html! {}
+    };
+
+    html! {
+        div class=(format!("bg-gray-900 border rounded-lg p-3 {}", border_color)) {
+            div class="flex items-center gap-2 text-xs text-gray-500 mb-1" {
+                (icon("bandage"))
+                span class="text-amber-400 font-medium" { "Health" }
+                span { "·" }
+                span { "Day " (msg.game_day) " " (msg.phase) }
+            }
+            p class="text-sm text-gray-200 flex items-center gap-2" {
+                (content)
+                (badge)
+            }
         }
     }
 }

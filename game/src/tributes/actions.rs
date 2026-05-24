@@ -2,6 +2,7 @@ use crate::areas::Area;
 use crate::items::Item;
 use crate::tributes::Tribute;
 use serde::{Deserialize, Serialize};
+use shared::afflictions::TraumaSource;
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -59,6 +60,14 @@ pub enum Action {
     /// entirely. Emits `MessagePayload::PhobiaTriggered { effect: Freeze }`.
     /// See spec §5 (phobia brain layer).
     Frozen,
+    /// Tribute experiences a trauma flashback — skips this cycle.
+    /// Emitted by the trauma brain layer.
+    Flashback {
+        trauma_source: TraumaSource,
+    },
+    /// Tribute avoids a triggering stimulus due to trauma.
+    /// Brain override returns this action instead of the intended one.
+    Avoidance,
 }
 
 impl Display for Action {
@@ -79,6 +88,8 @@ impl Display for Action {
             Action::DrinkItem(_) => write!(f, "drink item"),
             Action::Sleep { .. } => write!(f, "sleep"),
             Action::Frozen => write!(f, "frozen"),
+            Action::Flashback { .. } => write!(f, "flashback"),
+            Action::Avoidance => write!(f, "avoidance"),
         }
     }
 }
@@ -103,6 +114,7 @@ impl FromStr for Action {
             "drink item" => Ok(Action::DrinkItem(None)),
             "sleep" => Ok(Action::Sleep { duration_phases: 0 }),
             "frozen" => Ok(Action::Frozen),
+            "flashback" | "avoidance" => Ok(Action::Avoidance),
             _ => Err(()),
         }
     }

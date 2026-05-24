@@ -523,6 +523,10 @@ impl Tribute {
                 // Tribute is frozen by phobia — skip this cycle.
                 // Event emitted by the brain pipeline caller.
             }
+            Action::Flashback { .. } | Action::Avoidance => {
+                // Flashback and avoidance are handled by the brain layer
+                // (trauma_override) which emits the event. No action needed here.
+            }
         }
     }
 
@@ -1196,7 +1200,7 @@ pub fn calculate_stamina_cost(
         // Sleep is free at the action layer; phase scheduler handles it.
         Action::Sleep { .. } => 0.0,
         // Frozen tribute takes no action — no stamina cost.
-        Action::Frozen => 0.0,
+        Action::Frozen | Action::Flashback { .. } | Action::Avoidance => 0.0,
     };
 
     // If base cost is 0, no need to calculate multipliers

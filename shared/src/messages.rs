@@ -556,6 +556,43 @@ pub enum MessagePayload {
         subject: String,
         trigger: String,
     },
+    // Trauma escalation/effects (trauma PR3 brain layer).
+    /// Trauma severity escalated (producer reinforcement roll).
+    TraumaEscalated {
+        tribute: String,
+        from_severity: String,
+        to_severity: String,
+    },
+    /// Tribute experienced a trauma flashback.
+    TraumaFlashback {
+        tribute: String,
+        severity: String,
+        source: String,
+    },
+    /// Tribute avoided an action due to trauma avoidance.
+    TraumaAvoidance {
+        tribute: String,
+        source: String,
+        prevented_action: String,
+    },
+    /// A tribute observed someone else's trauma firing.
+    TraumaObserved {
+        observer: String,
+        subject: String,
+        source: String,
+    },
+    /// A tribute forgot someone else's trauma (observer decay).
+    TraumaForgotten {
+        observer: String,
+        subject: String,
+        source: String,
+    },
+    /// Trauma severity decayed or cured (habituation).
+    TraumaHabituated {
+        tribute: String,
+        from_severity: String,
+        to_severity: Option<String>,
+    },
 }
 
 impl MessagePayload {
@@ -596,7 +633,13 @@ impl MessagePayload {
             | TributeSlept { .. }
             | TributeWoke { .. }
             | TraumaAcquired { .. }
-            | TraumaReinforced { .. } => MessageKind::State,
+            | TraumaReinforced { .. }
+            | TraumaEscalated { .. }
+            | TraumaFlashback { .. }
+            | TraumaAvoidance { .. }
+            | TraumaObserved { .. }
+            | TraumaForgotten { .. }
+            | TraumaHabituated { .. } => MessageKind::Trauma,
             PhobiaAcquired { .. }
             | PhobiaTriggered { .. }
             | PhobiaEscalated { .. }
@@ -660,6 +703,22 @@ impl MessagePayload {
                 tribute: tribute_id,
                 ..
             }
+            | TraumaEscalated {
+                tribute: tribute_id,
+                ..
+            }
+            | TraumaFlashback {
+                tribute: tribute_id,
+                ..
+            }
+            | TraumaAvoidance {
+                tribute: tribute_id,
+                ..
+            }
+            | TraumaHabituated {
+                tribute: tribute_id,
+                ..
+            }
             | PhobiaAcquired {
                 tribute: tribute_id,
                 ..
@@ -680,6 +739,12 @@ impl MessagePayload {
                 observer, subject, ..
             } => observer == id || subject == id,
             PhobiaForgotten {
+                observer, subject, ..
+            } => observer == id || subject == id,
+            TraumaObserved {
+                observer, subject, ..
+            } => observer == id || subject == id,
+            TraumaForgotten {
                 observer, subject, ..
             } => observer == id || subject == id,
             SponsorGift { recipient, .. } => r(recipient),

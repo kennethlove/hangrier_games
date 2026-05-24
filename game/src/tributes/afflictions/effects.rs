@@ -90,6 +90,12 @@ fn base_penalties(kind: AfflictionKind) -> (i32, i32, i32, i32, i32, f64, i32, i
         AfflictionKind::BrokenBone => (-3, -3, 0, 0, 0, 0.5, 0, 0),
         AfflictionKind::Infected => (0, 0, 0, 0, 0, 0.0, -1, -1),
         AfflictionKind::Wounded => (-1, -1, 0, 0, 0, 0.0, 0, 0),
+        // Trauma: stat penalties for psychological distress.
+        // Moderate-tier base: forage=-2 (distracted), escape=-2 (slower reactions),
+        // atk=-1 (combat penality), def=-1 (less aware).
+        // Severity scaling: Mild → -1 forage, -1 escape; Moderate → full base;
+        // Severe → -2 atk/def, -3 forage/escape (clamped elsewhere).
+        AfflictionKind::Trauma => (-1, -1, -2, -2, 0, 0.0, 0, 0),
         // Non-table afflictions: no direct stat penalties in v1.
         // Their effects are handled elsewhere (survival bands, etc.).
         AfflictionKind::Poisoned
@@ -102,7 +108,6 @@ fn base_penalties(kind: AfflictionKind) -> (i32, i32, i32, i32, i32, f64, i32, i
         | AfflictionKind::Electrocuted
         | AfflictionKind::Drowned
         | AfflictionKind::Buried
-        | AfflictionKind::Trauma
         | AfflictionKind::Phobia(_) => (0, 0, 0, 0, 0, 0.0, 0, 0),
     }
 }
@@ -185,6 +190,11 @@ fn base_bias(kind: AfflictionKind) -> (f64, f64, f64, f64, f64) {
         AfflictionKind::Infected => (1.0, 1.4, 1.0, 1.6, 1.3),
         // Wounded: rest preference
         AfflictionKind::Wounded => (1.0, 1.0, 1.0, 1.0, 1.3),
+        // Trauma: avoidance behavior from psychological distress.
+        // Bias values align with spec: combat_avoid=1.3 (moderate avoidance),
+        // shelter_preference=1.2, isolation=1.2, rest_preference=1.2.
+        // Severity scales via the composition formula in compute_brain_bias.
+        AfflictionKind::Trauma => (1.3, 1.2, 1.2, 1.0, 1.2),
         // Non-table afflictions: no direct brain bias in v1
         AfflictionKind::Poisoned
         | AfflictionKind::Starving
@@ -196,9 +206,35 @@ fn base_bias(kind: AfflictionKind) -> (f64, f64, f64, f64, f64) {
         | AfflictionKind::Electrocuted
         | AfflictionKind::Drowned
         | AfflictionKind::Buried
-        | AfflictionKind::Trauma
         | AfflictionKind::Phobia(_) => (1.0, 1.0, 1.0, 1.0, 1.0),
     }
+}
+
+/// Chance of a flashback occurring when the trauma stimulus is present.
+/// Values from spec §7.2: Mild=5%, Moderate=10%, Severe=20%.
+pub fn flashback_chance(severity: Severity) -> f64 {
+    match severity {
+        Severity::Mild => 0.05,
+        Severity::Moderate => 0.10,
+        Severity::Severe => 0.20,
+    }
+}
+
+/// Sleep recovery multiplier from trauma.
+/// Spec §6: Moderate=50% recovery, Severe=25% recovery.
+/// Returns 1.0 for Mild (no penalty).
+pub fn sleep_recovery_multiplier(severity: Severity) -> f64 {
+    match severity {
+        Severity::Mild => 1.0,
+        Severity::Moderate => 0.5,
+        Severity::Severe => 0.25,
+    }
+}
+
+/// Whether trauma severity produces a hard avoidance veto.
+/// Spec §7.2: Only Severe produces a hard veto.
+pub fn avoidance_hard_veto(severity: Severity) -> bool {
+    matches!(severity, Severity::Severe)
 }
 
 #[cfg(test)]
@@ -551,5 +587,55 @@ mod tests {
         let bias = compute_brain_bias(&[aff(AfflictionKind::Starving, Severity::Severe)]);
         assert_eq!(bias.combat_avoid, 1.0);
         assert_eq!(bias.shelter_preference, 1.0);
+    }
+
+    // ── Trauma effects tests ───────────────────────────────────────────
+
+    #[test]
+    fn trauma_mild_penalties() {
+        let mods = compute_stat_modifiers(&[aff(AfflictionKind::Trauma, Severity::Mild)]);
+        assert!(mods.atk >= -1);
+        assert!(mods.def >= -1);
+        assert!(mods.forage <= -1);
+        assert!(mods.escape <= -1);
+    }
+
+    #[test]
+    fn trauma_moderate_penalties() {
+        let mods = compute_stat_modifiers(&[aff(AfflictionKind::Trauma, Severity::Moderate)]);
+        assert_eq!(mods.atk, -1);
+        assert_eq!(mods.def, -1);
+    }
+
+    #[test]
+    fn trauma_severe_penalties_heavier() {
+        let mild = compute_stat_modifiers(&[aff(AfflictionKind::Trauma, Severity::Mild)]);
+        let severe = compute_stat_modifiers(&[aff(AfflictionKind::Trauma, Severity::Severe)]);
+        assert!(severe.atk <= mild.atk);
+        assert!(severe.escape <= mild.escape);
+    }
+
+    #[test]
+    fn flashback_chance_table() {
+        use shared::afflictions::Severity;
+        assert!((flashback_chance(Severity::Mild) - 0.05).abs() < f64::EPSILON);
+        assert!((flashback_chance(Severity::Moderate) - 0.10).abs() < f64::EPSILON);
+        assert!((flashback_chance(Severity::Severe) - 0.20).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn sleep_recovery_multiplier_table() {
+        use shared::afflictions::Severity;
+        assert!((sleep_recovery_multiplier(Severity::Mild) - 1.0).abs() < f64::EPSILON);
+        assert!((sleep_recovery_multiplier(Severity::Moderate) - 0.5).abs() < f64::EPSILON);
+        assert!((sleep_recovery_multiplier(Severity::Severe) - 0.25).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn avoidance_veto_only_at_severe() {
+        use shared::afflictions::Severity;
+        assert!(!avoidance_hard_veto(Severity::Mild));
+        assert!(!avoidance_hard_veto(Severity::Moderate));
+        assert!(avoidance_hard_veto(Severity::Severe));
     }
 }

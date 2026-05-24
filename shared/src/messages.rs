@@ -528,6 +528,32 @@ pub enum MessagePayload {
         severity: String,
         effect: PhobiaEffect,
     },
+    /// Phobia escalation (Traumatic origin only).
+    PhobiaEscalated {
+        tribute: String,
+        trigger: String,
+        from_severity: String,
+        to_severity: String,
+    },
+    /// Phobia habituation (Traumatic origin, severity decayed or cured).
+    PhobiaHabituated {
+        tribute: String,
+        trigger: String,
+        from_severity: String,
+        to_severity: Option<String>,
+    },
+    /// A tribute observed someone else's phobia firing.
+    PhobiaObserved {
+        observer: String,
+        subject: String,
+        trigger: String,
+    },
+    /// A tribute forgot someone else's phobia (observer decay).
+    PhobiaForgotten {
+        observer: String,
+        subject: String,
+        trigger: String,
+    },
 }
 
 impl MessagePayload {
@@ -570,7 +596,11 @@ impl MessagePayload {
             | TraumaAcquired { .. }
             | TraumaReinforced { .. }
             | PhobiaAcquired { .. }
-            | PhobiaTriggered { .. } => MessageKind::State,
+            | PhobiaTriggered { .. }
+            | PhobiaEscalated { .. }
+            | PhobiaHabituated { .. }
+            | PhobiaObserved { .. }
+            | PhobiaForgotten { .. } => MessageKind::State,
             AfflictionAcquired { .. }
             | AfflictionProgressed { .. }
             | AfflictionHealed { .. }
@@ -635,7 +665,21 @@ impl MessagePayload {
             | PhobiaTriggered {
                 tribute: tribute_id,
                 ..
+            }
+            | PhobiaEscalated {
+                tribute: tribute_id,
+                ..
+            }
+            | PhobiaHabituated {
+                tribute: tribute_id,
+                ..
             } => tribute_id == id,
+            PhobiaObserved {
+                observer, subject, ..
+            } => observer == id || subject == id,
+            PhobiaForgotten {
+                observer, subject, ..
+            } => observer == id || subject == id,
             SponsorGift { recipient, .. } => r(recipient),
             AreaClosed { .. } | AreaEvent { .. } => false,
             CycleStart { .. } | CycleEnd { .. } | PhaseStarted { .. } | PhaseEnded { .. } => false,

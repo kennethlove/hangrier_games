@@ -3,6 +3,7 @@
 //!
 //! See `docs/superpowers/specs/2026-05-03-health-conditions-design.md` §9.
 
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -633,19 +634,23 @@ mod tests {
     // ── Traumatic reinforcement ────────────────────────────────────────
 
     /// Deterministic RNG that always yields the same `u64`.
+    /// Implements `TryRng` → blanket impl provides `Rng`.
     struct FixedRng(u64);
-    impl rand::RngCore for FixedRng {
-        fn next_u32(&mut self) -> u32 {
-            self.next_u64() as u32
+    impl rand::TryRng for FixedRng {
+        type Error = std::convert::Infallible;
+
+        fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+            Ok(self.0 as u32)
         }
-        fn next_u64(&mut self) -> u64 {
-            self.0
+        fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+            Ok(self.0)
         }
-        fn fill_bytes(&mut self, dest: &mut [u8]) {
+        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Self::Error> {
             for chunk in dest.chunks_mut(8) {
                 let bytes = self.0.to_le_bytes();
                 chunk.copy_from_slice(&bytes[..chunk.len()]);
             }
+            Ok(())
         }
     }
 

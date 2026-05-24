@@ -7,7 +7,8 @@
 //!
 //! See spec §4, §7.
 
-use shared::afflictions::{AfflictionKind, PhobiaMetadata, Severity};
+use shared::afflictions::{AfflictionKind, PhobiaMetadata, PhobiaOrigin, PhobiaTrigger, Severity};
+use shared::messages::MessagePayload;
 
 use crate::tributes::Tribute;
 
@@ -20,6 +21,8 @@ pub struct PhobiaScanResult {
     pub firing_count: u32,
     /// Highest severity among firing phobias.
     pub highest_firing_severity: Option<Severity>,
+    /// Messages produced by this scan (observations, escalations, habituations).
+    pub messages: Vec<MessagePayload>,
 }
 
 /// Scans all tributes for phobia triggers in the current cycle.
@@ -27,14 +30,15 @@ pub struct PhobiaScanResult {
 /// For each tribute with Phobia afflictions:
 /// 1. Checks if each trigger is present via `is_present()`
 /// 2. Updates `cycles_since_last_fire` counter on metadata
-/// 3. Tracks observer state (PR3 will flesh this out)
+/// 3. Tracks observer state
+/// 4. Handles traumatic reinforcement on fire, traumatic decay on idle
 ///
-/// This is a pure detection pass. Reactions (stat penalties, flee bias,
-/// freeze) are implemented in PR2.
+/// Reactions (stat penalties, flee bias, freeze) are implemented in PR2.
 pub fn scan_phobias<'a>(
     tributes: &'a mut [Tribute],
     ctx: &PhobiaContext<'_>,
     cycle: u32,
+    rng: &mut impl rand::Rng,
 ) -> Vec<(&'a Tribute, PhobiaScanResult)> {
     let mut results = Vec::new();
 
@@ -43,8 +47,8 @@ pub fn scan_phobias<'a>(
             continue;
         }
 
-        let result = scan_tribute_phobias(tribute, ctx, cycle);
-        if result.firing_count > 0 {
+        let result = scan_tribute_phobias(tribute, ctx, cycle, rng);
+        if result.firing_count > 0 || !result.messages.is_empty() {
             results.push((&*tribute, result));
         }
     }
@@ -52,11 +56,25 @@ pub fn scan_phobias<'a>(
     results
 }
 
+/// Scan a single tribute's phobia afflictions.
+///
+/// Convenience wrapper for calling from the game cycle where tributes are
+/// processed area-by-area.
+pub fn scan_tribute(
+    tribute: &mut Tribute,
+    ctx: &PhobiaContext<'_>,
+    cycle: u32,
+    rng: &mut impl rand::Rng,
+) -> PhobiaScanResult {
+    scan_tribute_phobias(tribute, ctx, cycle, rng)
+}
+
 /// Scans a single tribute's phobia afflictions.
 fn scan_tribute_phobias(
     tribute: &mut Tribute,
     ctx: &PhobiaContext<'_>,
     cycle: u32,
+    rng: &mut impl rand::Rng,
 ) -> PhobiaScanResult {
     let mut result = PhobiaScanResult::default();
 
@@ -90,7 +108,19 @@ fn scan_tribute_phobias(
         if let Some(aff) = tribute.afflictions.get_mut(key)
             && let Some(meta) = &mut aff.phobia_metadata
         {
-            on_phobia_fire(meta, cycle);
+            let AfflictionKind::Phobia(ref trigger) = aff.kind else {
+                unreachable!()
+            };
+            let msgs = on_phobia_fire(
+                meta,
+                cycle,
+                &mut aff.severity,
+                trigger,
+                &tribute.identifier,
+                ctx,
+                rng,
+            );
+            result.messages.extend(msgs);
         }
     }
 
@@ -102,7 +132,15 @@ fn scan_tribute_phobias(
         if let Some(aff) = tribute.afflictions.get_mut(key)
             && let Some(meta) = &mut aff.phobia_metadata
         {
-            on_phobia_idle(meta);
+            let AfflictionKind::Phobia(ref trigger) = aff.kind else {
+                unreachable!()
+            };
+            let (msgs, should_remove) =
+                on_phobia_idle(meta, &mut aff.severity, trigger, &tribute.identifier);
+            result.messages.extend(msgs);
+            if should_remove {
+                tribute.afflictions.remove(key);
+            }
         }
     }
 
@@ -111,20 +149,105 @@ fn scan_tribute_phobias(
 
 /// Called when a phobia fires this cycle.
 ///
-/// Resets the decay counter and (for Traumatic phobias) would trigger
-/// the sensitization escalation roll in PR3.
-fn on_phobia_fire(meta: &mut PhobiaMetadata, cycle: u32) {
+/// Resets the decay counter. For Traumatic phobias, rolls reinforcement
+/// escalation (12% chance per spec §7.1). For visible firings (Moderate+),
+/// adds co-located tributes as observers.
+fn on_phobia_fire(
+    meta: &mut PhobiaMetadata,
+    cycle: u32,
+    severity: &mut Severity,
+    trigger: &PhobiaTrigger,
+    tribute_id: &str,
+    ctx: &PhobiaContext<'_>,
+    rng: &mut impl rand::Rng,
+) -> Vec<MessagePayload> {
+    let mut messages = Vec::new();
+
+    // Reset the decay counter.
     meta.cycles_since_last_fire = 0;
+
+    // Clean stale observer entries (keep only those seen within 5 cycles).
     meta.observer_seen_cycle
         .retain(|_observer_id, last_seen| cycle.saturating_sub(*last_seen) <= 5);
+
+    // Add observer if this is a visible firing (Moderate+) and there are
+    // other tributes in the area who haven't already observed.
+    if *severity > Severity::Mild {
+        let trigger_str = trigger.to_string();
+        for other in ctx.other_tributes_in_area {
+            let other_id = &other.identifier;
+            if other_id == tribute_id {
+                continue;
+            }
+            if !meta.observed_by.contains(other_id) {
+                meta.observed_by.insert(other_id.clone());
+                messages.push(MessagePayload::PhobiaObserved {
+                    observer: other_id.clone(),
+                    subject: tribute_id.to_string(),
+                    trigger: trigger_str.clone(),
+                });
+            }
+            meta.observer_seen_cycle.insert(other_id.clone(), cycle);
+        }
+    }
+
+    // Traumatic reinforcement (spec §7.1).
+    if matches!(meta.origin, PhobiaOrigin::Traumatic { .. }) {
+        let outcome = shared::afflictions::apply_traumatic_reinforcement(*severity, 0.12, rng);
+        if outcome.escalated {
+            messages.push(MessagePayload::PhobiaEscalated {
+                tribute: tribute_id.to_string(),
+                trigger: trigger.to_string(),
+                from_severity: severity.to_string(),
+                to_severity: outcome.new_severity.to_string(),
+            });
+            *severity = outcome.new_severity;
+        }
+    }
+
+    messages
 }
 
 /// Called when a phobia does not fire this cycle.
 ///
-/// Increments the decay counter. At threshold (5 cycles), Traumatic
-/// phobias decay one tier in PR3.
-fn on_phobia_idle(meta: &mut PhobiaMetadata) {
+/// Increments the decay counter. For Traumatic phobias at threshold (5 cycles),
+/// decays one tier. Returns PhobiaHabituated message if decay occurred.
+fn on_phobia_idle(
+    meta: &mut PhobiaMetadata,
+    severity: &mut Severity,
+    trigger: &PhobiaTrigger,
+    tribute_id: &str,
+) -> (Vec<MessagePayload>, bool) {
     meta.cycles_since_last_fire = meta.cycles_since_last_fire.saturating_add(1);
+    let mut should_remove = false;
+    let mut messages = Vec::new();
+
+    // Traumatic habituation (spec §7.2).
+    if matches!(meta.origin, PhobiaOrigin::Traumatic { .. }) {
+        let outcome = shared::afflictions::tick_decay(*severity, meta.cycles_since_last_fire, 5);
+        if outcome.decayed {
+            if let Some(new_sev) = outcome.new_severity {
+                messages.push(MessagePayload::PhobiaHabituated {
+                    tribute: tribute_id.to_string(),
+                    trigger: trigger.to_string(),
+                    from_severity: severity.to_string(),
+                    to_severity: Some(new_sev.to_string()),
+                });
+                *severity = new_sev;
+            } else {
+                // Cured — Mild decayed off.
+                messages.push(MessagePayload::PhobiaHabituated {
+                    tribute: tribute_id.to_string(),
+                    trigger: trigger.to_string(),
+                    from_severity: severity.to_string(),
+                    to_severity: None,
+                });
+                should_remove = true;
+            }
+        }
+    }
+
+    (messages, should_remove)
 }
 
 #[cfg(test)]
@@ -134,6 +257,8 @@ mod tests {
     use crate::areas::events::AreaEvent;
     use crate::terrain::{BaseTerrain, TerrainType};
     use crate::tributes::AfflictionDraft;
+    use rand::SeedableRng;
+    use rand::rngs::SmallRng;
     use shared::afflictions::{AfflictionSource, PhobiaOrigin, PhobiaTrigger};
 
     fn make_context_with_fire() -> PhobiaContext<'static> {
@@ -171,6 +296,7 @@ mod tests {
 
     #[test]
     fn scan_detects_firing_phobia() {
+        let mut rng = SmallRng::seed_from_u64(42);
         let mut tribute = crate::tributes::Tribute::new("Test".to_string(), None, None);
         let draft = AfflictionDraft {
             kind: AfflictionKind::Phobia(PhobiaTrigger::Fire),
@@ -189,13 +315,14 @@ mod tests {
         }
 
         let ctx = make_context_with_fire();
-        let results = scan_phobias(std::slice::from_mut(&mut tribute), &ctx, 1);
+        let results = scan_phobias(std::slice::from_mut(&mut tribute), &ctx, 1, &mut rng);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].1.firing_count, 1);
     }
 
     #[test]
     fn scan_no_firing_when_trigger_absent() {
+        let mut rng = SmallRng::seed_from_u64(42);
         let mut tribute = crate::tributes::Tribute::new("Test".to_string(), None, None);
         let draft = AfflictionDraft {
             kind: AfflictionKind::Phobia(PhobiaTrigger::Fire),
@@ -213,12 +340,13 @@ mod tests {
         }
 
         let ctx = make_context_clear();
-        let results = scan_phobias(std::slice::from_mut(&mut tribute), &ctx, 1);
+        let results = scan_phobias(std::slice::from_mut(&mut tribute), &ctx, 1, &mut rng);
         assert!(results.is_empty());
     }
 
     #[test]
     fn scan_dead_tribute_skipped() {
+        let mut rng = SmallRng::seed_from_u64(42);
         use crate::tributes::statuses::TributeStatus;
         let mut tribute = crate::tributes::Tribute::new("Test".to_string(), None, None);
         tribute.status = TributeStatus::RecentlyDead;
@@ -232,12 +360,13 @@ mod tests {
         tribute.try_acquire_affliction(draft);
 
         let ctx = make_context_with_fire();
-        let results = scan_phobias(std::slice::from_mut(&mut tribute), &ctx, 1);
+        let results = scan_phobias(std::slice::from_mut(&mut tribute), &ctx, 1, &mut rng);
         assert!(results.is_empty());
     }
 
     #[test]
     fn cycles_since_last_fire_increments_on_idle() {
+        let mut rng = SmallRng::seed_from_u64(42);
         let mut tribute = crate::tributes::Tribute::new("Test".to_string(), None, None);
         let draft = AfflictionDraft {
             kind: AfflictionKind::Phobia(PhobiaTrigger::Fire),
@@ -256,7 +385,7 @@ mod tests {
         }
 
         let ctx = make_context_clear();
-        scan_phobias(std::slice::from_mut(&mut tribute), &ctx, 1);
+        scan_phobias(std::slice::from_mut(&mut tribute), &ctx, 1, &mut rng);
 
         let (_, aff) = tribute.afflictions.iter().next().unwrap();
         assert_eq!(
@@ -265,8 +394,344 @@ mod tests {
         );
     }
 
+    fn make_context_with_others(others: &[Tribute]) -> PhobiaContext<'_> {
+        use std::sync::LazyLock;
+        static AREA: LazyLock<crate::areas::AreaDetails> = LazyLock::new(|| {
+            let mut area = crate::areas::AreaDetails::new(None, Area::Cornucopia);
+            area.terrain = TerrainType::new(BaseTerrain::Forest, vec![]).unwrap();
+            area.events = vec![AreaEvent::Wildfire];
+            area
+        });
+        PhobiaContext {
+            area: &AREA,
+            is_night: false,
+            other_tributes_in_area: others,
+            cycle_messages: &[],
+            cycle: 1,
+        }
+    }
+
+    #[test]
+    fn innate_phobia_never_escalates() {
+        let mut rng = SmallRng::seed_from_u64(42);
+        let mut tribute = crate::tributes::Tribute::new("Test".to_string(), None, None);
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Phobia(PhobiaTrigger::Fire),
+            body_part: None,
+            severity: Severity::Mild,
+            source: AfflictionSource::Spawn,
+        };
+        tribute.try_acquire_affliction(draft);
+        let initial_severity;
+
+        // Add Innate phobia metadata
+        if let Some((_, aff)) = tribute.afflictions.iter_mut().next() {
+            aff.phobia_metadata = Some(PhobiaMetadata {
+                origin: PhobiaOrigin::Innate,
+                ..PhobiaMetadata::default()
+            });
+            initial_severity = aff.severity;
+        } else {
+            panic!("no affliction after acquire");
+        }
+
+        let ctx = make_context_with_fire();
+        let results = scan_phobias(std::slice::from_mut(&mut tribute), &ctx, 1, &mut rng);
+
+        assert!(
+            !results.is_empty(),
+            "innate phobia should fire in fire context"
+        );
+        let result = &results[0].1;
+        let has_escalation = result
+            .messages
+            .iter()
+            .any(|m| matches!(m, MessagePayload::PhobiaEscalated { .. }));
+        assert!(
+            !has_escalation,
+            "innate phobia must not emit PhobiaEscalated"
+        );
+
+        // Severity unchanged after scan.
+        let (_, aff) = tribute.afflictions.iter().next().unwrap();
+        assert_eq!(
+            aff.severity, initial_severity,
+            "innate phobia severity must stay the same"
+        );
+    }
+
+    #[test]
+    fn traumatic_phobia_escalates_at_seed_zero() {
+        let mut rng = SmallRng::seed_from_u64(3);
+        let mut tribute = crate::tributes::Tribute::new("Test".to_string(), None, None);
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Phobia(PhobiaTrigger::Fire),
+            body_part: None,
+            severity: Severity::Mild,
+            source: AfflictionSource::Spawn,
+        };
+        tribute.try_acquire_affliction(draft);
+
+        // Add Traumatic phobia metadata.
+        if let Some((_, aff)) = tribute.afflictions.iter_mut().next() {
+            aff.phobia_metadata = Some(PhobiaMetadata {
+                origin: PhobiaOrigin::Traumatic {
+                    event_ref: "forest_fire".into(),
+                },
+                ..PhobiaMetadata::default()
+            });
+        }
+
+        let ctx = make_context_with_fire();
+        let results = scan_phobias(std::slice::from_mut(&mut tribute), &ctx, 1, &mut rng);
+
+        assert!(
+            !results.is_empty(),
+            "traumatic phobia should fire in fire context"
+        );
+        assert!(
+            !results[0].1.messages.is_empty(),
+            "should have messages after scan"
+        );
+
+        let has_escalation = results[0].1.messages.iter().any(|m| {
+            matches!(
+                m,
+                MessagePayload::PhobiaEscalated {
+                    from_severity,
+                    to_severity,
+                    ..
+                } if from_severity == "mild" && to_severity == "moderate"
+            )
+        });
+        assert!(
+            has_escalation,
+            "expected PhobiaEscalated from mild to moderate"
+        );
+
+        // Verify severity was updated on the affliction.
+        let (_, aff) = tribute.afflictions.iter().next().unwrap();
+        assert_eq!(
+            aff.severity,
+            Severity::Moderate,
+            "traumatic phobia severity must escalate to Moderate"
+        );
+    }
+
+    #[test]
+    fn traumatic_habituation_decays_severity() {
+        let mut rng = SmallRng::seed_from_u64(99);
+        let mut tribute = crate::tributes::Tribute::new("Test".to_string(), None, None);
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Phobia(PhobiaTrigger::Fire),
+            body_part: None,
+            severity: Severity::Severe,
+            source: AfflictionSource::Spawn,
+        };
+        tribute.try_acquire_affliction(draft);
+
+        // Add Traumatic phobia metadata with idle counter at threshold.
+        if let Some((_, aff)) = tribute.afflictions.iter_mut().next() {
+            aff.phobia_metadata = Some(PhobiaMetadata {
+                origin: PhobiaOrigin::Traumatic {
+                    event_ref: "forest_fire".into(),
+                },
+                cycles_since_last_fire: 5,
+                ..PhobiaMetadata::default()
+            });
+        }
+
+        let ctx = make_context_clear();
+        let results = scan_phobias(std::slice::from_mut(&mut tribute), &ctx, 1, &mut rng);
+
+        assert!(
+            !results.is_empty(),
+            "should produce result even with firing_count=0"
+        );
+        let result = &results[0].1;
+
+        let has_habituation = result.messages.iter().any(|m| {
+            matches!(
+                m,
+                MessagePayload::PhobiaHabituated {
+                    from_severity,
+                    to_severity: Some(to),
+                    ..
+                } if from_severity == "severe" && to == "moderate"
+            )
+        });
+        assert!(
+            has_habituation,
+            "expected PhobiaHabituated from severe to moderate"
+        );
+
+        // Verify severity decayed on the affliction.
+        let (_, aff) = tribute.afflictions.iter().next().unwrap();
+        assert_eq!(
+            aff.severity,
+            Severity::Moderate,
+            "severity must decay one tier"
+        );
+    }
+
+    #[test]
+    fn traumatic_habituation_cures_mild() {
+        let mut rng = SmallRng::seed_from_u64(99);
+        let mut tribute = crate::tributes::Tribute::new("Test".to_string(), None, None);
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Phobia(PhobiaTrigger::Fire),
+            body_part: None,
+            severity: Severity::Mild,
+            source: AfflictionSource::Spawn,
+        };
+        tribute.try_acquire_affliction(draft);
+
+        let key = (AfflictionKind::Phobia(PhobiaTrigger::Fire), None);
+
+        // Add Traumatic phobia metadata with idle counter at threshold.
+        if let Some((_, aff)) = tribute.afflictions.iter_mut().next() {
+            aff.phobia_metadata = Some(PhobiaMetadata {
+                origin: PhobiaOrigin::Traumatic {
+                    event_ref: "forest_fire".into(),
+                },
+                cycles_since_last_fire: 5,
+                ..PhobiaMetadata::default()
+            });
+        }
+
+        let ctx = make_context_clear();
+        let results = scan_phobias(std::slice::from_mut(&mut tribute), &ctx, 1, &mut rng);
+
+        assert!(
+            !results.is_empty(),
+            "should produce result even with firing_count=0"
+        );
+        let result = &results[0].1;
+
+        let has_cure = result.messages.iter().any(|m| {
+            matches!(
+                m,
+                MessagePayload::PhobiaHabituated {
+                    from_severity,
+                    to_severity: None,
+                    ..
+                } if from_severity == "mild"
+            )
+        });
+        assert!(
+            has_cure,
+            "expected PhobiaHabituated with to_severity: None (cured)"
+        );
+
+        // Affliction should be removed from the map.
+        assert!(
+            !tribute.afflictions.contains_key(&key),
+            "phobia should be removed (cured) from afflictions"
+        );
+    }
+
+    #[test]
+    fn observer_added_on_moderate_fire() {
+        let mut main_tribute = crate::tributes::Tribute::new("MainTribute".to_string(), None, None);
+        let observer_tribute = crate::tributes::Tribute::new("Observer".to_string(), None, None);
+
+        // Capture UUID-generated identifiers before they're moved.
+        let main_id = main_tribute.identifier.clone();
+        let observer_id = observer_tribute.identifier.clone();
+
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Phobia(PhobiaTrigger::Fire),
+            body_part: None,
+            severity: Severity::Moderate,
+            source: AfflictionSource::Spawn,
+        };
+        main_tribute.try_acquire_affliction(draft);
+
+        if let Some((_, aff)) = main_tribute.afflictions.iter_mut().next() {
+            aff.phobia_metadata = Some(PhobiaMetadata {
+                origin: PhobiaOrigin::Innate,
+                ..PhobiaMetadata::default()
+            });
+        }
+
+        let mut rng = SmallRng::seed_from_u64(42);
+        let others = [observer_tribute];
+        let ctx = make_context_with_others(&others);
+        let results = scan_phobias(std::slice::from_mut(&mut main_tribute), &ctx, 1, &mut rng);
+
+        assert!(!results.is_empty(), "should fire in fire context");
+        let result = &results[0].1;
+
+        let has_observed = result.messages.iter().any(|m| {
+            matches!(
+                m,
+                MessagePayload::PhobiaObserved {
+                    observer,
+                    subject,
+                    ..
+                } if *observer == observer_id && *subject == main_id
+            )
+        });
+        assert!(
+            has_observed,
+            "should emit PhobiaObserved for Moderate firing"
+        );
+
+        // Check metadata was updated.
+        let (_, aff) = main_tribute.afflictions.iter().next().unwrap();
+        let meta = aff.phobia_metadata.as_ref().unwrap();
+        assert!(
+            meta.observed_by.contains(&observer_id),
+            "observer should be tracked in observed_by"
+        );
+    }
+
+    #[test]
+    fn no_observer_on_mild_fire() {
+        let mut main_tribute = crate::tributes::Tribute::new("MainTribute".to_string(), None, None);
+        let observer_tribute = crate::tributes::Tribute::new("Observer".to_string(), None, None);
+
+        let draft = AfflictionDraft {
+            kind: AfflictionKind::Phobia(PhobiaTrigger::Fire),
+            body_part: None,
+            severity: Severity::Mild,
+            source: AfflictionSource::Spawn,
+        };
+        main_tribute.try_acquire_affliction(draft);
+
+        if let Some((_, aff)) = main_tribute.afflictions.iter_mut().next() {
+            aff.phobia_metadata = Some(PhobiaMetadata {
+                origin: PhobiaOrigin::Innate,
+                ..PhobiaMetadata::default()
+            });
+        }
+
+        let mut rng = SmallRng::seed_from_u64(42);
+        let others = [observer_tribute];
+        let ctx = make_context_with_others(&others);
+        let results = scan_phobias(std::slice::from_mut(&mut main_tribute), &ctx, 1, &mut rng);
+
+        assert!(!results.is_empty(), "should fire in fire context");
+        let result = &results[0].1;
+
+        let has_observed = result
+            .messages
+            .iter()
+            .any(|m| matches!(m, MessagePayload::PhobiaObserved { .. }));
+        assert!(!has_observed, "Mild phobia must not emit PhobiaObserved");
+
+        // observed_by should be empty.
+        let (_, aff) = main_tribute.afflictions.iter().next().unwrap();
+        let meta = aff.phobia_metadata.as_ref().unwrap();
+        assert!(
+            meta.observed_by.is_empty(),
+            "no observers should be recorded for Mild phobia"
+        );
+    }
+
     #[test]
     fn cycles_since_last_fire_resets_on_fire() {
+        let mut rng = SmallRng::seed_from_u64(42);
         let mut tribute = crate::tributes::Tribute::new("Test".to_string(), None, None);
         let draft = AfflictionDraft {
             kind: AfflictionKind::Phobia(PhobiaTrigger::Fire),
@@ -285,7 +750,7 @@ mod tests {
         }
 
         let ctx = make_context_with_fire();
-        scan_phobias(std::slice::from_mut(&mut tribute), &ctx, 1);
+        scan_phobias(std::slice::from_mut(&mut tribute), &ctx, 1, &mut rng);
 
         let (_, aff) = tribute.afflictions.iter().next().unwrap();
         assert_eq!(

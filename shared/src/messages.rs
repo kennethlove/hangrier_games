@@ -171,6 +171,8 @@ pub enum MessageKind {
     SponsorGift,
     /// Trauma acquisition or reinforcement.
     Trauma,
+    /// Affliction acquired, progressed, healed, or cascaded.
+    Affliction,
 }
 
 /// Visible fatigue band derived from a tribute's stamina/max_stamina ratio.
@@ -565,14 +567,14 @@ impl MessagePayload {
             | Ate { .. }
             | TributeSlept { .. }
             | TributeWoke { .. }
-            | AfflictionAcquired { .. }
-            | AfflictionProgressed { .. }
-            | AfflictionHealed { .. }
-            | AfflictionCascaded { .. }
             | TraumaAcquired { .. }
             | TraumaReinforced { .. }
             | PhobiaAcquired { .. }
             | PhobiaTriggered { .. } => MessageKind::State,
+            AfflictionAcquired { .. }
+            | AfflictionProgressed { .. }
+            | AfflictionHealed { .. }
+            | AfflictionCascaded { .. } => MessageKind::Affliction,
         }
     }
 

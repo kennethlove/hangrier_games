@@ -201,6 +201,38 @@ fn tribute_card(tribute: &game::tributes::Tribute) -> maud::Markup {
                 }
             }
 
+            // Fears
+            @let phobias: Vec<_> = tribute.afflictions.values()
+                .filter(|a| matches!(a.kind, shared::afflictions::AfflictionKind::Phobia(_)))
+                .collect();
+            @if !phobias.is_empty() {
+                div class="card-fears" {
+                    span class="fears-header" { (icon("eye")) " Fears" }
+                    @for affliction in &phobias {
+                        @let trigger = match &affliction.kind {
+                            shared::afflictions::AfflictionKind::Phobia(t) => t.to_string(),
+                            _ => unreachable!(),
+                        };
+                        @let severity_class = match affliction.severity.to_string().as_str() {
+                            "severe" => "severity-severe",
+                            "moderate" => "severity-moderate",
+                            _ => "severity-mild",
+                        };
+                        @let origin_icon = match &affliction.phobia_metadata {
+                            Some(m) => match m.origin {
+                                shared::afflictions::PhobiaOrigin::Innate => "dna",
+                                shared::afflictions::PhobiaOrigin::Traumatic { event_ref: _ } => "zap",
+                            },
+                            None => "help-circle",
+                        };
+                        span class=(format!("affliction-badge {}", severity_class)) {
+                            (icon(origin_icon))
+                            " " (trigger)
+                        }
+                    }
+                }
+            }
+
             // Survival bands
             div class="card-bands" {
                 span class=(hunger_color(tribute.hunger)) { "H: " (hunger_label(tribute.hunger)) }
@@ -403,6 +435,7 @@ fn message_kind_label(payload: &shared::messages::MessagePayload) -> &'static st
         MessageKind::State => "State",
         MessageKind::Trauma => "Trauma",
         MessageKind::Affliction => "Health",
+        MessageKind::Phobia => "Fear",
     }
 }
 
@@ -465,6 +498,7 @@ fn kind_color(payload: &shared::messages::MessagePayload) -> &'static str {
         MessageKind::Item | MessageKind::SponsorGift => "kind-item",
         MessageKind::State | MessageKind::Trauma => "kind-state",
         MessageKind::Affliction => "kind-affliction",
+        MessageKind::Phobia => "kind-phobia",
     }
 }
 

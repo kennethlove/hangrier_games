@@ -661,6 +661,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
 .kind-item { color: oklch(65% 0.18 85); }
 .kind-state { color: var(--muted); }
 .kind-affliction { color: oklch(65% 0.2 60); }
+.kind-phobia { color: oklch(60% 0.22 290); }
 
 /* Severity badge colors */
 .severity-mild {
@@ -689,6 +690,21 @@ h1, h2, h3, h4 { text-wrap: balance; }
   flex-wrap: wrap;
   gap: 0.375rem;
   margin-top: 0.5rem;
+}
+.card-fears {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: 0.75rem;
+}
+.fears-header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  margin-bottom: 0.125rem;
 }
 
 /* Survival band colors */

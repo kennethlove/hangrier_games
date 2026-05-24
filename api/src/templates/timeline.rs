@@ -310,6 +310,7 @@ pub fn event_card(msg: &GameMessage) -> maud::Markup {
         State => state_card(msg),
         Trauma => trauma_card(msg),
         Affliction => affliction_card(msg),
+        Phobia => phobia_card(msg),
     }
 }
 
@@ -882,6 +883,101 @@ fn affliction_card(msg: &GameMessage) -> maud::Markup {
                 (icon("bandage"))
                 span class="text-amber-400 font-medium" { "Health" }
                 span { "·" }
+                span { "Day " (msg.game_day) " " (msg.phase) }
+            }
+            p class="text-sm text-gray-200 flex items-center gap-2" {
+                (content)
+                (badge)
+            }
+        }
+    }
+}
+
+/// Phobia event card.
+fn phobia_card(msg: &GameMessage) -> maud::Markup {
+    use shared::messages::MessagePayload::*;
+    use shared::messages::PhobiaEffect;
+    let (severity, content) = match &msg.payload {
+        PhobiaAcquired {
+            tribute: _,
+            trigger,
+            severity,
+            origin: _,
+        } => (severity.as_str(), format!("acquired fear of {trigger}")),
+        PhobiaTriggered {
+            tribute: _,
+            trigger,
+            severity,
+            effect,
+        } => {
+            let effect_text = match effect {
+                PhobiaEffect::Penalty => " (penalty)",
+                PhobiaEffect::Flee => " (fled)",
+                PhobiaEffect::Freeze => " (frozen!)",
+            };
+            (severity.as_str(), format!("feared {trigger}{effect_text}"))
+        }
+        PhobiaEscalated {
+            tribute: _,
+            trigger,
+            from_severity,
+            to_severity,
+        } => (
+            to_severity.as_str(),
+            format!("fear of {trigger} deepened: {from_severity} \u{2192} {to_severity}"),
+        ),
+        PhobiaHabituated {
+            tribute: _,
+            trigger,
+            from_severity,
+            to_severity,
+        } => match to_severity {
+            Some(to) => (
+                to.as_str(),
+                format!("fear of {trigger} faded: {from_severity} \u{2192} {to}"),
+            ),
+            None => ("", format!("overcame fear of {trigger}")),
+        },
+        PhobiaObserved {
+            observer: _,
+            subject,
+            trigger,
+        } => ("", format!("spotted {subject}'s fear of {trigger}")),
+        PhobiaForgotten {
+            observer: _,
+            subject,
+            trigger,
+        } => ("", format!("forgot {subject}'s fear of {trigger}")),
+        _ => return fallback_card(msg),
+    };
+
+    let border_color = match severity {
+        "severe" | "Severe" => "border-red-900/50",
+        "moderate" | "Moderate" => "border-orange-900/50",
+        _ if severity.is_empty() => "border-gray-800",
+        _ => "border-yellow-900/50",
+    };
+    let badge_color = match severity {
+        "severe" | "Severe" => "bg-red-500/20 text-red-300",
+        "moderate" | "Moderate" => "bg-orange-500/20 text-orange-300",
+        _ if severity.is_empty() => "",
+        _ => "bg-yellow-500/20 text-yellow-300",
+    };
+
+    let badge = if !severity.is_empty() {
+        html! {
+            span class=(format!("text-xs px-1.5 py-0.5 rounded {}", badge_color)) { (severity) }
+        }
+    } else {
+        html! {}
+    };
+
+    html! {
+        div class=(format!("bg-gray-900 border rounded-lg p-3 {}", border_color)) {
+            div class="flex items-center gap-2 text-xs text-gray-500 mb-1" {
+                (icon("eye"))
+                span class="text-indigo-400 font-medium" { "Fear" }
+                span { "\u{b7}" }
                 span { "Day " (msg.game_day) " " (msg.phase) }
             }
             p class="text-sm text-gray-200 flex items-center gap-2" {

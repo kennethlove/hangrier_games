@@ -1237,6 +1237,8 @@ pub struct Attributes {
     pub persuasion: u32,
     /// Are they likely to get gifts or come out slightly ahead?
     pub luck: u32,
+    /// How quickly they react in a turn.
+    pub agility: u32,
     /// Can other tributes see them?
     pub is_hidden: bool,
 }
@@ -1254,6 +1256,7 @@ impl Default for Attributes {
             intelligence: 100,
             persuasion: 100,
             luck: 100,
+            agility: 50,
             is_hidden: false,
         }
     }
@@ -1275,6 +1278,7 @@ impl Attributes {
             intelligence: rng.random_range(1..=config.max_intelligence),
             persuasion: rng.random_range(1..=config.max_persuasion),
             luck: rng.random_range(1..=config.max_luck),
+            agility: rng.random_range(1..=config.max_agility),
             is_hidden: false,
         }
     }

@@ -157,8 +157,14 @@ fn build_isolated_migration_root() -> std::path::PathBuf {
 }
 
 /// Process-wide source-of-truth for migration files. We do NOT point
-/// tests at the workspace tree directly because `MigrationRunner::up()`
-/// rewrites files in `migrations/definitions/`. Instead, copy the
+/// # Container safety
+///
+/// `env!("CARGO_MANIFEST_DIR")` is evaluated at compile time, so it
+/// embeds the **build-time** path. In CI/devcontainers the build and
+/// runtime environments share the same filesystem, so this is safe.
+/// If building in a separate container from the one running tests,
+/// this path would not exist at runtime.
+///
 /// workspace tree into a per-process tempdir once, treat that as the
 /// read-only source, and snapshot from it on every test.
 fn source_migration_root() -> std::path::PathBuf {

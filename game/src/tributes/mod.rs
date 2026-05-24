@@ -21,7 +21,7 @@ pub use combat::inflict_table::{
 pub use combat::{attack_contest, update_stats};
 pub use movement::TravelResult;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::areas::{Area, AreaDetails};
 use crate::items::Item;
@@ -40,6 +40,7 @@ use rand::rngs::SmallRng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeSeq};
 use shared::afflictions::{
     Affliction, AfflictionKey, AfflictionKind, AfflictionSource, BodyPart, PhobiaTrigger, Severity,
+    TraumaMetadata, TraumaSource,
 };
 use statuses::TributeStatus;
 use uuid::Uuid;
@@ -523,6 +524,10 @@ impl Tribute {
                 // Tribute is frozen by phobia — skip this cycle.
                 // Event emitted by the brain pipeline caller.
             }
+            Action::Flashback { .. } | Action::Avoidance => {
+                // Flashback and avoidance are handled by the brain layer
+                // (trauma_override) which emits the event. No action needed here.
+            }
         }
     }
 
@@ -820,6 +825,33 @@ impl Tribute {
             .max_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap_or(0.0);
 
+        // Trauma penalty (5477 PR3 spec §12):
+        // Soft penalty: each trauma reduces formation chance by -0.15 per severity tier.
+        let trauma_penalty: f64 = self
+            .afflictions
+            .values()
+            .filter(|aff| matches!(aff.kind, AfflictionKind::Trauma))
+            .map(|aff| aff.severity.ordinal() as f64 * 0.15)
+            .sum::<f64>()
+            .min(1.0); // Cap at 1.0 so chance can't go below 0
+
+        // Hard veto: Severe trauma with Betrayal source hard-blocks alliance.
+        let has_betrayal_veto = self.afflictions.values().any(|aff| {
+            if !matches!(aff.kind, AfflictionKind::Trauma) {
+                return false;
+            }
+            if aff.severity < Severity::Severe {
+                return false;
+            }
+            matches!(
+                aff.trauma_metadata,
+                Some(ref m) if matches!(m.source, TraumaSource::Betrayal { .. })
+            )
+        });
+        if has_betrayal_veto {
+            return;
+        }
+
         if candidates.is_empty() {
             return;
         }
@@ -841,6 +873,21 @@ impl Tribute {
             },
         ));
 
+        // Sympathetic bond (5477 PR3 spec §12):
+        // If target has observed a flashback, +0.10 bonus offsetting trauma penalty.
+        let trauma_observer_bonus: f64 = if self.afflictions.values().any(|aff| {
+            if !matches!(aff.kind, AfflictionKind::Trauma) {
+                return false;
+            }
+            aff.trauma_metadata
+                .as_ref()
+                .is_some_and(|m| m.observed_by.contains(&target.identifier))
+        }) {
+            0.10
+        } else {
+            0.0
+        };
+
         let same_district = self.district == target.district;
         let formed = try_form_alliance(
             &self.traits,
@@ -849,6 +896,7 @@ impl Tribute {
             self.allies.len(),
             target.allies.len(),
             phobia_penalty,
+            trauma_penalty - trauma_observer_bonus,
             rng,
         );
         if formed {
@@ -1077,7 +1125,12 @@ impl Tribute {
             let floor_bumped = to > from;
             if floor_bumped {
                 existing.severity = to;
-                existing.trauma_metadata = Some(source);
+                existing.trauma_metadata = Some(TraumaMetadata {
+                    source,
+                    cycles_since_last_fire: 0,
+                    observed_by: BTreeSet::new(),
+                    observer_seen_cycle: BTreeMap::new(),
+                });
             }
             TraumaAcquisition::Reinforced {
                 from_severity: from,
@@ -1092,7 +1145,12 @@ impl Tribute {
                 source: AfflictionSource::Environmental,
                 acquired_cycle: 0,
                 last_progressed_cycle: 0,
-                trauma_metadata: Some(source.clone()),
+                trauma_metadata: Some(TraumaMetadata {
+                    source: source.clone(),
+                    cycles_since_last_fire: 0,
+                    observed_by: BTreeSet::new(),
+                    observer_seen_cycle: BTreeMap::new(),
+                }),
                 phobia_metadata: None,
             };
             self.afflictions.insert(key, aff);
@@ -1196,7 +1254,7 @@ pub fn calculate_stamina_cost(
         // Sleep is free at the action layer; phase scheduler handles it.
         Action::Sleep { .. } => 0.0,
         // Frozen tribute takes no action — no stamina cost.
-        Action::Frozen => 0.0,
+        Action::Frozen | Action::Flashback { .. } | Action::Avoidance => 0.0,
     };
 
     // If base cost is 0, no need to calculate multipliers

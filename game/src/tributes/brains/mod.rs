@@ -11,6 +11,7 @@ use std::collections::HashMap;
 
 pub mod affliction_override;
 pub mod phobia_override;
+pub mod trauma_override;
 
 const LOW_ENEMY_LIMIT: u32 = 6;
 
@@ -569,7 +570,8 @@ impl Brain {
     /// 3. Survival override (terrain-dependent; skipped when `terrain` is `None`)
     /// 4. Stamina override (terrain-dependent for parity with survival)
     /// 5. Phobia override (spec §5 — fires freeze reactions, stat penalties)
-    /// 6. Affliction override (hard gates + brain bias; spec §11)
+    /// 6. Trauma override (spec §7 — avoidance hard veto)
+    /// 7. Affliction override (hard gates + brain bias; spec §11)
     /// 7. Preferred action
     /// 8. Alliance proposal
     /// 9. Consumable
@@ -656,6 +658,14 @@ impl Brain {
             if let Some(action) = phobia_override::phobia_override(tribute, &phobia_ctx, rng) {
                 return Some(action);
             }
+        }
+
+        // Trauma override (spec §7): avoidance hard veto.
+        // Gated on config.trauma_enabled.
+        if config.trauma_enabled
+            && let Some(action) = trauma_override::trauma_override(tribute)
+        {
+            return Some(action);
         }
 
         // Affliction override (spec §11): hard gates + brain bias.

@@ -476,7 +476,14 @@ fn message_kind_icon(payload: &shared::messages::MessagePayload) -> maud::Markup
         | MessagePayload::AfflictionProgressed { .. }
         | MessagePayload::AfflictionHealed { .. }
         | MessagePayload::AfflictionCascaded { .. } => "bandage",
-        MessagePayload::TraumaAcquired { .. } | MessagePayload::TraumaReinforced { .. } => "brain",
+        MessagePayload::TraumaAcquired { .. }
+        | MessagePayload::TraumaReinforced { .. }
+        | MessagePayload::TraumaEscalated { .. }
+        | MessagePayload::TraumaFlashback { .. }
+        | MessagePayload::TraumaAvoidance { .. }
+        | MessagePayload::TraumaObserved { .. }
+        | MessagePayload::TraumaForgotten { .. }
+        | MessagePayload::TraumaHabituated { .. } => "brain",
         MessagePayload::PhobiaAcquired { .. }
         | MessagePayload::PhobiaTriggered { .. }
         | MessagePayload::PhobiaEscalated { .. }

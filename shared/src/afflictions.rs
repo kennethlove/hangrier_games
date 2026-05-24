@@ -95,6 +95,20 @@ impl Default for PhobiaMetadata {
     }
 }
 
+/// Metadata attached to Trauma afflictions. Tracks observer state,
+/// reinforcement history, and source. Only populated for Trauma kinds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TraumaMetadata {
+    /// The source event that caused this trauma.
+    pub source: TraumaSource,
+    /// Cycles since this trauma last fired/reinforced (for decay tracking).
+    pub cycles_since_last_fire: u32,
+    /// Tributes who have observed a flashback associated with this trauma.
+    pub observed_by: BTreeSet<String>,
+    /// Last cycle each observer witnessed a flashback.
+    pub observer_seen_cycle: BTreeMap<String, u32>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AfflictionKind {
@@ -431,8 +445,9 @@ pub struct Affliction {
     pub acquired_cycle: u32,
     /// Last cycle this affliction progressed (stepped up or spawned successor).
     pub last_progressed_cycle: u32,
-    /// Optional trauma-specific metadata (source, reinforcement history).
-    pub trauma_metadata: Option<TraumaSource>,
+    /// Optional trauma-specific metadata (source, observer state, reinforcement history).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trauma_metadata: Option<TraumaMetadata>,
     /// Optional phobia-specific metadata (origin, observer state).
     /// Only `Some` for `AfflictionKind::Phobia` variants.
     #[serde(default, skip_serializing_if = "Option::is_none")]

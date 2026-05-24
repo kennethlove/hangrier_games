@@ -142,6 +142,23 @@ pub fn tributes_page(
     )
 }
 
+/// Format a trauma source for display in tribute card.
+fn format_trauma_source(source: &shared::afflictions::TraumaSource) -> String {
+    match source {
+        shared::afflictions::TraumaSource::WitnessedAllyDeath { ally, cause: _ } => {
+            format!("witnessed {ally}'s death")
+        }
+        shared::afflictions::TraumaSource::NearDeath { cause: _ } => "near-death".to_string(),
+        shared::afflictions::TraumaSource::Betrayal { by } => {
+            format!("betrayed by {by}")
+        }
+        shared::afflictions::TraumaSource::MassCasualty {
+            cause_class: _,
+            deaths_this_cycle,
+        } => format!("mass casualty (\u{d7}{deaths_this_cycle})"),
+    }
+}
+
 /// Single tribute card with stats strip.
 fn tribute_card(tribute: &game::tributes::Tribute) -> maud::Markup {
     let is_alive = tribute.is_alive();
@@ -228,6 +245,40 @@ fn tribute_card(tribute: &game::tributes::Tribute) -> maud::Markup {
                         span class=(format!("affliction-badge {}", severity_class)) {
                             (icon(origin_icon))
                             " " (trigger)
+                        }
+                    }
+                }
+            }
+
+            // Trauma
+            @let traumas: Vec<_> = tribute.afflictions.values()
+                .filter(|a| matches!(a.kind, shared::afflictions::AfflictionKind::Trauma))
+                .collect();
+            @if !traumas.is_empty() {
+                div class="card-trauma" {
+                    span class="trauma-header" { (icon("brain")) " Trauma" }
+                    @for affliction in &traumas {
+                        @let severity_class = match affliction.severity.to_string().as_str() {
+                            "severe" => "severity-severe",
+                            "moderate" => "severity-moderate",
+                            _ => "severity-mild",
+                        };
+                        @let source_text = affliction.trauma_metadata.as_ref()
+                            .map(|m| format_trauma_source(&m.source))
+                            .unwrap_or_default();
+                        span class=(format!("affliction-badge {}", severity_class)) {
+                            (icon("brain"))
+                            " " (affliction.severity)
+                            @if !source_text.is_empty() {
+                                " \u{2014} " (source_text)
+                            }
+                        }
+                        @if let Some(meta) = &affliction.trauma_metadata {
+                            @if !meta.observed_by.is_empty() {
+                                span class="trauma-observers" {
+                                    (icon("eye")) " " (meta.observed_by.len()) " observer(s)"
+                                }
+                            }
                         }
                     }
                 }
@@ -362,7 +413,7 @@ pub fn log_page(
         CycleStart,CycleEnd,PhaseStarted,PhaseEnded,\
         TributeSlept,TributeWoke,GameEnded,\
         AfflictionAcquired,AfflictionProgressed,AfflictionHealed,AfflictionCascaded,\
-        TraumaAcquired,TraumaReinforced,\
+        TraumaAcquired,TraumaReinforced,TraumaEscalated,TraumaFlashback,TraumaAvoidance,TraumaObserved,TraumaForgotten,TraumaHabituated,\
         PhobiaAcquired,PhobiaTriggered";
 
     base_layout(
@@ -503,7 +554,8 @@ fn kind_color(payload: &shared::messages::MessagePayload) -> &'static str {
         MessageKind::Alliance => "kind-alliance",
         MessageKind::Movement => "kind-movement",
         MessageKind::Item | MessageKind::SponsorGift => "kind-item",
-        MessageKind::State | MessageKind::Trauma => "kind-state",
+        MessageKind::State => "kind-state",
+        MessageKind::Trauma => "kind-trauma",
         MessageKind::Affliction => "kind-affliction",
         MessageKind::Phobia => "kind-phobia",
     }

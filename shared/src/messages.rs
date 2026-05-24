@@ -1459,7 +1459,7 @@ mod survival_event_tests {
         let json = serde_json::to_string(&p).unwrap();
         let back: MessagePayload = serde_json::from_str(&json).unwrap();
         assert_eq!(format!("{:?}", p), format!("{:?}", back));
-        assert_eq!(p.kind(), MessageKind::State);
+        assert_eq!(p.kind(), MessageKind::Phobia);
         assert!(p.involves("t1"));
         assert!(!p.involves("other"));
     }
@@ -1475,7 +1475,7 @@ mod survival_event_tests {
         let json = serde_json::to_string(&p).unwrap();
         let back: MessagePayload = serde_json::from_str(&json).unwrap();
         assert_eq!(format!("{:?}", p), format!("{:?}", back));
-        assert_eq!(p.kind(), MessageKind::State);
+        assert_eq!(p.kind(), MessageKind::Phobia);
         assert!(p.involves("t1"));
         assert!(!p.involves("other"));
     }

@@ -1,9 +1,6 @@
 -- Adds email-based auth support to the user table.
 --
--- Adds email + email_verified fields, a unique email index, and
--- updates the SIGNIN/SIGNUP scope to support dual-mode auth
--- (email OR username) during migration.
---
+-- Adds email + email_verified fields and a unique email index.
 -- The `username` field is repurposed as the display name; login
 -- credentials are now email-based.
 DEFINE FIELD OVERWRITE email ON user TYPE string
@@ -14,18 +11,18 @@ DEFINE FIELD OVERWRITE email_verified ON user TYPE bool DEFAULT false
 
 DEFINE INDEX OVERWRITE unique_email ON user FIELDS email UNIQUE;
 
--- Redefine the access scope for dual-mode auth
+-- Redefine the access scope for email-only auth
 DEFINE ACCESS OVERWRITE user ON DATABASE TYPE RECORD
     SIGNUP (
         CREATE user CONTENT {
-            username: $display_name ?? $username,
+            username: $display_name,
             email: $email,
             password: crypto::argon2::generate($password)
         }
     )
     SIGNIN (
         SELECT * FROM user
-        WHERE (email = $email OR username = $email OR username = $username)
+        WHERE email = $email
         AND crypto::argon2::compare(password, $password)
     )
     WITH JWT

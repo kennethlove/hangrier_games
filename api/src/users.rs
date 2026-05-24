@@ -130,9 +130,8 @@ async fn user_authenticate(
 ) -> Result<Response, AppError> {
     let email = payload
         .get("email")
-        .or_else(|| payload.get("username"))
         .and_then(|v| v.as_str())
-        .ok_or_else(|| AppError::BadRequest("Email or username is required".to_string()))?;
+        .ok_or_else(|| AppError::BadRequest("Email is required".to_string()))?;
     let password = payload
         .get("password")
         .and_then(|v| v.as_str())

@@ -1,5 +1,4 @@
 DEFINE TABLE OVERWRITE user SCHEMAFULL
-    -- Only allow users to query their own record, including their password.
     PERMISSIONS
         FOR select WHERE $auth
         FOR update, delete WHERE id = $auth.id;
@@ -22,22 +21,16 @@ DEFINE INDEX OVERWRITE unique_username ON user FIELDS username UNIQUE;
 DEFINE INDEX OVERWRITE unique_email ON user FIELDS email UNIQUE;
 
 DEFINE ACCESS OVERWRITE user ON DATABASE TYPE RECORD
-    -- SIGNUP accepts $display_name (new-style) OR $username (old-style) for
-    -- backward compatibility during migration. $email is optional for old-style
-    -- registrations (existing code that doesn't pass it).
     SIGNUP (
         CREATE user CONTENT {
-            username: $display_name ?? $username,
+            username: $display_name,
             email: $email,
             password: crypto::argon2::generate($password)
         }
     )
-    -- Dual-mode SIGNIN: accepts email OR username in the $email param.
-    -- During migration, existing users can still sign in with their username
-    -- until they set an email address on their account.
     SIGNIN (
         SELECT * FROM user
-        WHERE (email = $email OR username = $email OR username = $username)
+        WHERE email = $email
         AND crypto::argon2::compare(password, $password)
     )
     WITH JWT

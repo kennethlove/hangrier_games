@@ -160,14 +160,6 @@ pub struct GameArea {
     pub area: String,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize, Validate)]
-pub struct RegistrationUser {
-    #[validate(length(min = 3, max = 50, message = "Username must be 3-50 characters"))]
-    pub username: String,
-    #[validate(length(min = 8, max = 72, message = "Password must be 8-72 characters"))]
-    pub password: String,
-}
-
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, Validate)]
 pub struct EmailRegistrationUser {
     /// User-chosen display name (shown in header, game listings, etc.)
@@ -300,9 +292,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_short_username_validation() {
-        let user = RegistrationUser {
-            username: "ab".to_string(), // Too short (min 3)
+    fn test_short_display_name_validation() {
+        let user = EmailRegistrationUser {
+            display_name: "ab".to_string(), // Too short (min 3)
+            email: "test@example.com".to_string(),
             password: "password123".to_string(),
         };
         let result = user.validate();
@@ -323,8 +316,9 @@ mod tests {
 
     #[test]
     fn test_password_max_length() {
-        let user = RegistrationUser {
-            username: "testuser".to_string(),
+        let user = EmailRegistrationUser {
+            display_name: "testuser".to_string(),
+            email: "test@example.com".to_string(),
             password: "a".repeat(73), // Exceeds max of 72
         };
         let result = user.validate();

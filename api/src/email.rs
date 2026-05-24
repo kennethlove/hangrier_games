@@ -113,6 +113,71 @@ pub async fn send_verification_email(to: &str, token: &str) -> Result<(), EmailE
     }
 }
 
+/// Send a password reset email via the configured backend.
+pub async fn send_password_reset_email(to: &str, token: &str) -> Result<(), EmailError> {
+    let backend = std::env::var("EMAIL_BACKEND").unwrap_or_else(|_| {
+        if cfg!(debug_assertions) {
+            "mailpit".into()
+        } else {
+            "resend".into()
+        }
+    });
+
+    let reset_url = format!(
+        "{}/auth/reset-password?token={}",
+        std::env::var("APP_URL").unwrap_or_else(|_| "http://localhost:3000".to_string()),
+        token
+    );
+
+    let html_body = format!(
+        r#"<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Reset your password</title></head>
+<body style="font-family: sans-serif; padding: 20px;">
+    <h1>Password Reset</h1>
+    <p>We received a request to reset the password for your Hangrier Games account.</p>
+    <p><a href="{}" style="display: inline-block; padding: 12px 24px; background: #4f46e5; color: white; text-decoration: none; border-radius: 6px;">Reset Password</a></p>
+    <p>Or copy this link into your browser:</p>
+    <p style="word-break: break-all; color: #666;">{}</p>
+    <p>This link expires in 24 hours.</p>
+    <p>If you didn't request a password reset, you can ignore this email.</p>
+</body>
+</html>"#,
+        reset_url, reset_url
+    );
+
+    match backend.as_str() {
+        "mailpit" => {
+            send_via_mailpit(
+                to,
+                &EMAIL_FROM,
+                "Reset your Hangrier Games password",
+                &html_body,
+            )
+            .await
+        }
+        "resend" => {
+            send_via_resend(
+                to,
+                &EMAIL_FROM,
+                "Reset your Hangrier Games password",
+                &html_body,
+            )
+            .await
+        }
+        other => {
+            tracing::warn!("Unknown EMAIL_BACKEND '{}', falling back to mailpit", other);
+            send_via_mailpit(
+                to,
+                &EMAIL_FROM,
+                "Reset your Hangrier Games password",
+                &html_body,
+            )
+            .await
+        }
+    }
+}
+
 async fn send_via_mailpit(
     to: &str,
     from: &str,

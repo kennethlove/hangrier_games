@@ -160,15 +160,15 @@ pub fn auth_page(auth: AuthState, error: Option<&str>, default_tab: AuthTab) -> 
                 // ── Reset tab ──
                 div class=(if reset_active { "tab-panel active" } else { "tab-panel" }) id="reset" {
                     h2 class="auth-title" { "Reset password" }
-                    p class="auth-subtitle" { "Enter your username and we'll send you a reset link." }
+                    p class="auth-subtitle" { "Enter your email and we'll send you a reset link." }
 
                     form method="POST" action="/auth/reset-password" {
                         input type="hidden" name="csrf_token" value=(csrf_placeholder()) {}
 
                         div class="form-group" {
-                            label for="reset-username" { "Username" }
-                            input type="text" id="reset-username" name="username"
-                                required placeholder="Your username";
+                            label for="reset-email" { "Email" }
+                            input type="email" id="reset-email" name="email"
+                                required placeholder="Enter your email";
                         }
 
                         button type="submit" class="btn btn-primary" {
@@ -474,6 +474,46 @@ pub fn email_verified_page(auth: AuthState) -> maud::Markup {
                             "Sign In"
                         }
                     }
+                }
+            }
+        },
+    )
+}
+
+/// Password reset form shown when user clicks link from email.
+pub fn reset_form_page(auth: AuthState, token: &str, csrf: &str) -> maud::Markup {
+    base_layout(
+        "Reset Password",
+        auth,
+        html! {
+            div class="auth-card" {
+                div class="auth-logo" { "Hangry " span { "Games" } }
+                h2 class="auth-title" { "Set new password" }
+                p class="auth-subtitle" { "Enter your new password below." }
+
+                form method="POST" action="/auth/reset-password/complete" {
+                    input type="hidden" name="csrf_token" value=(csrf) {}
+                    input type="hidden" name="token" value=(token) {}
+
+                    div class="form-group" {
+                        label for="reset-password" { "New Password" }
+                        input type="password" id="reset-password" name="password"
+                            required minlength="8" maxlength="72"
+                            placeholder="8-72 characters";
+                    }
+
+                    div class="form-group" {
+                        label for="reset-confirm" { "Confirm Password" }
+                        input type="password" id="reset-confirm" name="confirm_password"
+                            required minlength="8" maxlength="72"
+                            placeholder="Repeat your password";
+                    }
+
+                    button type="submit" class="btn btn-primary" { "Reset Password" }
+                }
+
+                div class="auth-footer" {
+                    a href="/auth?tab=login" { "Back to Sign In" }
                 }
             }
         },

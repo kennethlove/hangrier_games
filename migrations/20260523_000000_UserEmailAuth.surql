@@ -25,7 +25,7 @@ DEFINE ACCESS OVERWRITE user ON DATABASE TYPE RECORD
     )
     SIGNIN (
         SELECT * FROM user
-        WHERE (email = $email OR username = $email)
+        WHERE (email = $email OR username = $email OR username = $username)
         AND crypto::argon2::compare(password, $password)
     )
     WITH JWT

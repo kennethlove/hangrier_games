@@ -1,11 +1,17 @@
 use crate::cookies::{
-    REFRESH_COOKIE, clear_auth_cookies, read_cookie, set_refresh_cookie, set_session_cookie,
+    CSRF_COOKIE, REFRESH_COOKIE, clear_auth_cookies, generate_csrf_token, read_cookie,
+    set_refresh_cookie, set_session_cookie,
 };
+use crate::email::{
+    generate_verification_token, send_password_reset_email, validate_verification_token,
+};
+use crate::templates::AuthState;
+use crate::templates::auth::reset_form_page;
 use crate::{AppError, AppState};
-use axum::extract::{Form, State};
+use axum::extract::{Form, Query, State};
 use axum::http::{HeaderMap, StatusCode};
-use axum::response::{IntoResponse, Redirect, Response};
-use axum::routing::post;
+use axum::response::{Html, IntoResponse, Redirect, Response};
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use chrono::Utc;
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
@@ -24,15 +30,34 @@ pub static AUTH_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
     Router::new()
         .route("/refresh", post(refresh_token))
         .route("/logout", post(logout))
-        .route("/reset-password", post(reset_password_stub))
+        .route(
+            "/reset-password",
+            get(show_reset_form).post(request_password_reset),
+        )
+        .route("/reset-password/complete", post(complete_password_reset))
 });
 
 #[derive(Deserialize)]
 struct ResetPasswordRequest {
-    username: String,
+    email: String,
     #[serde(default)]
-    #[allow(dead_code)] // accepted from form, not yet verified — see TODO below
+    #[allow(dead_code)]
     csrf_token: String,
+}
+
+#[derive(Deserialize)]
+struct CompleteResetRequest {
+    token: String,
+    password: String,
+    confirm_password: String,
+    #[serde(default)]
+    #[allow(dead_code)]
+    csrf_token: String,
+}
+
+#[derive(Deserialize)]
+struct ResetTokenQuery {
+    token: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -301,20 +326,173 @@ async fn logout(
     Ok(response)
 }
 
-/// Stub handler for password reset requests.
+/// Handle POST /auth/reset-password — request a password reset email.
 ///
-/// TODO: Real password reset flow — see beads issue. For now, always
-/// redirects with a generic message so we never disclose whether a
-/// username exists. No DB lookup, no email, no token issued.
-async fn reset_password_stub(Form(req): Form<ResetPasswordRequest>) -> Redirect {
-    let sanitized: String = req
-        .username
-        .chars()
-        .filter(|c| c.is_alphanumeric() || matches!(*c, '_' | '-' | '.'))
-        .take(50)
-        .collect();
-    tracing::info!("password reset requested for username={}", sanitized);
-    Redirect::to("/auth?tab=login")
+/// Always redirects to `/auth?tab=login` to avoid disclosing whether
+/// the email exists. If user exists and verified, generates a token
+/// and sends the reset email asynchronously.
+async fn request_password_reset(
+    State(state): State<AppState>,
+    Form(req): Form<ResetPasswordRequest>,
+) -> Redirect {
+    let email = req.email.trim().to_lowercase();
+    let base = "/auth?tab=login";
+
+    if email.is_empty() {
+        return Redirect::to(base);
+    }
+
+    let user_db = (*state.db).clone();
+    if user_db
+        .use_ns(&state.namespace)
+        .use_db(&state.database)
+        .await
+        .is_err()
+    {
+        return Redirect::to(base);
+    }
+
+    // Check user exists and is verified without revealing result
+    let email_bind = email.clone();
+    #[allow(clippy::result_large_err)]
+    let result: Result<Vec<serde_json::Value>, _> = user_db
+        .query("SELECT email, email_verified FROM user WHERE email = $email")
+        .bind(("email", email_bind))
+        .await
+        .and_then(|mut r| r.take(0));
+
+    if let Ok(rows) = result
+        && let Some(row) = rows.into_iter().next()
+    {
+        let verified = row
+            .get("email_verified")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        if verified {
+            let token = match generate_verification_token(&email) {
+                Ok(t) => t,
+                Err(e) => {
+                    tracing::error!("Failed to generate reset token: {}", e);
+                    return Redirect::to(base);
+                }
+            };
+
+            let to = email.clone();
+            tokio::spawn(async move {
+                if let Err(e) = send_password_reset_email(&to, &token).await {
+                    tracing::error!("Failed to send password reset email: {}", e);
+                }
+            });
+        }
+    }
+
+    Redirect::to(base)
+}
+
+/// Handle GET /auth/reset-password?token=... — show the new-password form.
+async fn show_reset_form(
+    State(_state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<ResetTokenQuery>,
+) -> Response {
+    match validate_verification_token(&query.token) {
+        Ok(_email) => {
+            let csrf = read_cookie(&headers, CSRF_COOKIE)
+                .map(|s| s.to_owned())
+                .unwrap_or_else(generate_csrf_token);
+            Html(reset_form_page(
+                AuthState::guest(csrf.clone()),
+                &query.token,
+                &csrf,
+            ))
+            .into_response()
+        }
+        Err(_) => Redirect::to("/auth?tab=login").into_response(),
+    }
+}
+
+/// Handle POST /auth/reset-password/complete — update password.
+async fn complete_password_reset(
+    State(state): State<AppState>,
+    Form(req): Form<CompleteResetRequest>,
+) -> Redirect {
+    let base = "/auth?tab=login";
+
+    // Validate passwords match
+    if req.password != req.confirm_password {
+        return Redirect::to(&format!(
+            "{}&error={}",
+            base,
+            urlencode("Passwords do not match")
+        ));
+    }
+
+    // Validate password length
+    if req.password.len() < 8 || req.password.len() > 72 {
+        return Redirect::to(&format!(
+            "{}&error={}",
+            base,
+            urlencode("Password must be 8-72 characters")
+        ));
+    }
+
+    // Validate token and get email
+    let email = match validate_verification_token(&req.token) {
+        Ok(email) => email,
+        Err(_) => {
+            return Redirect::to(&format!(
+                "{}&error={}",
+                base,
+                urlencode("Invalid or expired reset link")
+            ));
+        }
+    };
+
+    // Update password using SurrealDB crypto function
+    let user_db = (*state.db).clone();
+    if user_db
+        .use_ns(&state.namespace)
+        .use_db(&state.database)
+        .await
+        .is_err()
+    {
+        return Redirect::to(&format!("{}&error={}", base, urlencode("Database error")));
+    }
+
+    let password_bind = req.password.clone();
+    let email_bind = email.clone();
+    #[allow(clippy::result_large_err)]
+    let update_result: Result<Vec<serde_json::Value>, _> = user_db
+        .query(
+            "UPDATE user SET password = crypto::argon2::generate($password) WHERE email = $email",
+        )
+        .bind(("password", password_bind))
+        .bind(("email", email_bind))
+        .await
+        .and_then(|mut r| r.take(0));
+
+    match update_result {
+        Ok(rows) if !rows.is_empty() => {
+            Redirect::to("/auth?tab=login") // Password reset success
+        }
+        _ => Redirect::to(&format!(
+            "{}&error={}",
+            base,
+            urlencode("Failed to reset password")
+        )),
+    }
+}
+
+/// Minimal percent-encoding for error messages in URLs.
+fn urlencode(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    for c in s.replace(' ', "+").chars() {
+        match c {
+            'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '+' => result.push(c),
+            _ => result.push_str(&format!("%{:02X}", c as u8)),
+        }
+    }
+    result
 }
 
 #[cfg(test)]

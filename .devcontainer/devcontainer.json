@@ -12,17 +12,22 @@
         "ghcr.io/devcontainers/features/node:1": {}
     },
 
-    "forwardPorts": [3000, 8000],
+    "forwardPorts": [3000, 8000, 8025],
     "portsAttributes": {
         "3000": { "label": "API", "onAutoForward": "notify" },
-        "8000": { "label": "SurrealDB", "onAutoForward": "silent" }
+        "8000": { "label": "SurrealDB", "onAutoForward": "silent" },
+        "8025": { "label": "Mailpit", "onAutoForward": "notify" }
     },
 
     "remoteEnv": {
         "ENV": "development",
         "SURREAL_HOST": "ws://localhost:8000",
         "SURREAL_USER": "root",
-        "SURREAL_PASS": "root"
+        "SURREAL_PASS": "root",
+        "EMAIL_BACKEND": "mailpit",
+        "EMAIL_FROM": "noreply@hangrier.fun",
+        "MAILPIT_HOST": "localhost",
+        "MAILPIT_PORT": "1025"
     },
 
     "postCreateCommand": "bash .devcontainer/post-create.sh",

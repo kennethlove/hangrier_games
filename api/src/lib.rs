@@ -13,6 +13,7 @@ use tracing::error;
 pub mod auth;
 pub mod cleanup;
 pub mod cookies;
+pub mod email;
 pub mod games;
 // pub mod messages; // TODO: Module file missing
 pub mod sse;

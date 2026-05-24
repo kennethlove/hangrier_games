@@ -13,13 +13,45 @@ api:
 db:
     surreal start --log trace --user root --pass root --bind 0.0.0.0:8000 surrealkv://.surrealdb
 
-# Start full development environment (DB, API, and Tailwind watcher)
+# Start Mailpit email catcher for development
+mailpit:
+    #!/usr/bin/env bash
+    if command -v mailpit &> /dev/null; then
+        mailpit &
+        MP_PID=$!
+        echo "Mailpit running at http://localhost:8025 (SMTP :1025)"
+        echo "Press Ctrl+C to stop"
+        trap "kill $MP_PID 2>/dev/null" EXIT
+        wait
+    else
+        echo "Mailpit not installed. Run 'just setup-mailpit' to install it."
+        exit 1
+    fi
+
+# Install Mailpit email catcher
+setup-mailpit:
+    #!/usr/bin/env bash
+    echo "Installing Mailpit..."
+    if command -v brew &> /dev/null; then
+        brew install mailpit
+    elif command -v go &> /dev/null; then
+        go install github.com/axllent/mailpit@latest
+    else
+        bash <(curl -sL https://raw.githubusercontent.com/axllent/mailpit/develop/install.sh)
+    fi
+    echo "✓ Mailpit installed. Run 'just mailpit' to start it."
+
+# Start full development environment (DB, API, Mailpit, and Tailwind watcher)
 dev:
     #!/usr/bin/env bash
     echo "Starting SurrealDB..."
     surreal start --log info --user root --pass root --bind 0.0.0.0:8000 surrealkv://.surrealdb &
     DB_PID=$!
     sleep 2
+    echo "Starting Mailpit..."
+    MAILPIT_HOST=0.0.0.0 mailpit &
+    MP_PID=$!
+    sleep 1
     echo "Starting API server..."
     cargo run --package api &
     API_PID=$!
@@ -32,11 +64,12 @@ dev:
     echo ""
     echo "Development environment running:"
     echo "  - SurrealDB: ws://localhost:8000"
+    echo "  - Mailpit: http://localhost:8025 (SMTP :1025)"
     echo "  - API + HTMX pages: http://localhost:3000"
     echo "  - Tailwind: watching api/assets/src/main.css"
     echo ""
     echo "Press Ctrl+C to stop all services"
-    trap "kill $DB_PID $API_PID $CSS_PID 2>/dev/null" EXIT
+    trap "kill $DB_PID $MP_PID $API_PID $CSS_PID 2>/dev/null" EXIT
     wait
 
 # Building recipes

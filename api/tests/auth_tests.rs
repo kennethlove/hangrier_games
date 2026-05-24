@@ -17,17 +17,17 @@ async fn test_user_registration() {
     let response = server
         .post("/api/users")
         .json(&json!({
-            "username": test_user.username,
+            "display_name": test_user.username,
             "email": test_user.email,
             "password": test_user.password,
         }))
         .await;
 
-    response.assert_status_ok();
+    response.assert_status(axum::http::StatusCode::CREATED);
 
     let body = response.json::<serde_json::Value>();
-    assert!(body.get("access_token").is_some());
-    assert!(body.get("refresh_token").is_some());
+    assert_eq!(body.get("status").and_then(|v| v.as_str()), Some("created"));
+    assert!(body.get("message").is_some());
 
     test_db.cleanup().await;
 }
@@ -46,18 +46,21 @@ async fn test_user_authentication() {
     let reg_response = server
         .post("/api/users")
         .json(&json!({
-            "username": test_user.username,
+            "display_name": test_user.username,
             "email": test_user.email,
             "password": test_user.password,
         }))
         .await;
-    reg_response.assert_status_ok();
+    reg_response.assert_status(axum::http::StatusCode::CREATED);
+
+    // Manually verify email in test database
+    test_db.verify_email(&test_user.email).await;
 
     // Then, authenticate
     let auth_response = server
         .post("/api/users/authenticate")
         .json(&json!({
-            "username": test_user.username,
+            "email": test_user.email,
             "password": test_user.password,
         }))
         .await;
@@ -85,18 +88,20 @@ async fn test_authentication_wrong_password() {
     server
         .post("/api/users")
         .json(&json!({
-            "username": test_user.username,
+            "display_name": test_user.username,
             "email": test_user.email,
             "password": test_user.password,
         }))
         .await
-        .assert_status_ok();
+        .assert_status(axum::http::StatusCode::CREATED);
+
+    test_db.verify_email(&test_user.email).await;
 
     // Try to authenticate with wrong password
     let auth_response = server
         .post("/api/users/authenticate")
         .json(&json!({
-            "username": test_user.username,
+            "email": test_user.email,
             "password": "WrongPassword123!",
         }))
         .await;
@@ -116,19 +121,31 @@ async fn test_token_refresh() {
 
     let test_user = TestUser::new("testuser4");
 
-    // Register user and get tokens
+    // Register user
     let reg_response = server
         .post("/api/users")
         .json(&json!({
-            "username": test_user.username,
+            "display_name": test_user.username,
             "email": test_user.email,
             "password": test_user.password,
         }))
         .await;
-    reg_response.assert_status_ok();
+    reg_response.assert_status(axum::http::StatusCode::CREATED);
 
-    let reg_body = reg_response.json::<serde_json::Value>();
-    let refresh_token = reg_body["refresh_token"].as_str().unwrap();
+    test_db.verify_email(&test_user.email).await;
+
+    // Authenticate to get tokens
+    let auth_response = server
+        .post("/api/users/authenticate")
+        .json(&json!({
+            "email": test_user.email,
+            "password": test_user.password,
+        }))
+        .await;
+    auth_response.assert_status_ok();
+
+    let auth_body = auth_response.json::<serde_json::Value>();
+    let refresh_token = auth_body["refresh_token"].as_str().unwrap();
 
     // Use refresh token to get new tokens
     let refresh_response = server
@@ -161,19 +178,31 @@ async fn test_logout() {
 
     let test_user = TestUser::new("testuser5");
 
-    // Register user and get tokens
+    // Register user
     let reg_response = server
         .post("/api/users")
         .json(&json!({
-            "username": test_user.username,
+            "display_name": test_user.username,
             "email": test_user.email,
             "password": test_user.password,
         }))
         .await;
-    reg_response.assert_status_ok();
+    reg_response.assert_status(axum::http::StatusCode::CREATED);
 
-    let reg_body = reg_response.json::<serde_json::Value>();
-    let refresh_token = reg_body["refresh_token"].as_str().unwrap();
+    test_db.verify_email(&test_user.email).await;
+
+    // Authenticate to get tokens
+    let auth_response = server
+        .post("/api/users/authenticate")
+        .json(&json!({
+            "email": test_user.email,
+            "password": test_user.password,
+        }))
+        .await;
+    auth_response.assert_status_ok();
+
+    let auth_body = auth_response.json::<serde_json::Value>();
+    let refresh_token = auth_body["refresh_token"].as_str().unwrap();
 
     // Logout (revoke refresh token)
     let logout_response = server
@@ -212,18 +241,18 @@ async fn test_duplicate_username() {
     server
         .post("/api/users")
         .json(&json!({
-            "username": test_user.username,
+            "display_name": test_user.username,
             "email": test_user.email,
             "password": test_user.password,
         }))
         .await
-        .assert_status_ok();
+        .assert_status(axum::http::StatusCode::CREATED);
 
     // Try to register same username again - should fail
     let response = server
         .post("/api/users")
         .json(&json!({
-            "username": test_user.username,
+            "display_name": test_user.username,
             "email": "different@test.com",
             "password": test_user.password,
         }))
@@ -253,15 +282,27 @@ async fn test_session_endpoint() {
     let reg_response = server
         .post("/api/users")
         .json(&json!({
-            "username": test_user.username,
+            "display_name": test_user.username,
             "email": test_user.email,
             "password": test_user.password,
         }))
         .await;
-    reg_response.assert_status_ok();
+    reg_response.assert_status(axum::http::StatusCode::CREATED);
 
-    let reg_body = reg_response.json::<serde_json::Value>();
-    let access_token = reg_body["access_token"].as_str().unwrap();
+    test_db.verify_email(&test_user.email).await;
+
+    // Authenticate to get tokens
+    let auth_response = server
+        .post("/api/users/authenticate")
+        .json(&json!({
+            "email": test_user.email,
+            "password": test_user.password,
+        }))
+        .await;
+    auth_response.assert_status_ok();
+
+    let auth_body = auth_response.json::<serde_json::Value>();
+    let access_token = auth_body["access_token"].as_str().unwrap();
 
     // Call session endpoint with token
     let session_response = server

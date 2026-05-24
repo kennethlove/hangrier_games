@@ -1,25 +1,17 @@
-DEFINE TABLE OVERWRITE user SCHEMAFULL
-    PERMISSIONS
-        FOR select WHERE $auth
-        FOR update, delete WHERE id = $auth.id;
-
-DEFINE FIELD OVERWRITE username ON user TYPE string
-    PERMISSIONS
-        FOR select FULL
-        FOR update WHERE id = $auth.id;
+-- Adds email-based auth support to the user table.
+--
+-- Adds email + email_verified fields and a unique email index.
+-- The `username` field is repurposed as the display name; login
+-- credentials are now email-based.
 DEFINE FIELD OVERWRITE email ON user TYPE string
-    PERMISSIONS
-        FOR select FULL
-        FOR update WHERE id = $auth.id;
-DEFINE FIELD OVERWRITE email_verified ON user TYPE bool DEFAULT false
-    PERMISSIONS
-        FOR select FULL
-        FOR update WHERE id = $auth.id;
-DEFINE FIELD OVERWRITE password on user TYPE string;
+    PERMISSIONS FOR select FULL FOR update WHERE id = $auth.id;
 
-DEFINE INDEX OVERWRITE unique_username ON user FIELDS username UNIQUE;
+DEFINE FIELD OVERWRITE email_verified ON user TYPE bool DEFAULT false
+    PERMISSIONS FOR select FULL FOR update WHERE id = $auth.id;
+
 DEFINE INDEX OVERWRITE unique_email ON user FIELDS email UNIQUE;
 
+-- Redefine the access scope for email-only auth
 DEFINE ACCESS OVERWRITE user ON DATABASE TYPE RECORD
     SIGNUP (
         CREATE user CONTENT {

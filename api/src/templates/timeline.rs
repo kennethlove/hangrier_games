@@ -831,28 +831,30 @@ fn affliction_card(msg: &GameMessage) -> maud::Markup {
             tribute_id: _,
             affliction,
             severity,
-        } => (
-            severity.as_str(),
-            format!("acquired {affliction} ({severity})"),
-        ),
+        } => {
+            (severity.as_str(), format!("acquired {affliction} ({severity})"))
+        }
         AfflictionProgressed {
             tribute_id: _,
             affliction,
             from_severity,
             to_severity,
-        } => (
-            to_severity.as_str(),
-            format!("{affliction} worsened: {from_severity} → {to_severity}"),
-        ),
+        } => {
+            (to_severity.as_str(), format!("{affliction} worsened: {from_severity} → {to_severity}"))
+        }
         AfflictionHealed {
             tribute_id: _,
             affliction,
-        } => ("", format!("healed from {affliction}")),
+        } => {
+            ("", format!("healed from {affliction}"))
+        }
         AfflictionCascaded {
             tribute_id: _,
             from_affliction,
             to_affliction,
-        } => ("", format!("{from_affliction} cascaded to {to_affliction}")),
+        } => {
+            ("", format!("{from_affliction} cascaded to {to_affliction}"))
+        }
         _ => return fallback_card(msg),
     };
 
@@ -891,7 +893,6 @@ fn affliction_card(msg: &GameMessage) -> maud::Markup {
         }
     }
 }
-
 /// Fallback card for unrecognized payloads.
 fn fallback_card(msg: &GameMessage) -> maud::Markup {
     html! {

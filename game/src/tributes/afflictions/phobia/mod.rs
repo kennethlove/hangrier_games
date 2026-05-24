@@ -21,6 +21,6 @@ pub use reaction::{
     FiringPhobia, MAX_PHOBIA_PENALTY, PhobiaEffect, Reaction, collect_firing_phobias, effect_for,
     effective_severity, reaction_for, strongest_reaction, total_stat_penalty,
 };
-pub use scan::{PhobiaScanResult, scan_phobias};
+pub use scan::{PhobiaScanResult, scan_phobias, scan_tribute};
 pub use spawn::{MAX_PHOBIAS, innate_phobia_metadata, roll_spawn_phobias};
 pub use triggers::PhobiaContext;

@@ -49,6 +49,52 @@ fn area_event_to_kind(ev: &AreaEvent) -> shared::messages::AreaEventKind {
     }
 }
 
+/// Generate a human-readable line for phobia-related messages.
+fn phobia_message_line(payload: &crate::messages::MessagePayload, tribute_name: &str) -> String {
+    use crate::messages::MessagePayload;
+    match payload {
+        MessagePayload::PhobiaEscalated {
+            trigger,
+            from_severity,
+            to_severity,
+            ..
+        } => {
+            format!(
+                "{tribute_name}'s fear of {trigger} intensifies from {from_severity} to {to_severity}."
+            )
+        }
+        MessagePayload::PhobiaHabituated {
+            trigger,
+            from_severity,
+            to_severity,
+            ..
+        } => {
+            if let Some(to) = to_severity {
+                format!("{tribute_name}'s fear of {trigger} fades from {from_severity} to {to}.")
+            } else {
+                format!("{tribute_name} has overcome their fear of {trigger}.")
+            }
+        }
+        MessagePayload::PhobiaObserved {
+            observer,
+            subject,
+            trigger,
+            ..
+        } => {
+            format!("{observer} sees {subject}'s fear of {trigger}.")
+        }
+        MessagePayload::PhobiaForgotten {
+            observer,
+            subject,
+            trigger,
+            ..
+        } => {
+            format!("{observer} no longer remembers {subject}'s fear of {trigger}.")
+        }
+        _ => String::new(),
+    }
+}
+
 /// Errors that can occur during game operations.
 #[derive(Debug, Clone, PartialEq)]
 pub enum GameError {
@@ -1573,6 +1619,55 @@ impl Game {
             // with liveness checks so tributes killed by earlier actions
             // cannot act.
             tributes_to_act.push(idx);
+        }
+
+        // ── Phobia scan ────────────────────────────────────────────
+        // Run after survival/sleep ticks, before action execution.
+        // Detects firing phobias, handles reinforcement/decay,
+        // tracks observer state, emits escalation/habituation/observation
+        // messages so severity changes take effect before brain decisions.
+        if self.config.phobias_enabled && !tributes_to_act.is_empty() {
+            use crate::tributes::afflictions::phobia::scan_tribute;
+            use crate::tributes::afflictions::phobia::triggers::PhobiaContext;
+
+            // Monotonically increasing cycle number (Day 1 Day = 1, etc.).
+            let phobia_cycle = (current_day.saturating_sub(1)) * 4 + phase.ord() as u32;
+
+            for &idx in &tributes_to_act {
+                let area = self.tributes[idx].area;
+                let Some(area_details) = all_areas_snapshot.iter().find(|ad| ad.area == Some(area))
+                else {
+                    continue;
+                };
+
+                // Use the pre-built tribute snapshot for observer tracking.
+                let other_tributes: &[Tribute] = tributes_by_area
+                    .get(&area)
+                    .map(|v| v.as_slice())
+                    .unwrap_or(&[]);
+
+                let phobia_ctx = PhobiaContext {
+                    area: area_details,
+                    is_night: !day,
+                    other_tributes_in_area: other_tributes,
+                    cycle_messages: &[],
+                    cycle: phobia_cycle,
+                };
+
+                let scan_result =
+                    scan_tribute(&mut self.tributes[idx], &phobia_ctx, phobia_cycle, rng);
+
+                for msg in scan_result.messages {
+                    let line = phobia_message_line(&msg, &self.tributes[idx].name);
+                    collected_events.push((
+                        self.tributes[idx].identifier.clone(),
+                        self.tributes[idx].name.clone(),
+                        line,
+                        Some(msg),
+                        None,
+                    ));
+                }
+            }
         }
 
         // Sort by initiative so faster tributes act first (tm6a).

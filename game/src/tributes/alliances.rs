@@ -178,18 +178,20 @@ pub fn try_form_alliance(
     same_district: bool,
     self_allies_len: usize,
     target_allies_len: usize,
+    phobia_penalty: f64,
     rng: &mut impl rand::Rng,
 ) -> bool {
     if !passes_gate(self_traits, target_traits) {
         return false;
     }
-    let chance = roll_chance(
+    let base_chance = roll_chance(
         self_traits,
         target_traits,
         same_district,
         self_allies_len,
         target_allies_len,
     );
+    let chance = (base_chance - phobia_penalty).max(0.0);
     if chance <= 0.0 {
         return false;
     }
@@ -427,8 +429,15 @@ mod tests {
     fn try_form_alliance_returns_false_when_gate_blocks() {
         // LoneWolf vs Friendly fails passes_gate; helper must short-circuit.
         let mut rng = StdRng::seed_from_u64(313);
-        let formed =
-            try_form_alliance(&[Trait::LoneWolf], &[Trait::Friendly], true, 0, 0, &mut rng);
+        let formed = try_form_alliance(
+            &[Trait::LoneWolf],
+            &[Trait::Friendly],
+            true,
+            0,
+            0,
+            0.0,
+            &mut rng,
+        );
         assert!(!formed);
     }
 
@@ -441,6 +450,7 @@ mod tests {
             true,
             MAX_ALLIES,
             0,
+            0.0,
             &mut rng,
         );
         assert!(!r1, "self at cap blocks");
@@ -450,6 +460,7 @@ mod tests {
             true,
             0,
             MAX_ALLIES,
+            0.0,
             &mut rng,
         );
         assert!(!r2, "target at cap blocks");
@@ -462,7 +473,15 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(547);
         let mut successes = 0;
         for _ in 0..200 {
-            if try_form_alliance(&[Trait::Friendly], &[Trait::Friendly], true, 0, 0, &mut rng) {
+            if try_form_alliance(
+                &[Trait::Friendly],
+                &[Trait::Friendly],
+                true,
+                0,
+                0,
+                0.0,
+                &mut rng,
+            ) {
                 successes += 1;
             }
         }
@@ -483,6 +502,7 @@ mod tests {
                 false,
                 MAX_ALLIES,
                 MAX_ALLIES,
+                0.0,
                 &mut rng
             ));
         }

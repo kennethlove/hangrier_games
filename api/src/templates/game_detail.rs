@@ -444,7 +444,12 @@ fn message_kind_icon(payload: &shared::messages::MessagePayload) -> maud::Markup
         | MessagePayload::AfflictionHealed { .. }
         | MessagePayload::AfflictionCascaded { .. } => "bandage",
         MessagePayload::TraumaAcquired { .. } | MessagePayload::TraumaReinforced { .. } => "brain",
-        MessagePayload::PhobiaAcquired { .. } | MessagePayload::PhobiaTriggered { .. } => "eye",
+        MessagePayload::PhobiaAcquired { .. }
+        | MessagePayload::PhobiaTriggered { .. }
+        | MessagePayload::PhobiaEscalated { .. }
+        | MessagePayload::PhobiaHabituated { .. }
+        | MessagePayload::PhobiaObserved { .. }
+        | MessagePayload::PhobiaForgotten { .. } => "eye",
     };
     icon(name)
 }

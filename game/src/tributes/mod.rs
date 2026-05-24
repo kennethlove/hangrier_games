@@ -39,7 +39,7 @@ use rand::prelude::*;
 use rand::rngs::SmallRng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeSeq};
 use shared::afflictions::{
-    Affliction, AfflictionKey, AfflictionKind, AfflictionSource, BodyPart, Severity,
+    Affliction, AfflictionKey, AfflictionKind, AfflictionSource, BodyPart, PhobiaTrigger, Severity,
 };
 use statuses::TributeStatus;
 use uuid::Uuid;
@@ -795,6 +795,31 @@ impl Tribute {
             .filter(|t| t.allies.len() < MAX_ALLIES)
             .filter(|t| passes_gate(&self.traits, &t.traits))
             .collect();
+
+        // Phobia veto (qqqx PR3 spec §12):
+        // Hard veto: cannot propose alliance if you have Phobia(Tribute).
+        if self
+            .afflictions
+            .values()
+            .any(|aff| matches!(aff.kind, AfflictionKind::Phobia(PhobiaTrigger::Tribute)))
+        {
+            return;
+        }
+
+        // Soft penalty: Phobia(TraitGroup) reduces formation chance.
+        let phobia_penalty: f64 = self
+            .afflictions
+            .values()
+            .filter_map(|aff| {
+                if matches!(aff.kind, AfflictionKind::Phobia(PhobiaTrigger::TraitGroup)) {
+                    Some(aff.severity.ordinal() as f64 * 0.15)
+                } else {
+                    None
+                }
+            })
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap_or(0.0);
+
         if candidates.is_empty() {
             return;
         }
@@ -823,6 +848,7 @@ impl Tribute {
             same_district,
             self.allies.len(),
             target.allies.len(),
+            phobia_penalty,
             rng,
         );
         if formed {

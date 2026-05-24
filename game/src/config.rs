@@ -60,6 +60,7 @@ pub struct GameConfig {
     pub max_intelligence: u32,
     pub max_persuasion: u32,
     pub max_luck: u32,
+    pub max_agility: u32,
 }
 
 impl Default for GameConfig {
@@ -102,6 +103,7 @@ impl Default for GameConfig {
             max_intelligence: 100,
             max_persuasion: 100,
             max_luck: 100,
+            max_agility: 100,
         }
     }
 }

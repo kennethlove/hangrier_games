@@ -25,4 +25,4 @@ EOF
   echo "Created default .env"
 fi
 
-echo "==> Done. Run 'just dev' (starts SurrealDB + API + Tailwind in one shell)."
+echo "==> Done. Run 'just dev' to start everything, then 'just seed' + 'just open'."

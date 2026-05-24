@@ -13,74 +13,74 @@ api:
 db:
     surreal start --log trace --user root --pass root --bind 0.0.0.0:8000 surrealkv://.surrealdb
 
-# Start Mailpit email catcher for development
-mailpit:
+# Build Tailwind CSS for HTMX pages
+build-css:
     #!/usr/bin/env bash
-    if command -v mailpit &> /dev/null; then
-        mailpit &
-        MP_PID=$!
-        echo "Mailpit running at http://localhost:8025 (SMTP :1025)"
-        echo "Press Ctrl+C to stop"
-        trap "kill $MP_PID 2>/dev/null" EXIT
-        wait
-    else
-        echo "Mailpit not installed. Run 'just setup-mailpit' to install it."
-        exit 1
-    fi
+    cd api/assets && npm install --silent && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css
 
-# Install Mailpit email catcher
-setup-mailpit:
-    #!/usr/bin/env bash
-    echo "Installing Mailpit..."
-    if command -v brew &> /dev/null; then
-        brew install mailpit
-    elif command -v go &> /dev/null; then
-        go install github.com/axllent/mailpit@latest
-    else
-        bash <(curl -sL https://raw.githubusercontent.com/axllent/mailpit/develop/install.sh)
-    fi
-    echo "✓ Mailpit installed. Run 'just mailpit' to start it."
+# Watch Tailwind CSS for changes and auto-rebuild
+watch-css:
+    cd api/assets && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css --watch
 
-# Start full development environment (DB, API, Mailpit, and Tailwind watcher)
+# Start full development environment (DB + API + CSS)
 dev:
     #!/usr/bin/env bash
-    echo "Starting SurrealDB..."
+    echo "==> Starting SurrealDB..."
     surreal start --log info --user root --pass root --bind 0.0.0.0:8000 surrealkv://.surrealdb &
     DB_PID=$!
     sleep 2
-    echo "Starting Mailpit..."
-    MAILPIT_HOST=0.0.0.0 mailpit &
-    MP_PID=$!
-    sleep 1
-    echo "Starting API server..."
+
+    echo "==> Building Tailwind CSS..."
+    cd api/assets && npm install --silent && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css
+    echo "==> Starting Tailwind watcher..."
+    cd api/assets && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css --watch &
+    CSS_PID=$!
+
+    echo "==> Starting API server..."
     cargo run --package api &
     API_PID=$!
-    sleep 2
-    echo "Building Tailwind CSS..."
-    (cd api/assets && npm install --silent && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css)
-    echo "Starting Tailwind watcher..."
-    (cd api/assets && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css --watch) &
-    CSS_PID=$!
+    sleep 3
+
     echo ""
     echo "Development environment running:"
     echo "  - SurrealDB: ws://localhost:8000"
-    echo "  - Mailpit: http://localhost:8025 (SMTP :1025)"
     echo "  - API + HTMX pages: http://localhost:3000"
     echo "  - Tailwind: watching api/assets/src/main.css"
     echo ""
     echo "Press Ctrl+C to stop all services"
-    trap "kill $DB_PID $MP_PID $API_PID $CSS_PID 2>/dev/null" EXIT
+    trap "kill $DB_PID $API_PID $CSS_PID 2>/dev/null; exit" INT
     wait
+
+# Seed dev database with test user and game
+seed:
+    #!/usr/bin/env bash
+    if [ ! -f scripts/dev-seed.sh ]; then
+        echo "Error: scripts/dev-seed.sh not found."
+        exit 1
+    fi
+    bash scripts/dev-seed.sh "$@"
+
+# Open the app in browser
+open:
+    open http://localhost:3000
+
+# Install dependencies for development
+install-deps:
+    #!/usr/bin/env bash
+    echo "==> Installing Node dependencies..."
+    cd api/assets && npm install
+    echo "==> Installing Mailpit..."
+    if command -v brew &> /dev/null; then
+        brew install mailpit 2>/dev/null || echo "   Mailpit already installed"
+    fi
+    echo "==> Installing cargo-watch..."
+    cargo install cargo-watch 2>/dev/null || echo "   cargo-watch already installed"
+    echo ""
+    echo "✓ Dev dependencies installed."
+    echo "   Run 'just build-css' then 'just dev' to start."
 
 # Building recipes
 # ================
-
-# Build Tailwind CSS for HTMX pages
-build-css:
-    #!/usr/bin/env bash
-    cd api/assets
-    npm install
-    npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css
 
 # Build the entire workspace
 build-all:
@@ -142,10 +142,11 @@ setup-node:
 setup: setup-node setup-ollama
     @echo "✓ Setup complete!"
     @echo ""
-    @echo "Next steps:"
-    @echo "  1. Ensure .env file exists with required variables"
-    @echo "  2. Run 'just build-css' to build Tailwind CSS"
-    @echo "  3. Run 'just dev' to start the development environment"
+    @echo "Quick start:"
+    @echo "  1. just build-css"
+    @echo "  2. just dev"
+    @echo "  3. just seed"
+    @echo "  4. just open"
 
 # Utility recipes
 # ==============
@@ -208,11 +209,15 @@ tree:
 
 # Show helpful development tips
 tips:
-    @echo "Development tips:"
-    @echo "  - API serves HTMX pages directly at http://localhost:3000"
-    @echo "  - Build Tailwind CSS before running the API: just build-css"
-    @echo "  - .env file must exist with SURREAL_HOST, SURREAL_USER, SURREAL_PASS"
-    @echo "  - Game crate tests can be slow; workspace tests may hang"
-    @echo "  - Use 'just dev' to start all services at once"
+    @echo "Quick start:"
+    @echo "  Terminal 1: just db"
+    @echo "  Terminal 2: just build-css && just api"
+    @echo "  Terminal 3: just seed"
+    @echo "  Browser:    http://localhost:3000"
+    @echo ""
+    @echo "   OR"
+    @echo ""
+    @echo "  Single terminal: just dev"
+    @echo "  (then in another: just seed && just open)"
     @echo ""
     @echo "For more information, see AGENTS.md"

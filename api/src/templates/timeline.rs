@@ -831,33 +831,31 @@ fn affliction_card(msg: &GameMessage) -> maud::Markup {
             tribute_id: _,
             affliction,
             severity,
-        } => {
-            (severity.as_str(), format!("acquired {affliction} ({severity})"))
-        }
+        } => (
+            severity.as_str(),
+            format!("acquired {affliction} ({severity})"),
+        ),
         AfflictionProgressed {
             tribute_id: _,
             affliction,
             from_severity,
             to_severity,
-        } => {
-            (to_severity.as_str(), format!("{affliction} worsened: {from_severity} → {to_severity}"))
-        }
+        } => (
+            to_severity.as_str(),
+            format!("{affliction} worsened: {from_severity} → {to_severity}"),
+        ),
         AfflictionHealed {
             tribute_id: _,
             affliction,
-        } => {
-            ("", format!("healed from {affliction}"))
-        }
+        } => ("", format!("healed from {affliction}")),
         AfflictionCascaded {
             tribute_id: _,
             from_affliction,
             to_affliction,
-        } => {
-            ("", format!("{from_affliction} cascaded to {to_affliction}"))
-        }
+        } => ("", format!("{from_affliction} cascaded to {to_affliction}")),
         _ => return fallback_card(msg),
     };
-    
+
     let border_color = match severity {
         "severe" | "Severe" => "border-red-900/50",
         "moderate" | "Moderate" => "border-orange-900/50",
@@ -869,7 +867,7 @@ fn affliction_card(msg: &GameMessage) -> maud::Markup {
         _ if severity.is_empty() => "",
         _ => "bg-yellow-500/20 text-yellow-300",
     };
-    
+
     let badge = if !severity.is_empty() {
         html! {
             span class=(format!("text-xs px-1.5 py-0.5 rounded {}", badge_color)) { (severity) }

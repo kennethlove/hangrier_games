@@ -309,7 +309,6 @@ pub fn event_card(msg: &GameMessage) -> maud::Markup {
         Item | SponsorGift => item_card(msg),
         State => state_card(msg),
         Trauma => trauma_card(msg),
-        Affliction => affliction_card(msg),
     }
 }
 
@@ -893,6 +892,7 @@ fn affliction_card(msg: &GameMessage) -> maud::Markup {
         }
     }
 }
+
 /// Fallback card for unrecognized payloads.
 fn fallback_card(msg: &GameMessage) -> maud::Markup {
     html! {

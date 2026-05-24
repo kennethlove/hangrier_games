@@ -863,15 +863,7 @@ async fn login_post_handler(
     headers: axum::http::HeaderMap,
     Form(form): Form<LoginRequest>,
 ) -> impl IntoResponse {
-    handle_login_post(
-        &state,
-        &headers,
-        form.email,
-        form.password,
-        form.csrf_token,
-        "/auth?tab=login",
-    )
-    .await
+    handle_login_post(&state, &headers, form.email, form.password, form.csrf_token).await
 }
 
 /// POST /register — create new user account.
@@ -892,6 +884,17 @@ async fn register_post_handler(
     .await
 }
 
+/// Redirect to an auth tab with an error message in the query string.
+/// Uses `url::form_urlencoded` for robust query construction and
+/// percent-encoding. Handles paths that already contain query strings.
+fn redirect_with_error(path: &str, tab: &str, error: &str) -> Response {
+    let query = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair("tab", tab)
+        .append_pair("error", error)
+        .finish();
+    let separator = if path.contains('?') { "&" } else { "?" };
+    Redirect::to(&format!("{}{}{}", path, separator, query)).into_response()
+}
 /// Handle login POST logic.
 async fn handle_login_post(
     state: &AppState,
@@ -899,26 +902,9 @@ async fn handle_login_post(
     login: String,
     password: String,
     csrf_token: String,
-    base_redirect: &str,
 ) -> Response {
-    let redirect_with_error = |error: &str| {
-        let encoded: String = error
-            .chars()
-            .map(|c| {
-                if c == ' ' {
-                    '+'.to_string()
-                } else if c.is_alphanumeric() || c == '-' || c == '_' || c == '.' {
-                    c.to_string()
-                } else {
-                    c.escape_unicode().to_string()
-                }
-            })
-            .collect();
-        Redirect::to(&format!("{}&error={}", base_redirect, encoded)).into_response()
-    };
-
     if !validate_csrf(headers, &csrf_token) {
-        return redirect_with_error("Invalid form submission");
+        return redirect_with_error("/auth", "login", "Invalid form submission");
     }
 
     let user_db = (*state.db).clone();
@@ -928,7 +914,7 @@ async fn handle_login_post(
         .await
         .is_err()
     {
-        return redirect_with_error("Database error");
+        return redirect_with_error("/auth", "login", "Database error");
     }
 
     // Pass as $email so the scope matches email OR username columns.
@@ -969,11 +955,11 @@ async fn handle_login_post(
                 .await
             {
                 Ok(r) => r,
-                Err(_) => return redirect_with_error("Authentication error"),
+                Err(_) => return redirect_with_error("/auth", "login", "Authentication error"),
             };
             let row: Option<AuthRow> = match resp.take(0) {
                 Ok(r) => r,
-                Err(_) => return redirect_with_error("Authentication error"),
+                Err(_) => return redirect_with_error("/auth", "login", "Authentication error"),
             };
             let AuthRow {
                 id: user_id,
@@ -981,11 +967,15 @@ async fn handle_login_post(
                 email_verified,
             } = match row {
                 Some(r) => r,
-                None => return redirect_with_error("Authentication error"),
+                None => return redirect_with_error("/auth", "login", "Authentication error"),
             };
 
             if !email_verified.unwrap_or(false) {
-                return redirect_with_error("Please verify your email before signing in");
+                return redirect_with_error(
+                    "/auth",
+                    "login",
+                    "Please verify your email before signing in",
+                );
             }
 
             // Mint our own JWT carrying `sub: <username>` so display paths
@@ -999,12 +989,12 @@ async fn handle_login_post(
                 &state.database,
             ) {
                 Ok(t) => t,
-                Err(_) => return redirect_with_error("Authentication error"),
+                Err(_) => return redirect_with_error("/auth", "login", "Authentication error"),
             };
 
             let refresh_token = RefreshToken::new(user_id, display_name);
             if store_refresh_token(&user_db, &refresh_token).await.is_err() {
-                return redirect_with_error("Session error");
+                return redirect_with_error("/auth", "login", "Session error");
             }
 
             let pair = TokenResponse {
@@ -1017,7 +1007,7 @@ async fn handle_login_post(
             set_refresh_cookie(&mut response, &pair.refresh_token);
             response
         }
-        Err(_) => redirect_with_error("Invalid email or username"),
+        Err(_) => redirect_with_error("/auth", "login", "Invalid email or username"),
     }
 }
 
@@ -1032,28 +1022,12 @@ async fn handle_register_post(
     confirm_password: String,
     csrf_token: String,
 ) -> Response {
-    let redirect_with_error = |error: &str| {
-        let encoded: String = error
-            .chars()
-            .map(|c| {
-                if c == ' ' {
-                    '+'.to_string()
-                } else if c.is_alphanumeric() || c == '-' || c == '_' || c == '.' {
-                    c.to_string()
-                } else {
-                    c.escape_unicode().to_string()
-                }
-            })
-            .collect();
-        Redirect::to(&format!("/auth?tab=register&error={}", encoded)).into_response()
-    };
-
     if !validate_csrf(headers, &csrf_token) {
-        return redirect_with_error("Invalid form submission");
+        return redirect_with_error("/auth", "register", "Invalid form submission");
     }
 
     if password != confirm_password {
-        return redirect_with_error("Passwords do not match");
+        return redirect_with_error("/auth", "register", "Passwords do not match");
     }
 
     // Validate the registration inputs
@@ -1063,7 +1037,7 @@ async fn handle_register_post(
         password: password.clone(),
     };
     if let Err(e) = reg_user.validate() {
-        return redirect_with_error(&e.to_string());
+        return redirect_with_error("/auth", "register", &e.to_string());
     }
 
     let user_db = (*state.db).clone();
@@ -1073,7 +1047,7 @@ async fn handle_register_post(
         .await
         .is_err()
     {
-        return redirect_with_error("Database error");
+        return redirect_with_error("/auth", "register", "Database error");
     }
 
     // Signup via SurrealDB access scope
@@ -1129,12 +1103,20 @@ async fn handle_register_post(
             // - schema validation failure
             let combined = format!("{e} {e:?}").to_lowercase();
             if combined.contains("unique_email") || combined.contains("already exists") {
-                return redirect_with_error("An account with this email already exists");
+                return redirect_with_error(
+                    "/auth",
+                    "register",
+                    "An account with this email already exists",
+                );
             }
             if combined.contains("unique_username") || combined.contains("username already") {
-                return redirect_with_error("This display name is already taken");
+                return redirect_with_error(
+                    "/auth",
+                    "register",
+                    "This display name is already taken",
+                );
             }
-            redirect_with_error("Registration failed")
+            redirect_with_error("/auth", "register", "Registration failed")
         }
     }
 }

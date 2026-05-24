@@ -768,58 +768,108 @@ fn state_card(msg: &GameMessage) -> maud::Markup {
 }
 
 /// Trauma event card.
+/// Trauma event card. Handles all 8 trauma message variants with
+/// severity-colored borders and badges. Follows affliction/phobia_card pattern.
 fn trauma_card(msg: &GameMessage) -> maud::Markup {
-    let content = match &msg.payload {
-        MessagePayload::TraumaAcquired {
+    use shared::messages::MessagePayload::*;
+    let (severity, content) = match &msg.payload {
+        TraumaAcquired {
             tribute,
             severity,
             source,
-        } => {
-            format!("{} acquired trauma ({}) from {}", tribute, severity, source)
-        }
-        MessagePayload::TraumaReinforced {
+        } => (
+            severity.as_str(),
+            format!("{tribute} acquired trauma from {source}"),
+        ),
+        TraumaReinforced {
             tribute,
             from_severity,
             to_severity,
-            floor_bumped,
-        } => {
-            let bump = if *floor_bumped { " (floor bumped)" } else { "" };
-            format!(
-                "{} trauma reinforced: {} → {}{}",
-                tribute, from_severity, to_severity, bump
-            )
-        }
-        MessagePayload::PhobiaAcquired {
+            floor_bumped: _,
+        } => (
+            to_severity.as_str(),
+            format!("{tribute}'s trauma reinforced: {from_severity} \u{2192} {to_severity}"),
+        ),
+        TraumaEscalated {
             tribute,
-            trigger,
+            from_severity,
+            to_severity,
+        } => (
+            to_severity.as_str(),
+            format!("{tribute}'s trauma escalated: {from_severity} \u{2192} {to_severity}"),
+        ),
+        TraumaFlashback {
+            tribute,
             severity,
-            origin,
-        } => {
-            format!(
-                "{} developed phobia of {} ({}, {})",
-                tribute, trigger, severity, origin
-            )
-        }
-        MessagePayload::PhobiaTriggered {
+            source,
+        } => (severity.as_str(), format!("{tribute} relives {source}")),
+        TraumaAvoidance {
             tribute,
-            trigger,
-            severity: _,
-            effect,
-        } => {
-            format!("{} phobia of {} triggered — {:?}", tribute, trigger, effect)
-        }
+            source,
+            prevented_action: _,
+        } => ("", format!("{tribute} avoids {source} due to trauma")),
+        TraumaObserved {
+            observer: _,
+            subject,
+            source,
+        } => ("", format!("spotted {subject}'s trauma from {source}")),
+        TraumaForgotten {
+            observer: _,
+            subject,
+            source,
+        } => ("", format!("forgot {subject}'s trauma from {source}")),
+        TraumaHabituated {
+            tribute,
+            from_severity,
+            to_severity: Some(to),
+        } => (
+            to.as_str(),
+            format!("{tribute}'s trauma response weakens: {from_severity} \u{2192} {to}"),
+        ),
+        TraumaHabituated {
+            tribute,
+            from_severity,
+            to_severity: None,
+        } => (
+            "",
+            format!("{tribute} begins to heal from {from_severity} trauma"),
+        ),
         _ => return fallback_card(msg),
     };
 
+    let border_color = match severity {
+        "severe" | "Severe" => "border-red-900/50",
+        "moderate" | "Moderate" => "border-orange-900/50",
+        _ if severity.is_empty() => "border-gray-800",
+        _ => "border-yellow-900/50",
+    };
+    let badge_color = match severity {
+        "severe" | "Severe" => "bg-red-500/20 text-red-300",
+        "moderate" | "Moderate" => "bg-orange-500/20 text-orange-300",
+        _ if severity.is_empty() => "",
+        _ => "bg-yellow-500/20 text-yellow-300",
+    };
+
+    let badge = if !severity.is_empty() {
+        html! {
+            span class=(format!("text-xs px-1.5 py-0.5 rounded {}", badge_color)) { (severity) }
+        }
+    } else {
+        html! {}
+    };
+
     html! {
-        div class="bg-gray-900 border border-gray-800 rounded-lg p-3" {
+        div class=(format!("bg-gray-900 border rounded-lg p-3 {}", border_color)) {
             div class="flex items-center gap-2 text-xs text-gray-500 mb-1" {
                 (icon("brain"))
-                span class="text-gray-400 font-medium" { "Trauma" }
-                span { "·" }
+                span class="text-purple-400 font-medium" { "Trauma" }
+                span { "\u{b7}" }
                 span { "Day " (msg.game_day) " " (msg.phase) }
             }
-            p class="text-sm text-gray-200" { (content) }
+            p class="text-sm text-gray-200 flex items-center gap-2" {
+                (content)
+                (badge)
+            }
         }
     }
 }

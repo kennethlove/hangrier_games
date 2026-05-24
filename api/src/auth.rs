@@ -416,35 +416,33 @@ async fn complete_password_reset(
     State(state): State<AppState>,
     Form(req): Form<CompleteResetRequest>,
 ) -> Redirect {
-    let base = "/auth?tab=login";
-
     // Validate passwords match
     if req.password != req.confirm_password {
-        return Redirect::to(&format!(
-            "{}&error={}",
-            base,
-            urlencode("Passwords do not match")
-        ));
+        let query = url::form_urlencoded::Serializer::new(String::new())
+            .append_pair("tab", "login")
+            .append_pair("error", "Passwords do not match")
+            .finish();
+        return Redirect::to(&format!("/auth?{}", query));
     }
 
     // Validate password length
     if req.password.len() < 8 || req.password.len() > 72 {
-        return Redirect::to(&format!(
-            "{}&error={}",
-            base,
-            urlencode("Password must be 8-72 characters")
-        ));
+        let query = url::form_urlencoded::Serializer::new(String::new())
+            .append_pair("tab", "login")
+            .append_pair("error", "Password must be 8-72 characters")
+            .finish();
+        return Redirect::to(&format!("/auth?{}", query));
     }
 
     // Validate token and get email
     let email = match validate_verification_token(&req.token) {
         Ok(email) => email,
         Err(_) => {
-            return Redirect::to(&format!(
-                "{}&error={}",
-                base,
-                urlencode("Invalid or expired reset link")
-            ));
+            let query = url::form_urlencoded::Serializer::new(String::new())
+                .append_pair("tab", "login")
+                .append_pair("error", "Invalid or expired reset link")
+                .finish();
+            return Redirect::to(&format!("/auth?{}", query));
         }
     };
 
@@ -456,7 +454,11 @@ async fn complete_password_reset(
         .await
         .is_err()
     {
-        return Redirect::to(&format!("{}&error={}", base, urlencode("Database error")));
+        let query = url::form_urlencoded::Serializer::new(String::new())
+            .append_pair("tab", "login")
+            .append_pair("error", "Database error")
+            .finish();
+        return Redirect::to(&format!("/auth?{}", query));
     }
 
     let password_bind = req.password.clone();
@@ -475,24 +477,14 @@ async fn complete_password_reset(
         Ok(rows) if !rows.is_empty() => {
             Redirect::to("/auth?tab=login") // Password reset success
         }
-        _ => Redirect::to(&format!(
-            "{}&error={}",
-            base,
-            urlencode("Failed to reset password")
-        )),
-    }
-}
-
-/// Minimal percent-encoding for error messages in URLs.
-fn urlencode(s: &str) -> String {
-    let mut result = String::with_capacity(s.len());
-    for c in s.replace(' ', "+").chars() {
-        match c {
-            'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '+' => result.push(c),
-            _ => result.push_str(&format!("%{:02X}", c as u8)),
+        _ => {
+            let query = url::form_urlencoded::Serializer::new(String::new())
+                .append_pair("tab", "login")
+                .append_pair("error", "Failed to reset password")
+                .finish();
+            Redirect::to(&format!("/auth?{}", query))
         }
     }
-    result
 }
 
 #[cfg(test)]

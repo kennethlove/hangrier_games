@@ -939,9 +939,13 @@ async fn handle_login_post(
             struct AuthRow {
                 id: surrealdb::sql::Thing,
                 username: String,
+                email_verified: Option<bool>,
             }
 
-            let mut resp = match user_db.query("SELECT id, username FROM $auth").await {
+            let mut resp = match user_db
+                .query("SELECT id, username, email_verified FROM $auth")
+                .await
+            {
                 Ok(r) => r,
                 Err(_) => return redirect_with_error("Authentication error"),
             };
@@ -952,10 +956,15 @@ async fn handle_login_post(
             let AuthRow {
                 id: user_id,
                 username: display_name,
+                email_verified,
             } = match row {
                 Some(r) => r,
                 None => return redirect_with_error("Authentication error"),
             };
+
+            if !email_verified.unwrap_or(false) {
+                return redirect_with_error("Please verify your email before signing in");
+            }
 
             // Mint our own JWT carrying `sub: <username>` so display paths
             // (extract_auth_state) read the username directly without a DB

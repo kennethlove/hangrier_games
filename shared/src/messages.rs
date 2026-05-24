@@ -631,8 +631,8 @@ impl MessagePayload {
             | Drank { .. }
             | Ate { .. }
             | TributeSlept { .. }
-            | TributeWoke { .. }
-            | TraumaAcquired { .. }
+            | TributeWoke { .. } => MessageKind::State,
+            TraumaAcquired { .. }
             | TraumaReinforced { .. }
             | TraumaEscalated { .. }
             | TraumaFlashback { .. }

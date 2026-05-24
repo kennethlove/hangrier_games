@@ -49,6 +49,36 @@ fn area_event_to_kind(ev: &AreaEvent) -> shared::messages::AreaEventKind {
     }
 }
 
+/// Generate a human-readable line for trauma-related messages.
+fn format_trauma_message(payload: &crate::messages::MessagePayload, tribute_name: &str) -> String {
+    use crate::messages::MessagePayload;
+    match payload {
+        MessagePayload::TraumaFlashback { source, .. } => {
+            format!("{tribute_name} is haunted by {source}.")
+        }
+        MessagePayload::TraumaObserved {
+            observer, subject, ..
+        } => {
+            format!("{observer} witnesses {subject}'s distress.")
+        }
+        MessagePayload::TraumaHabituated {
+            from_severity,
+            to_severity: Some(to),
+            ..
+        } => {
+            format!("{tribute_name}'s trauma response weakens from {from_severity} to {to}.")
+        }
+        MessagePayload::TraumaHabituated {
+            from_severity,
+            to_severity: None,
+            ..
+        } => {
+            format!("{tribute_name} begins to heal from {from_severity} trauma.")
+        }
+        _ => String::new(),
+    }
+}
+
 /// Generate a human-readable line for phobia-related messages.
 fn phobia_message_line(payload: &crate::messages::MessagePayload, tribute_name: &str) -> String {
     use crate::messages::MessagePayload;
@@ -1659,6 +1689,39 @@ impl Game {
 
                 for msg in scan_result.messages {
                     let line = phobia_message_line(&msg, &self.tributes[idx].name);
+                    collected_events.push((
+                        self.tributes[idx].identifier.clone(),
+                        self.tributes[idx].name.clone(),
+                        line,
+                        Some(msg),
+                        None,
+                    ));
+                }
+            }
+        }
+
+        // ── Trauma cycle processing ──────────────────────────────────
+        // Run after phobia scan, before action execution.
+        // Handles flashback rolls, observer tracking, and decay.
+        if self.config.trauma_enabled && !tributes_to_act.is_empty() {
+            let trauma_cycle = (current_day.saturating_sub(1)) * 4 + phase.ord() as u32;
+
+            for &idx in &tributes_to_act {
+                let area = self.tributes[idx].area;
+                let other_tributes: &[Tribute] = tributes_by_area
+                    .get(&area)
+                    .map(|v| v.as_slice())
+                    .unwrap_or(&[]);
+
+                let t_result = crate::tributes::afflictions::trauma::process_traumas(
+                    &mut self.tributes[idx],
+                    other_tributes,
+                    trauma_cycle,
+                    rng,
+                );
+
+                for msg in t_result.messages {
+                    let line = format_trauma_message(&msg, &self.tributes[idx].name);
                     collected_events.push((
                         self.tributes[idx].identifier.clone(),
                         self.tributes[idx].name.clone(),

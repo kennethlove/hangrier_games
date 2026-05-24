@@ -5,19 +5,37 @@ use common::{TestDb, TestUser, create_test_router};
 use serde_json::json;
 
 /// Helper to create an authenticated test user
-async fn create_authenticated_user(server: &TestServer, username: &str) -> TestUser {
+async fn create_authenticated_user(
+    test_db: &TestDb,
+    server: &TestServer,
+    username: &str,
+) -> TestUser {
     let test_user = TestUser::new(username);
 
     let response = server
         .post("/api/users")
         .json(&json!({
-            "username": test_user.username,
+            "display_name": test_user.username,
             "email": test_user.email,
             "password": test_user.password,
         }))
         .await;
 
-    let body = response.json::<serde_json::Value>();
+    response.assert_status(axum::http::StatusCode::CREATED);
+
+    // Verify email
+    test_db.verify_email(&test_user.email).await;
+
+    // Authenticate to get tokens
+    let auth_response = server
+        .post("/api/users/authenticate")
+        .json(&json!({
+            "email": test_user.email,
+            "password": test_user.password,
+        }))
+        .await;
+
+    let body = auth_response.json::<serde_json::Value>();
     let access_token = body["access_token"].as_str().unwrap().to_string();
     let refresh_token = body["refresh_token"].as_str().unwrap().to_string();
 
@@ -79,7 +97,7 @@ async fn test_game_auto_spawns_tributes() {
     let router = create_test_router(app_state);
     let server = TestServer::new(router);
 
-    let user = create_authenticated_user(&server, "tribute_creator1").await;
+    let user = create_authenticated_user(&test_db, &server, "tribute_creator1").await;
     let game_id = create_test_game(&server, &user).await;
 
     let tributes = fetch_tributes(&server, &user, &game_id).await;
@@ -108,7 +126,7 @@ async fn test_get_tribute() {
     let router = create_test_router(app_state);
     let server = TestServer::new(router);
 
-    let user = create_authenticated_user(&server, "tribute_getter").await;
+    let user = create_authenticated_user(&test_db, &server, "tribute_getter").await;
     let game_id = create_test_game(&server, &user).await;
     let tribute_id = first_tribute_id(&server, &user, &game_id).await;
 
@@ -135,7 +153,7 @@ async fn test_update_tribute() {
     let router = create_test_router(app_state);
     let server = TestServer::new(router);
 
-    let user = create_authenticated_user(&server, "tribute_updater").await;
+    let user = create_authenticated_user(&test_db, &server, "tribute_updater").await;
     let game_id = create_test_game(&server, &user).await;
     let tribute_id = first_tribute_id(&server, &user, &game_id).await;
 
@@ -171,7 +189,7 @@ async fn test_delete_tribute() {
     let router = create_test_router(app_state);
     let server = TestServer::new(router);
 
-    let user = create_authenticated_user(&server, "tribute_deleter").await;
+    let user = create_authenticated_user(&test_db, &server, "tribute_deleter").await;
     let game_id = create_test_game(&server, &user).await;
     let tribute_id = first_tribute_id(&server, &user, &game_id).await;
 
@@ -203,7 +221,7 @@ async fn test_auto_spawn_district_coverage() {
     let router = create_test_router(app_state);
     let server = TestServer::new(router);
 
-    let user = create_authenticated_user(&server, "multi_tribute_creator").await;
+    let user = create_authenticated_user(&test_db, &server, "multi_tribute_creator").await;
     let game_id = create_test_game(&server, &user).await;
 
     let tributes = fetch_tributes(&server, &user, &game_id).await;
@@ -232,7 +250,7 @@ async fn test_tribute_log() {
     let router = create_test_router(app_state);
     let server = TestServer::new(router);
 
-    let user = create_authenticated_user(&server, "tribute_logger").await;
+    let user = create_authenticated_user(&test_db, &server, "tribute_logger").await;
     let game_id = create_test_game(&server, &user).await;
     let tribute_id = first_tribute_id(&server, &user, &game_id).await;
 
@@ -260,7 +278,7 @@ async fn test_tribute_items() {
     let router = create_test_router(app_state);
     let server = TestServer::new(router);
 
-    let user = create_authenticated_user(&server, "tribute_item_tester").await;
+    let user = create_authenticated_user(&test_db, &server, "tribute_item_tester").await;
     let game_id = create_test_game(&server, &user).await;
     let tribute_id = first_tribute_id(&server, &user, &game_id).await;
 
@@ -285,7 +303,7 @@ async fn test_update_tribute_validation() {
     let router = create_test_router(app_state);
     let server = TestServer::new(router);
 
-    let user = create_authenticated_user(&server, "tribute_validator").await;
+    let user = create_authenticated_user(&test_db, &server, "tribute_validator").await;
     let game_id = create_test_game(&server, &user).await;
     let tribute_id = first_tribute_id(&server, &user, &game_id).await;
 

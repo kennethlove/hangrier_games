@@ -117,6 +117,18 @@ impl TestDb {
         // For now, we'll just clear the tables
         let _ = self.db.query("REMOVE DATABASE $this").await;
     }
+
+    /// Manually verify an email for testing purposes
+    pub async fn verify_email(&self, email: &str) {
+        let query = format!(
+            "UPDATE user SET email_verified = true WHERE email = '{}'",
+            email
+        );
+        self.db
+            .query(&query)
+            .await
+            .expect("Failed to verify email in test database");
+    }
 }
 
 /// Build a fresh per-test migration root by copying `schemas/` and

@@ -405,7 +405,7 @@ pub fn create_game_page_with_csrf(auth: AuthState, csrf: &str) -> maud::Markup {
 }
 
 /// "Check your email" interstitial shown after successful registration.
-pub fn check_email_page(auth: AuthState, address: Option<&str>) -> maud::Markup {
+pub fn check_email_page(auth: AuthState, address: Option<&str>, csrf: &str) -> maud::Markup {
     base_layout(
         "Check Your Email",
         auth,
@@ -434,11 +434,44 @@ pub fn check_email_page(auth: AuthState, address: Option<&str>) -> maud::Markup 
                             "Go to Sign In"
                         }
                     }
-                    div class="mt-4 text-xs text-gray-500" {
-                        "Didn't receive the email? Check your spam folder, or "
-                        a href="#" onclick="alert('Coming soon! For now, try again later.');return false;"
-                            class="text-amber-400 hover:underline" {
-                            "request a new one."
+                    @if let Some(addr) = address {
+                        div class="mt-4 text-xs text-gray-500" {
+                            "Didn't receive the email? Check your spam folder, or "
+                            button
+                                hx-post="/auth/resend-verification"
+                                hx-vals=(maud::PreEscaped(format!(r#"{{"email":"{}","csrf_token":"{}"}}"#, addr, csrf)))
+                                hx-target="find .resend-feedback"
+                                hx-swap="innerHTML"
+                                class="text-amber-400 hover:underline cursor-pointer bg-transparent border-none p-0 inline"
+                            {
+                                "send another one."
+                            }
+                            span class="resend-feedback" {}
+                        }
+                    }
+                }
+            }
+        },
+    )
+}
+
+/// "Email verified!" page shown after successful verification.
+pub fn email_verified_page(auth: AuthState) -> maud::Markup {
+    base_layout(
+        "Email Verified",
+        auth,
+        html! {
+            div class="auth-card" {
+                div class="auth-logo" { "Hangry " span { "Games" } }
+                div class="check-email" {
+                    div class="mail-icon" { "✓" }
+                    h2 class="auth-title" { "Email verified!" }
+                    p class="auth-subtitle" {
+                        "Your email has been verified. You can now sign in to your account."
+                    }
+                    div class="mt-6" {
+                        a href="/auth?tab=login" class="btn btn-primary" {
+                            "Sign In"
                         }
                     }
                 }

@@ -28,12 +28,14 @@ use axum::{Json, Router, middleware};
 use base64_url::decode;
 use serde_json::Value;
 use shared::{EmailRegistrationUser, ListDisplayGame, UserSession};
+use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::env;
 use std::hash::{Hash, Hasher};
 use std::string::String;
 use std::sync::Arc;
 use std::sync::LazyLock;
+use std::sync::Mutex;
 use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
 use surrealdb::opt::auth::{Jwt, Root};
@@ -51,6 +53,11 @@ use tracing_subscriber::util::SubscriberInitExt;
 use validator::Validate;
 
 pub static DATABASE: LazyLock<Arc<Surreal<Any>>> = LazyLock::new(|| Arc::new(Surreal::init()));
+
+/// Cooldown cache for resend verification requests.
+/// Key: "resend:<email>", Value: Instant of last send.
+static RESEND_COOLDOWN: LazyLock<Mutex<HashMap<String, std::time::Instant>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 fn initialize_logging() {
     // a layer that logs events to stdout
@@ -343,6 +350,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route(
             "/auth/verify-email",
             axum::routing::get(verify_email_handler),
+        )
+        .route(
+            "/auth/resend-verification",
+            axum::routing::post(resend_verification_handler),
+        )
+        .route(
+            "/auth/email-verified",
+            axum::routing::get(email_verified_handler),
         )
         .route("/games", axum::routing::get(games_list_handler))
         .route("/games/{id}", axum::routing::get(game_detail_handler))
@@ -806,6 +821,13 @@ struct CheckEmailQuery {
 }
 
 #[derive(serde::Deserialize)]
+struct ResendVerificationRequest {
+    email: String,
+    #[serde(default)]
+    csrf_token: String,
+}
+
+#[derive(serde::Deserialize)]
 struct CreateGameRequest {
     #[serde(default)]
     name: Option<String>,
@@ -1123,7 +1145,7 @@ async fn check_email_handler(
     Query(params): Query<CheckEmailQuery>,
 ) -> impl IntoResponse {
     let (auth, csrf) = extract_auth(&headers);
-    let body = auth::check_email_page(auth, params.address.as_deref());
+    let body = auth::check_email_page(auth, params.address.as_deref(), &csrf);
     html_with_csrf(body, &csrf)
 }
 
@@ -1158,14 +1180,128 @@ async fn verify_email_handler(
         .await;
 
     match result {
-        Ok(_) => Redirect::to("/auth?tab=login&error=Email+verified!+You+can+now+sign+in.")
-            .into_response(),
+        Ok(_) => Redirect::to("/auth/email-verified").into_response(),
         Err(e) => {
             tracing::error!("Failed to verify email {}: {}", email, e);
             Redirect::to("/auth?tab=login&error=Verification+failed.+Please+try+again.")
                 .into_response()
         }
     }
+}
+
+/// POST /auth/resend-verification — resend verification email.
+async fn resend_verification_handler(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Form(form): Form<ResendVerificationRequest>,
+) -> impl IntoResponse {
+    if !validate_csrf(&headers, &form.csrf_token) {
+        return Redirect::to("/auth?tab=login").into_response();
+    }
+
+    // Rate limit: check cooldown cache before proceeding
+    let now = std::time::Instant::now();
+    let cooldown_key = format!("resend:{}", form.email.to_lowercase());
+    if let Some(last_sent) = RESEND_COOLDOWN.lock().unwrap().get(&cooldown_key)
+        && now.duration_since(*last_sent).as_secs() < 60
+    {
+        return Redirect::to(&format!(
+            "/auth/check-email?address={}&error={}",
+            urlencoding(&form.email),
+            urlencoding("Please wait 60 seconds before requesting another email.")
+        ))
+        .into_response();
+    }
+
+    let user_db = (*state.db).clone();
+    if user_db
+        .use_ns(&state.namespace)
+        .use_db(&state.database)
+        .await
+        .is_err()
+    {
+        return Redirect::to(&format!(
+            "/auth/check-email?address={}&error={}",
+            urlencoding(&form.email),
+            urlencoding("Something went wrong. Please try again.")
+        ))
+        .into_response();
+    }
+
+    // Check user exists and email is not already verified
+    let result = user_db
+        .query("SELECT email_verified FROM user WHERE email = $email LIMIT 1")
+        .bind(("email", form.email.clone()))
+        .await;
+
+    match result {
+        Ok(mut resp) => {
+            #[derive(serde::Deserialize)]
+            struct EmailRow {
+                email_verified: Option<bool>,
+            }
+            let row: Option<EmailRow> = resp.take(0).unwrap_or(None);
+            match row {
+                Some(r) if r.email_verified.unwrap_or(false) => {
+                    Redirect::to("/auth?tab=login&error=Email+already+verified").into_response()
+                }
+                Some(_) => {
+                    // Not verified yet — send new token
+                    let email_for_token = form.email.clone();
+                    tokio::spawn(async move {
+                        match api::email::generate_verification_token(&email_for_token) {
+                            Ok(token) => {
+                                if let Err(e) =
+                                    api::email::send_verification_email(&email_for_token, &token)
+                                        .await
+                                {
+                                    tracing::error!("Resend failed for {}: {}", email_for_token, e);
+                                }
+                            }
+                            Err(e) => {
+                                tracing::error!(
+                                    "Token generation failed for {}: {}",
+                                    email_for_token,
+                                    e
+                                );
+                            }
+                        }
+                    });
+
+                    // Set cooldown
+                    RESEND_COOLDOWN.lock().unwrap().insert(cooldown_key, now);
+
+                    Redirect::to(&format!(
+                        "/auth/check-email?address={}",
+                        urlencoding(&form.email)
+                    ))
+                    .into_response()
+                }
+                None => {
+                    // No user found with this email
+                    // Don't reveal existence — redirect to check-email anyway
+                    Redirect::to(&format!(
+                        "/auth/check-email?address={}",
+                        urlencoding(&form.email)
+                    ))
+                    .into_response()
+                }
+            }
+        }
+        Err(_) => Redirect::to(&format!(
+            "/auth/check-email?address={}&error={}",
+            urlencoding(&form.email),
+            urlencoding("Something went wrong. Please try again.")
+        ))
+        .into_response(),
+    }
+}
+
+/// GET /auth/email-verified — confirmation page after email verification.
+async fn email_verified_handler(headers: axum::http::HeaderMap) -> impl IntoResponse {
+    let (auth, csrf) = extract_auth(&headers);
+    let body = auth::email_verified_page(auth);
+    html_with_csrf(body, &csrf)
 }
 
 /// Simple URL-encoding for query parameter values.

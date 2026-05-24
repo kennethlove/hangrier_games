@@ -1208,14 +1208,11 @@ async fn dev_verify_email_handler(
         .bind(("email", email.clone()))
         .await
     {
-        Ok(_) => {
-            Redirect::to("/auth?tab=login&error=Email+verified!+You+can+now+sign+in.")
-                .into_response()
-        }
+        Ok(_) => Redirect::to("/auth?tab=login&error=Email+verified!+You+can+now+sign+in.")
+            .into_response(),
         Err(e) => {
             tracing::error!("Dev verify failed for {}: {}", email, e);
-            Redirect::to("/auth?tab=login&error=Verification+failed.+Try+again.")
-                .into_response()
+            Redirect::to("/auth?tab=login&error=Verification+failed.+Try+again.").into_response()
         }
     }
 }

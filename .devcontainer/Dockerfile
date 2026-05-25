@@ -25,9 +25,4 @@ RUN curl -sSfL https://github.com/axllent/mailpit/releases/download/v1.30.0/mail
 USER vscode
 RUN rustup component add clippy rustfmt rust-src
 
-# Install Mailpit for email testing in development
-RUN curl -sSfL https://github.com/axllent/mailpit/releases/download/v1.30.0/mailpit-linux-amd64.tar.gz \
-    | tar xz -C /usr/local/bin mailpit \
-    && mailpit version
-
 USER root

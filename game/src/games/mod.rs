@@ -981,7 +981,7 @@ impl Game {
     /// Scans the current phase's messages and acquires/reinforces trauma
     /// afflictions on living tributes who witnessed or survived traumatic events.
     fn run_trauma_producers(&mut self, _phase: crate::messages::Phase) {
-        crate::tributes::afflictions::trauma_producers::run_trauma_producers(self);
+        crate::tributes::afflictions::producers::run_trauma_producers(self);
     }
 
     /// Announce events in closed areas.

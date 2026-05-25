@@ -11,8 +11,8 @@ pub mod cascade;
 pub mod cure;
 pub mod effects;
 pub mod phobia;
+pub mod producers;
 pub mod trauma;
-pub mod trauma_producers;
 pub mod tuning;
 
 pub use anatomy::{AcquireResolution, RejectReason, can_acquire};
@@ -59,6 +59,8 @@ pub fn target_has_visible_affliction(
         .any(|a| a.kind == kind && a.severity >= min_severity)
 }
 
+#[cfg(test)]
+mod anatomy_tests;
 #[cfg(test)]
 mod integration_tests;
 #[cfg(test)]

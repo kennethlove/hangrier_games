@@ -11,6 +11,8 @@ use shared::messages::MessagePayload;
 
 use crate::tributes::Tribute;
 
+use super::effects::flashback_chance;
+
 /// Result of attempting to acquire or reinforce trauma.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TraumaAcquisition {
@@ -140,15 +142,6 @@ pub fn process_traumas(
     }
 
     result
-}
-
-/// Flashback roll chance per severity tier (spec §7.2).
-fn flashback_chance(severity: Severity) -> f64 {
-    match severity {
-        Severity::Mild => 0.05,
-        Severity::Moderate => 0.10,
-        Severity::Severe => 0.20,
-    }
 }
 
 /// Format a trauma source into a human-readable fragment for messages.

@@ -16,6 +16,11 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 RUN curl -sSf https://install.surrealdb.com | sh -s -- --version v2.3.2 \
     && surreal version
 
+# Install Mailpit for email testing in development
+RUN curl -sSfL https://github.com/axllent/mailpit/releases/download/v1.30.0/mailpit-linux-amd64.tar.gz \
+    | tar xz -C /usr/local/bin mailpit \
+    && mailpit version
+
 # Add clippy and rustfmt as the vscode user
 USER vscode
 RUN rustup component add clippy rustfmt rust-src

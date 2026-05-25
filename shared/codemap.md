@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Provides shared data types and contracts between frontend (`web/`), backend (`api/`), and core simulation (`game/`). Ensures consistent serialization/deserialization across the WASM boundary and HTTP API.
+Provides shared data types and contracts between the API server (`api/`) and core simulation (`game/`). Ensures consistent serialization/deserialization across the HTTP API and game engine boundary.
 
 ## Design
 
@@ -27,25 +27,24 @@ NotStarted → InProgress → Finished
 
 ## Flow
 
-**Frontend → API:**
-- Web components serialize `EditGame`, `EditTribute`, `RegistrationUser` to JSON
+**Client (HTMX browser / API client) → API:**
+- HTML form submissions or JSON requests carry `EditGame`, `EditTribute`, `RegistrationUser`
 - API endpoints deserialize into these shared types
 
-**API → Frontend:**
+**API → Client:**
 - Database queries map to `DisplayGame`, `ListDisplayGame`
-- Responses serialize to JSON for Dioxus components
+- Responses serialize to JSON for REST clients, or rendered server-side via Maud templates
 
 **Game Simulation:**
 - `game/` crate imports `GameStatus` to track simulation lifecycle
-- Status flows: core logic → database → frontend display
+- Status flows: core logic → database → API templates for HTML display
 
 ## Integration
 
 **Used By:**
 - `api/src/games.rs`: `DisplayGame`, `EditGame`, `GameStatus`, `GameArea`, `ListDisplayGame`
 - `api/src/tributes.rs`: `EditTribute`
-- `web/src/components/*.rs`: Nearly all UI components (15+ files)
-- `web/src/cache.rs`: `AuthenticatedUser`, `DisplayGame`, `TributeKey` for local state
+- `api/src/templates/*.rs`: Maud template components render shared types to HTML
 - `game/src/games.rs`: `GameStatus` for simulation state
 
 **Key Files:**

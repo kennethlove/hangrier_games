@@ -143,10 +143,10 @@ API → Custom function (fn::get_*) → Graph traversal → Aggregation → Retu
 - API translates simulation results to database updates
 - State synchronized after each simulation step
 
-### Frontend (`web/` crate)
-- Authenticates via JWT (signup/signin)
-- Queries games via API endpoints
-- Real-time updates by polling game state
+### Browser (HTMX)
+- Authenticates via JWT in HttpOnly cookies (signup/signin)
+- Queries games via API endpoints (server-rendered HTML)
+- Real-time updates via SSE (Server-Sent Events) on game detail page
 - Permission checks handled transparently by schema
 
 ### Announcers (`announcers/` crate)

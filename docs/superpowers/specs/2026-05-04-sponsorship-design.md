@@ -267,7 +267,7 @@ pub const ITEM_COSTS: &[(ItemKindTag, u32)] = &[
 
 - **In-progress games:** game-load hook spawns sponsors lazily if the field is empty. No schema migration script needed (Rust struct default for the `Vec` field).
 - **Existing snapshot tests** asserting `donor: "Sponsor"` will break in PR2 — re-snapshot then.
-- **Trauma + addiction specs** currently reference "deferred to dvd Therapy/Detox." Those references must be amended to "no in-game recovery — tribute carries until death/end-of-game." Separate small PR after sponsorship PR1 lands.
+- **Trauma + addiction specs** have been amended — "deferred to dvd Therapy/Detox" replaced with "no in-game recovery — tribute carries this affliction until death or end-of-game." (PR: `fix-e8zt-spec-amend`)
 
 ## 12. Open Questions
 

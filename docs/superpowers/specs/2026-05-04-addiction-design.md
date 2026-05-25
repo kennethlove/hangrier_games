@@ -35,7 +35,7 @@ Cap of 2 active addictions per tribute. Use counts persist across cure (relapse-
 | `Fixations` (`2026-05-03`) | Independent in v1 (filed as follow-up: substance-target fixation). |
 | Alliance system (`2026-04-25`) | Known addictions reduce alliance-acceptance affinity (§11). Observed Craving creates a small sympathetic bond increase. |
 | Consumable / inventory (`game/src/tributes/inventory.rs`) | The `try_use_consumable` hook is the producer trigger. The addiction layer also drives the inventory bias and the substance-search action. |
-| Sponsor system (`dvd`, filed) | Reserved Substance variants (Alcohol, Painkiller, Morphling) ship via sponsor gifts; Detox and Therapy gifts cure addictions. |
+| Sponsor system (\`dvd\`, filed) | Reserved Substance variants (Alcohol, Painkiller, Morphling) ship via sponsor gifts; **no in-game recovery** — tribute carries addiction until death or end-of-game. |
 
 ## 4. Types
 
@@ -177,8 +177,8 @@ Decay and reinforcement are mutually exclusive in a given cycle: the tribute eit
 | Path | Effect |
 |---|---|
 | Decay (15 trigger-free cycles per tier-step; 45 cycles total worst case from Severe) | -1 tier; off Mild = cured |
-| **Sponsor gift: Detox** (filed `dvd`) | Removes Addiction entirely; clears `high_cycles_remaining`; does **not** clear `addiction_use_count` (relapse semantics preserved) |
-| **Sponsor gift: Therapy** (filed `dvd`; shared with trauma) | Removes Addiction entirely; same persistence semantics as Detox |
+| **Sponsor gift: Detox** | **no in-game recovery** — tribute carries this affliction until death or end-of-game. |
+| **Sponsor gift: Therapy** | **no in-game recovery** — tribute carries this affliction until death or end-of-game. |
 | **Shelter rest** | Counts as trigger-free toward decay (advances `cycles_since_last_use` normally); **plus** Withdrawal stat penalties halved during the rest cycle |
 | **Ally aid** (`hangrier_games-e2cf`, palliative) | Co-located ally spends a turn → Withdrawal stat penalties halved for one cycle (does not affect severity or decay counter) |
 
@@ -415,7 +415,7 @@ Per `uz80` (proptest) and `yj9u` (snapshot streams).
 - `alcohol_high_suppresses_phobia_trigger.rs`: tribute with Severe Phobia + Alcohol Mild Addiction in High mode; phobia stimulus present; phobia override does not fire.
 - `painkiller_high_suppresses_wound_penalty.rs`: tribute Wounded(Severe) + Painkiller Mild Addiction in High mode; Wounded stat penalty suppressed for the cycle (condition persists).
 - `withdrawal_to_decay_cure.rs`: Mild Addiction; 15 trigger-free cycles; cured; `AddictionHabituated { to: None }` emitted; use_count preserved.
-- `detox_cures_addiction.rs`: Detox sponsor gift (using trapdoor for `dvd`-blocked test); Addiction removed; use_count preserved; subsequent use triggers relapse.
+- \`addiction_no_in_game_recovery.rs\`: Verify addiction persists until death or end-of-game — no sponsor gift (including Detox/Therapy) can cure it.
 - `observer_learns_then_alliance_penalty.rs`: target has Severe Addiction; uses substance co-located with potential ally; ally observes; subsequent alliance proposal scored with reduced affinity (-0.10 × 3 = -0.30 for one Severe addiction).
 - `sympathetic_bond_on_craving.rs`: ally witnesses tribute's `SearchForSubstance`; bond-affinity increases by `+0.05`.
 - `forgotten_after_decay.rs`: 16 cycles separated; observer's `knows_addiction` returns false; `AddictionForgotten` emitted.
@@ -458,7 +458,7 @@ Existing saves load with empty `addiction_use_count` and no `Addiction` afflicti
 
 - **PR1** — Types & storage: `Substance` enum, `AddictionMetadata`, `AddictionResistReason`, `AfflictionKind::Addiction(Substance)` variant, `addiction_metadata: Option<AddictionMetadata>` on `Affliction`, `addiction_use_count: BTreeMap<Substance, u32>` on `Tribute`. `try_acquire_addiction(tribute, substance, rng)` helper enforcing probabilistic curve + substance multiplier + cap-at-2 + relapse short-circuit. `high_duration` table function. No-op migration for version bump. Unit tests for acquisition curve, substance multiplier, cap-at-2, relapse path, single-instance reinforcement, severity floor.
 - **PR2** — Use pipeline & producers: `Consumable::substance(&self) -> Option<Substance>` mapping for v1 items (Stimulant only, with mock items used to test the other three substance paths). Hook into `try_use_consumable` → emit `SubstanceUsed` → call `try_acquire_addiction` → emit `AddictionAcquired`/`AddictionReinforced`/`AddictionEscalated`/`AddictionResisted`/`AddictionRelapse`. Co-acquired immediate High effect dispatched here (refresh `high_cycles_remaining`). Reinforcement decrement of decay counter on subsequent use. Integration tests for first-use, repeated-use, cap-at-2, relapse-after-cure, Morphling multiplier path.
-- **PR3** — Brain layer (`addiction_override`), `Action::SearchForSubstance`, severity-tiered Withdrawal effects table (stat penalty, inventory bias, craving rolls, sleep penalty), substance-specific High effects (cross-system suppression: Morphling-suppress-affliction-stat, Alcohol-suppress-phobia-trigger, Painkiller-suppress-wound-penalty), alliance integration (acceptance penalty, sympathetic bond), observer state, decay tick, reinforcement-on-use (the shared rule), all 10 message payloads emitted. Integration tests for High→Withdrawal transition, tolerance, Severe craving compulsion, cross-substance suppression, alliance penalty, sympathetic bond, observer learning, decay-to-cure, Detox.
+- **PR3** — Brain layer (`addiction_override`), `Action::SearchForSubstance`, severity-tiered Withdrawal effects table (stat penalty, inventory bias, craving rolls, sleep penalty), substance-specific High effects (cross-system suppression: Morphling-suppress-affliction-stat, Alcohol-suppress-phobia-trigger, Painkiller-suppress-wound-penalty), alliance integration (acceptance penalty, sympathetic bond), observer state, decay tick, reinforcement-on-use (the shared rule), all 10 message payloads emitted. Integration tests for High→Withdrawal transition, tolerance, Severe craving compulsion, cross-substance suppression, alliance penalty, sympathetic bond, observer learning, decay-to-cure, no-in-game-recovery.
 - **PR4** — Frontend: tribute-detail "Addictions" section after Trauma, use-count bar chart, timeline `addiction_card.rs` consuming all 10 payloads, state-strip High/Withdrawal indicators, spectator-skin integration. Smoke tests + WCAG check on substance icons.
 
 ### Hard prerequisites
@@ -470,7 +470,7 @@ Existing saves load with empty `addiction_use_count` and no `Addiction` afflicti
 
 ### Soft dependencies
 
-- **Sponsor gift Detox / Therapy** delivery is filed under `dvd` and not implemented in this spec; PR3 provides the cure-removal logic so a future Detox/Therapy gift can call into it without further changes here.
+- Addiction has **no in-game recovery** — tribute carries this affliction until death or end-of-game.
 - **Sponsor gift substance delivery** for Morphling, Alcohol, Painkiller is filed under `dvd`. PR2 producer code is exercised against mock items in tests; the production path lights up when `dvd` lands.
 - **Ally aid** palliative cure path is filed (`hangrier_games-e2cf`); PR3 provides the half-Withdrawal-penalty logic so the aid action can call into it.
 - **Tribute-viewport UI** (`n52s`) will respect addiction observer state when built.

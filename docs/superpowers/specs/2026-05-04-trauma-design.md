@@ -20,7 +20,7 @@ This is the "PTSD bucket" plus the "what events break a tribute" mapping in one 
 - Trauma from witnessing affliction acquisition / mutilation (defer until afflictions stabilize).
 - Trauma from sustained-source torture (needs new per-source duration tracker).
 - Source-keyed decay rates or fine-grained source taxonomy (one 10-cycle rule for v1).
-- Trauma-specific sponsor gifts beyond Therapy and Sedative (wait for `dvd`).
+- Trauma-specific sponsor gifts beyond Sedative (wait for future sponsorship expansion).
 - Dedicated trauma-viewport UI (covered by `n52s`).
 
 ## 3. Relationship to neighboring systems
@@ -138,7 +138,7 @@ Decay and reinforcement are mutually exclusive in a given cycle (the producer-pa
 | Path | Effect |
 |---|---|
 | Decay (10 trigger-free cycles) | -1 tier; off Mild = cured |
-| **Sponsor gift: Therapy** (filed `dvd`) | Removes Trauma entirely; also removes co-acquired Traumatic phobias whose `Origin::Traumatic { event_ref }` matches a source in the cured Trauma's `sources` set |
+| **Sponsor gift: Therapy** | **no in-game recovery** — tribute carries this affliction until death or end-of-game. |
 | **Sponsor gift: Sedative** (already in phobia spec §7.3) | Suppresses the next flashback roll for one cycle (does not reset the decay counter) |
 | **Ally aid** (`hangrier_games-e2cf`, filed) | Co-located ally spends a turn → -1 sanity stat penalty for one cycle (palliative; does not affect severity, counter, or escalation) |
 | Shelter rest | Counts as trigger-free toward decay; sanity stat penalty halved during the rest cycle |
@@ -344,7 +344,7 @@ Per `uz80` (proptest) and `yj9u` (snapshot streams).
 - `observer_learns_then_alliance_penalty.rs`: target has Severe Trauma; flashback co-located with potential ally; ally observes; subsequent alliance proposal scored with reduced affinity.
 - `sympathetic_bond_increment.rs`: ally witnesses ally's flashback; bond-affinity increases by sympathetic_bond_increment.
 - `forgotten_after_decay.rs`: 11 cycles separated; observer's `knows_trauma` returns false; `TraumaForgotten` emitted.
-- `therapy_cures_trauma_and_co_phobias.rs`: Therapy sponsor gift (using trapdoor for `dvd`-blocked test); Trauma removed AND Traumatic phobias whose event_ref matches a Trauma source removed.
+- \`trauma_no_in_game_recovery.rs\`: Verify trauma persists until death or end-of-game — no sponsor gift (including Therapy) can cure it.
 
 ### 13.3 Insta snapshots
 
@@ -385,7 +385,7 @@ Rollout: ship behind a `trauma_enabled: bool` config flag on `Game`, default `tr
 ### Soft dependencies
 
 - **Vengeance-fixation** integration in PR2 producer (d) depends on fixation PR1 (`hangrier_games-fazp` epic). If fixation PR1 has not landed, the call is stubbed; the integration is wired in fixation PR2 (`hangrier_games-wss4`).
-- **Therapy sponsor gift** cure path is filed under `dvd` and not implemented in this spec; PR3 provides the cure-removal logic so a future Therapy gift can call into it without further changes here.
+- Trauma has **no in-game recovery** — tribute carries this affliction until death or end-of-game.
 
 ## 16. Out of scope (filed as follow-ups)
 
@@ -393,7 +393,7 @@ Rollout: ship behind a `trauma_enabled: bool` config flag on `Game`, default `tr
 - Producer (g) sustained-source torture — needs new per-cycle source tracker; file as `trauma: sustained-source torture producer`.
 - Producer (h) witness-mutilation — defer until afflictions stabilize; file as `trauma: witness-affliction-acquisition producer`.
 - Trauma transmission across generations — N/A for this game.
-- Trauma-specific sponsor gifts beyond Therapy/Sedative — wait for `dvd`.
+- Trauma-specific sponsor gifts beyond Sedative — wait for future sponsorship expansion.
 - Fine-grained source taxonomy (e.g. `Fire { intensity }`) — start coarse.
 - Per-source decay rates — single 10-cycle rule for v1.
 - Dedicated trauma-viewport UI — covered by `n52s`.

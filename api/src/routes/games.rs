@@ -264,13 +264,10 @@ pub async fn account_handler(
 }
 
 /// GET /games/new — create game form (requires auth).
-pub async fn create_game_handler(
-    State(state): State<AppState>,
-    headers: axum::http::HeaderMap,
-) -> Response {
+pub async fn create_game_handler(headers: axum::http::HeaderMap) -> Response {
     let (auth, csrf) = extract_auth(&headers);
-    if require_auth(&state, &headers).await.is_err() {
-        return Redirect::to("/auth").into_response();
+    if !auth.is_authenticated() {
+        return Redirect::to("/auth?tab=login").into_response();
     }
 
     let body = api::templates::auth::create_game_page_with_csrf(auth, &csrf);

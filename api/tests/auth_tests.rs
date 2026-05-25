@@ -248,7 +248,8 @@ async fn test_duplicate_username() {
         .await
         .assert_status(axum::http::StatusCode::CREATED);
 
-    // Try to register same username again - should fail
+    // Try to register same display name with different email — should succeed
+    // (display names are no longer unique, only email is unique)
     let response = server
         .post("/api/users")
         .json(&json!({
@@ -258,12 +259,7 @@ async fn test_duplicate_username() {
         }))
         .await;
 
-    // Should return error (400 or 409)
-
-    assert!(
-        response.status_code() == axum::http::StatusCode::BAD_REQUEST
-            || response.status_code() == axum::http::StatusCode::CONFLICT
-    );
+    assert_eq!(response.status_code(), axum::http::StatusCode::CREATED);
 
     test_db.cleanup().await;
 }

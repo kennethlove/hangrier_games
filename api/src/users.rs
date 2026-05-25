@@ -109,13 +109,7 @@ async fn user_create(
             .into_response()),
         Err(e) => {
             let combined = format!("{e} {e:?}").to_lowercase();
-            if combined.contains("unique_username")
-                || combined.contains("already")
-                || combined.contains("duplicate")
-                || combined.contains("signup query failed")
-            {
-                Err(AppError::Conflict("Username already taken".to_string()))
-            } else if combined.contains("unique_email") {
+            if combined.contains("unique_email") {
                 Err(AppError::Conflict("Email already taken".to_string()))
             } else {
                 Err(AppError::DbError(format!("Failed to create user: {e}")))

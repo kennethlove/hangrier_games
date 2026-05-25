@@ -30,6 +30,10 @@ dev:
     DB_PID=$!
     sleep 2
 
+    echo "==> Starting Mailpit (email testing)..."
+    mailpit --smtp 0.0.0.0:1025 --listen 0.0.0.0:8025 &
+    MAILPIT_PID=$!
+
     echo "==> Building Tailwind CSS..."
     cd api/assets && npm install --silent && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css
     echo "==> Starting Tailwind watcher..."
@@ -43,13 +47,18 @@ dev:
 
     echo ""
     echo "Development environment running:"
+    echo "  - Mailpit UI: http://localhost:8025"
     echo "  - SurrealDB: ws://localhost:8000"
     echo "  - API + HTMX pages: http://localhost:3000"
     echo "  - Tailwind: watching api/assets/src/main.css"
     echo ""
     echo "Press Ctrl+C to stop all services"
-    trap "kill $DB_PID $API_PID $CSS_PID 2>/dev/null; exit" INT
+    trap "kill $DB_PID $MAILPIT_PID $API_PID $CSS_PID 2>/dev/null; exit" INT
     wait
+
+# Start Mailpit email testing UI
+mailpit:
+    mailpit --smtp 0.0.0.0:1025 --listen 0.0.0.0:8025
 
 # Seed dev database with test user and game
 seed:

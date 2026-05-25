@@ -1,321 +1,10 @@
 use maud::html;
-use shared::messages::TributeRef;
-use shared::messages::{GameMessage, MessageKind, MessagePayload, PeriodSummary, TimelineSummary};
+use shared::messages::{GameMessage, MessagePayload};
 
-use super::{AuthState, base_layout, icon};
-
-/// Context for rendering the timeline page.
-pub struct TimelineContext<'a> {
-    pub auth: AuthState,
-    pub game_id: &'a str,
-    pub game_name: &'a str,
-    pub periods: &'a TimelineSummary,
-    pub current_day: u32,
-    pub current_phase: &'a shared::messages::Phase,
-    pub filter: &'a str,
-    pub tribute_filter: &'a str,
-    pub tributes: &'a [TributeRef],
-    pub events: &'a [GameMessage],
-    pub selected_day: Option<u32>,
-    pub selected_phase: Option<shared::messages::Phase>,
-}
-
-/// Full timeline page with period grid, filters, and event cards.
-pub fn timeline_page(ctx: &TimelineContext<'_>) -> maud::Markup {
-    base_layout(
-        &format!("Timeline — {}", ctx.game_name),
-        ctx.auth.clone(),
-        html! {
-            div {
-                // Back link
-                a href=(format!("/games/{}", ctx.game_id))
-                    class="text-sm text-gray-400 hover:text-white mb-4 inline-block" {
-                    (icon("arrow-left"))
-                    " Back to Game"
-                }
-
-                // Header
-                div class="mb-4" {
-                    h1 class="text-xl font-bold text-amber-400" { "Timeline" }
-                    p class="text-sm text-gray-500" {
-                        "Day " (ctx.current_day) " · " (ctx.current_phase)
-                    }
-                }
-
-                // Period timeline strip
-                @if !ctx.periods.periods.is_empty() {
-                    div class="mb-4" {
-                        div class="flex gap-1.5 overflow-x-auto pb-2" {
-                            @for period in &ctx.periods.periods {
-                                (period_chip(ctx.game_id, period, ctx.filter, ctx.tribute_filter))
-                            }
-                        }
-                    }
-                }
-
-                // Filter chips row
-                (filter_chips(ctx.game_id, ctx.selected_day, ctx.selected_phase, ctx.filter, ctx.tribute_filter))
-
-                // Tribute filter chips row
-                @if !ctx.tributes.is_empty() {
-                    (tribute_chips(ctx.game_id, ctx.selected_day, ctx.selected_phase, ctx.filter, ctx.tribute_filter, ctx.tributes))
-                }
-
-                // Event timeline or period grid
-                @if let (Some(_day), Some(_phase)) = (ctx.selected_day, ctx.selected_phase) {
-                    // Show filtered events for selected period
-                    @if ctx.events.is_empty() {
-                        (empty_state("No events for this period."))
-                    } @else {
-                        div class="space-y-2" {
-                            @for msg in ctx.events {
-                                (event_card(msg))
-                            }
-                        }
-                    }
-                } @else {
-                    // Show period grid overview
-                    (period_grid(&ctx.periods.periods))
-                }
-            }
-        },
-    )
-}
-
-/// Single period chip in the timeline strip.
-fn period_chip(
-    game_id: &str,
-    period: &PeriodSummary,
-    filter: &str,
-    tribute_filter: &str,
-) -> maud::Markup {
-    let is_current = period.is_current;
-    let border_class = if is_current {
-        "border-amber-500 ring-1 ring-amber-500/30"
-    } else {
-        "border-gray-700 hover:border-gray-500"
-    };
-    let bg_class = if is_current {
-        "bg-amber-900/30"
-    } else {
-        "bg-gray-900"
-    };
-
-    let deaths_indicator = if period.deaths > 0 {
-        html! {
-            span class="text-red-400 text-xs" {
-                (icon("skull"))
-                " " (period.deaths)
-            }
-        }
-    } else {
-        html! {}
-    };
-
-    let filter_param = if !filter.is_empty() {
-        format!("&filter={filter}")
-    } else {
-        String::new()
-    };
-    let tribute_param = if !tribute_filter.is_empty() {
-        format!("&tribute={tribute_filter}")
-    } else {
-        String::new()
-    };
-
-    html! {
-        a href=(format!(
-            "/games/{}/timeline?day={}&phase={}{}{}",
-            game_id, period.day, period.phase, filter_param, tribute_param
-        ))
-            class=(format!("flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors {} {}", bg_class, border_class)) {
-            span class="text-gray-300 font-medium" {
-                "D" (period.day) " " (period.phase)
-            }
-            span class="text-gray-500" { (period.event_count) }
-            (deaths_indicator)
-        }
-    }
-}
-
-/// Category filter chips row.
-fn filter_chips(
-    game_id: &str,
-    selected_day: Option<u32>,
-    selected_phase: Option<shared::messages::Phase>,
-    active_filter: &str,
-    tribute_filter: &str,
-) -> maud::Markup {
-    let filters = [
-        ("", "All", "list"),
-        ("Deaths", "Deaths", "skull"),
-        ("Combat", "Combat", "sword"),
-        ("Alliances", "Alliances", "users"),
-        ("Movement", "Movement", "map-pin"),
-        ("Items", "Items", "backpack"),
-    ];
-
-    let day_param = selected_day
-        .map(|d| format!("&day={d}"))
-        .unwrap_or_default();
-    let phase_param = selected_phase
-        .map(|p| format!("&phase={p}"))
-        .unwrap_or_default();
-    let tribute_param = if !tribute_filter.is_empty() {
-        format!("&tribute={tribute_filter}")
-    } else {
-        String::new()
-    };
-
-    html! {
-        div class="flex flex-wrap gap-1.5 mb-3" {
-            @for (value, label, icon_name) in &filters {
-                @let is_active = active_filter == *value;
-                @let chip_class = if is_active {
-                    "bg-amber-600 text-white"
-                } else {
-                    "bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200"
-                };
-                a href=(format!(
-                    "/games/{}/timeline?filter={}{}{}{}",
-                    game_id, value, day_param, phase_param, tribute_param
-                ))
-                    class=(format!("px-2.5 py-1 rounded-full text-xs font-medium transition-colors {}", chip_class)) {
-                    (icon(icon_name))
-                    " " (label)
-                }
-            }
-        }
-    }
-}
-
-/// Tribute filter chips row.
-fn tribute_chips(
-    game_id: &str,
-    selected_day: Option<u32>,
-    selected_phase: Option<shared::messages::Phase>,
-    filter: &str,
-    tribute_filter: &str,
-    tributes: &[TributeRef],
-) -> maud::Markup {
-    let day_param = selected_day
-        .map(|d| format!("&day={d}"))
-        .unwrap_or_default();
-    let phase_param = selected_phase
-        .map(|p| format!("&phase={p}"))
-        .unwrap_or_default();
-    let filter_param = if !filter.is_empty() {
-        format!("&filter={filter}")
-    } else {
-        String::new()
-    };
-
-    // Show first 12 tributes to avoid overwhelming the UI
-    let max_tributes = tributes.len().min(12);
-
-    html! {
-        div class="flex flex-wrap gap-1.5 mb-3" {
-            // "All tributes" chip
-            @let is_all = tribute_filter.is_empty();
-            @let all_class = if is_all {
-                "bg-blue-600 text-white"
-            } else {
-                "bg-gray-800 text-gray-500 hover:bg-gray-700"
-            };
-            a href=(format!(
-                "/games/{}/timeline?tribute={}{}{}{}",
-                game_id, "", filter_param, day_param, phase_param
-            ))
-                class=(format!("px-2 py-0.5 rounded-full text-xs transition-colors {}", all_class)) {
-                "All"
-            }
-            @for tribute in &tributes[..max_tributes] {
-                @let is_active = tribute_filter == tribute.name;
-                @let chip_class = if is_active {
-                    "bg-blue-600 text-white"
-                } else {
-                    "bg-gray-800 text-gray-400 hover:bg-gray-700"
-                };
-                a href=(format!(
-                    "/games/{}/timeline?tribute={}{}{}{}",
-                    game_id, tribute.name, filter_param, day_param, phase_param
-                ))
-                    class=(format!("px-2 py-0.5 rounded-full text-xs transition-colors {}", chip_class)) {
-                    (tribute.name)
-                }
-            }
-        }
-    }
-}
-
-/// Overview grid showing all periods at a glance.
-fn period_grid(periods: &[PeriodSummary]) -> maud::Markup {
-    html! {
-        div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2" {
-            @for period in periods {
-                @let border_class = if period.is_current {
-                    "border-amber-500"
-                } else {
-                    "border-gray-800"
-                };
-                @let bg_class = if period.is_current {
-                    "bg-amber-900/20"
-                } else {
-                    "bg-gray-900"
-                };
-                div class=(format!("p-3 rounded-lg border {} {}", bg_class, border_class)) {
-                    div class="flex items-center justify-between mb-1" {
-                        span class="text-sm font-medium text-gray-300" {
-                            "Day " (period.day) " " (period.phase)
-                        }
-                        @if period.is_current {
-                            span class="text-xs text-amber-400" { "Now" }
-                        }
-                    }
-                    div class="flex items-center gap-3 text-xs text-gray-500" {
-                        span { (period.event_count) " events" }
-                        @if period.deaths > 0 {
-                            span class="text-red-400" {
-                                (icon("skull"))
-                                " " (period.deaths)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// Empty state placeholder.
-fn empty_state(message: &str) -> maud::Markup {
-    html! {
-        div class="text-center py-12" {
-            (icon("ghost"))
-            p class="text-gray-500 mt-2" { (message) }
-        }
-    }
-}
-
-/// Dispatch to kind-specific event card.
-pub fn event_card(msg: &GameMessage) -> maud::Markup {
-    use MessageKind::*;
-    match msg.payload.kind() {
-        Death => death_card(msg),
-        Combat => combat_card(msg),
-        CombatSwing => combat_swing_card(msg),
-        Alliance => alliance_card(msg),
-        Movement => movement_card(msg),
-        Item | SponsorGift => item_card(msg),
-        State => state_card(msg),
-        Trauma => trauma_card(msg),
-        Affliction => affliction_card(msg),
-        Phobia => phobia_card(msg),
-    }
-}
+use super::super::icon;
 
 /// Death event card.
-fn death_card(msg: &GameMessage) -> maud::Markup {
+pub fn death_card(msg: &GameMessage) -> maud::Markup {
     let (victim, killer, cause) = match &msg.payload {
         MessagePayload::TributeKilled {
             victim,
@@ -345,7 +34,7 @@ fn death_card(msg: &GameMessage) -> maud::Markup {
 }
 
 /// Combat event card.
-fn combat_card(msg: &GameMessage) -> maud::Markup {
+pub fn combat_card(msg: &GameMessage) -> maud::Markup {
     let (attacker, target, outcome) = match &msg.payload {
         MessagePayload::Combat(engagement) => (
             &engagement.attacker,
@@ -379,7 +68,7 @@ fn combat_card(msg: &GameMessage) -> maud::Markup {
 }
 
 /// Combat swing card (typed beat).
-fn combat_swing_card(msg: &GameMessage) -> maud::Markup {
+pub fn combat_swing_card(msg: &GameMessage) -> maud::Markup {
     use shared::combat_beat::SwingOutcome;
     let beat = match &msg.payload {
         MessagePayload::CombatSwing(beat) => beat,
@@ -421,7 +110,7 @@ fn combat_swing_card(msg: &GameMessage) -> maud::Markup {
 }
 
 /// Alliance event card.
-fn alliance_card(msg: &GameMessage) -> maud::Markup {
+pub fn alliance_card(msg: &GameMessage) -> maud::Markup {
     let content = match &msg.payload {
         MessagePayload::AllianceFormed { members } => {
             let names: Vec<_> = members.iter().map(|m| m.name.as_str()).collect();
@@ -457,7 +146,7 @@ fn alliance_card(msg: &GameMessage) -> maud::Markup {
 }
 
 /// Movement event card.
-fn movement_card(msg: &GameMessage) -> maud::Markup {
+pub fn movement_card(msg: &GameMessage) -> maud::Markup {
     let content = match &msg.payload {
         MessagePayload::TributeMoved { tribute, from, to } => {
             format!("{} moved from {} to {}", tribute.name, from.name, to.name)
@@ -497,7 +186,7 @@ fn movement_card(msg: &GameMessage) -> maud::Markup {
 }
 
 /// Item event card (covers both Item and SponsorGift).
-fn item_card(msg: &GameMessage) -> maud::Markup {
+pub fn item_card(msg: &GameMessage) -> maud::Markup {
     let (label, color, content) = match &msg.payload {
         MessagePayload::ItemFound {
             tribute,
@@ -553,7 +242,7 @@ fn item_card(msg: &GameMessage) -> maud::Markup {
 }
 
 /// State event card (fallback for stamina, survival, cycle, phase, sleep, wake, etc.).
-fn state_card(msg: &GameMessage) -> maud::Markup {
+pub fn state_card(msg: &GameMessage) -> maud::Markup {
     use MessagePayload::*;
     let content = match &msg.payload {
         TributeRested {
@@ -767,10 +456,9 @@ fn state_card(msg: &GameMessage) -> maud::Markup {
     }
 }
 
-/// Trauma event card.
 /// Trauma event card. Handles all 8 trauma message variants with
 /// severity-colored borders and badges. Follows affliction/phobia_card pattern.
-fn trauma_card(msg: &GameMessage) -> maud::Markup {
+pub fn trauma_card(msg: &GameMessage) -> maud::Markup {
     use shared::messages::MessagePayload::*;
     let (severity, content) = match &msg.payload {
         TraumaAcquired {
@@ -788,7 +476,7 @@ fn trauma_card(msg: &GameMessage) -> maud::Markup {
             floor_bumped: _,
         } => (
             to_severity.as_str(),
-            format!("{tribute}'s trauma reinforced: {from_severity} \u{2192} {to_severity}"),
+            format!("{tribute}'s trauma reinforced: {from_severity} → {to_severity}"),
         ),
         TraumaEscalated {
             tribute,
@@ -796,7 +484,7 @@ fn trauma_card(msg: &GameMessage) -> maud::Markup {
             to_severity,
         } => (
             to_severity.as_str(),
-            format!("{tribute}'s trauma escalated: {from_severity} \u{2192} {to_severity}"),
+            format!("{tribute}'s trauma escalated: {from_severity} → {to_severity}"),
         ),
         TraumaFlashback {
             tribute,
@@ -824,7 +512,7 @@ fn trauma_card(msg: &GameMessage) -> maud::Markup {
             to_severity: Some(to),
         } => (
             to.as_str(),
-            format!("{tribute}'s trauma response weakens: {from_severity} \u{2192} {to}"),
+            format!("{tribute}'s trauma response weakens: {from_severity} → {to}"),
         ),
         TraumaHabituated {
             tribute,
@@ -875,7 +563,7 @@ fn trauma_card(msg: &GameMessage) -> maud::Markup {
 }
 
 /// Affliction event card.
-fn affliction_card(msg: &GameMessage) -> maud::Markup {
+pub fn affliction_card(msg: &GameMessage) -> maud::Markup {
     use shared::messages::MessagePayload::*;
     let (severity, content) = match &msg.payload {
         AfflictionAcquired {
@@ -944,7 +632,7 @@ fn affliction_card(msg: &GameMessage) -> maud::Markup {
 }
 
 /// Phobia event card.
-fn phobia_card(msg: &GameMessage) -> maud::Markup {
+pub fn phobia_card(msg: &GameMessage) -> maud::Markup {
     use shared::messages::MessagePayload::*;
     use shared::messages::PhobiaEffect;
     let (severity, content) = match &msg.payload {
@@ -974,7 +662,7 @@ fn phobia_card(msg: &GameMessage) -> maud::Markup {
             to_severity,
         } => (
             to_severity.as_str(),
-            format!("fear of {trigger} deepened: {from_severity} \u{2192} {to_severity}"),
+            format!("fear of {trigger} deepened: {from_severity} → {to_severity}"),
         ),
         PhobiaHabituated {
             tribute: _,
@@ -984,7 +672,7 @@ fn phobia_card(msg: &GameMessage) -> maud::Markup {
         } => match to_severity {
             Some(to) => (
                 to.as_str(),
-                format!("fear of {trigger} faded: {from_severity} \u{2192} {to}"),
+                format!("fear of {trigger} faded: {from_severity} → {to}"),
             ),
             None => ("", format!("overcame fear of {trigger}")),
         },
@@ -1039,7 +727,7 @@ fn phobia_card(msg: &GameMessage) -> maud::Markup {
 }
 
 /// Fallback card for unrecognized payloads.
-fn fallback_card(msg: &GameMessage) -> maud::Markup {
+pub fn fallback_card(msg: &GameMessage) -> maud::Markup {
     html! {
         div class="bg-gray-900 border border-gray-800 rounded-lg p-3" {
             div class="flex items-center gap-2 text-xs text-gray-500 mb-1" {

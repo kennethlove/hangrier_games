@@ -1,12 +1,3 @@
-//! Lifecycle, health, and status management for tributes.
-//!
-//! This module handles:
-//! - Life and death state
-//! - Health and mental health (damage/healing)
-//! - Attribute modifications
-//! - Status effects and their processing
-//! - Rest and recovery
-
 use crate::areas::AreaDetails;
 use crate::areas::events::AreaEvent;
 use crate::messages::{MessagePayload, TaggedEvent, TributeRef};
@@ -16,19 +7,7 @@ use crate::tributes::Tribute;
 use crate::tributes::statuses::TributeStatus;
 use rand::RngExt;
 use rand::prelude::*;
-use rand::rngs::SmallRng;
 use shared::afflictions::{AfflictionKind, AfflictionSource, BodyPart, Severity};
-
-/// Attribute maximums
-const MAX_HEALTH: u32 = 100;
-const MAX_SANITY: u32 = 100;
-const MAX_MOVEMENT: u32 = 100;
-const MAX_STRENGTH: u32 = 50;
-const MAX_BRAVERY: u32 = 100;
-
-/// Default healing amounts
-const DEFAULT_HEAL: u32 = 5;
-const DEFAULT_MENTAL_HEAL: u32 = 5;
 
 /// Status effect damage constants
 const WOUNDED_DAMAGE: u32 = 1;
@@ -52,165 +31,6 @@ const BURNED_DAMAGE: u32 = 5;
 const BURIED_DAMAGE: u32 = 5;
 
 impl Tribute {
-    /// Marks the tribute as dead and reveals them.
-    pub fn dies(&mut self) {
-        self.attributes.health = 0;
-        self.set_status(TributeStatus::Dead);
-        self.attributes.is_hidden = false;
-        self.items.clear();
-    }
-
-    /// Does the tribute have health and an OK status?
-    pub fn is_alive(&self) -> bool {
-        self.attributes.health > 0
-            && self.status != TributeStatus::Dead
-            && self.status != TributeStatus::RecentlyDead
-    }
-
-    /// Hides the tribute from view.
-    pub(crate) fn hides(&mut self) -> bool {
-        let mut rng = SmallRng::from_rng(&mut rand::rng());
-        let hidden = rng.random_bool(self.attributes.intelligence as f64 / 100.0);
-        self.attributes.is_hidden = hidden;
-        hidden
-    }
-
-    /// Helper function to see if the tribute is hidden
-    pub fn is_visible(&self) -> bool {
-        !self.attributes.is_hidden
-    }
-
-    /// Tribute is lonely/homesick/etc., loses some sanity.
-    pub(crate) fn misses_home(&mut self) {
-        let loneliness = self.attributes.bravery as f64 / 100.0; // how lonely is the tribute?
-
-        if loneliness.round() < 0.25 {
-            if self.attributes.sanity < 25 {
-                self.takes_mental_damage(self.attributes.bravery);
-            }
-            self.takes_mental_damage(self.attributes.bravery);
-        }
-    }
-
-    /// Reduces physical health.
-    pub(crate) fn takes_physical_damage(&mut self, damage: u32) {
-        self.attributes.health = self.attributes.health.saturating_sub(damage);
-    }
-
-    /// Reduces mental health.
-    pub(crate) fn takes_mental_damage(&mut self, damage: u32) {
-        self.attributes.sanity = self.attributes.sanity.saturating_sub(damage);
-    }
-
-    /// Reduces attack strength.
-    pub(crate) fn reduce_strength(&mut self, amount: u32) {
-        self.attributes.strength = self.attributes.strength.saturating_sub(amount).max(1);
-    }
-
-    /// Increases attack strength.
-    pub(crate) fn increase_strength(&mut self, amount: u32) {
-        self.attributes.strength = self
-            .attributes
-            .strength
-            .saturating_add(amount)
-            .min(MAX_STRENGTH);
-    }
-
-    /// Reduces movement which limits travel and is used by AI for retreat decisions.
-    pub(crate) fn reduce_movement(&mut self, amount: u32) {
-        self.attributes.movement = self.attributes.movement.saturating_sub(amount).max(1);
-    }
-
-    /// Reduces intelligence which affects decision-making and hiding.
-    pub(crate) fn reduce_intelligence(&mut self, amount: u32) {
-        self.attributes.intelligence = self.attributes.intelligence.saturating_sub(amount).max(1);
-    }
-
-    /// Increases bravery which affects decision-making.
-    pub(crate) fn increase_bravery(&mut self, amount: u32) {
-        self.attributes.bravery = self
-            .attributes
-            .bravery
-            .saturating_add(amount)
-            .min(MAX_BRAVERY);
-    }
-
-    /// Increases movement which allows more travel
-    pub(crate) fn increase_movement(&mut self, amount: u32) {
-        self.attributes.movement = self
-            .attributes
-            .movement
-            .saturating_add(amount)
-            .min(MAX_MOVEMENT);
-    }
-
-    /// Restores health.
-    pub(crate) fn heals(&mut self, health: u32) {
-        if self.is_alive() {
-            self.attributes.health = self
-                .attributes
-                .health
-                .saturating_add(health)
-                .min(MAX_HEALTH);
-        }
-    }
-
-    /// Restores mental health.
-    pub(crate) fn heals_mental_damage(&mut self, sanity: u32) {
-        self.attributes.sanity = self
-            .attributes
-            .sanity
-            .saturating_add(sanity)
-            .min(MAX_SANITY);
-    }
-
-    /// Restores movement.
-    pub(crate) fn short_rests(&mut self) {
-        self.attributes.movement = MAX_MOVEMENT;
-    }
-
-    /// Restores movement, some health, and some sanity
-    pub(crate) fn long_rests(&mut self) {
-        self.short_rests();
-        self.heals(DEFAULT_HEAL);
-        self.heals_mental_damage(DEFAULT_MENTAL_HEAL);
-    }
-
-    /// Recover stamina based on the tribute's current action and survival state.
-    ///
-    /// Per-phase rates (from `CombatTuning`):
-    /// - idle (any non-Rest action): `recover_idle` (default 5)
-    /// - resting in the open: `recover_resting` (default 30)
-    /// - resting while sheltered: `recover_resting_sheltered` (default 60)
-    ///
-    /// Multiplied by `recover_starving_dehydrated_mul` (default 0.5) when the
-    /// tribute is Starving OR Dehydrated. Result is capped at `max_stamina`.
-    /// See spec `docs/superpowers/specs/2026-05-03-stamina-combat-resource-design.md`.
-    pub fn recover_stamina(
-        &mut self,
-        action: &crate::tributes::actions::Action,
-        sheltered: bool,
-        hunger: crate::tributes::survival::HungerBand,
-        thirst: crate::tributes::survival::ThirstBand,
-        tuning: &crate::tributes::combat_tuning::CombatTuning,
-    ) {
-        use crate::tributes::actions::Action;
-        use crate::tributes::survival::{HungerBand, ThirstBand};
-        let base = match (action, sheltered) {
-            (Action::Rest, true) => tuning.recovery_sheltered_resting,
-            (Action::Rest, false) => tuning.recovery_resting,
-            _ => tuning.recovery_idle,
-        };
-        let mul =
-            if matches!(hunger, HungerBand::Starving) || matches!(thirst, ThirstBand::Dehydrated) {
-                tuning.recovery_starving_dehydrated_mult
-            } else {
-                1.0
-            };
-        let amount = ((base as f64) * mul).round() as u32;
-        self.stamina = (self.stamina + amount).min(self.max_stamina);
-    }
-
     /// Set the tribute's status
     pub fn set_status(&mut self, status: TributeStatus) {
         self.status = status;
@@ -417,136 +237,29 @@ impl Tribute {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::areas::Area;
+    use crate::areas::events::AreaEvent;
     use crate::threats::animals::Animal;
+    use crate::tributes::AfflictionDraft;
     use crate::tributes::Tribute;
     use crate::tributes::statuses::TributeStatus;
     use rand::SeedableRng;
     use rand::rngs::SmallRng;
     use rstest::*;
+    use shared::afflictions::{AfflictionKind, AfflictionSource, Severity};
 
     #[fixture]
     fn tribute() -> Tribute {
         Tribute::new("Katniss".to_string(), None, None)
     }
 
-    #[rstest]
-    fn takes_physical_damage(mut tribute: Tribute) {
-        let health = tribute.attributes.health;
-        tribute.takes_physical_damage(10);
-        assert_eq!(tribute.attributes.health, health - 10);
-    }
-
-    #[rstest]
-    fn takes_no_physical_damage_when_dead(mut tribute: Tribute) {
-        tribute.dies();
-        tribute.takes_physical_damage(10);
-        assert_eq!(tribute.attributes.health, 0);
-    }
-
-    #[rstest]
-    fn heals(mut tribute: Tribute) {
-        tribute.attributes.health = 50;
-        tribute.heals(10);
-        assert_eq!(tribute.attributes.health, 60);
-    }
-
-    #[rstest]
-    fn does_not_heal_when_dead(mut tribute: Tribute) {
-        tribute.dies();
-        tribute.heals(10);
-        assert_eq!(tribute.attributes.health, 0);
-    }
-
-    #[rstest]
-    fn takes_mental_damage(mut tribute: Tribute) {
-        let sanity = tribute.attributes.sanity;
-        tribute.takes_mental_damage(10);
-        assert_eq!(tribute.attributes.sanity, sanity - 10);
-    }
-
-    #[rstest]
-    fn takes_no_mental_damage_when_insane(mut tribute: Tribute) {
-        tribute.attributes.sanity = 0;
-        tribute.takes_mental_damage(10);
-        assert_eq!(tribute.attributes.sanity, 0);
-    }
-
-    #[rstest]
-    fn heals_mental_damage(mut tribute: Tribute) {
-        tribute.attributes.sanity = 50;
-        tribute.heals_mental_damage(10);
-        assert_eq!(tribute.attributes.sanity, 60);
-    }
-
-    #[rstest]
-    fn short_rests(mut tribute: Tribute) {
-        tribute.attributes.movement = 0;
-        tribute.short_rests();
-        assert_eq!(tribute.attributes.movement, 100);
-    }
-
-    #[rstest]
-    fn long_rests(mut tribute: Tribute) {
-        tribute.attributes.movement = 0;
-        tribute.attributes.health = 50;
-        tribute.attributes.sanity = 50;
-        tribute.long_rests();
-        assert_eq!(tribute.attributes.movement, 100);
-        assert_eq!(tribute.attributes.health, 55);
-        assert_eq!(tribute.attributes.sanity, 55);
-    }
-
-    #[rstest]
-    fn dies(mut tribute: Tribute) {
-        tribute.dies();
-        assert_eq!(tribute.attributes.health, 0);
-        assert_eq!(tribute.status, TributeStatus::Dead);
-        assert!(!tribute.attributes.is_hidden);
-        assert_eq!(tribute.items.len(), 0);
-    }
-
-    #[rstest]
-    fn is_alive(mut tribute: Tribute) {
-        assert!(tribute.is_alive());
-        tribute.dies();
-        assert!(!tribute.is_alive());
-    }
-
-    #[rstest]
-    fn hides_success(mut tribute: Tribute) {
-        tribute.attributes.intelligence = 100;
-        let hidden = tribute.hides();
-        assert!(hidden);
-        assert!(tribute.attributes.is_hidden);
-    }
-
-    #[rstest]
-    fn hides_fail(mut tribute: Tribute) {
-        tribute.attributes.intelligence = 0;
-        let hidden = tribute.hides();
-        assert!(!hidden);
-        assert!(!tribute.attributes.is_hidden);
-    }
-
-    #[rstest]
-    fn misses_home(mut tribute: Tribute) {
-        tribute.attributes.bravery = 20;
-        tribute.attributes.sanity = 20;
-        let sanity = tribute.attributes.sanity;
-        tribute.misses_home();
-        assert!(tribute.attributes.sanity < sanity);
-    }
-
-    #[rstest]
-    fn is_visible(mut tribute: Tribute) {
-        assert!(tribute.is_visible());
-        tribute.attributes.is_hidden = true;
-        assert!(!tribute.is_visible());
+    #[fixture]
+    fn small_rng() -> SmallRng {
+        SmallRng::seed_from_u64(0)
     }
 
     #[rstest]
     fn process_status_mauled(mut tribute: Tribute, mut small_rng: SmallRng) {
-        use crate::threats::animals::Animal;
         let health = tribute.attributes.health;
         tribute.status = TributeStatus::Mauled(Animal::Bear);
         let area_details =
@@ -585,16 +298,8 @@ mod tests {
         assert_eq!(tribute.status, TributeStatus::RecentlyDead);
     }
 
-    #[fixture]
-    fn small_rng() -> SmallRng {
-        SmallRng::seed_from_u64(0)
-    }
-
     #[rstest]
     fn process_status_from_area_event(mut tribute: Tribute, mut small_rng: SmallRng) {
-        use crate::areas::Area;
-        use crate::areas::events::AreaEvent;
-
         let mut area_details = AreaDetails::new(Some("Forest".to_string()), Area::Cornucopia);
         area_details.events.push(AreaEvent::Wildfire);
 
@@ -608,8 +313,6 @@ mod tests {
 
     #[rstest]
     fn wildfire_sets_affliction(mut tribute: Tribute) {
-        use crate::areas::events::AreaEvent;
-
         let mut area_details =
             AreaDetails::new(Some("Forest".to_string()), crate::areas::Area::Cornucopia);
         area_details.events.push(AreaEvent::Wildfire);
@@ -625,8 +328,6 @@ mod tests {
 
     #[rstest]
     fn blizzard_sets_affliction(mut tribute: Tribute) {
-        use crate::areas::events::AreaEvent;
-
         let mut area_details =
             AreaDetails::new(Some("Tundra".to_string()), crate::areas::Area::Cornucopia);
         area_details.events.push(AreaEvent::Blizzard);
@@ -642,8 +343,6 @@ mod tests {
 
     #[rstest]
     fn heatwave_sets_affliction(mut tribute: Tribute) {
-        use crate::areas::events::AreaEvent;
-
         let mut area_details =
             AreaDetails::new(Some("Desert".to_string()), crate::areas::Area::Cornucopia);
         area_details.events.push(AreaEvent::Heatwave);
@@ -659,8 +358,6 @@ mod tests {
 
     #[rstest]
     fn sandstorm_sets_affliction(mut tribute: Tribute) {
-        use crate::areas::events::AreaEvent;
-
         let mut area_details =
             AreaDetails::new(Some("Desert".to_string()), crate::areas::Area::Cornucopia);
         area_details.events.push(AreaEvent::Sandstorm);
@@ -676,8 +373,6 @@ mod tests {
 
     #[rstest]
     fn drought_sets_affliction(mut tribute: Tribute) {
-        use crate::areas::events::AreaEvent;
-
         let mut area_details =
             AreaDetails::new(Some("Desert".to_string()), crate::areas::Area::Cornucopia);
         area_details.events.push(AreaEvent::Drought);
@@ -693,8 +388,6 @@ mod tests {
 
     #[rstest]
     fn flood_sets_drowned_affliction(mut tribute: Tribute) {
-        use crate::areas::events::AreaEvent;
-
         let mut area_details =
             AreaDetails::new(Some("River".to_string()), crate::areas::Area::Cornucopia);
         area_details.events.push(AreaEvent::Flood);
@@ -710,8 +403,6 @@ mod tests {
 
     #[rstest]
     fn earthquake_sets_buried_affliction(mut tribute: Tribute) {
-        use crate::areas::events::AreaEvent;
-
         let mut area_details =
             AreaDetails::new(Some("Cave".to_string()), crate::areas::Area::Cornucopia);
         area_details.events.push(AreaEvent::Earthquake);
@@ -723,104 +414,5 @@ mod tests {
                 .afflictions
                 .contains_key(&(AfflictionKind::Buried, None))
         );
-    }
-
-    mod recovery {
-        use super::*;
-        use crate::tributes::actions::Action;
-        use crate::tributes::combat_tuning::CombatTuning;
-        use crate::tributes::survival::{HungerBand, ThirstBand};
-
-        fn fresh_state() -> (HungerBand, ThirstBand) {
-            (HungerBand::Sated, ThirstBand::Sated)
-        }
-
-        #[test]
-        fn recover_idle_adds_5() {
-            let mut t = Tribute {
-                stamina: 50,
-                max_stamina: 100,
-                ..Tribute::default()
-            };
-            let tuning = CombatTuning::default();
-            let (h, th) = fresh_state();
-            t.recover_stamina(&Action::None, false, h, th, &tuning);
-            assert_eq!(t.stamina, 55);
-        }
-
-        #[test]
-        fn recover_resting_adds_30() {
-            let mut t = Tribute {
-                stamina: 50,
-                max_stamina: 100,
-                ..Tribute::default()
-            };
-            let tuning = CombatTuning::default();
-            let (h, th) = fresh_state();
-            t.recover_stamina(&Action::Rest, false, h, th, &tuning);
-            assert_eq!(t.stamina, 80);
-        }
-
-        #[test]
-        fn recover_sheltered_resting_adds_60() {
-            let mut t = Tribute {
-                stamina: 30,
-                max_stamina: 100,
-                ..Tribute::default()
-            };
-            let tuning = CombatTuning::default();
-            let (h, th) = fresh_state();
-            t.recover_stamina(&Action::Rest, true, h, th, &tuning);
-            assert_eq!(t.stamina, 90);
-        }
-
-        #[test]
-        fn recover_caps_at_max_stamina() {
-            let mut t = Tribute {
-                stamina: 80,
-                max_stamina: 100,
-                ..Tribute::default()
-            };
-            let tuning = CombatTuning::default();
-            let (h, th) = fresh_state();
-            t.recover_stamina(&Action::Rest, true, h, th, &tuning);
-            assert_eq!(t.stamina, 100);
-        }
-
-        #[test]
-        fn recover_starving_halves_rate() {
-            let mut t = Tribute {
-                stamina: 50,
-                max_stamina: 100,
-                ..Tribute::default()
-            };
-            let tuning = CombatTuning::default();
-            t.recover_stamina(
-                &Action::Rest,
-                false,
-                HungerBand::Starving,
-                ThirstBand::Sated,
-                &tuning,
-            );
-            assert_eq!(t.stamina, 65);
-        }
-
-        #[test]
-        fn recover_dehydrated_halves_rate() {
-            let mut t = Tribute {
-                stamina: 50,
-                max_stamina: 100,
-                ..Tribute::default()
-            };
-            let tuning = CombatTuning::default();
-            t.recover_stamina(
-                &Action::Rest,
-                false,
-                HungerBand::Sated,
-                ThirstBand::Dehydrated,
-                &tuning,
-            );
-            assert_eq!(t.stamina, 65);
-        }
     }
 }

@@ -1120,6 +1120,7 @@ async fn handle_register_post(
                     "This display name is already taken",
                 );
             }
+            tracing::warn!("Registration failed with unrecognized error: {}", e);
             redirect_with_error("/auth", "register", "Registration failed")
         }
     }

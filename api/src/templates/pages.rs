@@ -54,6 +54,7 @@ pub fn games_list_page(
     stats: &GameStats,
     active_filter: &str,
 ) -> maud::Markup {
+    let csrf = auth.csrf_token().to_owned();
     base_layout(
         "Games",
         auth,
@@ -73,7 +74,7 @@ pub fn games_list_page(
                     div class="launch-block" {
                         // Quickstart form
                         form method="POST" action="/games/new" {
-                            input type="hidden" name="csrf_token" value="";
+                            input type="hidden" name="csrf_token" value=(csrf);
                             input type="hidden" name="name" value="Quick Game";
                             button.quickstart-btn type="submit" { "⚡ Quickstart — New 24-Tribute Game" }
                         }
@@ -82,7 +83,7 @@ pub fn games_list_page(
                         div class="create-form" {
                             h3 { "Create a Game" }
                             form method="POST" action="/games/new" {
-                                input type="hidden" name="csrf_token" value="";
+                                input type="hidden" name="csrf_token" value=(csrf);
                                 input type="text" name="name" placeholder="Game name";
                                 button class="btn btn-primary btn-sm" type="submit" { "Create" }
                             }

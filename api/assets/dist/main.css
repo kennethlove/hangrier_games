@@ -1062,6 +1062,9 @@ h1, h2, h3, h4 {
 .kind-phobia {
   color: oklch(60% 0.22 290);
 }
+.kind-trauma {
+  color: oklch(55% 0.18 310);
+}
 .severity-mild {
   background: oklch(75% 0.15 85 / 0.2);
   color: oklch(80% 0.18 85);
@@ -1103,6 +1106,28 @@ h1, h2, h3, h4 {
   font-size: var(--fs-xs);
   color: var(--muted);
   margin-bottom: 0.125rem;
+}
+.card-trauma {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: 0.75rem;
+}
+.trauma-header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  margin-bottom: 0.125rem;
+}
+.trauma-observers {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: var(--fs-xs);
+  color: var(--muted);
 }
 .band-good {
   color: var(--running);

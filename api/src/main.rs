@@ -1103,7 +1103,6 @@ async fn handle_register_post(
         Err(e) => {
             // SurrealDB signup error — common causes:
             // - unique_email index violation (already registered)
-            // - unique_username index violation (display name taken)
             // - schema validation failure
             let combined = format!("{e} {e:?}").to_lowercase();
             if combined.contains("unique_email") || combined.contains("already exists") {
@@ -1111,13 +1110,6 @@ async fn handle_register_post(
                     "/auth",
                     "register",
                     "An account with this email already exists",
-                );
-            }
-            if combined.contains("unique_username") || combined.contains("username already") {
-                return redirect_with_error(
-                    "/auth",
-                    "register",
-                    "This display name is already taken",
                 );
             }
             tracing::warn!("Registration failed with unrecognized error: {}", e);

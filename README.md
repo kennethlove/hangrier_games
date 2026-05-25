@@ -11,26 +11,29 @@
 - **Turn-Based Combat**: D20-based combat system with weapons, shields, and status effects
 - **Procedural Arena**: 5-region arena (Cornucopia + 4 cardinal directions) with dynamic item spawning and area closures
 - **AI Commentary**: Dual-commentator narration powered by Ollama LLM, transforming game events into Capitol-style sports commentary
-- **Full-Stack Rust**: Backend API (Axum + SurrealDB), frontend (Dioxus WASM), pure Rust game engine
-- **Real-Time State Management**: Query-driven frontend with automatic cache invalidation and optimistic updates
-- **Multiple Themes**: 3 themeable colorschemes with LocalStorage persistence
+- **Full-Stack Rust**: Backend API (Axum + SurrealDB), HTMX server-rendered UI, pure Rust game engine
+- **Real-Time State Management**: SSE-driven live updates with HTMX
+- **Multiple Themes**: 3 themeable colorschemes with CSS custom properties
 
 ##  Architecture
 
-**5-Crate Rust Workspace:**
+**4-Crate Rust Workspace:**
 
 ```
+
 ┌─────────────────────────────────────────────┐
-│  Browser (WASM) - Dioxus Frontend           │
-│  • Query-driven state (dioxus-query)        │
+│  Browser - HTMX + Maud Templates            │
+│  • Server-rendered HTML (maud)              │
 │  • Themeable UI with Tailwind CSS          │
+│  • Real-time updates via SSE               │
 └──────────────────┬──────────────────────────┘
-                   │ HTTP/JSON
+                   │ HTML fragments + JSON
                    ▼
 ┌─────────────────────────────────────────────┐
 │  API Server - Axum REST API                 │
 │  • JWT authentication                       │
 │  • SurrealDB graph database                 │
+│  • Server-side rendering with Maud         │
 └──────────────────┬──────────────────────────┘
                    │ Pure functions
                    ▼
@@ -49,19 +52,18 @@
 ```
 
 **Data Flow:**
-1. Frontend sends HTTP request with JWT authentication
-2. API validates request and hydrates game state from SurrealDB
+1. Browser requests page via HTMX (or direct navigation)
+2. API renders HTML with Maud templates, hydrating state from SurrealDB
 3. Game engine runs pure simulation logic
 4. API persists updated state to database
 5. Announcers generate commentary from event log (optional)
-6. Frontend refetches via query invalidation
+6. HTMX swaps in updated HTML via SSE push or hx-trigger
 
 ##  Prerequisites
 
 - **Rust** (edition 2024) - [Install rustup](https://rustup.rs/)
 - **Node.js** & npm - For Tailwind CSS compilation
 - **SurrealDB** - [Installation guide](https://surrealdb.com/docs/installation)
-- **Dioxus CLI** - Installed via `cargo install dioxus-cli@0.6.2 --locked`
 - **Ollama** - [Installation guide](https://ollama.ai) (optional, for commentary)
 - **Just** - [Installation guide](https://github.com/casey/just) (recommended, or use cargo commands directly)
 
@@ -74,20 +76,20 @@
 git clone https://github.com/kennethlove/hangrier_games.git
 cd hangrier_games
 
-# Install all dependencies (Dioxus CLI, Node packages, Ollama model)
+# Install all dependencies (Node packages, Ollama model)
 just setup
 
 # Build Tailwind CSS
 just build-css
 
-# Start the full development environment (SurrealDB + API + web frontend)
+# Start the full development environment (SurrealDB + API)
 just dev
 ```
 
 The application will be available at:
-- **Frontend**: http://localhost:8080
-- **API**: http://localhost:3000
+- **Web UI + API**: http://localhost:3000
 - **SurrealDB**: ws://localhost:8000
+- **Mailpit (email testing)**: http://localhost:8025
 
 ### Manual Setup
 
@@ -95,9 +97,7 @@ If you don't have `just` installed:
 
 ```bash
 # Install dependencies
-rustup target add wasm32-unknown-unknown
-cargo install dioxus-cli@0.6.2 --locked
-cd web/assets && npm install && cd ../..
+cd api/assets && npm install && cd ../..
 
 # Create Ollama model (optional)
 cd announcers/src
@@ -105,7 +105,7 @@ ollama create announcers -f Modelfile.qwen
 cd ../..
 
 # Build Tailwind CSS
-cd web/assets
+cd api/assets
 npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css
 cd ../..
 
@@ -113,11 +113,8 @@ cd ../..
 # Terminal 1: SurrealDB
 surrealdb start --log info --user root --pass root memory
 
-# Terminal 2: API server
+# Terminal 2: API server (serves both UI and REST API)
 cargo run --package api
-
-# Terminal 3: Web frontend
-cd web && dx serve
 ```
 
 ##  Development Workflow
@@ -129,28 +126,15 @@ This project uses [`just`](https://github.com/casey/just) for task automation. R
 **Most useful commands:**
 
 ```bash
-just dev          # Start SurrealDB, API, and web frontend
-just api          # Run API server only
-just web          # Run frontend dev server only
+just dev          # Start SurrealDB, API, Mailpit, and Tailwind watcher
+just api          # Run API server only (serves both UI and REST)
 just build-css    # Build Tailwind CSS
 just test         # Run game crate tests (60+ unit tests)
 just fmt          # Format all code
 just quality      # Run all quality checks (format, check, clippy, test)
+just seed         # Seed dev database with test user and game
+just open         # Open http://localhost:3000 in browser
 just clean        # Clean all build artifacts
-```
-
-### Frontend-Only Development
-
-```bash
-# Terminal 1: Start backend services
-just db &
-just api &
-
-# Terminal 2: Start frontend with hot reload
-just web
-
-# Rebuild CSS after changing Tailwind classes
-just build-css
 ```
 
 ### Running Tests
@@ -172,13 +156,9 @@ hangrier_games/
 │   ├── items/     # Weapons, shields, consumables
 │   ├── tributes/  # Autonomous AI with decision-making
 │   └── threats/   # Environmental hazards
-├── api/           # Axum REST API + SurrealDB integration
-│   ├── db/        # Database client and queries
-│   ├── routes/    # HTTP endpoints
-│   └── middleware/ # JWT authentication
-├── web/           # Dioxus WASM frontend
-│   ├── components/ # UI components (42+ files)
-│   ├── queries/   # API integration layer
+├── api/           # Axum REST API + HTMX server-rendered UI
+│   ├── routes/    # HTTP endpoints (HTML + JSON)
+│   ├── templates/ # Maud HTML templates
 │   └── assets/    # Tailwind CSS and static files
 ├── shared/        # Shared data types (DTOs, enums)
 ├── announcers/    # Ollama LLM integration
@@ -197,10 +177,10 @@ See [`codemap.md`](codemap.md) for detailed architecture documentation.
 - **Runtime**: Tokio 1.45.0 (async)
 
 ### Frontend
-- **Framework**: Dioxus 0.6.3 (React-like WASM)
-- **State Management**: dioxus-query 0.7.0 (async query caching)
-- **Styling**: Tailwind CSS
-- **Storage**: LocalStorage (JWT + theme persistence)
+- **Rendering**: Server-side HTML with [Maud](https://maud.lambda.xyz/)
+- **Dynamic UI**: [HTMX 2.0](https://htmx.org/) + SSE for real-time updates
+- **Styling**: Tailwind CSS with CSS custom properties
+- **Storage**: Cookies (JWT + session)
 
 ### Game Logic
 - **Language**: Pure Rust (edition 2024)
@@ -218,13 +198,10 @@ Create a `.env` file in the project root:
 
 ```bash
 ENV=development
-APP_API_HOST=http://127.0.0.1:3000  # Frontend → API
 SURREAL_HOST=ws://localhost:8000     # API → SurrealDB
 SURREAL_USER=root
 SURREAL_PASS=root
 ```
-
-**Note**: Frontend reads `APP_*` environment variables at **build time** via `build.rs`. Changing these requires rebuilding the frontend.
 
 ##  Docker Deployment
 
@@ -244,8 +221,7 @@ just docker-down
 
 Services:
 - **surrealdb**: Database (port 8000)
-- **api**: REST API (port 3000)
-- **web**: Frontend static files (port 8080)
+- **api**: REST API + HTMX UI (port 3000)
 
 ##  Testing
 
@@ -278,10 +254,10 @@ Contributions are welcome! Please follow these guidelines:
 
 ### Development Tips
 
-- Frontend requires `RUSTFLAGS='--cfg getrandom_backend="wasm_js"'` for WASM builds
-- Build Tailwind CSS before building the web frontend
+- Run `just dev` to start all services at once
+- Build Tailwind CSS with `just build-css` before starting the API
 - Game crate tests can be slow; workspace-wide tests may hang
-- Use `just dev` to start all services at once
+- Use `just seed` to populate the dev database with test data
 - See `AGENTS.md` for AI agent instructions
 
 ##  Further Reading
@@ -289,7 +265,8 @@ Contributions are welcome! Please follow these guidelines:
 - **[codemap.md](codemap.md)**: Comprehensive architecture documentation
 - **[AGENTS.md](AGENTS.md)**: Project-specific AI agent instructions
 - **[justfile](justfile)**: All available development commands
-- **[Dioxus Documentation](https://dioxuslabs.com/)**
+- **[HTMX Documentation](https://htmx.org/)**
+- **[Maud Template Documentation](https://maud.lambda.xyz/)**
 - **[SurrealDB Documentation](https://surrealdb.com/docs)**
 
 ##  License
@@ -305,6 +282,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Current Status**: Active development  
-**Last Updated**: April 2026
+**Last Updated**: May 2026
 
 For questions or issues, please [open an issue](https://github.com/kennethlove/hangrier_games/issues).

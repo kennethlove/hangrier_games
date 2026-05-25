@@ -100,7 +100,7 @@ run_day_night_cycle(day: bool)
 ### **Consumed By**
 - **API Crate** (`api/`): REST endpoints call `Game` methods to advance simulation and query state
 - **Announcers Crate** (`announcers/`): Consumes messages from `GLOBAL_MESSAGES` to generate LLM commentary
-- **Frontend** (`web/`): Indirectly via API - displays game state and messages
+- **Browser** (HTMX): Indirectly via API - API renders Maud templates for HTML display
 
 ### **Depends On**
 - **Modules (within `game/src/`)**:

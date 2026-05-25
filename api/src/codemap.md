@@ -20,14 +20,43 @@ REST API server built with **Axum** that provides HTTP endpoints for the Hangrie
 ### File Structure
 
 ```
-api/src/
-├── main.rs          # Application entry point, server setup, auth middleware
-├── lib.rs           # Shared types (AppState, AppError)
-├── games.rs         # Game lifecycle endpoints (CRUD, step simulation)
-├── tributes.rs      # Tribute management endpoints
-├── users.rs         # Authentication and user management
-├── messages.rs      # Game message/log persistence (incomplete)
-└── logging.rs       # Custom tracing layer (currently unused)
+api/
+├── src/
+│   ├── main.rs                # Application entry point, Axum server, routes, middleware
+│   ├── lib.rs                 # Shared types (AppState, AppError)
+│   ├── auth.rs                # JWT middleware, refresh token logic
+│   ├── cookies.rs             # Cookie-based session management
+│   ├── email.rs               # Email verification
+│   ├── games.rs               # Game lifecycle endpoints (CRUD, step simulation)
+│   ├── tributes.rs            # Tribute management endpoints
+│   ├── users.rs               # Authentication and user management
+│   ├── messages.rs            # Game message/log persistence (incomplete)
+│   ├── logging.rs             # Custom tracing layer (currently unused)
+│   ├── sse.rs                 # Server-Sent Events for live game log streaming
+│   ├── websocket.rs           # WebSocket broadcaster for game events
+│   ├── storage.rs             # File upload storage backend
+│   ├── cleanup.rs             # Scheduled cleanup of expired refresh tokens
+│   ├── routes/
+│   │   ├── mod.rs             # Route module aggregator
+│   │   ├── auth.rs            # Auth HTML page handlers (login, register, logout)
+│   │   ├── games.rs           # Game HTML page handlers (list, detail)
+│   │   └── dev.rs             # Dev-only routes
+│   └── templates/
+│       ├── mod.rs             # Base layout, AuthState enum, icon helpers
+│       ├── pages.rs           # Page components: home, game list, 404, 500
+│       ├── game_detail.rs     # Game detail page, tribute/area/log cards
+│       ├── auth.rs            # Auth page components (login, register forms)
+│       └── timeline/
+│           ├── mod.rs         # Timeline layout and card rendering
+│           └── cards.rs       # Event card components (combat, death, etc.)
+├── assets/
+│   ├── src/main.css           # Tailwind CSS source with design tokens
+│   ├── dist/main.css          # Compiled CSS (Tailwind v4 + LightningCSS)
+│   ├── icons/
+│   │   ├── sprite-ui.svg      # UI icon sprite (nav, actions)
+│   │   └── sprite-narrative.svg  # Narrative icon sprite (events, items)
+│   └── package.json           # Node.js deps for CSS build (Tailwind CLI)
+└── tests/                     # Integration tests (auth, games, tributes, simulation)
 ```
 
 ### Architecture Patterns
@@ -155,7 +184,76 @@ db.query("COMMIT").await;
 
 Used in `save_game` to ensure atomic state updates.
 
----
+**8. Server-Side Rendering Pattern (HTMX + Maud)**
+
+- All HTML is rendered server-side using `maud` (compile-time HTML templates)
+- HTMX 2.0 handles client-side interactivity (form submissions, dynamic loading, tab switches)
+- SSE for real-time log streaming (game log follows simulation step)
+- Static assets (CSS, icons) served via `ServeDir` in Axum's tower service layer
+- CSRF tokens protect all mutating HTML form submissions
+
+**9. Design System v1 — CSS Custom Properties + Tailwind v4**
+
+The UI follows a single canonical light theme defined via CSS custom properties in `:root {}`. All component styling uses these tokens — no hardcoded colors in templates.
+
+**Token Categories** (defined in `api/assets/src/main.css`):
+
+| Category | Tokens | Description |
+|----------|--------|-------------|
+| **Backgrounds** | `--bg`, `--surface` | Page background (light) and card surface (white) |
+| **Foregrounds** | `--fg`, `--muted` | Primary text and secondary/meta text |
+| **Accent** | `--accent`, `--accent-soft` | Interactive/emphasis color (violet) with 10% mix |
+| **Status** | `--running` (green), `--waiting` (amber), `--finished` (gray) | Game status indicators |
+| **Borders** | `--border` | Subtle gray border on cards/sections |
+| **Typography** | `--font-display` (Newsreader serif), `--font-body` (Inter), `--font-mono` (JetBrains Mono) | Font stack assignments |
+| **Type Scale** | `--fs-h1` (clamp 48–84px) → `--fs-xs` (11px) | Fluid/stepped type scale |
+| **Spacing** | `--gap-xs` (6px) → `--gap-xl` (48px) | Consistent spacing scale |
+| **Layout** | `--container` (1200px), `--gutter` (28px) | Max-width and page padding |
+| **Radii** | `--radius-sm` (4px), `--radius` (8px) | Border radius for inputs/cards |
+
+All color values use **OKLCH** color space for perceptual uniformity.
+
+**Component Classes** (naming convention: `.{component}`, `.{component}-{variant}`):
+
+| Group | Classes | Description |
+|-------|---------|-------------|
+| **Navigation** | `.topnav`, `.logo`, `.auth-links` | Sticky top nav with backdrop blur |
+| **Page Structure** | `.page-header`, `.deck`, `.container`, `.detail-header`, `.detail-tabs` | Page layout sections |
+| **Game Cards** | `.game-card`, `.game-card.featured`, `.game-card.running`, `.game-info`, `.game-meta`, `.status-pill` | List cards with status color-coded left border |
+| **Buttons** | `.btn`, `.btn-primary`, `.btn-ghost`, `.btn-sm`, `.quickstart-btn`, `.reveal-btn` | Primary (accent fill), ghost (border), small variants |
+| **Stats** | `.stats-col`, `.summary-card`, `.s-val`, `.s-label` | Dashboard stat tiles |
+| **Tribute/Area** | `.tribute-card`, `.area-card`, `.card-grid`, `.card-stats`, `.card-bands`, `.item-tag` | Entity detail cards with stat grids |
+| **Filters** | `.filter-pills`, `.filter-pill`, `.filter-pill.active` | Status filter pill buttons |
+| **Forms** | `.form-group`, `.tab-bar`, `.tab-btn`, `.tab-panel`, `.auth-card`, `.error-banner` | Auth forms with client-side tab switching |
+| **Log** | `.log-container`, `.log-entry`, `.kind-death`, `.kind-combat`, `.kind-alliance`, `.kind-movement`, `.kind-item`, `.kind-state`, `.kind-affliction`, `.kind-phobia`, `.kind-trauma` | Game log entries with payload-type color coding |
+| **Severity** | `.severity-mild`, `.severity-moderate`, `.severity-severe` | Affliction/trauma severity badges |
+| **Survival** | `.band-good`, `.band-warn`, `.band-danger`, `.band-none` | Tribute survival status indicators |
+| **Status** | `.status-not-started`, `.status-in-progress`, `.status-finished` | Game status badges |
+| **Animations** | `.live-pulse`, `.progress-bar .fill`, `.htmx-indicator`, `.spinner` | Live pulsing indicator, progress bars, HTMX loading states |
+| **Utilities** | `.icon`, `.capitalize`, `.text-center`, `.num`, `.container` | Icon sizing, typography helpers |
+
+**Maud Template Components** (`api/src/templates/`):
+
+| Module | Key Exports | Purpose |
+|--------|-------------|---------|
+| `mod.rs` | `base_layout()`, `AuthState`, `icon()`, `narrative_icon()` | HTML shell, auth state machine, SVG icon renderers |
+| `pages.rs` | `home_page()`, `games_list_page()`, `summary_card()`, `filter_pill()`, `featured_running_card()`, `running_card()`, `waiting_card()`, `finished_card()`, `status_color()`, `not_found_page()`, `server_error_page()` | Page-level layouts and reusable card components |
+| `game_detail.rs` | detail page, `kind_color()`, `hunger_color()`, `thirst_color()`, `stamina_color()` | Game detail with tribute/area/log card rendering |
+| `auth.rs` | login/register pages | Auth forms with tab switching |
+| `timeline/mod.rs` | chronology layout | Timeline card grid |
+| `timeline/cards.rs` | event cards | Combat/death/affliction item cards with severity styling |
+
+**SVG Icon Sprites**:
+- `sprite-ui.svg` — navigation and action icons (referenced via `#icon_ui_{name}`)
+- `sprite-narrative.svg` — game event icons (referenced via `#icon_narrative_{name}`)
+- Loaded once in `<body>` via `<svg style="display:none"><use href="/icons/sprite-ui.svg"/></svg>`
+
+**Build Pipeline**:
+```bash
+# CSS builds with Tailwind v4 + LightningCSS
+cd api/assets
+npx @tailwindcss/cli -i src/main.css -o dist/main.css
+```
 
 ## Flow
 
@@ -369,24 +467,42 @@ save_game(&game, db).await?;
 - `fn::get_tributes_items_by_game($id)` - Cleanup helper
 - `fn::get_areas_items_by_game($id)` - Cleanup helper
 
-### With Frontend (`web` crate)
+### With Browser (HTMX + Server-Rendered Pages)
 
-**Protocol**: HTTP REST (JSON)
+**Protocol**: HTML over HTTP (server-rendered) + JSON API
 
-**Base URL**: `APP_API_HOST` env var (e.g., `http://127.0.0.1:3000`)
+**Base URL**: `http://localhost:3000` (same server — no CORS needed)
 
-**Authentication**: JWT token in `Authorization: Bearer <token>` header
+**Authentication**: HttpOnly cookies (`hg_session` JWT + `hg_refresh`), CSRF tokens for form mutations
 
-**Key Endpoints Used by Frontend**:
-- `GET /api/games` - List all games
-- `POST /api/games` - Create new game
-- `GET /api/games/{id}/display` - Display view (optimized)
-- `PUT /api/games/{id}/next` - Step simulation
-- `GET /api/games/{id}/log/{day}` - Day logs
-- `POST /api/users` - Register
-- `POST /api/users/authenticate` - Login
+**Rendering Pipeline**:
+```
+Browser request  →  Axum handler  →  hydrate data from SurrealDB
+                    →  pure game engine functions
+                    →  render HTML via maud templates
+                    →  return full HTML page  →  HTMX swaps fragments
+```
 
-**CORS**: Configured to allow any origin for frontend access.
+**HTMX-driven Pages**:
+| Route | Handler | HTMX Features |
+|-------|---------|---------------|
+| `GET /games` | `games_list_handler` | hx-get for "Load More" pagination |
+| `GET /games/{id}` | `game_detail_handler` | hx-ext="sse" for live log streaming |
+| `POST /games/new` | `create_game_post_handler` | Standard form POST |
+| `POST /auth/login` | `login_post_handler` | Form POST + hx-target for inline errors |
+| `GET /auth` | `auth_handler` | Client-side tab switching (no HTMX) |
+
+**SSE Streaming**:
+- `GET /api/games/{game_id}/events` — SSE endpoint for live game log updates
+- Connected via `hx-ext="sse"` in the game detail template
+- Streams new log entries as the simulation progresses
+
+**Static Assets**:
+- `/assets/main.css` — Compiled stylesheet
+- `/icons/sprite-ui.svg` / `/icons/sprite-narrative.svg` — SVG icon sprites
+- Served via Axum's `ServeDir` tower service (no separate frontend build)
+
+**No CORS needed** — frontend and API are the same server.
 
 ---
 
@@ -591,11 +707,11 @@ struct JwtResponse {
 
 - `../game/src/` - Core simulation logic (pure Rust, no I/O)
 - `../shared/src/` - Shared types between API and frontend
-- `../web/src/` - Frontend Dioxus app (API consumer)
+- `./assets/src/main.css` - Design tokens and component CSS
 - `schemas/` - SurrealDB schema definitions
 - `migrations/` - Database migration files
 - `justfile` - Development commands (`just api`, `just dev`)
 
 ---
 
-**Last Updated**: 2026-04-05 (via Cartography skill exploration)
+**Last Updated**: 2026-05-25

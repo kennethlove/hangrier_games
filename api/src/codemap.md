@@ -2,9 +2,9 @@
 
 ## Responsibility
 
-REST API server built with **Axum** that provides HTTP endpoints for the Hangrier Games simulation. The API acts as the bridge between the frontend (Dioxus WASM) and the game engine (pure Rust simulation logic), persisting game state in **SurrealDB**.
+REST API + HTML server built with **Axum** that provides both HTTP API endpoints and server-rendered HTMX pages for the Hangrier Games simulation. The API acts as the bridge between the browser (HTMX + Maud templates) and the game engine (pure Rust simulation logic), persisting game state in **SurrealDB**.
 
-**Core Job**: Translate HTTP requests → call pure game engine functions → persist results to SurrealDB → return HTTP responses.
+**Core Job**: Serve HTMX-powered HTML pages + REST API, translate HTTP requests → call pure game engine functions → persist results to SurrealDB → return responses.
 
 **Key Services**:
 - Game lifecycle management (create, delete, step simulation)

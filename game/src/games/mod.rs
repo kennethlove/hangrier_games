@@ -80,6 +80,23 @@ fn format_trauma_message(payload: &crate::messages::MessagePayload, tribute_name
     }
 }
 
+/// Generate a human-readable line for fixation-related messages.
+fn fixation_message_line(payload: &crate::messages::MessagePayload, tribute_name: &str) -> String {
+    use crate::messages::MessagePayload;
+    match payload {
+        MessagePayload::FixationConsummated { target, .. } => {
+            format!("{tribute_name}'s fixation on {target} is consummated!")
+        }
+        MessagePayload::FixationThwarted { target, reason, .. } => {
+            format!("{tribute_name}'s fixation on {target} is thwarted ({reason}).")
+        }
+        MessagePayload::FixationFaded { target, .. } => {
+            format!("{tribute_name}'s fixation on {target} fades away.")
+        }
+        _ => String::new(),
+    }
+}
+
 /// Generate a human-readable line for phobia-related messages.
 fn phobia_message_line(payload: &crate::messages::MessagePayload, tribute_name: &str) -> String {
     use crate::messages::MessagePayload;

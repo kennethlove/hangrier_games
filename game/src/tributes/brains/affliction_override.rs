@@ -254,7 +254,10 @@ mod tests {
 
     #[test]
     fn affliction_bias_neutral_without_afflictions() {
-        let tribute = Tribute::new("Test".to_string(), None, None);
+        use rand::SeedableRng;
+        use rand::rngs::SmallRng;
+        let mut rng = SmallRng::seed_from_u64(42);
+        let tribute = Tribute::new_with_rng("Test".to_string(), None, None, &mut rng);
         let bias = affliction_bias(&tribute);
         assert_eq!(bias.combat_avoid, 1.0);
         assert_eq!(bias.rest_preference, 1.0);

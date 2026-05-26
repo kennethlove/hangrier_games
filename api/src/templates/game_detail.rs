@@ -540,7 +540,13 @@ fn message_kind_icon(payload: &shared::messages::MessagePayload) -> maud::Markup
         | MessagePayload::PhobiaEscalated { .. }
         | MessagePayload::PhobiaHabituated { .. }
         | MessagePayload::PhobiaObserved { .. }
-        | MessagePayload::PhobiaForgotten { .. } => "eye",
+        | MessagePayload::PhobiaForgotten { .. }
+        | MessagePayload::FixationAcquired { .. }
+        | MessagePayload::FixationEscalated { .. }
+        | MessagePayload::FixationFired { .. }
+        | MessagePayload::FixationConsummated { .. }
+        | MessagePayload::FixationThwarted { .. }
+        | MessagePayload::FixationFaded { .. } => "eye",
     };
     icon(name)
 }

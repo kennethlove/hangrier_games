@@ -43,9 +43,46 @@ impl fmt::Display for ThwartReason {
     }
 }
 
+/// Category of action a fixation pushes the tribute toward.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FixationAction {
+    /// Move toward or attack a tribute.
+    TargetPick,
+    /// Prioritize looting/gathering from an area.
+    LootPick,
+    /// Move toward an area.
+    MovePick,
+}
+
+impl fmt::Display for FixationAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FixationAction::TargetPick => write!(f, "target_pick"),
+            FixationAction::LootPick => write!(f, "loot_pick"),
+            FixationAction::MovePick => write!(f, "move_pick"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fixation_action_display_roundtrip() {
+        for action in [
+            FixationAction::TargetPick,
+            FixationAction::LootPick,
+            FixationAction::MovePick,
+        ] {
+            let s = action.to_string();
+            assert!(!s.is_empty());
+            let json = serde_json::to_string(&action).unwrap();
+            let restored: FixationAction = serde_json::from_str(&json).unwrap();
+            assert_eq!(action, restored);
+        }
+    }
 
     #[test]
     fn fixation_origin_roundtrip_innate() {

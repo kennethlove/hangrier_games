@@ -310,8 +310,10 @@ mod tests {
     }
 
     #[test]
-    fn innate_phobia_never_escalates() {
-        let mut rng = SmallRng::seed_from_u64(42);
+    fn innate_phobia_can_escalate_with_amendment() {
+        // Spec amendment: all phobia firings roll ~12% escalation.
+        // Innate phobias can now escalate. Use seed that triggers escalation.
+        let mut rng = SmallRng::seed_from_u64(3);
         let mut tribute = crate::tributes::Tribute::new("Test".to_string(), None, None);
         let draft = AfflictionDraft {
             kind: AfflictionKind::Phobia(PhobiaTrigger::Fire),
@@ -320,7 +322,6 @@ mod tests {
             source: AfflictionSource::Spawn,
         };
         tribute.try_acquire_affliction(draft);
-        let initial_severity;
 
         // Add Innate phobia metadata
         if let Some((_, aff)) = tribute.afflictions.iter_mut().next() {
@@ -328,7 +329,6 @@ mod tests {
                 origin: PhobiaOrigin::Innate,
                 ..PhobiaMetadata::default()
             });
-            initial_severity = aff.severity;
         } else {
             panic!("no affliction after acquire");
         }
@@ -340,21 +340,28 @@ mod tests {
             !results.is_empty(),
             "innate phobia should fire in fire context"
         );
-        let result = &results[0].1;
-        let has_escalation = result
-            .messages
-            .iter()
-            .any(|m| matches!(m, MessagePayload::PhobiaEscalated { .. }));
+
+        let has_escalation = results[0].1.messages.iter().any(|m| {
+            matches!(
+                m,
+                MessagePayload::PhobiaEscalated {
+                    from_severity,
+                    to_severity,
+                    ..
+                } if from_severity == "mild" && to_severity == "moderate"
+            )
+        });
         assert!(
-            !has_escalation,
-            "innate phobia must not emit PhobiaEscalated"
+            has_escalation,
+            "innate phobia should escalate with spec amendment"
         );
 
-        // Severity unchanged after scan.
+        // Verify severity was escalated.
         let (_, aff) = tribute.afflictions.iter().next().unwrap();
         assert_eq!(
-            aff.severity, initial_severity,
-            "innate phobia severity must stay the same"
+            aff.severity,
+            Severity::Moderate,
+            "innate phobia severity must escalate to Moderate"
         );
     }
 

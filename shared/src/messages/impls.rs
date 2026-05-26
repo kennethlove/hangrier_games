@@ -51,6 +51,12 @@ impl MessagePayload {
             | PhobiaHabituated { .. }
             | PhobiaObserved { .. }
             | PhobiaForgotten { .. } => MessageKind::Phobia,
+            FixationAcquired { .. }
+            | FixationEscalated { .. }
+            | FixationFired { .. }
+            | FixationConsummated { .. }
+            | FixationThwarted { .. }
+            | FixationFaded { .. } => MessageKind::Phobia,
             AfflictionAcquired { .. }
             | AfflictionProgressed { .. }
             | AfflictionHealed { .. }
@@ -139,7 +145,13 @@ impl MessagePayload {
             | PhobiaHabituated {
                 tribute: tribute_id,
                 ..
-            } => tribute_id == id,
+            }
+            | FixationAcquired { tribute_id, .. }
+            | FixationEscalated { tribute_id, .. }
+            | FixationFired { tribute_id, .. }
+            | FixationConsummated { tribute_id, .. }
+            | FixationThwarted { tribute_id, .. }
+            | FixationFaded { tribute_id, .. } => tribute_id == id,
             PhobiaObserved {
                 observer, subject, ..
             } => observer == id || subject == id,

@@ -593,6 +593,45 @@ pub enum MessagePayload {
         from_severity: String,
         to_severity: Option<String>,
     },
+
+    // Fixation events (fixation brain layer PR2).
+    /// A tribute acquired a fixation on a target.
+    FixationAcquired {
+        tribute_id: String,
+        target: String,
+        severity: String,
+        origin: String,
+    },
+    /// A fixation's severity escalated.
+    FixationEscalated {
+        tribute_id: String,
+        target: String,
+        old_severity: String,
+        new_severity: String,
+    },
+    /// A fixation fired — the brain is overriding toward the target.
+    FixationFired {
+        tribute_id: String,
+        target: String,
+        severity: String,
+        action: String,
+    },
+    /// A fixation was consummated (target reached/acquired).
+    FixationConsummated {
+        tribute_id: String,
+        target: String,
+    },
+    /// A fixation was thwarted (target lost/unreachable).
+    FixationThwarted {
+        tribute_id: String,
+        target: String,
+        reason: String,
+    },
+    /// A fixation faded (severity decayed to nothing).
+    FixationFaded {
+        tribute_id: String,
+        target: String,
+    },
 }
 
 pub mod impls;

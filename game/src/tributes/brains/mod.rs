@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub mod affliction_override;
+pub mod fixation_override;
 pub mod phobia_override;
 pub mod trauma_override;
 
@@ -572,12 +573,13 @@ impl Brain {
     /// 2. Psychotic break
     /// 3. Survival override (terrain-dependent; skipped when `terrain` is `None`)
     /// 4. Stamina override (terrain-dependent for parity with survival)
-    /// 5. Phobia override (spec §5 — fires freeze reactions, stat penalties)
-    /// 6. Trauma override (spec §7 — avoidance hard veto)
-    /// 7. Affliction override (hard gates + brain bias; spec §11)
-    /// 7. Preferred action
-    /// 8. Alliance proposal
-    /// 9. Consumable
+    /// 5. Fixation override (spec §8 — per-tier override semantics)
+    /// 6. Phobia override (spec §5 — fires freeze reactions, stat penalties)
+    /// 7. Trauma override (spec §7 — avoidance hard veto)
+    /// 8. Affliction override (hard gates + brain bias; spec §11)
+    /// 8. Preferred action
+    /// 9. Alliance proposal
+    /// 10. Consumable
     ///
     /// Layers 3 and 4 are gated on `terrain.is_some()` because the legacy
     /// `act` entry point does not yet receive the tribute's current terrain
@@ -644,6 +646,17 @@ impl Brain {
                 false,
                 &crate::tributes::combat_tuning::CombatTuning::default(),
             ) {
+                return Some(action);
+            }
+        }
+
+        // Fixation override (spec §8): per-tier override semantics.
+        // Runs between stamina and phobia overrides.
+        {
+            let fixation_ctx = fixation_override::FixationOverrideContext {
+                target_reachable: true, // conservative: assume reachable
+            };
+            if let Some(action) = fixation_override::fixation_override(tribute, &fixation_ctx) {
                 return Some(action);
             }
         }

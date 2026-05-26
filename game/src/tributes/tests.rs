@@ -513,13 +513,23 @@ use shared::afflictions::{AfflictionKind, AfflictionSource, BodyPart, Severity};
 
 #[test]
 fn test_afflictions_empty_by_default() {
-    let t = Tribute::new("Test".to_string(), None, None);
+    let t = Tribute::new_with_rng(
+        "Test".to_string(),
+        None,
+        None,
+        &mut SmallRng::seed_from_u64(42),
+    );
     assert!(t.afflictions.is_empty());
 }
 
 #[test]
 fn test_afflictions_skip_serialization_when_empty() {
-    let t = Tribute::new("Test".to_string(), None, None);
+    let t = Tribute::new_with_rng(
+        "Test".to_string(),
+        None,
+        None,
+        &mut SmallRng::seed_from_u64(42),
+    );
     let json = serde_json::to_string(&t).unwrap();
     assert!(!json.contains("\"afflictions\""));
 }

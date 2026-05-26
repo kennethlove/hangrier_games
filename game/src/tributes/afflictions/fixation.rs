@@ -154,13 +154,23 @@ mod tests {
 
     #[test]
     fn count_fixations_empty() {
-        let t = make_tribute();
+        let t = Tribute::new_with_rng(
+            "Test".to_string(),
+            None,
+            None,
+            &mut SmallRng::seed_from_u64(42),
+        );
         assert_eq!(count_fixations(&t.afflictions), 0);
     }
 
     #[test]
     fn count_fixations_with_fixations() {
-        let mut t = make_tribute();
+        let mut t = Tribute::new_with_rng(
+            "Test".to_string(),
+            None,
+            None,
+            &mut SmallRng::seed_from_u64(42),
+        );
         add_fixation(&mut t, FixationTarget::Area("sector1".to_string()));
         assert_eq!(count_fixations(&t.afflictions), 1);
 
@@ -170,7 +180,12 @@ mod tests {
 
     #[test]
     fn count_by_target_kind_mixed() {
-        let mut t = make_tribute();
+        let mut t = Tribute::new_with_rng(
+            "Test".to_string(),
+            None,
+            None,
+            &mut SmallRng::seed_from_u64(42),
+        );
         add_fixation(&mut t, FixationTarget::Area("sector1".to_string()));
         add_fixation(&mut t, FixationTarget::Tribute("other-tribute".to_string()));
         let (trib, item, area) = count_by_target_kind(&t.afflictions);
@@ -219,7 +234,12 @@ mod tests {
 
     #[test]
     fn per_kind_cap_blocks_duplicates() {
-        let mut t = make_tribute();
+        let mut t = Tribute::new_with_rng(
+            "Test".to_string(),
+            None,
+            None,
+            &mut SmallRng::seed_from_u64(42),
+        );
         add_fixation(&mut t, FixationTarget::Area("sector1".to_string()));
 
         // Try adding another area fixation - should be blocked by cap checks

@@ -15,8 +15,9 @@ use super::triggers::PhobiaContext;
 
 /// Called when a phobia fires this cycle.
 ///
-/// Resets the decay counter. For Traumatic phobias, rolls reinforcement
-/// escalation (12% chance per spec §7.1). For visible firings (Moderate+),
+/// Resets the decay counter. Rolls escalation for all phobias (~12% chance
+/// per spec amendment). For Traumatic phobias, also rolls the original
+/// reinforcement escalation (spec §7.1). For visible firings (Moderate+),
 /// adds co-located tributes as observers.
 pub(super) fn on_phobia_fire(
     meta: &mut PhobiaMetadata,
@@ -57,18 +58,16 @@ pub(super) fn on_phobia_fire(
         }
     }
 
-    // Traumatic reinforcement (spec §7.1).
-    if matches!(meta.origin, PhobiaOrigin::Traumatic { .. }) {
-        let outcome = apply_traumatic_reinforcement(*severity, 0.12, rng);
-        if outcome.escalated {
-            messages.push(MessagePayload::PhobiaEscalated {
-                tribute: tribute_id.to_string(),
-                trigger: trigger.to_string(),
-                from_severity: severity.to_string(),
-                to_severity: outcome.new_severity.to_string(),
-            });
-            *severity = outcome.new_severity;
-        }
+    // Spec amendment: all phobia firings roll ~12% escalation chance.
+    let outcome = apply_traumatic_reinforcement(*severity, 0.12, rng);
+    if outcome.escalated {
+        messages.push(MessagePayload::PhobiaEscalated {
+            tribute: tribute_id.to_string(),
+            trigger: trigger.to_string(),
+            from_severity: severity.to_string(),
+            to_severity: outcome.new_severity.to_string(),
+        });
+        *severity = outcome.new_severity;
     }
 
     messages

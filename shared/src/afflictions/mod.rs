@@ -8,7 +8,7 @@ mod source;
 mod trauma;
 
 pub use affliction::Affliction;
-pub use fixation::{FixationMetadata, FixationOrigin, ThwartReason};
+pub use fixation::{FixationAction, FixationMetadata, FixationOrigin, ThwartReason};
 pub use kind::{AfflictionKind, BodyPart, FixationTarget, PhobiaTrigger};
 pub use mechanics::{
     DecayOutcome, ReinforcementOutcome, apply_traumatic_reinforcement, tick_decay,

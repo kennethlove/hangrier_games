@@ -1,7 +1,7 @@
 //! Brain bias computation: maps affliction kinds to behavioral bias
 //! multipliers scaled by severity tier.
 
-use shared::afflictions::{Affliction, AfflictionKind, Severity};
+use shared::afflictions::{Affliction, AfflictionKind, FixationTarget, Severity};
 
 /// Multiplier per severity tier. Permanent afflictions (MissingArm,
 /// MissingLeg, Blind, Deaf) are always Severe in practice but still
@@ -80,8 +80,14 @@ fn base_bias(kind: AfflictionKind) -> (f64, f64, f64, f64, f64) {
         | AfflictionKind::Electrocuted
         | AfflictionKind::Drowned
         | AfflictionKind::Buried
-        | AfflictionKind::Phobia(_)
-        | AfflictionKind::Fixation(_) => (1.0, 1.0, 1.0, 1.0, 1.0),
+        | AfflictionKind::Phobia(_) => (1.0, 1.0, 1.0, 1.0, 1.0),
+        // Fixation: push toward target
+        // Tribute fixation → reduced combat_avoid (want to engage)
+        AfflictionKind::Fixation(FixationTarget::Tribute(_)) => (0.7, 1.0, 1.0, 1.0, 1.0),
+        // Item fixation → reduced rest_preference (want to explore/loot)
+        AfflictionKind::Fixation(FixationTarget::Item(_)) => (1.0, 1.0, 1.0, 1.0, 0.7),
+        // Area fixation → reduced isolation (want to travel)
+        AfflictionKind::Fixation(FixationTarget::Area(_)) => (1.0, 1.0, 0.7, 1.0, 1.0),
     }
 }
 
@@ -291,5 +297,41 @@ mod tests {
         let bias = compute_brain_bias(&[aff(AfflictionKind::Starving, Severity::Severe)]);
         assert_eq!(bias.combat_avoid, 1.0);
         assert_eq!(bias.shelter_preference, 1.0);
+    }
+
+    #[test]
+    fn fixation_tribute_reduces_combat_avoid() {
+        let bias = compute_brain_bias(&[aff(
+            AfflictionKind::Fixation(FixationTarget::Tribute("u-1".into())),
+            Severity::Moderate,
+        )]);
+        assert!(
+            bias.combat_avoid < 1.0,
+            "tribute fixation should reduce combat_avoid"
+        );
+    }
+
+    #[test]
+    fn fixation_item_reduces_rest_preference() {
+        let bias = compute_brain_bias(&[aff(
+            AfflictionKind::Fixation(FixationTarget::Item("i-1".into())),
+            Severity::Moderate,
+        )]);
+        assert!(
+            bias.rest_preference < 1.0,
+            "item fixation should reduce rest_preference"
+        );
+    }
+
+    #[test]
+    fn fixation_area_reduces_isolation() {
+        let bias = compute_brain_bias(&[aff(
+            AfflictionKind::Fixation(FixationTarget::Area("sector1".into())),
+            Severity::Moderate,
+        )]);
+        assert!(
+            bias.isolation < 1.0,
+            "area fixation should reduce isolation"
+        );
     }
 }

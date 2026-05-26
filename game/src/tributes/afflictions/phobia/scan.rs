@@ -85,19 +85,19 @@ fn scan_tribute_phobias(
         .afflictions
         .iter()
         .filter(|(_, aff)| aff.phobia_metadata.is_some())
-        .map(|(key, aff)| (*key, aff.severity))
+        .map(|(key, aff)| (key.clone(), aff.severity))
         .collect();
 
     // Check which phobias are firing (immutable borrow of tribute).
     let firing: Vec<_> = phobia_data
         .iter()
         .filter(|(key, _)| {
-            let AfflictionKind::Phobia(trigger) = key.0 else {
+            let AfflictionKind::Phobia(ref trigger) = key.0 else {
                 return false;
             };
-            is_present(&trigger, tribute, ctx)
+            is_present(trigger, tribute, ctx)
         })
-        .map(|(key, severity)| (*key, *severity))
+        .map(|(key, severity)| (key.clone(), *severity))
         .collect();
 
     // Update metadata based on firing state.

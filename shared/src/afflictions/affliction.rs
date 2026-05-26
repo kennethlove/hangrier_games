@@ -1,3 +1,4 @@
+use super::fixation::FixationMetadata;
 use super::kind::{AfflictionKind, BodyPart};
 use super::phobia::PhobiaMetadata;
 use super::severity::Severity;
@@ -23,12 +24,16 @@ pub struct Affliction {
     /// Only `Some` for `AfflictionKind::Phobia` variants.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub phobia_metadata: Option<PhobiaMetadata>,
+    /// Optional fixation-specific metadata (origin).
+    /// Only `Some` for `AfflictionKind::Fixation` variants.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fixation_metadata: Option<FixationMetadata>,
 }
 
 impl Affliction {
     /// Returns the storage key for this affliction.
     pub fn key(&self) -> AfflictionKey {
-        (self.kind, self.body_part)
+        (self.kind.clone(), self.body_part)
     }
 
     /// Returns true if this affliction kind is permanent and cannot be cured in v1.
@@ -66,6 +71,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         assert_eq!(a.key(), (AfflictionKind::Wounded, Some(BodyPart::Arm)));
     }
@@ -83,6 +89,25 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
+        };
+        assert!(a.is_permanent());
+    }
+
+    #[test]
+    fn is_permanent_returns_true_for_missing_leg() {
+        let a = Affliction {
+            kind: AfflictionKind::MissingLeg,
+            body_part: Some(BodyPart::Leg),
+            severity: Severity::Severe,
+            source: AfflictionSource::Combat {
+                attacker_id: String::new(),
+            },
+            acquired_cycle: 0,
+            last_progressed_cycle: 0,
+            trauma_metadata: None,
+            phobia_metadata: None,
+            fixation_metadata: None,
         };
         assert!(a.is_permanent());
     }
@@ -98,6 +123,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         assert!(a.is_reversible());
     }
@@ -113,6 +139,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: Some(PhobiaMetadata::default()),
+            fixation_metadata: None,
         };
         let json = serde_json::to_string(&aff).unwrap();
         let restored: Affliction = serde_json::from_str(&json).unwrap();
@@ -132,6 +159,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         assert!(aff.phobia_metadata.is_none());
     }

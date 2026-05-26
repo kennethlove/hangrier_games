@@ -75,6 +75,9 @@ impl Tribute {
             if let Ok(()) = area_details.use_item(&item) {
                 self.add_item(item.clone());
 
+                // ~10% chance to acquire a fixation on the picked-up item.
+                crate::tributes::afflictions::fixation::maybe_acquire_item_fixation(self, &item);
+
                 return Some(item.clone());
             }
             None

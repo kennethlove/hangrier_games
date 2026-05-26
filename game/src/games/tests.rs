@@ -1457,6 +1457,7 @@ fn sleeping_wounded_tribute_does_not_regen_hp() {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         },
     );
     let prior_hp = t.attributes.health;

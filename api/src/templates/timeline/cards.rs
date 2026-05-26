@@ -726,6 +726,91 @@ pub fn phobia_card(msg: &GameMessage) -> maud::Markup {
     }
 }
 
+/// Fixation event card. Handles all 6 fixation variants with severity-colored
+/// borders and badges. Uses tier icon (eye) with "Fixation" label.
+pub fn fixation_card(msg: &GameMessage) -> maud::Markup {
+    use shared::messages::MessagePayload::*;
+    let (severity, content) = match &msg.payload {
+        FixationAcquired {
+            tribute_id: _,
+            target,
+            severity,
+            origin: _,
+        } => (severity.as_str(), format!("acquired fixation on {target}")),
+        FixationEscalated {
+            tribute_id: _,
+            target,
+            old_severity,
+            new_severity,
+        } => (
+            new_severity.as_str(),
+            format!("fixation on {target} deepened: {old_severity} \u{2192} {new_severity}"),
+        ),
+        FixationFired {
+            tribute_id: _,
+            target,
+            severity,
+            action,
+        } => (
+            severity.as_str(),
+            format!("fixation on {target} fired \u{2014} overriding toward {action}"),
+        ),
+        FixationConsummated {
+            tribute_id: _,
+            target,
+        } => ("", format!("fixation on {target} consummated")),
+        FixationThwarted {
+            tribute_id: _,
+            target,
+            reason,
+        } => (
+            "",
+            format!("fixation on {target} thwarted \u{2014} {reason}"),
+        ),
+        FixationFaded {
+            tribute_id: _,
+            target,
+        } => ("", format!("fixation on {target} faded")),
+        _ => return fallback_card(msg),
+    };
+
+    let border_color = match severity {
+        "severe" | "Severe" => "border-red-900/50",
+        "moderate" | "Moderate" => "border-orange-900/50",
+        _ if severity.is_empty() => "border-gray-800",
+        _ => "border-yellow-900/50",
+    };
+    let badge_color = match severity {
+        "severe" | "Severe" => "bg-red-500/20 text-red-300",
+        "moderate" | "Moderate" => "bg-orange-500/20 text-orange-300",
+        _ if severity.is_empty() => "",
+        _ => "bg-yellow-500/20 text-yellow-300",
+    };
+
+    let badge = if !severity.is_empty() {
+        html! {
+            span class=(format!("text-xs px-1.5 py-0.5 rounded {}", badge_color)) { (severity) }
+        }
+    } else {
+        html! {}
+    };
+
+    html! {
+        div class=(format!("bg-gray-900 border rounded-lg p-3 {}", border_color)) {
+            div class="flex items-center gap-2 text-xs text-gray-500 mb-1" {
+                (icon("eye"))
+                span class="text-rose-400 font-medium" { "Fixation" }
+                span { "\u{b7}" }
+                span { "Day " (msg.game_day) " " (msg.phase) }
+            }
+            p class="text-sm text-gray-200 flex items-center gap-2" {
+                (content)
+                (badge)
+            }
+        }
+    }
+}
+
 /// Fallback card for unrecognized payloads.
 pub fn fallback_card(msg: &GameMessage) -> maud::Markup {
     html! {

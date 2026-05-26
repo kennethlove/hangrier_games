@@ -56,7 +56,7 @@ impl MessagePayload {
             | FixationFired { .. }
             | FixationConsummated { .. }
             | FixationThwarted { .. }
-            | FixationFaded { .. } => MessageKind::Phobia,
+            | FixationFaded { .. } => MessageKind::Fixation,
             AfflictionAcquired { .. }
             | AfflictionProgressed { .. }
             | AfflictionHealed { .. }

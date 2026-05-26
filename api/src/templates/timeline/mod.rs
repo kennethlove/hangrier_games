@@ -70,8 +70,8 @@ pub fn timeline_page(ctx: &TimelineContext<'_>) -> maud::Markup {
                         (empty_state("No events for this period."))
                     } @else {
                         div class="space-y-2" {
-                            @for msg in ctx.events {
-                                (event_card(msg))
+                            @for card in render_condensed_events(ctx.events) {
+                                (card)
                             }
                         }
                     }
@@ -289,6 +289,85 @@ fn period_grid(periods: &[PeriodSummary]) -> maud::Markup {
     }
 }
 
+/// Render events with FixationFired condensation: consecutive FixationFired
+/// events for the same target collapse into a single "ongoing fixation" card.
+pub fn render_condensed_events(events: &[GameMessage]) -> Vec<maud::Markup> {
+    use shared::messages::MessagePayload;
+    let mut result: Vec<maud::Markup> = Vec::new();
+    let mut i = 0;
+    while i < events.len() {
+        let msg = &events[i];
+        if matches!(msg.payload, MessagePayload::FixationFired { .. }) {
+            // Count consecutive FixationFired for the same target
+            let target = match &msg.payload {
+                MessagePayload::FixationFired { target, .. } => target.clone(),
+                _ => unreachable!(),
+            };
+            let mut count = 1;
+            while i + count < events.len() {
+                let next = &events[i + count];
+                match &next.payload {
+                    MessagePayload::FixationFired { target: t, .. } if *t == target => {
+                        count += 1;
+                    }
+                    _ => break,
+                }
+            }
+            if count > 1 {
+                result.push(condensed_fixation_card(msg, count));
+            } else {
+                result.push(event_card(msg));
+            }
+            i += count;
+        } else {
+            result.push(event_card(msg));
+            i += 1;
+        }
+    }
+    result
+}
+
+/// Condensed card for repeated FixationFired events on the same target.
+fn condensed_fixation_card(msg: &GameMessage, count: usize) -> maud::Markup {
+    use shared::messages::MessagePayload;
+    let target = match &msg.payload {
+        MessagePayload::FixationFired { target, .. } => target.as_str(),
+        _ => "",
+    };
+    let severity = match &msg.payload {
+        MessagePayload::FixationFired { severity, .. } => severity.as_str(),
+        _ => "",
+    };
+
+    let border_color = match severity {
+        "severe" | "Severe" => "border-red-900/50",
+        "moderate" | "Moderate" => "border-orange-900/50",
+        _ => "border-yellow-900/50",
+    };
+
+    let badge_color = match severity {
+        "severe" | "Severe" => "bg-red-500/20 text-red-300",
+        "moderate" | "Moderate" => "bg-orange-500/20 text-orange-300",
+        _ => "bg-yellow-500/20 text-yellow-300",
+    };
+
+    html! {
+        div class=(format!("bg-gray-900 border rounded-lg p-3 {}", border_color)) {
+            div class="flex items-center gap-2 text-xs text-gray-500 mb-1" {
+                (icon("eye"))
+                span class="text-rose-400 font-medium" { "Fixation" }
+                span { "\u{b7}" }
+                span { "Day " (msg.game_day) " " (msg.phase) }
+            }
+            p class="text-sm text-gray-200 flex items-center gap-2" {
+                "Ongoing fixation on " (target)
+                span class=(format!("text-xs px-1.5 py-0.5 rounded {}", badge_color)) { (severity) }
+                span class="text-xs text-gray-500" { "(\u{d7}" (count) ")" }
+            }
+        }
+    }
+}
+
 /// Empty state placeholder.
 fn empty_state(message: &str) -> maud::Markup {
     html! {
@@ -313,5 +392,6 @@ pub fn event_card(msg: &GameMessage) -> maud::Markup {
         Trauma => cards::trauma_card(msg),
         Affliction => cards::affliction_card(msg),
         Phobia => cards::phobia_card(msg),
+        Fixation => cards::fixation_card(msg),
     }
 }

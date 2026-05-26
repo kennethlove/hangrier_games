@@ -363,6 +363,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             axum::routing::get(game_tributes_handler),
         )
         .route(
+            "/games/{game_id}/tributes/{tribute_id}",
+            axum::routing::get(game_tribute_detail_handler),
+        )
+        .route(
             "/games/new",
             axum::routing::get(create_game_handler).post(create_game_post_handler),
         )

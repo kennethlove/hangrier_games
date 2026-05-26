@@ -414,7 +414,7 @@ pub fn log_page(
         TributeSlept,TributeWoke,GameEnded,\
         AfflictionAcquired,AfflictionProgressed,AfflictionHealed,AfflictionCascaded,\
         TraumaAcquired,TraumaReinforced,TraumaEscalated,TraumaFlashback,TraumaAvoidance,TraumaObserved,TraumaForgotten,TraumaHabituated,\
-        PhobiaAcquired,PhobiaTriggered";
+        PhobiaAcquired,PhobiaTriggered,        FixationAcquired,FixationEscalated,FixationFired,FixationConsummated,FixationThwarted,FixationFaded";
 
     base_layout(
         "Log",
@@ -487,6 +487,7 @@ fn message_kind_label(payload: &shared::messages::MessagePayload) -> &'static st
         MessageKind::Trauma => "Trauma",
         MessageKind::Affliction => "Health",
         MessageKind::Phobia => "Fear",
+        MessageKind::Fixation => "Fixation",
     }
 }
 
@@ -564,6 +565,7 @@ fn kind_color(payload: &shared::messages::MessagePayload) -> &'static str {
         MessageKind::Trauma => "kind-trauma",
         MessageKind::Affliction => "kind-affliction",
         MessageKind::Phobia => "kind-phobia",
+        MessageKind::Fixation => "kind-fixation",
     }
 }
 

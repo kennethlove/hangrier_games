@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 /// Origin of a fixation affliction. Innate fixations are lifelong dispositions;
@@ -19,11 +20,17 @@ impl fmt::Display for FixationOrigin {
     }
 }
 
-/// Metadata attached to Fixation afflictions. Tracks origin.
-/// Only populated for Fixation kinds.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// Metadata attached to Fixation afflictions. Tracks origin, observer state,
+/// and contact timing. Only populated for Fixation kinds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FixationMetadata {
     pub origin: FixationOrigin,
+    /// Tributes who have seen this fixation.
+    pub observed_by: BTreeSet<String>,
+    /// Last cycle each observer saw this fixation.
+    pub observer_seen_cycle: BTreeMap<String, u32>,
+    /// Cycles since the fixated tribute was last in contact with their target.
+    pub cycles_since_last_contact: u32,
 }
 
 /// Reasons a fixation can be thwarted — the target is no longer relevant.

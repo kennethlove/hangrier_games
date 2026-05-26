@@ -144,7 +144,10 @@ fn strongest_fixation_severity(tribute: &Tribute) -> Option<Severity> {
 mod tests {
     use super::*;
     use crate::tributes::Tribute;
+    use rand::SeedableRng;
+    use rand::rngs::SmallRng;
     use shared::afflictions::{Affliction, AfflictionSource, FixationMetadata, FixationOrigin};
+    use std::collections::{BTreeMap, BTreeSet};
 
     fn make_fixation(target: FixationTarget, severity: Severity) -> Affliction {
         Affliction {
@@ -158,12 +161,16 @@ mod tests {
             phobia_metadata: None,
             fixation_metadata: Some(FixationMetadata {
                 origin: FixationOrigin::Innate,
+                observed_by: BTreeSet::new(),
+                observer_seen_cycle: BTreeMap::new(),
+                cycles_since_last_contact: 0,
             }),
         }
     }
 
     fn make_tribute_with_fixation(target: FixationTarget, severity: Severity) -> Tribute {
-        let mut tribute = Tribute::new("Test".to_string(), None, None);
+        let mut rng = SmallRng::seed_from_u64(42);
+        let mut tribute = Tribute::new_with_rng("Test".to_string(), None, None, &mut rng);
         let aff = make_fixation(target, severity);
         tribute.afflictions.insert(aff.key(), aff);
         tribute

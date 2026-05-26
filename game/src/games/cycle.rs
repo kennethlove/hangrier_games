@@ -705,6 +705,100 @@ impl Game {
             drained_alliance_events.append(&mut tribute.drain_alliance_events());
         }
 
+        // ── Fixation processing ──
+        // Run after Phase 2 actions so drained_alliance_events contains
+        // DeathRecorded events (with killer attributions) from this cycle.
+        if self.config.fixations_enabled {
+            let fixation_indices: Vec<usize> = self
+                .tributes
+                .iter()
+                .enumerate()
+                .filter(|(_, t)| {
+                    t.is_alive()
+                        && crate::tributes::afflictions::fixation::count_fixations(&t.afflictions)
+                            > 0
+                })
+                .map(|(i, _)| i)
+                .collect();
+
+            if !fixation_indices.is_empty() {
+                use crate::tributes::afflictions::fixation::{
+                    FixationContext, process_tribute_fixations,
+                };
+                use std::collections::HashMap;
+                use uuid::Uuid;
+
+                // Build identifier → UUID lookup.
+                let id_to_uuid: HashMap<String, Uuid> = self
+                    .tributes
+                    .iter()
+                    .map(|t| (t.identifier.clone(), t.id))
+                    .collect();
+
+                // Build dead-tribute → killer lookup from drained alliance events.
+                let mut dead_tribute_killers: HashMap<Uuid, Option<Uuid>> = HashMap::new();
+                for event in &drained_alliance_events {
+                    if let crate::tributes::alliances::AllianceEvent::DeathRecorded {
+                        deceased,
+                        killer,
+                    } = event
+                    {
+                        dead_tribute_killers.insert(*deceased, *killer);
+                    }
+                }
+
+                // Closed areas (lowercased for matching).
+                let closed_areas: std::collections::BTreeSet<String> = self
+                    .areas
+                    .iter()
+                    .filter(|a| !a.is_open())
+                    .filter_map(|a| a.area.map(|area| area.to_string().to_lowercase()))
+                    .collect();
+
+                // All item IDs still present in the game.
+                let all_item_ids: std::collections::BTreeSet<String> = self
+                    .tributes
+                    .iter()
+                    .flat_map(|t| t.items.iter().map(|i| i.identifier.clone()))
+                    .chain(
+                        self.areas
+                            .iter()
+                            .flat_map(|a| a.items.iter().map(|i| i.identifier.clone())),
+                    )
+                    .collect();
+
+                // Tribute identifier → area name mapping for same-area contact checks.
+                let tribute_areas: HashMap<String, String> = self
+                    .tributes
+                    .iter()
+                    .map(|t| (t.identifier.clone(), t.area.to_string()))
+                    .collect();
+
+                let fix_ctx = FixationContext {
+                    cycle: (current_day.saturating_sub(1)) * 4 + phase.ord() as u32,
+                    dead_tribute_killers: &dead_tribute_killers,
+                    id_to_uuid: &id_to_uuid,
+                    tribute_areas: &tribute_areas,
+                    closed_areas: &closed_areas,
+                    all_item_ids: &all_item_ids,
+                };
+
+                for idx in &fixation_indices {
+                    let msgs = process_tribute_fixations(&mut self.tributes[*idx], &fix_ctx);
+                    for msg in msgs {
+                        let line = fixation_message_line(&msg, &self.tributes[*idx].name);
+                        collected_events.push((
+                            self.tributes[*idx].identifier.clone(),
+                            self.tributes[*idx].name.clone(),
+                            line,
+                            Some(msg),
+                            None,
+                        ));
+                    }
+                }
+            }
+        }
+
         self.flush_tribute_events(collected_events);
 
         // Promote drained alliance events into the game queue and process them

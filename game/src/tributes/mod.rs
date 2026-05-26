@@ -1068,6 +1068,9 @@ impl Tribute {
                 if is_fixation && let Some(aff) = self.afflictions.get_mut(&insert_key) {
                     aff.fixation_metadata = Some(shared::afflictions::FixationMetadata {
                         origin: shared::afflictions::FixationOrigin::Innate,
+                        observed_by: BTreeSet::new(),
+                        observer_seen_cycle: BTreeMap::new(),
+                        cycles_since_last_contact: 0,
                     });
                 }
             }

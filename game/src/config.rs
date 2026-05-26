@@ -23,6 +23,8 @@ pub struct GameConfig {
     pub trauma_enabled: bool,
     /// Enable phobia afflictions (spawn-time acquisition, per-cycle scan)
     pub phobias_enabled: bool,
+    /// Enable fixation afflictions (spawn-time acquisition, per-cycle processing)
+    pub fixations_enabled: bool,
     /// Global multiplier for event severity (1.0 = normal, 2.0 = double damage)
     pub catastrophic_severity_multiplier: f64,
 
@@ -77,6 +79,7 @@ impl Default for GameConfig {
             instant_death_enabled: true,
             trauma_enabled: true,
             phobias_enabled: true,
+            fixations_enabled: true,
             catastrophic_severity_multiplier: 1.0,
 
             // Tribute AI

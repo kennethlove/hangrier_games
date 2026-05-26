@@ -25,15 +25,16 @@ mod tests {
     // ── Helpers ──────────────────────────────────────────────────────────
 
     fn make_affliction(kind: AfflictionKind, severity: Severity) -> Affliction {
+        let bp = Some(match &kind {
+            AfflictionKind::MissingArm => BodyPart::Arm,
+            AfflictionKind::MissingLeg => BodyPart::Leg,
+            AfflictionKind::Blind => BodyPart::Eye,
+            AfflictionKind::Deaf => BodyPart::Ear,
+            _ => BodyPart::Rib,
+        });
         Affliction {
             kind,
-            body_part: Some(match kind {
-                AfflictionKind::MissingArm => BodyPart::Arm,
-                AfflictionKind::MissingLeg => BodyPart::Leg,
-                AfflictionKind::Blind => BodyPart::Eye,
-                AfflictionKind::Deaf => BodyPart::Ear,
-                _ => BodyPart::Rib,
-            }),
+            body_part: bp,
             severity,
             source: AfflictionSource::Combat {
                 attacker_id: String::new(),
@@ -42,6 +43,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         }
     }
 
@@ -64,10 +66,10 @@ mod tests {
 
         for seed in [42u64, 99, 1024] {
             let mut rng = SmallRng::seed_from_u64(seed);
-            let mut attacker = Tribute::new("Attacker".to_string(), None, None);
+            let mut attacker = Tribute::new_with_rng("Attacker".to_string(), None, None, &mut rng);
             attacker.attributes.strength = 30;
             attacker.attributes.health = 100;
-            let mut target = Tribute::new("Target".to_string(), None, None);
+            let mut target = Tribute::new_with_rng("Target".to_string(), None, None, &mut rng);
             target.attributes.defense = 10;
             target.attributes.health = 100;
 
@@ -82,10 +84,11 @@ mod tests {
 
             // Second run with same seed should produce identical afflictions.
             let mut rng2 = SmallRng::seed_from_u64(seed);
-            let mut attacker2 = Tribute::new("Attacker".to_string(), None, None);
+            let mut attacker2 =
+                Tribute::new_with_rng("Attacker".to_string(), None, None, &mut rng2);
             attacker2.attributes.strength = 30;
             attacker2.attributes.health = 100;
-            let mut target2 = Tribute::new("Target".to_string(), None, None);
+            let mut target2 = Tribute::new_with_rng("Target".to_string(), None, None, &mut rng2);
             target2.attributes.defense = 10;
             target2.attributes.health = 100;
 
@@ -160,10 +163,12 @@ mod tests {
     fn seeded_affliction_snapshot_seed_42() {
         let tuning = CombatTuning::default();
         let mut rng = SmallRng::seed_from_u64(42);
-        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut tribute_rng = SmallRng::seed_from_u64(42);
+        let mut attacker =
+            Tribute::new_with_rng("Katniss".to_string(), None, None, &mut tribute_rng);
         attacker.attributes.strength = 30;
         attacker.attributes.health = 100;
-        let mut target = Tribute::new("Clove".to_string(), None, None);
+        let mut target = Tribute::new_with_rng("Clove".to_string(), None, None, &mut tribute_rng);
         target.attributes.defense = 10;
         target.attributes.health = 100;
 
@@ -189,10 +194,12 @@ mod tests {
     fn seeded_affliction_snapshot_seed_7() {
         let tuning = CombatTuning::default();
         let mut rng = SmallRng::seed_from_u64(7);
-        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut tribute_rng = SmallRng::seed_from_u64(7);
+        let mut attacker =
+            Tribute::new_with_rng("Katniss".to_string(), None, None, &mut tribute_rng);
         attacker.attributes.strength = 30;
         attacker.attributes.health = 100;
-        let mut target = Tribute::new("Clove".to_string(), None, None);
+        let mut target = Tribute::new_with_rng("Clove".to_string(), None, None, &mut tribute_rng);
         target.attributes.defense = 10;
         target.attributes.health = 100;
 
@@ -727,6 +734,7 @@ mod tests {
                 last_progressed_cycle: 0,
                 trauma_metadata: None,
                 phobia_metadata: None,
+                fixation_metadata: None,
             };
             afflictions.insert(wound.key(), wound);
 
@@ -803,6 +811,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
 
@@ -853,6 +862,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         let infected = Affliction {
             kind: AfflictionKind::Infected,
@@ -865,6 +875,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
         afflictions.insert(infected.key(), infected);
@@ -943,6 +954,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         let infected = Affliction {
             kind: AfflictionKind::Infected,
@@ -955,6 +967,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
         afflictions.insert(infected.key(), infected);
@@ -1002,6 +1015,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         let infected = Affliction {
             kind: AfflictionKind::Infected,
@@ -1014,6 +1028,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
         afflictions.insert(infected.key(), infected);
@@ -1024,7 +1039,7 @@ mod tests {
         // Both afflictions should have outcomes.
         assert_eq!(result.outcomes.len(), 2);
 
-        let kinds: Vec<_> = result.outcomes.iter().map(|(k, _)| *k).collect();
+        let kinds: Vec<_> = result.outcomes.iter().map(|(k, _)| k.clone()).collect();
         assert!(kinds.contains(&AfflictionKind::Wounded));
         assert!(kinds.contains(&AfflictionKind::Infected));
 
@@ -1085,6 +1100,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
 
@@ -1154,7 +1170,7 @@ mod tests {
                     .into_iter()
                     .filter(|(idx, _)| seen.insert(*idx))
                     .map(|(idx, severity)| Affliction {
-                        kind: kinds[idx],
+                        kind: kinds[idx].clone(),
                         body_part: None,
                         severity,
                         source: AfflictionSource::Combat {
@@ -1164,6 +1180,7 @@ mod tests {
                         last_progressed_cycle: 0,
                         trauma_metadata: None,
                         phobia_metadata: None,
+                        fixation_metadata: None,
                     })
                     .collect()
             },
@@ -1188,7 +1205,7 @@ mod tests {
             let mut initial_severities: BTreeMap<AfflictionKind, Severity> = BTreeMap::new();
             for aff in &afflictions {
                 if !aff.is_permanent() {
-                    initial_severities.insert(aff.kind, aff.severity);
+                    initial_severities.insert(aff.kind.clone(), aff.severity);
                 }
             }
 
@@ -1227,6 +1244,7 @@ mod tests {
                 last_progressed_cycle: 0,
                 trauma_metadata: None,
                     phobia_metadata: None,
+                    fixation_metadata: None,
             };
 
             let mut rng = SmallRng::seed_from_u64(seed);
@@ -1261,7 +1279,7 @@ mod tests {
 
             for kind in permanents {
                 let aff = Affliction {
-                    kind,
+                    kind: kind.clone(),
                     body_part: None,
                     severity: Severity::Severe,
                     source: AfflictionSource::Combat { attacker_id: String::new() },
@@ -1269,6 +1287,7 @@ mod tests {
                     last_progressed_cycle: 0,
                     trauma_metadata: None,
                     phobia_metadata: None,
+                    fixation_metadata: None,
                 };
                 let result = tick_cascade(&[aff], is_sheltered, &tuning, &mut rng);
                 prop_assert!(
@@ -1341,6 +1360,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
 
@@ -1431,6 +1451,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         let infected = Affliction {
             kind: AfflictionKind::Infected,
@@ -1443,6 +1464,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
         afflictions.insert(infected.key(), infected);

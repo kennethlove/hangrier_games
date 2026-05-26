@@ -29,6 +29,7 @@ mod tests {
                 last_progressed_cycle: 0,
                 trauma_metadata: None,
                 phobia_metadata: None,
+                fixation_metadata: None,
             },
         );
         map.insert(
@@ -44,6 +45,7 @@ mod tests {
                 last_progressed_cycle: 0,
                 trauma_metadata: None,
                 phobia_metadata: None,
+                fixation_metadata: None,
             },
         );
         map.insert(
@@ -57,6 +59,7 @@ mod tests {
                 last_progressed_cycle: 0,
                 trauma_metadata: None,
                 phobia_metadata: None,
+                fixation_metadata: None,
             },
         );
 

@@ -9,6 +9,9 @@ use shared::afflictions::{AfflictionKind, AfflictionSource, BodyPart, Severity};
 fn test_full_acquisition_flow() {
     let mut tribute = Tribute::new("Test".to_string(), Some(1), Some("1".to_string()));
 
+    // If a fixation was spawned, account for it in count assertions.
+    let start_count = tribute.afflictions.len();
+
     // Acquire first affliction
     let resolution = tribute.try_acquire_affliction(AfflictionDraft {
         kind: AfflictionKind::Wounded,
@@ -19,7 +22,7 @@ fn test_full_acquisition_flow() {
         },
     });
     assert!(matches!(resolution, AcquireResolution::Insert));
-    assert_eq!(tribute.afflictions.len(), 1);
+    assert_eq!(tribute.afflictions.len(), start_count + 1);
 
     // Upgrade severity
     let resolution = tribute.try_acquire_affliction(AfflictionDraft {
@@ -31,7 +34,7 @@ fn test_full_acquisition_flow() {
         },
     });
     assert!(matches!(resolution, AcquireResolution::Upgrade(_)));
-    assert_eq!(tribute.afflictions.len(), 1); // Still 1, upgraded in place
+    assert_eq!(tribute.afflictions.len(), start_count + 1); // Still same count, upgraded in place
 
     // Acquire second affliction on different body part
     let resolution = tribute.try_acquire_affliction(AfflictionDraft {
@@ -43,7 +46,7 @@ fn test_full_acquisition_flow() {
         },
     });
     assert!(matches!(resolution, AcquireResolution::Insert));
-    assert_eq!(tribute.afflictions.len(), 2);
+    assert_eq!(tribute.afflictions.len(), start_count + 2);
 }
 
 /// Test that afflictions survive a serde round-trip.
@@ -67,7 +70,9 @@ fn test_affliction_serde_round_trip() {
         source: AfflictionSource::Environmental,
     });
 
-    assert_eq!(tribute.afflictions.len(), 2);
+    // Tribute may spawn with an innate fixation (~5% chance), so total
+    // affliction count is >= the 2 we added via try_acquire_affliction.
+    assert!(tribute.afflictions.len() >= 2);
 
     // Serialize affliction values as Vec (tuple keys can't be JSON map keys)
     let afflictions_vec: Vec<_> = tribute.afflictions.values().cloned().collect();
@@ -77,7 +82,7 @@ fn test_affliction_serde_round_trip() {
     let restored: Vec<shared::afflictions::Affliction> = serde_json::from_str(&json).unwrap();
 
     // Verify afflictions survived round-trip
-    assert_eq!(restored.len(), 2);
+    assert!(restored.len() >= 2);
     assert!(
         restored
             .iter()

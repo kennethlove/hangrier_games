@@ -56,7 +56,42 @@ impl FromStr for PhobiaTrigger {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
+/// Target of a fixation affliction. A tribute becomes fixated on a specific
+/// entity: another tribute, an item, or an area.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
+pub enum FixationTarget {
+    Tribute(String),
+    Item(String),
+    Area(String),
+}
+
+impl fmt::Display for FixationTarget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FixationTarget::Tribute(id) => write!(f, "tribute:{id}"),
+            FixationTarget::Item(id) => write!(f, "item:{id}"),
+            FixationTarget::Area(name) => write!(f, "area:{name}"),
+        }
+    }
+}
+
+impl FromStr for FixationTarget {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some(id) = s.strip_prefix("tribute:") {
+            Ok(FixationTarget::Tribute(id.to_string()))
+        } else if let Some(id) = s.strip_prefix("item:") {
+            Ok(FixationTarget::Item(id.to_string()))
+        } else if let Some(name) = s.strip_prefix("area:") {
+            Ok(FixationTarget::Area(name.to_string()))
+        } else {
+            Err(format!("unknown FixationTarget: {s}"))
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AfflictionKind {
     Wounded,
@@ -78,6 +113,7 @@ pub enum AfflictionKind {
     Buried,
     Trauma,
     Phobia(PhobiaTrigger),
+    Fixation(FixationTarget),
 }
 
 impl fmt::Display for AfflictionKind {
@@ -102,6 +138,7 @@ impl fmt::Display for AfflictionKind {
             AfflictionKind::Buried => write!(f, "buried"),
             AfflictionKind::Trauma => write!(f, "trauma"),
             AfflictionKind::Phobia(trigger) => write!(f, "phobia:{trigger}"),
+            AfflictionKind::Fixation(target) => write!(f, "fixation:{target}"),
         }
     }
 }
@@ -133,6 +170,11 @@ impl FromStr for AfflictionKind {
                 let trigger_str = rest.strip_prefix("phobia:").unwrap();
                 let trigger = PhobiaTrigger::from_str(trigger_str)?;
                 Ok(AfflictionKind::Phobia(trigger))
+            }
+            rest if rest.starts_with("fixation:") => {
+                let target_str = rest.strip_prefix("fixation:").unwrap();
+                let target = FixationTarget::from_str(target_str)?;
+                Ok(AfflictionKind::Fixation(target))
             }
             other => Err(format!("unknown AfflictionKind: {other}")),
         }
@@ -236,5 +278,76 @@ mod tests {
     #[test]
     fn affliction_kind_phobia_from_str_invalid() {
         assert!(AfflictionKind::from_str("phobia:unknown").is_err());
+    }
+
+    #[test]
+    fn fixation_target_display_roundtrip_tribute() {
+        let target = FixationTarget::Tribute("uuid-123".to_string());
+        let s = target.to_string();
+        assert_eq!(s, "tribute:uuid-123");
+        let parsed: FixationTarget = s.parse().unwrap();
+        assert_eq!(target, parsed);
+    }
+
+    #[test]
+    fn fixation_target_display_roundtrip_item() {
+        let target = FixationTarget::Item("item-456".to_string());
+        let s = target.to_string();
+        assert_eq!(s, "item:item-456");
+        let parsed: FixationTarget = s.parse().unwrap();
+        assert_eq!(target, parsed);
+    }
+
+    #[test]
+    fn fixation_target_display_roundtrip_area() {
+        let target = FixationTarget::Area("cornucopia".to_string());
+        let s = target.to_string();
+        assert_eq!(s, "area:cornucopia");
+        let parsed: FixationTarget = s.parse().unwrap();
+        assert_eq!(target, parsed);
+    }
+
+    #[test]
+    fn fixation_target_from_str_invalid() {
+        assert!(FixationTarget::from_str("unknown:foo").is_err());
+        assert!(FixationTarget::from_str("tribute").is_err());
+    }
+
+    #[test]
+    fn affliction_kind_fixation_display() {
+        let kind = AfflictionKind::Fixation(FixationTarget::Tribute("u-1".to_string()));
+        assert_eq!(kind.to_string(), "fixation:tribute:u-1");
+
+        let kind = AfflictionKind::Fixation(FixationTarget::Item("i-1".to_string()));
+        assert_eq!(kind.to_string(), "fixation:item:i-1");
+
+        let kind = AfflictionKind::Fixation(FixationTarget::Area("sector1".to_string()));
+        assert_eq!(kind.to_string(), "fixation:area:sector1");
+    }
+
+    #[test]
+    fn affliction_kind_fixation_from_str() {
+        let kind: AfflictionKind = "fixation:tribute:u-1".parse().unwrap();
+        assert_eq!(
+            kind,
+            AfflictionKind::Fixation(FixationTarget::Tribute("u-1".to_string()))
+        );
+
+        let kind: AfflictionKind = "fixation:item:i-1".parse().unwrap();
+        assert_eq!(
+            kind,
+            AfflictionKind::Fixation(FixationTarget::Item("i-1".to_string()))
+        );
+
+        let kind: AfflictionKind = "fixation:area:sector1".parse().unwrap();
+        assert_eq!(
+            kind,
+            AfflictionKind::Fixation(FixationTarget::Area("sector1".to_string()))
+        );
+    }
+
+    #[test]
+    fn affliction_kind_fixation_from_str_invalid() {
+        assert!(AfflictionKind::from_str("fixation:unknown:foo").is_err());
     }
 }

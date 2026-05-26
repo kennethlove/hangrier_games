@@ -64,6 +64,7 @@ mod tests {
                 observer_seen_cycle: BTreeMap::new(),
             }),
             phobia_metadata: None,
+            fixation_metadata: None,
         }
     }
 

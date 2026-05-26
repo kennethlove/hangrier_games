@@ -2,7 +2,7 @@
 //!
 //! See spec §4 (full table) and §17 (testing strategy).
 
-use shared::afflictions::{Affliction, AfflictionKey, AfflictionKind, BodyPart};
+use shared::afflictions::{Affliction, AfflictionKey, AfflictionKind, BodyPart, FixationTarget};
 use std::collections::BTreeMap;
 
 /// Outcome of attempting to acquire an affliction given the current tribute state.
@@ -28,6 +28,10 @@ pub enum RejectReason {
     InfectedRequiresWoundedAncestor,
     /// New severity is not strictly greater than existing same-key severity.
     NotStrictlyHigherSeverity,
+    /// Tribute already has max fixations (2).
+    FixationCapReached,
+    /// Same FixationTarget variant already exists (max 1 per target kind).
+    FixationVariantDuplicate,
 }
 
 /// Decide what happens when `new` is offered to a tribute who already carries
@@ -37,6 +41,36 @@ pub fn can_acquire(
     new: &Affliction,
 ) -> AcquireResolution {
     let new_key = new.key();
+
+    // Rule: Fixation caps — max 2 total, max 1 per target kind.
+    if matches!(new.kind, AfflictionKind::Fixation(_)) {
+        let fixation_count = existing
+            .values()
+            .filter(|a| matches!(a.kind, AfflictionKind::Fixation(_)))
+            .count();
+        if fixation_count >= 2 {
+            return AcquireResolution::Reject(RejectReason::FixationCapReached);
+        }
+
+        let same_variant = existing.values().any(|a| {
+            matches!(
+                (&a.kind, &new.kind),
+                (
+                    AfflictionKind::Fixation(FixationTarget::Tribute(_)),
+                    AfflictionKind::Fixation(FixationTarget::Tribute(_))
+                ) | (
+                    AfflictionKind::Fixation(FixationTarget::Item(_)),
+                    AfflictionKind::Fixation(FixationTarget::Item(_))
+                ) | (
+                    AfflictionKind::Fixation(FixationTarget::Area(_)),
+                    AfflictionKind::Fixation(FixationTarget::Area(_))
+                )
+            )
+        });
+        if same_variant {
+            return AcquireResolution::Reject(RejectReason::FixationVariantDuplicate);
+        }
+    }
 
     // Rule: MissingArm/MissingLeg on a part supersedes ALL wound-state slots
     // on that part and rejects subsequent same-part Broken/Wounded/Infected.
@@ -53,12 +87,12 @@ pub fn can_acquire(
         }
 
         // 2. Reject if trying to re-miss an already-missing limb.
-        if is_missing_kind(new.kind) && existing.contains_key(&(new.kind, Some(part))) {
+        if is_missing_kind(&new.kind) && existing.contains_key(&(new.kind.clone(), Some(part))) {
             return AcquireResolution::Reject(RejectReason::LimbAlreadyMissing);
         }
 
         // 3. MissingArm/MissingLeg supersedes wound-state on the same part.
-        if is_missing_kind(new.kind) {
+        if is_missing_kind(&new.kind) {
             let supersede: Vec<AfflictionKey> = existing
                 .keys()
                 .filter(|(k, p)| {
@@ -70,7 +104,7 @@ pub fn can_acquire(
                                 | AfflictionKind::Infected
                         )
                 })
-                .copied()
+                .cloned()
                 .collect();
             if !supersede.is_empty() {
                 return AcquireResolution::Supersede(supersede);
@@ -113,7 +147,7 @@ fn is_limb_missing(existing: &BTreeMap<AfflictionKey, Affliction>, part: BodyPar
 }
 
 /// Check if an affliction kind represents a missing limb.
-fn is_missing_kind(kind: AfflictionKind) -> bool {
+fn is_missing_kind(kind: &AfflictionKind) -> bool {
     matches!(
         kind,
         AfflictionKind::MissingArm | AfflictionKind::MissingLeg

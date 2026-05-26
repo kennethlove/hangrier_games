@@ -164,7 +164,7 @@ impl Tribute {
     /// Replaces the legacy TributeStatus-based damage loop.
     fn apply_affliction_cycle_effects(&mut self, rng: &mut impl Rng) {
         // Collect affliction kinds first to avoid borrow conflicts
-        let kinds: Vec<AfflictionKind> = self.afflictions.keys().map(|(k, _)| *k).collect();
+        let kinds: Vec<AfflictionKind> = self.afflictions.keys().map(|(k, _)| k.clone()).collect();
 
         for kind in &kinds {
             match kind {
@@ -221,7 +221,8 @@ impl Tribute {
                 | AfflictionKind::Blind
                 | AfflictionKind::Deaf
                 | AfflictionKind::Trauma
-                | AfflictionKind::Phobia(_) => {}
+                | AfflictionKind::Phobia(_)
+                | AfflictionKind::Fixation(_) => {}
             }
         }
 

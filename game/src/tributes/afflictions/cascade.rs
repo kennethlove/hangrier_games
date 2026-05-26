@@ -55,7 +55,7 @@ pub fn tick_cascade(
     for aff in afflictions {
         // Permanent afflictions do not cascade or recover.
         if aff.is_permanent() {
-            outcomes.push((aff.kind, CascadeOutcome::NoChange));
+            outcomes.push((aff.kind.clone(), CascadeOutcome::NoChange));
             continue;
         }
 
@@ -65,7 +65,7 @@ pub fn tick_cascade(
             roll_exposed(aff, tuning, rng, &mut tribute_died)
         };
 
-        outcomes.push((aff.kind, outcome));
+        outcomes.push((aff.kind.clone(), outcome));
     }
 
     CascadeResult {
@@ -167,7 +167,7 @@ pub fn apply_cascade(
     let mut successors: Vec<Affliction> = Vec::new();
 
     for (kind, outcome) in &result.outcomes {
-        let key = (*kind, None);
+        let key = (kind.clone(), None);
         match outcome {
             CascadeOutcome::SteppedDown { from, to } => {
                 // Mild stepped down means removal.
@@ -184,7 +184,7 @@ pub fn apply_cascade(
             }
             CascadeOutcome::SpawnedSuccessor { to, .. } => {
                 let new_aff = Affliction {
-                    kind: *to,
+                    kind: to.clone(),
                     body_part: None,
                     severity: Severity::Moderate,
                     source: AfflictionSource::Cascade { from: key },
@@ -192,6 +192,7 @@ pub fn apply_cascade(
                     last_progressed_cycle: 0,
                     trauma_metadata: None,
                     phobia_metadata: None,
+                    fixation_metadata: None,
                 };
                 successors.push(new_aff);
             }
@@ -220,6 +221,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         }
     }
 

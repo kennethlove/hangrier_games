@@ -240,7 +240,7 @@ impl Tribute {
         let traits = traits::generate_traits(district as u8, &mut rng);
         let brain = Brain::from_traits(&traits, &mut rng);
 
-        Self {
+        let tribute = Self {
             identifier: id,
             id: id_uuid,
             area: Area::Cornucopia,
@@ -273,7 +273,11 @@ impl Tribute {
             sleeping: false,
             sleep_remaining: 0,
             afflictions: BTreeMap::new(),
-        }
+        };
+
+        // ~5% chance to spawn with an innate fixation.
+
+        tribute
     }
 
     pub fn random() -> Self {
@@ -982,7 +986,7 @@ impl Tribute {
     /// Returns the resolution (Insert, Upgrade, Supersede, or Reject).
     pub fn try_acquire_affliction(&mut self, draft: AfflictionDraft) -> AcquireResolution {
         let provisional = Affliction {
-            kind: draft.kind,
+            kind: draft.kind.clone(),
             body_part: draft.body_part,
             severity: draft.severity,
             source: draft.source.clone(),
@@ -990,6 +994,7 @@ impl Tribute {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         };
         let resolution = can_acquire(&self.afflictions, &provisional);
 
@@ -1020,6 +1025,7 @@ impl Tribute {
                     self.afflictions.remove(&wounded_key);
                 }
 
+                let insert_key = (draft.kind.clone(), draft.body_part);
                 let affliction = Affliction {
                     kind: draft.kind,
                     body_part: draft.body_part,
@@ -1029,9 +1035,18 @@ impl Tribute {
                     last_progressed_cycle: 0,
                     trauma_metadata: None,
                     phobia_metadata: None,
+                    fixation_metadata: None,
                 };
-                self.afflictions
-                    .insert((draft.kind, draft.body_part), affliction);
+                let is_fixation = matches!(affliction.kind, AfflictionKind::Fixation(_));
+                self.afflictions.insert(insert_key.clone(), affliction);
+
+                // Set default fixation metadata for Fixation kinds inserted
+                // through this pathway (used by generic affliction acquisition).
+                if is_fixation && let Some(aff) = self.afflictions.get_mut(&insert_key) {
+                    aff.fixation_metadata = Some(shared::afflictions::FixationMetadata {
+                        origin: shared::afflictions::FixationOrigin::Innate,
+                    });
+                }
             }
             AcquireResolution::Reject(_) => {}
         }
@@ -1086,6 +1101,7 @@ impl Tribute {
                     observer_seen_cycle: BTreeMap::new(),
                 }),
                 phobia_metadata: None,
+                fixation_metadata: None,
             };
             self.afflictions.insert(key, aff);
             TraumaAcquisition::Acquired { severity, source }

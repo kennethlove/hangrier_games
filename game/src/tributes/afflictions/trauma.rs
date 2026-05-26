@@ -70,7 +70,7 @@ pub fn process_traumas(
         .afflictions
         .iter()
         .filter(|(_, a)| matches!(a.kind, AfflictionKind::Trauma))
-        .map(|(key, _)| *key)
+        .map(|(key, _)| key.clone())
         .collect();
 
     for key in &trauma_keys {

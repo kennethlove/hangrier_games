@@ -66,7 +66,8 @@ fn base_penalties(kind: AfflictionKind) -> (i32, i32, i32, i32, i32, f64, i32, i
         | AfflictionKind::Electrocuted
         | AfflictionKind::Drowned
         | AfflictionKind::Buried
-        | AfflictionKind::Phobia(_) => (0, 0, 0, 0, 0, 0.0, 0, 0),
+        | AfflictionKind::Phobia(_)
+        | AfflictionKind::Fixation(_) => (0, 0, 0, 0, 0, 0.0, 0, 0),
     }
 }
 
@@ -82,7 +83,7 @@ pub fn compute_stat_modifiers(afflictions: &[Affliction]) -> StatModifiers {
     for aff in afflictions {
         let m = severity_multiplier(aff.severity);
         let (atk, def, forage, escape, ambush_detect, stamina_move, stamina_max, hp) =
-            base_penalties(aff.kind);
+            base_penalties(aff.kind.clone());
 
         mods.atk += (atk as f64 * m).round() as i32;
         mods.def += (def as f64 * m).round() as i32;
@@ -126,6 +127,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         }
     }
 
@@ -141,6 +143,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         }
     }
 

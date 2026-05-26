@@ -80,7 +80,8 @@ fn base_bias(kind: AfflictionKind) -> (f64, f64, f64, f64, f64) {
         | AfflictionKind::Electrocuted
         | AfflictionKind::Drowned
         | AfflictionKind::Buried
-        | AfflictionKind::Phobia(_) => (1.0, 1.0, 1.0, 1.0, 1.0),
+        | AfflictionKind::Phobia(_)
+        | AfflictionKind::Fixation(_) => (1.0, 1.0, 1.0, 1.0, 1.0),
     }
 }
 
@@ -93,7 +94,7 @@ pub fn compute_brain_bias(afflictions: &[Affliction]) -> BrainBias {
 
     for aff in afflictions {
         let m = severity_multiplier(aff.severity);
-        let (ca, sp, iso, ws, rp) = base_bias(aff.kind);
+        let (ca, sp, iso, ws, rp) = base_bias(aff.kind.clone());
 
         bias.combat_avoid *= 1.0 + (ca - 1.0) * m;
         bias.shelter_preference *= 1.0 + (sp - 1.0) * m;
@@ -129,6 +130,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         }
     }
 
@@ -144,6 +146,7 @@ mod tests {
             last_progressed_cycle: 0,
             trauma_metadata: None,
             phobia_metadata: None,
+            fixation_metadata: None,
         }
     }
 

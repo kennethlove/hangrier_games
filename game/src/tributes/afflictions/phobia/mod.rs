@@ -12,6 +12,7 @@
 //!
 //! See `docs/superpowers/specs/2026-05-03-phobias-design.md`.
 
+pub mod outcomes;
 pub mod reaction;
 pub mod scan;
 pub mod spawn;

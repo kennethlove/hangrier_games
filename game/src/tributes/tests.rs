@@ -59,7 +59,8 @@ fn serde_defaults_for_missing_alliance_fields() {
     // Persisted tribute records written before the alliance fields existed
     // must still deserialize. Simulate this by serialising a fresh tribute,
     // stripping the new fields, then round-tripping.
-    let baseline = Tribute::new("Legacy".to_string(), None, None);
+    let mut rng = SmallRng::seed_from_u64(42);
+    let baseline = Tribute::new_with_rng("Legacy".to_string(), None, None, &mut rng);
     let mut value: serde_json::Value = serde_json::to_value(&baseline).expect("to_value");
     let obj = value.as_object_mut().expect("object");
     obj.remove("allies");
@@ -78,7 +79,8 @@ fn serde_defaults_for_missing_alliance_fields() {
 fn brain_roundtrips_psychotic_break_state() {
     use crate::tributes::brains::PsychoticBreakType;
 
-    let mut tribute = Tribute::new("Cato".to_string(), None, None);
+    let mut rng = SmallRng::seed_from_u64(42);
+    let mut tribute = Tribute::new_with_rng("Cato".to_string(), None, None, &mut rng);
     tribute.brain.psychotic_break = Some(PsychoticBreakType::Berserk);
 
     let json = serde_json::to_string(&tribute).expect("serialize");
@@ -137,7 +139,8 @@ fn brain_missing_field_defaults() {
     // Pre-fix tribute rows persisted before #[serde(default)] was added
     // omit the `brain` column entirely. They must still deserialize, with
     // brain hydrated via `Brain::default()`.
-    let baseline = Tribute::new("Legacy".to_string(), None, None);
+    let mut rng = SmallRng::seed_from_u64(42);
+    let baseline = Tribute::new_with_rng("Legacy".to_string(), None, None, &mut rng);
     let mut value: serde_json::Value = serde_json::to_value(&baseline).expect("to_value");
     value.as_object_mut().expect("object").remove("brain");
 
@@ -523,7 +526,8 @@ fn test_afflictions_skip_serialization_when_empty() {
 
 #[test]
 fn test_try_acquire_insert() {
-    let mut t = Tribute::new("Test".to_string(), None, None);
+    let mut rng = SmallRng::seed_from_u64(42);
+    let mut t = Tribute::new_with_rng("Test".to_string(), None, None, &mut rng);
     let draft = AfflictionDraft {
         kind: AfflictionKind::Wounded,
         body_part: Some(BodyPart::Arm),
@@ -543,7 +547,8 @@ fn test_try_acquire_insert() {
 
 #[test]
 fn test_try_acquire_upgrade() {
-    let mut t = Tribute::new("Test".to_string(), None, None);
+    let mut rng = SmallRng::seed_from_u64(42);
+    let mut t = Tribute::new_with_rng("Test".to_string(), None, None, &mut rng);
     // Insert mild wound
     t.try_acquire_affliction(AfflictionDraft {
         kind: AfflictionKind::Wounded,

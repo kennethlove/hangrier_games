@@ -208,9 +208,15 @@ pub struct Tribute {
     /// `WakeReason::Rested`.
     #[serde(default)]
     pub sleep_remaining: u8,
-    /// Active afflictions keyed by (kind, body_part). Empty by default;
-    /// serde skips serialization when empty to keep payloads lean.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    /// Active afflictions keyed by (kind, body_part). Empty by default.
+    /// Serialized as a Vec<Affliction> because the tuple key type can't be a
+    /// JSON map key. Reconstructed via key() on deserialization.
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        serialize_with = "crate::tributes::helpers::serialize_affliction_map",
+        deserialize_with = "crate::tributes::helpers::deserialize_affliction_map"
+    )]
     pub afflictions: BTreeMap<AfflictionKey, Affliction>,
 }
 
@@ -222,7 +228,25 @@ impl Default for Tribute {
 
 impl Tribute {
     /// Creates a new Tribute with full health, sanity, and movement.
+    /// Seeded from system entropy. For deterministic construction in tests,
+    /// use [`new_with_rng()`].
     pub fn new(name: String, district: Option<u32>, avatar: Option<String>) -> Self {
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+        let mut tribute = Self::new_with_rng(name, district, avatar, &mut rng);
+        crate::tributes::afflictions::fixation::roll_spawn_fixations(&mut tribute, &mut rng);
+        tribute
+    }
+
+    /// Construct a tribute using a caller-provided RNG for deterministic
+    /// results (useful in tests, game-seeded worlds, etc.).
+    /// Does NOT roll for spawn-time fixations — call
+    /// [`roll_spawn_fixations`] separately if needed.
+    pub(crate) fn new_with_rng(
+        name: String,
+        district: Option<u32>,
+        avatar: Option<String>,
+        rng: &mut SmallRng,
+    ) -> Self {
         let district = district.unwrap_or(0);
         let attributes = Attributes::new();
         let statistics = Statistics::default();
@@ -231,14 +255,13 @@ impl Tribute {
         let id: String = id_uuid.to_string();
 
         // Assign terrain affinity, traits, and personality based on district
-        let mut rng = SmallRng::from_rng(&mut rand::rng());
         let terrain_affinity = if (1..=12).contains(&district) {
-            crate::districts::assign_terrain_affinity(district as u8, &mut rng)
+            crate::districts::assign_terrain_affinity(district as u8, rng)
         } else {
             vec![]
         };
-        let traits = traits::generate_traits(district as u8, &mut rng);
-        let brain = Brain::from_traits(&traits, &mut rng);
+        let traits = traits::generate_traits(district as u8, rng);
+        let brain = Brain::from_traits(&traits, rng);
 
         let tribute = Self {
             identifier: id,

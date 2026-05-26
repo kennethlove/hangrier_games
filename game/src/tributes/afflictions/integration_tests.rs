@@ -66,10 +66,10 @@ mod tests {
 
         for seed in [42u64, 99, 1024] {
             let mut rng = SmallRng::seed_from_u64(seed);
-            let mut attacker = Tribute::new("Attacker".to_string(), None, None);
+            let mut attacker = Tribute::new_with_rng("Attacker".to_string(), None, None, &mut rng);
             attacker.attributes.strength = 30;
             attacker.attributes.health = 100;
-            let mut target = Tribute::new("Target".to_string(), None, None);
+            let mut target = Tribute::new_with_rng("Target".to_string(), None, None, &mut rng);
             target.attributes.defense = 10;
             target.attributes.health = 100;
 
@@ -84,10 +84,11 @@ mod tests {
 
             // Second run with same seed should produce identical afflictions.
             let mut rng2 = SmallRng::seed_from_u64(seed);
-            let mut attacker2 = Tribute::new("Attacker".to_string(), None, None);
+            let mut attacker2 =
+                Tribute::new_with_rng("Attacker".to_string(), None, None, &mut rng2);
             attacker2.attributes.strength = 30;
             attacker2.attributes.health = 100;
-            let mut target2 = Tribute::new("Target".to_string(), None, None);
+            let mut target2 = Tribute::new_with_rng("Target".to_string(), None, None, &mut rng2);
             target2.attributes.defense = 10;
             target2.attributes.health = 100;
 
@@ -162,10 +163,12 @@ mod tests {
     fn seeded_affliction_snapshot_seed_42() {
         let tuning = CombatTuning::default();
         let mut rng = SmallRng::seed_from_u64(42);
-        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut tribute_rng = SmallRng::seed_from_u64(42);
+        let mut attacker =
+            Tribute::new_with_rng("Katniss".to_string(), None, None, &mut tribute_rng);
         attacker.attributes.strength = 30;
         attacker.attributes.health = 100;
-        let mut target = Tribute::new("Clove".to_string(), None, None);
+        let mut target = Tribute::new_with_rng("Clove".to_string(), None, None, &mut tribute_rng);
         target.attributes.defense = 10;
         target.attributes.health = 100;
 
@@ -191,10 +194,12 @@ mod tests {
     fn seeded_affliction_snapshot_seed_7() {
         let tuning = CombatTuning::default();
         let mut rng = SmallRng::seed_from_u64(7);
-        let mut attacker = Tribute::new("Katniss".to_string(), None, None);
+        let mut tribute_rng = SmallRng::seed_from_u64(7);
+        let mut attacker =
+            Tribute::new_with_rng("Katniss".to_string(), None, None, &mut tribute_rng);
         attacker.attributes.strength = 30;
         attacker.attributes.health = 100;
-        let mut target = Tribute::new("Clove".to_string(), None, None);
+        let mut target = Tribute::new_with_rng("Clove".to_string(), None, None, &mut tribute_rng);
         target.attributes.defense = 10;
         target.attributes.health = 100;
 

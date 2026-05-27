@@ -39,7 +39,8 @@ use rand::prelude::*;
 use rand::rngs::SmallRng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeSeq};
 use shared::afflictions::{
-    Affliction, AfflictionKey, AfflictionKind, AfflictionSource, BodyPart, Severity,
+    Affliction, AfflictionKey, AfflictionKind, AfflictionSource, BodyPart, PhobiaTrigger, Severity,
+    TraumaSource,
 };
 use statuses::TributeStatus;
 use uuid::Uuid;
@@ -345,6 +346,66 @@ impl Tribute {
         }
     }
 
+    #[allow(dead_code)]
+    pub(crate) fn new_with_rng(
+        name: String,
+        district: Option<u32>,
+        avatar: Option<String>,
+        rng: &mut SmallRng,
+    ) -> Self {
+        let district = district.unwrap_or(0);
+        let attributes = Attributes::new();
+        let statistics = Statistics::default();
+
+        let id_uuid: Uuid = Uuid::new_v4();
+        let id: String = id_uuid.to_string();
+
+        // Assign terrain affinity, traits, and personality based on district
+        let terrain_affinity = if (1..=12).contains(&district) {
+            crate::districts::assign_terrain_affinity(district as u8, rng)
+        } else {
+            vec![]
+        };
+        let traits = traits::generate_traits(district as u8, rng);
+        let brain = Brain::from_traits(&traits, rng);
+
+        Self {
+            identifier: id,
+            id: id_uuid,
+            area: Area::Cornucopia,
+            name,
+            district,
+            brain,
+            status: TributeStatus::default(),
+            avatar,
+            human_player_name: None,
+            attributes,
+            statistics,
+            items: vec![],
+            events: vec![],
+            editable: true,
+            terrain_affinity,
+            stamina: 100,
+            max_stamina: 100,
+            traits,
+            allies: Vec::new(),
+            turns_since_last_betrayal: 0,
+            pending_trust_shock: false,
+            alliance_events: Vec::new(),
+            recently_killed_by: None,
+            hunger: 0,
+            thirst: 0,
+            sheltered_until: None,
+            starvation_drain_step: 0,
+            dehydration_drain_step: 0,
+            cycles_awake: 0,
+            sleeping: false,
+            sleep_remaining: 0,
+            afflictions: BTreeMap::new(),
+            game_day: None,
+        }
+    }
+
     pub fn random() -> Self {
         let name = Name(EN).fake();
         let mut rng = SmallRng::from_rng(&mut rand::rng());
@@ -523,6 +584,7 @@ impl Tribute {
             Action::Sleep { duration_phases } => {
                 self.act_sleep(duration_phases, environment_details.phase, events);
             }
+            Action::Frozen | Action::Flashback { .. } | Action::Avoidance => {}
         }
     }
 
@@ -795,6 +857,58 @@ impl Tribute {
             .filter(|t| t.allies.len() < MAX_ALLIES)
             .filter(|t| passes_gate(&self.traits, &t.traits))
             .collect();
+
+        // Phobia veto (qqqx PR3 spec §12):
+        // Hard veto: cannot propose alliance if you have Phobia(Tribute).
+        if self
+            .afflictions
+            .values()
+            .any(|aff| matches!(aff.kind, AfflictionKind::Phobia(PhobiaTrigger::Tribute)))
+        {
+            return;
+        }
+
+        // Soft penalty: Phobia(TraitGroup) reduces formation chance.
+        let phobia_penalty: f64 = self
+            .afflictions
+            .values()
+            .filter_map(|aff| {
+                if matches!(aff.kind, AfflictionKind::Phobia(PhobiaTrigger::TraitGroup)) {
+                    Some(aff.severity.ordinal() as f64 * 0.15)
+                } else {
+                    None
+                }
+            })
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap_or(0.0);
+
+        // Trauma penalty (5477 PR3 spec §12):
+        // Soft penalty: each trauma reduces formation chance by -0.15 per severity tier.
+        let trauma_penalty: f64 = self
+            .afflictions
+            .values()
+            .filter(|aff| matches!(aff.kind, AfflictionKind::Trauma))
+            .map(|aff| aff.severity.ordinal() as f64 * 0.15)
+            .sum::<f64>()
+            .min(1.0); // Cap at 1.0 so chance can't go below 0
+
+        // Hard veto: Severe trauma with Betrayal source hard-blocks alliance.
+        let has_betrayal_veto = self.afflictions.values().any(|aff| {
+            if !matches!(aff.kind, AfflictionKind::Trauma) {
+                return false;
+            }
+            if aff.severity < Severity::Severe {
+                return false;
+            }
+            matches!(
+                aff.trauma_metadata,
+                Some(ref m) if m.sources.iter().any(|s| matches!(s, TraumaSource::Betrayal { .. }))
+            )
+        });
+        if has_betrayal_veto {
+            return;
+        }
+
         if candidates.is_empty() {
             return;
         }
@@ -816,6 +930,21 @@ impl Tribute {
             },
         ));
 
+        // Sympathetic bond (5477 PR3 spec §12):
+        // If target has observed a flashback, +0.10 bonus offsetting trauma penalty.
+        let trauma_observer_bonus: f64 = if self.afflictions.values().any(|aff| {
+            if !matches!(aff.kind, AfflictionKind::Trauma) {
+                return false;
+            }
+            aff.trauma_metadata
+                .as_ref()
+                .is_some_and(|m| m.observed_by.contains(&target.identifier))
+        }) {
+            0.10
+        } else {
+            0.0
+        };
+
         let same_district = self.district == target.district;
         let formed = try_form_alliance(
             &self.traits,
@@ -823,6 +952,8 @@ impl Tribute {
             same_district,
             self.allies.len(),
             target.allies.len(),
+            phobia_penalty,
+            trauma_penalty - trauma_observer_bonus,
             rng,
         );
         if formed {
@@ -975,7 +1106,7 @@ impl Tribute {
     pub fn try_acquire_affliction(&mut self, draft: AfflictionDraft) -> AcquireResolution {
         let cycle = self.game_day.unwrap_or(0) as u32;
         let provisional = Affliction {
-            kind: draft.kind,
+            kind: draft.kind.clone(),
             body_part: draft.body_part,
             severity: draft.severity,
             source: draft.source.clone(),
@@ -1015,7 +1146,7 @@ impl Tribute {
                 }
 
                 let affliction = Affliction {
-                    kind: draft.kind,
+                    kind: draft.kind.clone(),
                     body_part: draft.body_part,
                     severity: draft.severity,
                     source: draft.source,
@@ -1026,7 +1157,7 @@ impl Tribute {
                     fixation_metadata: None,
                 };
                 self.afflictions
-                    .insert((draft.kind, draft.body_part), affliction);
+                    .insert((draft.kind.clone(), draft.body_part), affliction);
             }
             AcquireResolution::Reject(_) => {}
         }
@@ -1100,6 +1231,7 @@ pub fn calculate_stamina_cost(
         Action::Eat(_) | Action::DrinkItem(_) => 0.0,
         // Sleep is free at the action layer; phase scheduler handles it.
         Action::Sleep { .. } => 0.0,
+        Action::Frozen | Action::Flashback { .. } | Action::Avoidance => 0.0,
     };
 
     // If base cost is 0, no need to calculate multipliers
@@ -1166,6 +1298,8 @@ pub struct Attributes {
     pub persuasion: u32,
     /// Are they likely to get gifts or come out slightly ahead?
     pub luck: u32,
+    /// How quickly they react in a turn.
+    pub agility: u32,
     /// Can other tributes see them?
     pub is_hidden: bool,
 }
@@ -1183,6 +1317,7 @@ impl Default for Attributes {
             intelligence: 100,
             persuasion: 100,
             luck: 100,
+            agility: 50,
             is_hidden: false,
         }
     }
@@ -1204,6 +1339,7 @@ impl Attributes {
             intelligence: rng.random_range(1..=config.max_intelligence),
             persuasion: rng.random_range(1..=config.max_persuasion),
             luck: rng.random_range(1..=config.max_luck),
+            agility: rng.random_range(1..=config.max_agility),
             is_hidden: false,
         }
     }

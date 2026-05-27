@@ -83,7 +83,7 @@ pub fn process_traumas(
                 .sources
                 .iter()
                 .next()
-                .map(|s| format_trauma_source(s))
+                .map(format_trauma_source)
                 .unwrap_or_default();
 
             result.messages.push(MessagePayload::TraumaFlashback {

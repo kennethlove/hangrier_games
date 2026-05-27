@@ -67,8 +67,8 @@ pub fn lookup_inflicts(
     let mut result = Vec::with_capacity(count);
     for _ in 0..count {
         if let Some(entry) = weighted_select(&table, rng) {
-            let body_part = select_body_part(entry.kind, rng);
-            let sev = select_severity(entry, severity, rng);
+            let body_part = select_body_part(entry.kind.clone(), rng);
+            let sev = select_severity(&entry, severity, rng);
             result.push(AfflictionDraft {
                 kind: entry.kind,
                 body_part,
@@ -91,7 +91,7 @@ pub fn lookup_break_mid_swing_inflict(
 ) -> Option<AfflictionDraft> {
     let table = break_mid_swing_table(weapon);
     weighted_select(&table, rng).map(|entry| {
-        let body_part = select_body_part(entry.kind, rng);
+        let body_part = select_body_part(entry.kind.clone(), rng);
         AfflictionDraft {
             kind: entry.kind,
             body_part,
@@ -132,12 +132,14 @@ fn select_body_part(kind: AfflictionKind, rng: &mut impl Rng) -> Option<BodyPart
         | AfflictionKind::Electrocuted
         | AfflictionKind::Drowned
         | AfflictionKind::Buried
-        | AfflictionKind::Trauma => None,
+        | AfflictionKind::Trauma
+        | AfflictionKind::Phobia(_)
+        | AfflictionKind::Fixation(_) => None,
     }
 }
 
 /// Select severity based on the entry weight and hit severity band.
-fn select_severity(_entry: InflictEntry, hit: HitSeverity, rng: &mut impl Rng) -> Severity {
+fn select_severity(_entry: &InflictEntry, hit: HitSeverity, rng: &mut impl Rng) -> Severity {
     // Higher hit severity shifts probability toward Severe.
     let severe_chance = match hit {
         HitSeverity::Normal => 0.1,
@@ -174,10 +176,10 @@ fn weighted_select(table: &[InflictEntry], rng: &mut impl Rng) -> Option<Inflict
     for entry in table {
         roll -= entry.base_weight;
         if roll <= 0.0 {
-            return Some(*entry);
+            return Some(entry.clone());
         }
     }
-    Some(*table.last().unwrap())
+    Some(table.last().unwrap().clone())
 }
 
 /// The full inflict table keyed by (WeaponKind, HitSeverity).

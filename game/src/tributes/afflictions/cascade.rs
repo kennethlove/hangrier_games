@@ -55,7 +55,7 @@ pub fn tick_cascade(
     for aff in afflictions {
         // Permanent afflictions do not cascade or recover.
         if aff.is_permanent() {
-            outcomes.push((aff.kind, CascadeOutcome::NoChange));
+            outcomes.push((aff.kind.clone(), CascadeOutcome::NoChange));
             continue;
         }
 
@@ -65,7 +65,7 @@ pub fn tick_cascade(
             roll_exposed(aff, tuning, rng, &mut tribute_died)
         };
 
-        outcomes.push((aff.kind, outcome));
+        outcomes.push((aff.kind.clone(), outcome));
     }
 
     CascadeResult {
@@ -167,7 +167,7 @@ pub fn apply_cascade(
     let mut successors: Vec<Affliction> = Vec::new();
 
     for (kind, outcome) in &result.outcomes {
-        let key = (*kind, None);
+        let key = (kind.clone(), None);
         match outcome {
             CascadeOutcome::SteppedDown { from, to } => {
                 // Mild stepped down means removal.
@@ -184,11 +184,11 @@ pub fn apply_cascade(
             }
             CascadeOutcome::SpawnedSuccessor { from, to } => {
                 let new_aff = Affliction {
-                    kind: *to,
+                    kind: to.clone(),
                     body_part: None,
                     severity: Severity::Moderate,
                     source: AfflictionSource::Cascade {
-                        from: (*from, None),
+                        from: (from.clone(), None),
                     },
                     acquired_cycle: 0,
                     last_progressed_cycle: 0,
@@ -216,10 +216,14 @@ mod tests {
             kind,
             body_part: None,
             severity,
-            source: AfflictionSource::Combat { attacker_id: "tributes:test".into() },
+            source: AfflictionSource::Combat {
+                attacker_id: "tributes:test".into(),
+            },
             acquired_cycle: 1,
             last_progressed_cycle: 1,
             trauma_metadata: None,
+            phobia_metadata: None,
+            fixation_metadata: None,
         }
     }
 
@@ -450,13 +454,13 @@ mod tests {
         assert_eq!(successors.len(), 1);
         assert_eq!(successors[0].kind, AfflictionKind::Infected);
         assert_eq!(successors[0].severity, Severity::Moderate);
-    assert_eq!(
-        successors[0].source,
-        AfflictionSource::Cascade {
-            from: (AfflictionKind::Wounded, None)
-        }
-    );
-}
+        assert_eq!(
+            successors[0].source,
+            AfflictionSource::Cascade {
+                from: (AfflictionKind::Wounded, None)
+            }
+        );
+    }
 
     #[test]
     fn empty_afflictions_returns_empty_result() {

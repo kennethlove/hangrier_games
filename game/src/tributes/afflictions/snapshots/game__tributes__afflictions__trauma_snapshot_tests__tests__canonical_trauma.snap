@@ -7,31 +7,35 @@ expression: json
   "body_part": null,
   "severity": "severe",
   "source": {
-    "kind": "cascade",
-    "from": [
-      "trauma",
-      null
-    ]
+    "cascade": {
+      "from": [
+        "trauma",
+        null
+      ]
+    }
   },
   "acquired_cycle": 10,
   "last_progressed_cycle": 15,
   "trauma_metadata": {
     "sources": [
       {
-        "kind": "witnessed_ally_death",
-        "ally": "tributes:glimmer",
-        "cause": {
-          "kind": "fire"
+        "witnessed_ally_death": {
+          "ally": "tributes:glimmer",
+          "cause": {
+            "kind": "fire"
+          }
         }
       },
       {
-        "kind": "betrayal",
-        "by": "tributes:marvel"
+        "betrayal": {
+          "by": "tributes:marvel"
+        }
       },
       {
-        "kind": "mass_casualty",
-        "cause_class": "combat",
-        "deaths_this_cycle": 5
+        "mass_casualty": {
+          "cause_class": "combat",
+          "deaths_this_cycle": 5
+        }
       }
     ],
     "cycles_since_last_event": 0,

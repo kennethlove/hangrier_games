@@ -141,15 +141,16 @@ mod tests {
     use shared::afflictions::{Affliction, AfflictionSource, BodyPart};
 
     fn make_affliction(kind: AfflictionKind, severity: Severity) -> Affliction {
+        let body_part = Some(match &kind {
+            AfflictionKind::MissingArm => BodyPart::Arm,
+            AfflictionKind::MissingLeg => BodyPart::Leg,
+            AfflictionKind::Blind => BodyPart::Eye,
+            AfflictionKind::Deaf => BodyPart::Ear,
+            _ => BodyPart::Rib,
+        });
         Affliction {
             kind,
-            body_part: Some(match kind {
-                AfflictionKind::MissingArm => BodyPart::Arm,
-                AfflictionKind::MissingLeg => BodyPart::Leg,
-                AfflictionKind::Blind => BodyPart::Eye,
-                AfflictionKind::Deaf => BodyPart::Ear,
-                _ => BodyPart::Rib,
-            }),
+            body_part,
             severity,
             source: AfflictionSource::Combat {
                 attacker_id: "tributes:test".into(),
@@ -157,6 +158,8 @@ mod tests {
             acquired_cycle: 1,
             last_progressed_cycle: 1,
             trauma_metadata: None,
+            phobia_metadata: None,
+            fixation_metadata: None,
         }
     }
 

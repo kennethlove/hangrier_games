@@ -77,15 +77,16 @@ mod visibility_tests {
     use shared::afflictions::{Affliction, AfflictionKind, AfflictionSource, BodyPart};
 
     fn make_affliction(kind: AfflictionKind, severity: Severity) -> Affliction {
+        let body_part = Some(match &kind {
+            AfflictionKind::MissingArm => BodyPart::Arm,
+            AfflictionKind::MissingLeg => BodyPart::Leg,
+            AfflictionKind::Blind => BodyPart::Eye,
+            AfflictionKind::Deaf => BodyPart::Ear,
+            _ => BodyPart::Rib,
+        });
         Affliction {
             kind,
-            body_part: Some(match kind {
-                AfflictionKind::MissingArm => BodyPart::Arm,
-                AfflictionKind::MissingLeg => BodyPart::Leg,
-                AfflictionKind::Blind => BodyPart::Eye,
-                AfflictionKind::Deaf => BodyPart::Ear,
-                _ => BodyPart::Rib,
-            }),
+            body_part,
             severity,
             source: AfflictionSource::Combat {
                 attacker_id: "tributes:test".into(),

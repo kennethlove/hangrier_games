@@ -4,6 +4,7 @@ pub mod auth;
 pub mod game_detail;
 pub mod pages;
 pub mod timeline;
+pub mod tribute_detail;
 
 /// Authentication state passed to templates for conditional rendering.
 ///

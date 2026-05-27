@@ -263,6 +263,44 @@ pub async fn account_handler(
     )
 }
 
+/// GET /games/{id}/tributes/{tribute_id} — tribute detail page.
+pub async fn game_tribute_detail_handler(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    axum::extract::Path((game_identifier, tribute_identifier)): axum::extract::Path<(
+        uuid::Uuid,
+        uuid::Uuid,
+    )>,
+) -> Response {
+    let (auth, csrf) = extract_auth(&headers);
+    let game_id = game_identifier.to_string();
+    let tribute_id = tribute_identifier.to_string();
+
+    let result = state
+        .db
+        .query("SELECT * FROM fn::get_full_tribute($identifier);")
+        .bind(("identifier", tribute_id.clone()))
+        .await;
+
+    let tribute = match result {
+        Ok(mut result) => result
+            .take::<Option<game::tributes::Tribute>>(0)
+            .unwrap_or_default(),
+        Err(_) => None,
+    };
+
+    match tribute {
+        Some(tribute) => html_with_csrf(
+            api::templates::tribute_detail::tribute_detail_page(auth, &game_id, &tribute),
+            &csrf,
+        ),
+        None => html_with_csrf(
+            pages::not_found_page(auth, "The tribute you're looking for doesn't exist."),
+            &csrf,
+        ),
+    }
+}
+
 /// GET /games/new — create game form (requires auth).
 pub async fn create_game_handler(headers: axum::http::HeaderMap) -> Response {
     let (auth, csrf) = extract_auth(&headers);

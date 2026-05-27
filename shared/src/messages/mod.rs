@@ -174,6 +174,8 @@ pub enum MessageKind {
     /// Phobia acquired, triggered, observed, escalated, habituated, or forgotten.
     Phobia,
     /// Affliction acquired, progressed, healed, or cascaded.
+    /// Fixation acquired, escalated, fired, consummated, thwarted, or faded.
+    Fixation,
     Affliction,
 }
 

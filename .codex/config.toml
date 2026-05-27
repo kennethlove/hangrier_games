@@ -1,3 +1,0 @@
-[mcp_servers.indxr]
-command = "indxr"
-args = ["serve", ".", "--all-tools"]

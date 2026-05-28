@@ -592,6 +592,53 @@ pub fn affliction_card(msg: &GameMessage) -> maud::Markup {
             from_affliction,
             to_affliction,
         } => ("", format!("{from_affliction} cascaded to {to_affliction}")),
+        SubstanceUsed {
+            tribute,
+            item,
+            substance,
+        } => ("", format!("{tribute} used {item} ({substance})")),
+        AddictionAcquired {
+            tribute,
+            substance,
+            severity,
+            use_count,
+        } => (
+            severity.as_str(),
+            format!("{tribute} acquired {substance} addiction (use #{use_count})"),
+        ),
+        AddictionReinforced {
+            tribute,
+            substance,
+            severity,
+        } => (
+            severity.as_str(),
+            format!("{tribute}'s {substance} addiction reinforced (now {severity})"),
+        ),
+        AddictionEscalated {
+            tribute,
+            substance,
+            from_severity,
+            to_severity,
+        } => (
+            to_severity.as_str(),
+            format!("{tribute}'s {substance} addiction escalated: {from_severity} → {to_severity}"),
+        ),
+        AddictionResisted {
+            tribute,
+            substance,
+            reason,
+        } => (
+            "",
+            format!("{tribute} resisted {substance} addiction ({reason})"),
+        ),
+        AddictionRelapse {
+            tribute,
+            substance,
+            prior_uses,
+        } => (
+            "",
+            format!("{tribute} relapsed into {substance} addiction (prior uses: {prior_uses})"),
+        ),
         _ => return fallback_card(msg),
     };
 

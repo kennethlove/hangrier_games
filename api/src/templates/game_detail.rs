@@ -414,7 +414,8 @@ pub fn log_page(
         TributeSlept,TributeWoke,GameEnded,\
         AfflictionAcquired,AfflictionProgressed,AfflictionHealed,AfflictionCascaded,\
         TraumaAcquired,TraumaReinforced,TraumaEscalated,TraumaFlashback,TraumaAvoidance,TraumaObserved,TraumaForgotten,TraumaHabituated,\
-        PhobiaAcquired,PhobiaTriggered,        FixationAcquired,FixationEscalated,FixationFired,FixationConsummated,FixationThwarted,FixationFaded";
+        PhobiaAcquired,PhobiaTriggered,        FixationAcquired,FixationEscalated,FixationFired,FixationConsummated,FixationThwarted,FixationFaded,\
+        SubstanceUsed,AddictionAcquired,AddictionReinforced,AddictionEscalated,AddictionResisted,AddictionRelapse";
 
     base_layout(
         "Log",
@@ -528,7 +529,13 @@ fn message_kind_icon(payload: &shared::messages::MessagePayload) -> maud::Markup
         | MessagePayload::AfflictionProgressed { .. }
         | MessagePayload::AfflictionHealed { .. }
         | MessagePayload::AfflictionCascaded { .. } => "bandage",
-        MessagePayload::TraumaAcquired { .. }
+        MessagePayload::SubstanceUsed { .. }
+        | MessagePayload::AddictionAcquired { .. }
+        | MessagePayload::AddictionReinforced { .. }
+        | MessagePayload::AddictionEscalated { .. }
+        | MessagePayload::AddictionResisted { .. }
+        | MessagePayload::AddictionRelapse { .. }
+        | MessagePayload::TraumaAcquired { .. }
         | MessagePayload::TraumaReinforced { .. }
         | MessagePayload::TraumaEscalated { .. }
         | MessagePayload::TraumaFlashback { .. }

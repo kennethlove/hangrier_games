@@ -17,7 +17,7 @@ pub mod producers;
 pub mod trauma;
 pub mod tuning;
 
-pub use addiction::AddictionAcquisition;
+pub use addiction::{AddictionAcquisition, acquisition_probability, high_duration};
 pub use anatomy::{AcquireResolution, RejectReason, can_acquire};
 pub use cascade::{CascadeOutcome, CascadeResult, apply_cascade, tick_cascade};
 pub use cure::{CureOutcome, apply_cure, cure_item_to_affliction, recovery_cycles};

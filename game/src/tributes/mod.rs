@@ -817,7 +817,7 @@ impl Tribute {
                 identifier: self.identifier.clone(),
                 name: self.name.clone(),
             };
-            if let Err(error) = self.try_use_consumable(item) {
+            if let Err(error) = self.try_use_consumable(item, events, None) {
                 let line = GameOutput::TributeCannotUseItem(self.name.as_str(), &error.to_string())
                     .to_string();
                 let item_ref = ItemRef {

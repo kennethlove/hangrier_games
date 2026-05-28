@@ -60,7 +60,13 @@ impl MessagePayload {
             AfflictionAcquired { .. }
             | AfflictionProgressed { .. }
             | AfflictionHealed { .. }
-            | AfflictionCascaded { .. } => MessageKind::Affliction,
+            | AfflictionCascaded { .. }
+            | SubstanceUsed { .. }
+            | AddictionAcquired { .. }
+            | AddictionReinforced { .. }
+            | AddictionEscalated { .. }
+            | AddictionResisted { .. }
+            | AddictionRelapse { .. } => MessageKind::Affliction,
         }
     }
 
@@ -164,6 +170,12 @@ impl MessagePayload {
             TraumaForgotten {
                 observer, subject, ..
             } => observer == id || subject == id,
+            SubstanceUsed { tribute, .. }
+            | AddictionAcquired { tribute, .. }
+            | AddictionReinforced { tribute, .. }
+            | AddictionEscalated { tribute, .. }
+            | AddictionResisted { tribute, .. }
+            | AddictionRelapse { tribute, .. } => tribute == id,
             SponsorGift { recipient, .. } => r(recipient),
             AreaClosed { .. } | AreaEvent { .. } => false,
             CycleStart { .. } | CycleEnd { .. } | PhaseStarted { .. } | PhaseEnded { .. } => false,

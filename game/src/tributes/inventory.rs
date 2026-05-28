@@ -9,8 +9,9 @@
 
 use crate::areas::AreaDetails;
 use crate::items::{Attribute, Item, ItemError, OwnsItems};
+use crate::messages::{MessagePayload, TaggedEvent};
 use crate::tributes::Tribute;
-use crate::tributes::afflictions::apply_cure;
+use crate::tributes::afflictions::{AddictionAcquisition, apply_cure};
 use rand::prelude::*;
 use rand::rngs::SmallRng;
 
@@ -84,8 +85,22 @@ impl Tribute {
         }
     }
 
-    /// Use consumable item from inventory
-    pub(crate) fn try_use_consumable(&mut self, chosen_item: &Item) -> Result<(), ItemError> {
+    /// Use consumable item from inventory.
+    ///
+    /// After applying the item's effect and cure logic, checks whether the
+    /// item carries a substance (addictive). If so, increments
+    /// [`addiction_use_count`] and calls [`try_acquire_addiction`], pushing
+    /// resulting [`MessagePayload`] variants as [`TaggedEvent`]s.
+    ///
+    /// `rng_seed` — optional [`SmallRng`] seed for deterministic testing.
+    /// When `None` (default production path), the RNG is seeded from system
+    /// entropy.
+    pub fn try_use_consumable(
+        &mut self,
+        chosen_item: &Item,
+        events: &mut Vec<TaggedEvent>,
+        rng_seed: Option<u64>,
+    ) -> Result<(), ItemError> {
         let items = self.consumables();
 
         // If the tribute has the item...
@@ -130,6 +145,101 @@ impl Tribute {
             }
             crate::tributes::afflictions::CureOutcome::NoEffect { .. } => {
                 // No matching affliction; not an error, just no cure effect.
+            }
+        }
+
+        // ── Addiction hook: check if item is a substance ──────────────
+        if let Some(substance) = item.attribute.substance() {
+            // Increment lifetime use counter for this substance.
+            let count = self.addiction_use_count.entry(substance).or_insert(0);
+            *count += 1;
+
+            // Push SubstanceUsed event.
+            events.push(TaggedEvent::new(
+                format!("{} used {} ({})", self.name, item.name, substance),
+                MessagePayload::SubstanceUsed {
+                    tribute: self.identifier.clone(),
+                    item: item.name.clone(),
+                    substance: substance.to_string(),
+                },
+            ));
+
+            // Roll for acquisition / reinforcement / relapse.
+            let mut rng = match rng_seed {
+                Some(seed) => SmallRng::seed_from_u64(seed),
+                None => SmallRng::from_rng(&mut rand::rng()),
+            };
+            let outcome = self.try_acquire_addiction(substance, &mut rng);
+
+            match outcome {
+                AddictionAcquisition::Acquired {
+                    substance: s,
+                    use_count: uc,
+                } => {
+                    events.push(TaggedEvent::new(
+                        format!("{} acquired {} addiction (use #{})", self.name, s, uc),
+                        MessagePayload::AddictionAcquired {
+                            tribute: self.identifier.clone(),
+                            substance: s.to_string(),
+                            severity: "mild".to_string(),
+                            use_count: uc,
+                        },
+                    ));
+                }
+                AddictionAcquisition::Reinforced {
+                    substance: s,
+                    severity,
+                    escalated,
+                } => {
+                    events.push(TaggedEvent::new(
+                        format!(
+                            "{}'s {} addiction reinforced (now {})",
+                            self.name, s, severity
+                        ),
+                        MessagePayload::AddictionReinforced {
+                            tribute: self.identifier.clone(),
+                            substance: s.to_string(),
+                            severity: severity.to_string(),
+                        },
+                    ));
+                    if escalated {
+                        events.push(TaggedEvent::new(
+                            format!("{}'s {} addiction escalated to {}", self.name, s, severity),
+                            MessagePayload::AddictionEscalated {
+                                tribute: self.identifier.clone(),
+                                substance: s.to_string(),
+                                from_severity: "moderate".to_string(),
+                                to_severity: severity.to_string(),
+                            },
+                        ));
+                    }
+                }
+                AddictionAcquisition::Relapse {
+                    substance: s,
+                    prior_uses,
+                } => {
+                    events.push(TaggedEvent::new(
+                        format!("{} relapsed into {} addiction", self.name, s),
+                        MessagePayload::AddictionRelapse {
+                            tribute: self.identifier.clone(),
+                            substance: s.to_string(),
+                            prior_uses,
+                        },
+                    ));
+                }
+                AddictionAcquisition::Resisted {
+                    substance: s,
+                    reason,
+                } => {
+                    events.push(TaggedEvent::new(
+                        format!("{} resisted {} addiction ({:?})", self.name, s, reason),
+                        MessagePayload::AddictionResisted {
+                            tribute: self.identifier.clone(),
+                            substance: s.to_string(),
+                            reason: format!("{:?}", reason),
+                        },
+                    ));
+                }
             }
         }
 

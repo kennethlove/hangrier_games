@@ -415,7 +415,8 @@ pub fn log_page(
         AfflictionAcquired,AfflictionProgressed,AfflictionHealed,AfflictionCascaded,\
         TraumaAcquired,TraumaReinforced,TraumaEscalated,TraumaFlashback,TraumaAvoidance,TraumaObserved,TraumaForgotten,TraumaHabituated,\
         PhobiaAcquired,PhobiaTriggered,        FixationAcquired,FixationEscalated,FixationFired,FixationConsummated,FixationThwarted,FixationFaded,\
-        SubstanceUsed,AddictionAcquired,AddictionReinforced,AddictionEscalated,AddictionResisted,AddictionRelapse";
+        SubstanceUsed,AddictionAcquired,AddictionReinforced,AddictionEscalated,AddictionResisted,AddictionRelapse,\
+        AddictionCraving,AddictionObserved,AddictionForgotten,AddictionHabituated";
 
     base_layout(
         "Log",
@@ -535,6 +536,10 @@ fn message_kind_icon(payload: &shared::messages::MessagePayload) -> maud::Markup
         | MessagePayload::AddictionEscalated { .. }
         | MessagePayload::AddictionResisted { .. }
         | MessagePayload::AddictionRelapse { .. }
+        | MessagePayload::AddictionCraving { .. }
+        | MessagePayload::AddictionObserved { .. }
+        | MessagePayload::AddictionForgotten { .. }
+        | MessagePayload::AddictionHabituated { .. }
         | MessagePayload::TraumaAcquired { .. }
         | MessagePayload::TraumaReinforced { .. }
         | MessagePayload::TraumaEscalated { .. }

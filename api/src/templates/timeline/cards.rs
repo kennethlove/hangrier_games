@@ -639,6 +639,45 @@ pub fn affliction_card(msg: &GameMessage) -> maud::Markup {
             "",
             format!("{tribute} relapsed into {substance} addiction (prior uses: {prior_uses})"),
         ),
+        AddictionCraving {
+            tribute,
+            substance,
+            severity,
+        } => (
+            severity.as_str(),
+            format!("{tribute} craves {substance} ({severity})"),
+        ),
+        AddictionObserved {
+            observer,
+            subject,
+            substance,
+        } => (
+            "",
+            format!("{observer} noticed {subject}'s {substance} craving"),
+        ),
+        AddictionForgotten {
+            observer,
+            subject,
+            substance,
+        } => (
+            "",
+            format!("{observer} forgot {subject}'s {substance} addiction"),
+        ),
+        AddictionHabituated {
+            tribute,
+            substance: _,
+            from_severity,
+            to_severity: Some(to),
+        } => (
+            to.as_str(),
+            format!("{tribute}'s addiction weakens: {from_severity} → {to}"),
+        ),
+        AddictionHabituated {
+            tribute,
+            substance: _,
+            from_severity,
+            to_severity: None,
+        } => ("", format!("{tribute} overcomes {from_severity} addiction")),
         _ => return fallback_card(msg),
     };
 

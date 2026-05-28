@@ -25,6 +25,8 @@ pub struct GameConfig {
     pub phobias_enabled: bool,
     /// Enable fixation afflictions (spawn-time acquisition, per-cycle processing)
     pub fixations_enabled: bool,
+    /// Enable addiction processing (brain layer, decay, observer tracking)
+    pub addiction_enabled: bool,
     /// Global multiplier for event severity (1.0 = normal, 2.0 = double damage)
     pub catastrophic_severity_multiplier: f64,
 
@@ -80,6 +82,7 @@ impl Default for GameConfig {
             trauma_enabled: true,
             phobias_enabled: true,
             fixations_enabled: true,
+            addiction_enabled: true,
             catastrophic_severity_multiplier: 1.0,
 
             // Tribute AI

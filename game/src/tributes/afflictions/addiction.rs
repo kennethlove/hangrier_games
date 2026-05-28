@@ -4,15 +4,17 @@
 //! - `try_acquire_addiction` — probabilistic acquisition/relapse/reinforcement
 //! - `high_duration` — tolerance-driven High mode duration table
 //! - `AddictionAcquisition` — result enum
+//! - `process_addictions` — per-cycle decay, observer tracking, and habituation
 //!
 //! Called from the consumable-use hook (PR2). PR3 wires decay, observer tracking,
-//! and the brain layer.
+//! and the brain layer (PR3).
 
 use rand::RngExt;
 use shared::afflictions::{
     AddictionMetadata, AddictionResistReason, Affliction, AfflictionKind, AfflictionSource,
     Severity, Substance,
 };
+use shared::messages::MessagePayload;
 
 use crate::tributes::Tribute;
 use std::collections::{BTreeMap, BTreeSet};
@@ -237,6 +239,131 @@ impl Tribute {
         let key = (AfflictionKind::Addiction(substance), None);
         self.afflictions.contains_key(&key)
     }
+}
+
+/// Per-cycle addiction processing for a single tribute.
+///
+/// For each addiction:
+/// 1. Decrement high_cycles_remaining (High → Withdrawal transition)
+/// 2. Increment cycles_since_last_use (decay)
+/// 3. At threshold (15 cycles): step severity down or cure
+/// 4. Observer decay (15-cycle threshold)
+///
+/// Returns messages for events that occurred.
+///
+/// Gated on `config.addiction_enabled` — caller must check.
+pub fn process_addictions(
+    tribute: &mut Tribute,
+    other_tributes_in_area: &[Tribute],
+    cycle: u32,
+    _rng: &mut impl rand::Rng,
+) -> Vec<MessagePayload> {
+    let mut messages = Vec::new();
+
+    // Early exit: no addiction afflictions
+    let has_addiction = tribute
+        .afflictions
+        .values()
+        .any(|a| matches!(a.kind, AfflictionKind::Addiction(_)));
+    if !has_addiction {
+        return messages;
+    }
+
+    let keys: Vec<_> = tribute
+        .afflictions
+        .iter()
+        .filter(|(_, a)| matches!(a.kind, AfflictionKind::Addiction(_)))
+        .map(|(k, _)| k.clone())
+        .collect();
+
+    for key in &keys {
+        let Some(aff) = tribute.afflictions.get_mut(key) else {
+            continue;
+        };
+        let Some(meta) = &mut aff.addiction_metadata else {
+            continue;
+        };
+
+        // ── High mode tick ──────────────────────────────
+        if meta.high_cycles_remaining > 0 {
+            meta.high_cycles_remaining -= 1;
+        }
+
+        // ── Decay (increment idle counter) ──────────────
+        meta.cycles_since_last_use = meta.cycles_since_last_use.saturating_add(1);
+
+        // ── Observer tracking (area observers see craving) ──
+        // At Severe severity in withdrawal, observers in the same area
+        // witness the craving behavior. AddictionCraving is emitted
+        // by the caller when the brain produces SearchForSubstance;
+        // here we track which observers have seen it.
+        if aff.severity >= Severity::Moderate && meta.high_cycles_remaining == 0 {
+            for other in other_tributes_in_area {
+                let other_id = &other.identifier;
+                if other_id == &tribute.identifier {
+                    continue;
+                }
+                if !meta.observed_by.contains(other_id) {
+                    meta.observed_by.insert(other_id.clone());
+                    messages.push(MessagePayload::AddictionObserved {
+                        observer: other_id.clone(),
+                        subject: tribute.identifier.clone(),
+                        substance: meta.substance.to_string(),
+                    });
+                }
+                meta.observer_seen_cycle.insert(other_id.clone(), cycle);
+            }
+        }
+
+        // ── Check decay threshold (15 cycles) ───────────
+        if meta.cycles_since_last_use >= 15 {
+            if aff.severity == Severity::Mild {
+                // Cured
+                let substance = meta.substance;
+                messages.push(MessagePayload::AddictionHabituated {
+                    tribute: tribute.identifier.clone(),
+                    substance: substance.to_string(),
+                    from_severity: aff.severity.to_string(),
+                    to_severity: None,
+                });
+                tribute.afflictions.remove(key);
+            } else {
+                // Step down one tier using Severity::prev_tier
+                let new_sev = aff.severity.prev_tier().unwrap_or(Severity::Mild);
+                let from = aff.severity.to_string();
+                let to = new_sev.to_string();
+                aff.severity = new_sev;
+                meta.cycles_since_last_use = 0;
+                messages.push(MessagePayload::AddictionHabituated {
+                    tribute: tribute.identifier.clone(),
+                    substance: meta.substance.to_string(),
+                    from_severity: from,
+                    to_severity: Some(to),
+                });
+            }
+            // Key was removed or decay counter reset — skip observer decay for this one
+            continue;
+        }
+
+        // ── Observer decay (15-cycle threshold) ─────────
+        let forgotten: Vec<String> = meta
+            .observer_seen_cycle
+            .iter()
+            .filter(|&(_, seen)| cycle.saturating_sub(*seen) >= 15)
+            .map(|(id, _)| id.clone())
+            .collect();
+        for observer_id in &forgotten {
+            meta.observed_by.remove(observer_id);
+            meta.observer_seen_cycle.remove(observer_id);
+            messages.push(MessagePayload::AddictionForgotten {
+                observer: observer_id.clone(),
+                subject: tribute.identifier.clone(),
+                substance: meta.substance.to_string(),
+            });
+        }
+    }
+
+    messages
 }
 
 #[cfg(test)]

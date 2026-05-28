@@ -634,7 +634,6 @@ pub enum MessagePayload {
         tribute_id: String,
         target: String,
     },
-
     // Addiction events (addiction PR2).
     /// Tribute used a substance (addictive consumable).
     SubstanceUsed {
@@ -673,6 +672,31 @@ pub enum MessagePayload {
         tribute: String,
         substance: String,
         prior_uses: u32,
+    },
+    /// Tribute is craving a substance (visible to observers).
+    AddictionCraving {
+        tribute: String,
+        substance: String,
+        severity: String,
+    },
+    /// A tribute observed someone's addiction behavior.
+    AddictionObserved {
+        observer: String,
+        subject: String,
+        substance: String,
+    },
+    /// A tribute forgot someone's addiction (observer decay).
+    AddictionForgotten {
+        observer: String,
+        subject: String,
+        substance: String,
+    },
+    /// Addiction severity decayed or cured (habituation).
+    AddictionHabituated {
+        tribute: String,
+        substance: String,
+        from_severity: String,
+        to_severity: Option<String>,
     },
 }
 

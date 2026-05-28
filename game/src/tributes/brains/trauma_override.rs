@@ -65,6 +65,7 @@ mod tests {
             }),
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         }
     }
 

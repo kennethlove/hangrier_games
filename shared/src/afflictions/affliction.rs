@@ -1,3 +1,4 @@
+use super::addiction::AddictionMetadata;
 use super::fixation::FixationMetadata;
 use super::kind::{AfflictionKind, BodyPart};
 use super::phobia::PhobiaMetadata;
@@ -28,6 +29,10 @@ pub struct Affliction {
     /// Only `Some` for `AfflictionKind::Fixation` variants.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixation_metadata: Option<FixationMetadata>,
+    /// Optional addiction-specific metadata (substance, use counters, observer state).
+    /// Only `Some` for `AfflictionKind::Addiction` variants.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub addiction_metadata: Option<AddictionMetadata>,
 }
 
 impl Affliction {
@@ -72,6 +77,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         assert_eq!(a.key(), (AfflictionKind::Wounded, Some(BodyPart::Arm)));
     }
@@ -90,6 +96,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         assert!(a.is_permanent());
     }
@@ -108,6 +115,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         assert!(a.is_permanent());
     }
@@ -124,6 +132,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         assert!(a.is_reversible());
     }
@@ -140,6 +149,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: Some(PhobiaMetadata::default()),
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         let json = serde_json::to_string(&aff).unwrap();
         let restored: Affliction = serde_json::from_str(&json).unwrap();
@@ -160,6 +170,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         assert!(aff.phobia_metadata.is_none());
     }

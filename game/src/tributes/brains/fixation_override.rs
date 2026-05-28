@@ -165,6 +165,7 @@ mod tests {
                 observer_seen_cycle: BTreeMap::new(),
                 cycles_since_last_contact: 0,
             }),
+            addiction_metadata: None,
         }
     }
 

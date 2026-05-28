@@ -21,7 +21,7 @@ pub use combat::inflict_table::{
 pub use combat::{attack_contest, update_stats};
 pub use movement::TravelResult;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::areas::{Area, AreaDetails};
 use crate::items::Item;
@@ -40,7 +40,7 @@ use rand::rngs::SmallRng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeSeq};
 use shared::afflictions::{
     Affliction, AfflictionKey, AfflictionKind, AfflictionSource, BodyPart, PhobiaTrigger, Severity,
-    TraumaSource,
+    Substance, TraumaSource,
 };
 use statuses::TributeStatus;
 use uuid::Uuid;
@@ -281,6 +281,16 @@ pub struct Tribute {
     /// Current game day (cycle). Used for affliction cycle tracking.
     #[serde(default)]
     pub game_day: Option<i64>,
+    /// Monotonic per-substance use counter (spec §4). Never reset by cure.
+    /// Enables relapse-on-first-use and the use-count-driven acquisition curve.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub addiction_use_count: BTreeMap<Substance, u32>,
+    /// Substances the tribute has ever been addicted to (spec §5.1 step 5c).
+    /// Populated on acquisition, never cleared. Enables the relapse short-circuit:
+    /// if `ever_addicted_to.contains(s)` and no current `Addiction(s)`, next use
+    /// of `s` auto-acquires at Mild.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub ever_addicted_to: BTreeSet<Substance>,
 }
 
 impl Default for Tribute {
@@ -343,6 +353,8 @@ impl Tribute {
             sleep_remaining: 0,
             afflictions: BTreeMap::new(),
             game_day: None,
+            addiction_use_count: BTreeMap::new(),
+            ever_addicted_to: BTreeSet::new(),
         }
     }
 
@@ -403,6 +415,8 @@ impl Tribute {
             sleep_remaining: 0,
             afflictions: BTreeMap::new(),
             game_day: None,
+            addiction_use_count: BTreeMap::new(),
+            ever_addicted_to: BTreeSet::new(),
         }
     }
 
@@ -1115,6 +1129,7 @@ impl Tribute {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         let resolution = can_acquire(&self.afflictions, &provisional);
 
@@ -1155,6 +1170,7 @@ impl Tribute {
                     trauma_metadata: None,
                     phobia_metadata: None,
                     fixation_metadata: None,
+                    addiction_metadata: None,
                 };
                 self.afflictions
                     .insert((draft.kind.clone(), draft.body_part), affliction);

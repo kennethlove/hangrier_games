@@ -91,6 +91,45 @@ impl FromStr for FixationTarget {
     }
 }
 
+/// Substances a tribute can become addicted to (spec §4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Substance {
+    /// Adrenaline-based combat stimulants (yayo, go-juice, adrenaline).
+    Stimulant,
+    /// Opioid-class painkiller, sponsor-gift only.
+    Morphling,
+    /// Ethanol — sponsor-gift only.
+    Alcohol,
+    /// Standard painkiller, sponsor-gift only.
+    Painkiller,
+}
+
+impl fmt::Display for Substance {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Substance::Stimulant => write!(f, "stimulant"),
+            Substance::Morphling => write!(f, "morphling"),
+            Substance::Alcohol => write!(f, "alcohol"),
+            Substance::Painkiller => write!(f, "painkiller"),
+        }
+    }
+}
+
+impl FromStr for Substance {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "stimulant" => Ok(Substance::Stimulant),
+            "morphling" => Ok(Substance::Morphling),
+            "alcohol" => Ok(Substance::Alcohol),
+            "painkiller" => Ok(Substance::Painkiller),
+            other => Err(format!("unknown Substance: {other}")),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AfflictionKind {
@@ -114,6 +153,7 @@ pub enum AfflictionKind {
     Trauma,
     Phobia(PhobiaTrigger),
     Fixation(FixationTarget),
+    Addiction(Substance),
 }
 
 impl fmt::Display for AfflictionKind {
@@ -139,6 +179,7 @@ impl fmt::Display for AfflictionKind {
             AfflictionKind::Trauma => write!(f, "trauma"),
             AfflictionKind::Phobia(trigger) => write!(f, "phobia:{trigger}"),
             AfflictionKind::Fixation(target) => write!(f, "fixation:{target}"),
+            AfflictionKind::Addiction(sub) => write!(f, "addiction:{sub}"),
         }
     }
 }
@@ -175,6 +216,11 @@ impl FromStr for AfflictionKind {
                 let target_str = rest.strip_prefix("fixation:").unwrap();
                 let target = FixationTarget::from_str(target_str)?;
                 Ok(AfflictionKind::Fixation(target))
+            }
+            rest if rest.starts_with("addiction:") => {
+                let sub_str = rest.strip_prefix("addiction:").unwrap();
+                let sub = Substance::from_str(sub_str)?;
+                Ok(AfflictionKind::Addiction(sub))
             }
             other => Err(format!("unknown AfflictionKind: {other}")),
         }

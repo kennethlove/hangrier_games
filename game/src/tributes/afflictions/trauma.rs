@@ -268,6 +268,7 @@ impl Tribute {
                 trauma_metadata: Some(metadata),
                 phobia_metadata: None,
                 fixation_metadata: None,
+                addiction_metadata: None,
             };
             self.afflictions.insert(key, affliction);
 

@@ -115,6 +115,30 @@ pub fn process_traumas(
         // ── Decay (increment idle counter) ────────────────────────
         meta.cycles_since_last_event = meta.cycles_since_last_event.saturating_add(1);
 
+        // ── Observer decay ───────────────────────────────────────
+        // Remove observers who haven't seen a flashback in 10+ cycles.
+        let forgotten: Vec<String> = meta
+            .observer_seen_cycle
+            .iter()
+            .filter(|&(_, seen_cycle)| cycle.saturating_sub(*seen_cycle) >= 10)
+            .map(|(id, _)| id.clone())
+            .collect();
+        for observer_id in &forgotten {
+            meta.observed_by.remove(observer_id);
+            meta.observer_seen_cycle.remove(observer_id);
+            let source_str = meta
+                .sources
+                .iter()
+                .next()
+                .map(format_trauma_source)
+                .unwrap_or_default();
+            result.messages.push(MessagePayload::TraumaForgotten {
+                observer: observer_id.clone(),
+                subject: tribute.identifier.clone(),
+                source: source_str,
+            });
+        }
+
         // ── Check decay threshold (10 cycles) ─────────────────────
         if meta.cycles_since_last_event >= 10 {
             let outcome =
@@ -145,7 +169,7 @@ pub fn process_traumas(
 }
 
 /// Format a trauma source into a human-readable fragment for messages.
-fn format_trauma_source(source: &TraumaSource) -> String {
+pub(crate) fn format_trauma_source(source: &TraumaSource) -> String {
     match source {
         TraumaSource::WitnessedAllyDeath { ally, .. } => {
             format!("witnessing the death of {ally}")

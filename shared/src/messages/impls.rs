@@ -66,7 +66,11 @@ impl MessagePayload {
             | AddictionReinforced { .. }
             | AddictionEscalated { .. }
             | AddictionResisted { .. }
-            | AddictionRelapse { .. } => MessageKind::Affliction,
+            | AddictionRelapse { .. }
+            | AddictionCraving { .. }
+            | AddictionObserved { .. }
+            | AddictionForgotten { .. }
+            | AddictionHabituated { .. } => MessageKind::Affliction,
         }
     }
 
@@ -175,7 +179,15 @@ impl MessagePayload {
             | AddictionReinforced { tribute, .. }
             | AddictionEscalated { tribute, .. }
             | AddictionResisted { tribute, .. }
-            | AddictionRelapse { tribute, .. } => tribute == id,
+            | AddictionRelapse { tribute, .. }
+            | AddictionCraving { tribute, .. } => tribute == id,
+            AddictionObserved {
+                observer, subject, ..
+            } => observer == id || subject == id,
+            AddictionForgotten {
+                observer, subject, ..
+            } => observer == id || subject == id,
+            AddictionHabituated { tribute, .. } => tribute == id,
             SponsorGift { recipient, .. } => r(recipient),
             AreaClosed { .. } | AreaEvent { .. } => false,
             CycleStart { .. } | CycleEnd { .. } | PhaseStarted { .. } | PhaseEnded { .. } => false,

@@ -592,6 +592,39 @@ impl Game {
             }
         }
 
+        // ── Addiction cycle processing ────────────────────────────────
+        // Run after trauma processing, before action execution.
+        // Handles High/Withdrawal tick, decay, observer tracking.
+        if self.config.addiction_enabled && !tributes_to_act.is_empty() {
+            let addiction_cycle = (current_day.saturating_sub(1)) * 4 + phase.ord() as u32;
+
+            for &idx in &tributes_to_act {
+                let area = self.tributes[idx].area;
+                let other_tributes: &[Tribute] = tributes_by_area
+                    .get(&area)
+                    .map(|v| v.as_slice())
+                    .unwrap_or(&[]);
+
+                let msgs = crate::tributes::afflictions::addiction::process_addictions(
+                    &mut self.tributes[idx],
+                    other_tributes,
+                    addiction_cycle,
+                    rng,
+                );
+
+                for msg in msgs {
+                    let line = format_addiction_message(&msg, &self.tributes[idx].name);
+                    collected_events.push((
+                        self.tributes[idx].identifier.clone(),
+                        self.tributes[idx].name.clone(),
+                        line,
+                        Some(msg),
+                        None,
+                    ));
+                }
+            }
+        }
+
         // Sort by initiative so faster tributes act first (tm6a).
         tributes_to_act.sort_by_cached_key(|&idx| {
             let agility = self.tributes[idx].attributes.agility;

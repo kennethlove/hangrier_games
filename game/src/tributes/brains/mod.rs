@@ -9,6 +9,7 @@ use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+pub mod addiction_override;
 pub mod affliction_override;
 pub mod fixation_override;
 pub mod phobia_override;
@@ -576,10 +577,11 @@ impl Brain {
     /// 5. Fixation override (spec §8 — per-tier override semantics)
     /// 6. Phobia override (spec §5 — fires freeze reactions, stat penalties)
     /// 7. Trauma override (spec §7 — avoidance hard veto)
-    /// 8. Affliction override (hard gates + brain bias; spec §11)
-    /// 8. Preferred action
-    /// 9. Alliance proposal
-    /// 10. Consumable
+    /// 8. Addiction override (spec §7-8 — craving/compulsion)
+    /// 9. Affliction override (hard gates + brain bias; spec §11)
+    /// 10. Preferred action
+    /// 11. Alliance proposal
+    /// 12. Consumable
     ///
     /// Layers 3 and 4 are gated on `terrain.is_some()` because the legacy
     /// `act` entry point does not yet receive the tribute's current terrain
@@ -680,6 +682,14 @@ impl Brain {
         // Gated on config.trauma_enabled.
         if config.trauma_enabled
             && let Some(action) = trauma_override::trauma_override(tribute)
+        {
+            return Some(action);
+        }
+
+        // Addiction override (spec §7-8): craving/compulsion.
+        // Gated on config.addiction_enabled.
+        if config.addiction_enabled
+            && let Some(action) = addiction_override::addiction_override(tribute)
         {
             return Some(action);
         }

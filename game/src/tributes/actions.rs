@@ -68,6 +68,11 @@ pub enum Action {
     /// Tribute avoids a triggering stimulus due to trauma.
     /// Brain override returns this action instead of the intended one.
     Avoidance,
+    /// Tribute searches for a substance to feed an addiction.
+    /// Driven by the addiction brain layer (PR3).
+    SearchForSubstance {
+        substance: shared::afflictions::Substance,
+    },
 }
 
 impl Display for Action {
@@ -90,6 +95,7 @@ impl Display for Action {
             Action::Frozen => write!(f, "frozen"),
             Action::Flashback { .. } => write!(f, "flashback"),
             Action::Avoidance => write!(f, "avoidance"),
+            Action::SearchForSubstance { .. } => write!(f, "search for substance"),
         }
     }
 }
@@ -115,6 +121,9 @@ impl FromStr for Action {
             "sleep" => Ok(Action::Sleep { duration_phases: 0 }),
             "frozen" => Ok(Action::Frozen),
             "flashback" | "avoidance" => Ok(Action::Avoidance),
+            "search for substance" => Ok(Action::SearchForSubstance {
+                substance: shared::afflictions::Substance::Stimulant,
+            }),
             _ => Err(()),
         }
     }
@@ -172,6 +181,15 @@ mod tests {
     #[test]
     fn action_from_str_invalid() {
         assert_eq!(Action::from_str("do a barrel roll"), Err(()));
+    }
+
+    #[rstest]
+    #[case(Action::SearchForSubstance { substance: shared::afflictions::Substance::Stimulant }, "search for substance")]
+    #[case(Action::SearchForSubstance { substance: shared::afflictions::Substance::Morphling }, "search for substance")]
+    #[case(Action::SearchForSubstance { substance: shared::afflictions::Substance::Alcohol }, "search for substance")]
+    #[case(Action::SearchForSubstance { substance: shared::afflictions::Substance::Painkiller }, "search for substance")]
+    fn search_for_substance_to_string(#[case] action: Action, #[case] expected: &str) {
+        assert_eq!(action.to_string(), expected.to_string());
     }
 
     #[test]

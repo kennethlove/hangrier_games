@@ -143,6 +143,41 @@ fn phobia_message_line(payload: &crate::messages::MessagePayload, tribute_name: 
     }
 }
 
+/// Generate a human-readable line for addiction-related messages.
+fn format_addiction_message(
+    payload: &crate::messages::MessagePayload,
+    tribute_name: &str,
+) -> String {
+    use crate::messages::MessagePayload;
+    match payload {
+        MessagePayload::AddictionObserved {
+            observer, subject, ..
+        } => {
+            format!("{observer} notices {subject}'s addiction behavior.")
+        }
+        MessagePayload::AddictionForgotten {
+            observer, subject, ..
+        } => {
+            format!("{observer} no longer remembers {subject}'s addiction.")
+        }
+        MessagePayload::AddictionHabituated {
+            from_severity,
+            to_severity: Some(to),
+            ..
+        } => {
+            format!("{tribute_name}'s addiction weakens from {from_severity} to {to}.")
+        }
+        MessagePayload::AddictionHabituated {
+            from_severity,
+            to_severity: None,
+            ..
+        } => {
+            format!("{tribute_name} overcomes their {from_severity} addiction.")
+        }
+        _ => String::new(),
+    }
+}
+
 /// Errors that can occur during game operations.
 #[derive(Debug, Clone, PartialEq)]
 pub enum GameError {

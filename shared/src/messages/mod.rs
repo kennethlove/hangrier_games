@@ -634,6 +634,46 @@ pub enum MessagePayload {
         tribute_id: String,
         target: String,
     },
+
+    // Addiction events (addiction PR2).
+    /// Tribute used a substance (addictive consumable).
+    SubstanceUsed {
+        tribute: String,
+        item: String,
+        substance: String,
+    },
+    /// Tribute acquired a new addiction.
+    AddictionAcquired {
+        tribute: String,
+        substance: String,
+        severity: String,
+        use_count: u32,
+    },
+    /// Existing addiction reinforced (used while already addicted).
+    AddictionReinforced {
+        tribute: String,
+        substance: String,
+        severity: String,
+    },
+    /// Addiction severity escalated (12% sensitization roll).
+    AddictionEscalated {
+        tribute: String,
+        substance: String,
+        from_severity: String,
+        to_severity: String,
+    },
+    /// Addiction acquisition prevented (at cap, or roll failed).
+    AddictionResisted {
+        tribute: String,
+        substance: String,
+        reason: String,
+    },
+    /// Relapse — cured tribute auto-reacquired on first use.
+    AddictionRelapse {
+        tribute: String,
+        substance: String,
+        prior_uses: u32,
+    },
 }
 
 pub mod impls;

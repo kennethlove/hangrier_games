@@ -5,6 +5,7 @@ pub mod name_generator;
 mod tests;
 
 use serde::{Deserialize, Serialize};
+use shared::afflictions::Substance;
 use std::fmt::Display;
 use std::str::FromStr;
 use strum::EnumIter;
@@ -300,6 +301,18 @@ impl ConsumableAttribute for Attribute {
             Attribute::Strength => "adrenaline".to_string(),
             // take hits better
             Attribute::Defense => "bear spray".to_string(),
+        }
+    }
+}
+
+impl Attribute {
+    /// Map this attribute to a [`Substance`] if the item is addictive.
+    pub fn substance(&self) -> Option<Substance> {
+        match self {
+            Attribute::Bravery | Attribute::Speed | Attribute::Strength => {
+                Some(Substance::Stimulant)
+            }
+            _ => None,
         }
     }
 }

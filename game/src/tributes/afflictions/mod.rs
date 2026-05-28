@@ -66,6 +66,8 @@ mod anatomy_tests;
 mod integration_tests;
 #[cfg(test)]
 mod snapshot_tests;
+#[cfg(test)]
+mod trauma_snapshot_tests;
 
 #[cfg(test)]
 mod visibility_tests {
@@ -75,22 +77,22 @@ mod visibility_tests {
     use shared::afflictions::{Affliction, AfflictionKind, AfflictionSource, BodyPart};
 
     fn make_affliction(kind: AfflictionKind, severity: Severity) -> Affliction {
-        let bp = match &kind {
+        let body_part = Some(match &kind {
             AfflictionKind::MissingArm => BodyPart::Arm,
             AfflictionKind::MissingLeg => BodyPart::Leg,
             AfflictionKind::Blind => BodyPart::Eye,
             AfflictionKind::Deaf => BodyPart::Ear,
             _ => BodyPart::Rib,
-        };
+        });
         Affliction {
             kind,
-            body_part: Some(bp),
+            body_part,
             severity,
             source: AfflictionSource::Combat {
-                attacker_id: String::new(),
+                attacker_id: "tributes:test".into(),
             },
-            acquired_cycle: 0,
-            last_progressed_cycle: 0,
+            acquired_cycle: 1,
+            last_progressed_cycle: 1,
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,

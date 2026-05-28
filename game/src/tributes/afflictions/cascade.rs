@@ -182,12 +182,14 @@ pub fn apply_cascade(
                     aff.severity = *to;
                 }
             }
-            CascadeOutcome::SpawnedSuccessor { to, .. } => {
+            CascadeOutcome::SpawnedSuccessor { from, to } => {
                 let new_aff = Affliction {
                     kind: to.clone(),
                     body_part: None,
                     severity: Severity::Moderate,
-                    source: AfflictionSource::Cascade { from: key },
+                    source: AfflictionSource::Cascade {
+                        from: (from.clone(), None),
+                    },
                     acquired_cycle: 0,
                     last_progressed_cycle: 0,
                     trauma_metadata: None,
@@ -215,10 +217,10 @@ mod tests {
             body_part: None,
             severity,
             source: AfflictionSource::Combat {
-                attacker_id: String::new(),
+                attacker_id: "tributes:test".into(),
             },
-            acquired_cycle: 0,
-            last_progressed_cycle: 0,
+            acquired_cycle: 1,
+            last_progressed_cycle: 1,
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
@@ -452,10 +454,12 @@ mod tests {
         assert_eq!(successors.len(), 1);
         assert_eq!(successors[0].kind, AfflictionKind::Infected);
         assert_eq!(successors[0].severity, Severity::Moderate);
-        assert!(matches!(
+        assert_eq!(
             successors[0].source,
-            AfflictionSource::Cascade { .. }
-        ));
+            AfflictionSource::Cascade {
+                from: (AfflictionKind::Wounded, None)
+            }
+        );
     }
 
     #[test]

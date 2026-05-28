@@ -74,7 +74,7 @@ pub fn lookup_inflicts(
                 body_part,
                 severity: sev,
                 source: AfflictionSource::Combat {
-                    attacker_id: String::new(),
+                    attacker_id: _attacker_id.into(),
                 },
             });
         }
@@ -97,7 +97,7 @@ pub fn lookup_break_mid_swing_inflict(
             body_part,
             severity: Severity::Moderate,
             source: AfflictionSource::Combat {
-                attacker_id: String::new(),
+                attacker_id: _attacker_id.into(),
             },
         }
     })

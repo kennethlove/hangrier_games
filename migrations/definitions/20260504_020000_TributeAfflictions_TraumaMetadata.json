@@ -1,0 +1,1 @@
+{"name": "TributeAfflictions_TraumaMetadata", "description": "Trauma affliction kind extended with trauma_metadata sub-object on Affliction. Schema is unchanged because afflictions are stored as option<array<object>>; this migration records the wire-shape extension for audit.", "up": "INFO FOR TABLE tribute;", "down": "INFO FOR TABLE tribute;"}

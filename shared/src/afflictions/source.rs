@@ -5,29 +5,62 @@ use serde::{Deserialize, Serialize};
 /// same kind on the same part collapses to one slot.
 pub type AfflictionKey = (AfflictionKind, Option<BodyPart>);
 
-/// Classification of trauma cause for mass casualty events.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// Coarse beast taxonomy used by `DeathCause::Beast`. Trauma source matching
+/// is at this granularity (no per-individual beast keying in v1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum CauseClass {
-    Combat,
-    Environmental,
-    Mixed,
+pub enum BeastKind {
+    Tracker,
+    Mutt,
+    Wolf,
+    Bear,
+    Snake,
+    Bird,
+    Other,
 }
 
-/// Specific cause of death, used in trauma source metadata.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// Coarse hazard taxonomy used by `DeathCause::Hazard`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum HazardKind {
+    Trap,
+    Pit,
+    FallingDebris,
+    ToxicGas,
+    Quicksand,
+    Other,
+}
+
+/// Coarse classification of how a tribute died, used as the keying source for
+/// trauma acquisition (spec §4). Stored on `TraumaSource` variants. Resolution
+/// finer than this lives in messages, not in trauma state.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum DeathCause {
     Tribute(String),
     Fire,
     Drowning,
+    Beast(BeastKind),
+    Hazard(HazardKind),
     Starvation,
     Dehydration,
+    Affliction(AfflictionKind),
+    Gamemaker,
     Unknown,
 }
 
+/// Coarse class of mass-casualty event source (spec §4, §7.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CauseClass {
+    Combat,
+    Environmental,
+    Gamemaker,
+    Mixed,
+}
+
 /// Source of a trauma affliction, capturing the triggering event.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TraumaSource {
     WitnessedAllyDeath {

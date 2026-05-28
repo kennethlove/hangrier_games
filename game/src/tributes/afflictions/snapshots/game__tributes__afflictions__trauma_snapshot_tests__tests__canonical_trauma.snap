@@ -1,0 +1,49 @@
+---
+source: game/src/tributes/afflictions/trauma_snapshot_tests.rs
+expression: json
+---
+{
+  "kind": "trauma",
+  "body_part": null,
+  "severity": "severe",
+  "source": {
+    "cascade": {
+      "from": [
+        "trauma",
+        null
+      ]
+    }
+  },
+  "acquired_cycle": 10,
+  "last_progressed_cycle": 15,
+  "trauma_metadata": {
+    "sources": [
+      {
+        "witnessed_ally_death": {
+          "ally": "tributes:glimmer",
+          "cause": {
+            "kind": "fire"
+          }
+        }
+      },
+      {
+        "betrayal": {
+          "by": "tributes:marvel"
+        }
+      },
+      {
+        "mass_casualty": {
+          "cause_class": "combat",
+          "deaths_this_cycle": 5
+        }
+      }
+    ],
+    "cycles_since_last_event": 0,
+    "observed_by": [
+      "tributes:cato"
+    ],
+    "observer_seen_cycle": {
+      "tributes:cato": 14
+    }
+  }
+}

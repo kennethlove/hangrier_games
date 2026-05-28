@@ -264,7 +264,7 @@ fn tribute_card(tribute: &game::tributes::Tribute) -> maud::Markup {
                             _ => "severity-mild",
                         };
                         @let source_text = affliction.trauma_metadata.as_ref()
-                            .map(|m| format_trauma_source(&m.source))
+                            .and_then(|m| m.sources.iter().next().map(format_trauma_source))
                             .unwrap_or_default();
                         span class=(format!("affliction-badge {}", severity_class)) {
                             (icon("brain"))

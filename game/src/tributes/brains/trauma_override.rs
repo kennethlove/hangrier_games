@@ -56,10 +56,10 @@ mod tests {
             acquired_cycle: 0,
             last_progressed_cycle: 0,
             trauma_metadata: Some(TraumaMetadata {
-                source: TraumaSource::NearDeath {
+                sources: BTreeSet::from([TraumaSource::NearDeath {
                     cause: shared::afflictions::DeathCause::Unknown,
-                },
-                cycles_since_last_fire: 0,
+                }]),
+                cycles_since_last_event: 0,
                 observed_by: BTreeSet::new(),
                 observer_seen_cycle: BTreeMap::new(),
             }),

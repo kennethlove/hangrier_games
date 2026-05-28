@@ -195,6 +195,7 @@ pub fn apply_cascade(
                     trauma_metadata: None,
                     phobia_metadata: None,
                     fixation_metadata: None,
+                    addiction_metadata: None,
                 };
                 successors.push(new_aff);
             }
@@ -224,6 +225,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         }
     }
 

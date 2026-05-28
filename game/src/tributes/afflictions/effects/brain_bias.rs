@@ -80,7 +80,8 @@ fn base_bias(kind: AfflictionKind) -> (f64, f64, f64, f64, f64) {
         | AfflictionKind::Electrocuted
         | AfflictionKind::Drowned
         | AfflictionKind::Buried
-        | AfflictionKind::Phobia(_) => (1.0, 1.0, 1.0, 1.0, 1.0),
+        | AfflictionKind::Phobia(_)
+        | AfflictionKind::Addiction(_) => (1.0, 1.0, 1.0, 1.0, 1.0),
         // Fixation: push toward target
         // Tribute fixation → reduced combat_avoid (want to engage)
         AfflictionKind::Fixation(FixationTarget::Tribute(_)) => (0.7, 1.0, 1.0, 1.0, 1.0),
@@ -137,6 +138,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         }
     }
 
@@ -153,6 +155,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         }
     }
 

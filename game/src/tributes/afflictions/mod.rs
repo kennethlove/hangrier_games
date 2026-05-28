@@ -6,6 +6,7 @@
 //!
 //! See `docs/superpowers/specs/2026-05-03-health-conditions-design.md`.
 
+pub mod addiction;
 pub mod anatomy;
 pub mod cascade;
 pub mod cure;
@@ -16,6 +17,7 @@ pub mod producers;
 pub mod trauma;
 pub mod tuning;
 
+pub use addiction::AddictionAcquisition;
 pub use anatomy::{AcquireResolution, RejectReason, can_acquire};
 pub use cascade::{CascadeOutcome, CascadeResult, apply_cascade, tick_cascade};
 pub use cure::{CureOutcome, apply_cure, cure_item_to_affliction, recovery_cycles};
@@ -96,6 +98,7 @@ mod visibility_tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         }
     }
 

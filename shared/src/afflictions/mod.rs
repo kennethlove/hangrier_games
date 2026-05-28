@@ -1,3 +1,4 @@
+mod addiction;
 mod affliction;
 mod fixation;
 mod kind;
@@ -7,9 +8,10 @@ mod severity;
 mod source;
 mod trauma;
 
+pub use addiction::{AddictionMetadata, AddictionResistReason};
 pub use affliction::Affliction;
 pub use fixation::{FixationAction, FixationMetadata, FixationOrigin, ThwartReason};
-pub use kind::{AfflictionKind, BodyPart, FixationTarget, PhobiaTrigger};
+pub use kind::{AfflictionKind, BodyPart, FixationTarget, PhobiaTrigger, Substance};
 pub use mechanics::{
     DecayOutcome, ReinforcementOutcome, apply_traumatic_reinforcement, tick_decay,
 };

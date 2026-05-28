@@ -44,6 +44,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         }
     }
 
@@ -730,6 +731,7 @@ mod tests {
                 trauma_metadata: None,
                 phobia_metadata: None,
                 fixation_metadata: None,
+                addiction_metadata: None,
             };
             afflictions.insert(wound.key(), wound);
 
@@ -807,6 +809,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
 
@@ -858,6 +861,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         let infected = Affliction {
             kind: AfflictionKind::Infected,
@@ -871,6 +875,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
         afflictions.insert(infected.key(), infected);
@@ -950,6 +955,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         let infected = Affliction {
             kind: AfflictionKind::Infected,
@@ -963,6 +969,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
         afflictions.insert(infected.key(), infected);
@@ -1011,6 +1018,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         let infected = Affliction {
             kind: AfflictionKind::Infected,
@@ -1024,6 +1032,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
         afflictions.insert(infected.key(), infected);
@@ -1096,6 +1105,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
 
@@ -1176,6 +1186,7 @@ mod tests {
                         trauma_metadata: None,
                         phobia_metadata: None,
                         fixation_metadata: None,
+                        addiction_metadata: None,
                     })
                     .collect()
             },
@@ -1240,6 +1251,7 @@ mod tests {
                 trauma_metadata: None,
                 phobia_metadata: None,
                 fixation_metadata: None,
+                addiction_metadata: None,
             };
 
             let mut rng = SmallRng::seed_from_u64(seed);
@@ -1283,6 +1295,7 @@ mod tests {
                     trauma_metadata: None,
                     phobia_metadata: None,
                     fixation_metadata: None,
+                    addiction_metadata: None,
                 };
                 let result = tick_cascade(&[aff], is_sheltered, &tuning, &mut rng);
                 prop_assert!(
@@ -1356,6 +1369,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
 
@@ -1447,6 +1461,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         let infected = Affliction {
             kind: AfflictionKind::Infected,
@@ -1460,6 +1475,7 @@ mod tests {
             trauma_metadata: None,
             phobia_metadata: None,
             fixation_metadata: None,
+            addiction_metadata: None,
         };
         afflictions.insert(wound.key(), wound);
         afflictions.insert(infected.key(), infected);

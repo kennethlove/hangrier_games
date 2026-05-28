@@ -222,7 +222,8 @@ impl Tribute {
                 | AfflictionKind::Deaf
                 | AfflictionKind::Trauma
                 | AfflictionKind::Phobia(_)
-                | AfflictionKind::Fixation(_) => {}
+                | AfflictionKind::Fixation(_)
+                | AfflictionKind::Addiction(_) => {}
             }
         }
 

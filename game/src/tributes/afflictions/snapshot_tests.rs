@@ -30,6 +30,7 @@ mod tests {
                 trauma_metadata: None,
                 phobia_metadata: None,
                 fixation_metadata: None,
+                addiction_metadata: None,
             },
         );
         map.insert(
@@ -46,6 +47,7 @@ mod tests {
                 trauma_metadata: None,
                 phobia_metadata: None,
                 fixation_metadata: None,
+                addiction_metadata: None,
             },
         );
         map.insert(
@@ -60,6 +62,7 @@ mod tests {
                 trauma_metadata: None,
                 phobia_metadata: None,
                 fixation_metadata: None,
+                addiction_metadata: None,
             },
         );
 

@@ -71,6 +71,10 @@ impl MessagePayload {
             | AddictionObserved { .. }
             | AddictionForgotten { .. }
             | AddictionHabituated { .. } => MessageKind::Affliction,
+            TributeTrapped { .. }
+            | Struggling { .. }
+            | TrappedEscaped { .. }
+            | TributeDiedWhileTrapped { .. } => MessageKind::Trapped,
         }
     }
 
@@ -188,6 +192,10 @@ impl MessagePayload {
                 observer, subject, ..
             } => observer == id || subject == id,
             AddictionHabituated { tribute, .. } => tribute == id,
+            TributeTrapped { tribute, .. }
+            | Struggling { tribute, .. }
+            | TrappedEscaped { tribute, .. }
+            | TributeDiedWhileTrapped { tribute, .. } => tribute == id,
             SponsorGift { recipient, .. } => r(recipient),
             AreaClosed { .. } | AreaEvent { .. } => false,
             CycleStart { .. } | CycleEnd { .. } | PhaseStarted { .. } | PhaseEnded { .. } => false,

@@ -76,6 +76,7 @@ pub fn lookup_inflicts(
                 source: AfflictionSource::Combat {
                     attacker_id: _attacker_id.into(),
                 },
+                trapped_metadata: None,
             });
         }
     }
@@ -99,6 +100,7 @@ pub fn lookup_break_mid_swing_inflict(
             source: AfflictionSource::Combat {
                 attacker_id: _attacker_id.into(),
             },
+            trapped_metadata: None,
         }
     })
 }
@@ -135,7 +137,8 @@ fn select_body_part(kind: AfflictionKind, rng: &mut impl Rng) -> Option<BodyPart
         | AfflictionKind::Trauma
         | AfflictionKind::Phobia(_)
         | AfflictionKind::Fixation(_)
-        | AfflictionKind::Addiction(_) => None,
+        | AfflictionKind::Addiction(_)
+        | AfflictionKind::Trapped(_) => None,
     }
 }
 

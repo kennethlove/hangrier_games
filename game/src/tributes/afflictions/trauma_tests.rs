@@ -203,6 +203,7 @@ mod tests {
             body_part: Some(BodyPart::Arm),
             severity: Severity::Mild,
             source: AfflictionSource::Spawn,
+            trapped_metadata: None,
         });
         assert_eq!(t.afflictions.len(), 1);
 

@@ -42,6 +42,7 @@ pub fn roll_spawn_phobias(tribute: &mut Tribute, rng: &mut impl Rng) -> Vec<Phob
             body_part: None,
             severity,
             source: AfflictionSource::Spawn,
+            trapped_metadata: None,
         };
 
         tribute.try_acquire_affliction(draft);

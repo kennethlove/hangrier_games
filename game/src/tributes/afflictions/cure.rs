@@ -142,6 +142,7 @@ mod tests {
             phobia_metadata: None,
             fixation_metadata: None,
             addiction_metadata: None,
+            trapped_metadata: None,
         }
     }
 
@@ -335,6 +336,7 @@ mod tests {
             phobia_metadata: None,
             fixation_metadata: None,
             addiction_metadata: None,
+            trapped_metadata: None,
         }];
         let result = apply_cure(&mut affs, "bandage");
         assert!(matches!(result, CureOutcome::Cured { .. }));

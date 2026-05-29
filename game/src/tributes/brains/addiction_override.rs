@@ -75,6 +75,7 @@ mod tests {
                 observed_by: BTreeSet::new(),
                 observer_seen_cycle: BTreeMap::new(),
             }),
+            trapped_metadata: None,
         }
     }
 

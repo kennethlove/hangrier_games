@@ -68,7 +68,8 @@ fn base_penalties(kind: AfflictionKind) -> (i32, i32, i32, i32, i32, f64, i32, i
         | AfflictionKind::Buried
         | AfflictionKind::Phobia(_)
         | AfflictionKind::Fixation(_)
-        | AfflictionKind::Addiction(_) => (0, 0, 0, 0, 0, 0.0, 0, 0),
+        | AfflictionKind::Addiction(_)
+        | AfflictionKind::Trapped(_) => (0, 0, 0, 0, 0, 0.0, 0, 0),
     }
 }
 
@@ -130,6 +131,7 @@ mod tests {
             phobia_metadata: None,
             fixation_metadata: None,
             addiction_metadata: None,
+            trapped_metadata: None,
         }
     }
 
@@ -147,6 +149,7 @@ mod tests {
             phobia_metadata: None,
             fixation_metadata: None,
             addiction_metadata: None,
+            trapped_metadata: None,
         }
     }
 

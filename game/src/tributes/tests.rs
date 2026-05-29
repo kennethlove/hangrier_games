@@ -543,9 +543,10 @@ fn test_try_acquire_insert() {
         body_part: Some(BodyPart::Arm),
         severity: Severity::Mild,
         source: AfflictionSource::Combat {
-            attacker_id: String::new(),
-        },
-    };
+                attacker_id: String::new(),
+            },
+            trapped_metadata: None,
+        };
     let resolution = t.try_acquire_affliction(draft);
     assert_eq!(resolution, AcquireResolution::Insert);
     assert_eq!(t.afflictions.len(), 1);
@@ -565,18 +566,20 @@ fn test_try_acquire_upgrade() {
         body_part: Some(BodyPart::Arm),
         severity: Severity::Mild,
         source: AfflictionSource::Combat {
-            attacker_id: String::new(),
-        },
-    });
+                attacker_id: String::new(),
+            },
+            trapped_metadata: None,
+        });
     // Upgrade to moderate
     let draft = AfflictionDraft {
         kind: AfflictionKind::Wounded,
         body_part: Some(BodyPart::Arm),
         severity: Severity::Moderate,
         source: AfflictionSource::Combat {
-            attacker_id: String::new(),
-        },
-    };
+                attacker_id: String::new(),
+            },
+            trapped_metadata: None,
+        };
     let resolution = t.try_acquire_affliction(draft);
     assert_eq!(
         resolution,
@@ -599,18 +602,20 @@ fn test_try_acquire_supersede() {
         body_part: Some(BodyPart::Arm),
         severity: Severity::Mild,
         source: AfflictionSource::Combat {
-            attacker_id: String::new(),
-        },
-    });
+                attacker_id: String::new(),
+            },
+            trapped_metadata: None,
+        });
     // Infected supersedes wounded at same body part
     let draft = AfflictionDraft {
         kind: AfflictionKind::Infected,
         body_part: Some(BodyPart::Arm),
         severity: Severity::Mild,
         source: AfflictionSource::Combat {
-            attacker_id: String::new(),
-        },
-    };
+                attacker_id: String::new(),
+            },
+            trapped_metadata: None,
+        };
     let resolution = t.try_acquire_affliction(draft);
     assert_eq!(resolution, AcquireResolution::Insert);
     // Wounded removed, Infected present
@@ -633,18 +638,20 @@ fn test_try_acquire_reject_limb_missing() {
         body_part: Some(BodyPart::Arm),
         severity: Severity::Severe,
         source: AfflictionSource::Combat {
-            attacker_id: String::new(),
-        },
-    });
+                attacker_id: String::new(),
+            },
+            trapped_metadata: None,
+        });
     // Can't wound a missing limb
     let draft = AfflictionDraft {
         kind: AfflictionKind::Wounded,
         body_part: Some(BodyPart::Arm),
         severity: Severity::Mild,
         source: AfflictionSource::Combat {
-            attacker_id: String::new(),
-        },
-    };
+                attacker_id: String::new(),
+            },
+            trapped_metadata: None,
+        };
     let resolution = t.try_acquire_affliction(draft);
     assert_eq!(
         resolution,
@@ -661,9 +668,10 @@ fn test_try_acquire_reject_no_wounded_ancestor() {
         body_part: Some(BodyPart::Arm),
         severity: Severity::Mild,
         source: AfflictionSource::Combat {
-            attacker_id: String::new(),
-        },
-    };
+                attacker_id: String::new(),
+            },
+            trapped_metadata: None,
+        };
     let resolution = t.try_acquire_affliction(draft);
     assert_eq!(
         resolution,
@@ -680,18 +688,20 @@ fn test_try_acquire_reject_same_severity() {
         body_part: Some(BodyPart::Arm),
         severity: Severity::Mild,
         source: AfflictionSource::Combat {
-            attacker_id: String::new(),
-        },
-    });
+                attacker_id: String::new(),
+            },
+            trapped_metadata: None,
+        });
     // Same severity rejected
     let draft = AfflictionDraft {
         kind: AfflictionKind::Wounded,
         body_part: Some(BodyPart::Arm),
         severity: Severity::Mild,
         source: AfflictionSource::Combat {
-            attacker_id: String::new(),
-        },
-    };
+                attacker_id: String::new(),
+            },
+            trapped_metadata: None,
+        };
     let resolution = t.try_acquire_affliction(draft);
     assert_eq!(
         resolution,

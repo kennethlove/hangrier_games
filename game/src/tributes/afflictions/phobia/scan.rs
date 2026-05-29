@@ -201,6 +201,7 @@ mod tests {
             body_part: None,
             severity: Severity::Mild,
             source: AfflictionSource::Spawn,
+            trapped_metadata: None,
         };
         tribute.try_acquire_affliction(draft);
 
@@ -227,6 +228,7 @@ mod tests {
             body_part: None,
             severity: Severity::Mild,
             source: AfflictionSource::Spawn,
+            trapped_metadata: None,
         };
         tribute.try_acquire_affliction(draft);
 
@@ -254,6 +256,7 @@ mod tests {
             body_part: None,
             severity: Severity::Mild,
             source: AfflictionSource::Spawn,
+            trapped_metadata: None,
         };
         tribute.try_acquire_affliction(draft);
 
@@ -271,6 +274,7 @@ mod tests {
             body_part: None,
             severity: Severity::Mild,
             source: AfflictionSource::Spawn,
+            trapped_metadata: None,
         };
         tribute.try_acquire_affliction(draft);
 
@@ -320,6 +324,7 @@ mod tests {
             body_part: None,
             severity: Severity::Mild,
             source: AfflictionSource::Spawn,
+            trapped_metadata: None,
         };
         tribute.try_acquire_affliction(draft);
 
@@ -374,6 +379,7 @@ mod tests {
             body_part: None,
             severity: Severity::Mild,
             source: AfflictionSource::Spawn,
+            trapped_metadata: None,
         };
         tribute.try_acquire_affliction(draft);
 
@@ -432,6 +438,7 @@ mod tests {
             body_part: None,
             severity: Severity::Severe,
             source: AfflictionSource::Spawn,
+            trapped_metadata: None,
         };
         tribute.try_acquire_affliction(draft);
 
@@ -488,6 +495,7 @@ mod tests {
             body_part: None,
             severity: Severity::Mild,
             source: AfflictionSource::Spawn,
+            trapped_metadata: None,
         };
         tribute.try_acquire_affliction(draft);
 
@@ -549,6 +557,7 @@ mod tests {
             body_part: None,
             severity: Severity::Moderate,
             source: AfflictionSource::Spawn,
+            trapped_metadata: None,
         };
         main_tribute.try_acquire_affliction(draft);
 
@@ -601,6 +610,7 @@ mod tests {
             body_part: None,
             severity: Severity::Mild,
             source: AfflictionSource::Spawn,
+            trapped_metadata: None,
         };
         main_tribute.try_acquire_affliction(draft);
 
@@ -643,6 +653,7 @@ mod tests {
             body_part: None,
             severity: Severity::Mild,
             source: AfflictionSource::Spawn,
+            trapped_metadata: None,
         };
         tribute.try_acquire_affliction(draft);
 

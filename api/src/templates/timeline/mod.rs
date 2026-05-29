@@ -393,5 +393,6 @@ pub fn event_card(msg: &GameMessage) -> maud::Markup {
         Affliction => cards::affliction_card(msg),
         Phobia => cards::phobia_card(msg),
         Fixation => cards::fixation_card(msg),
+        Trapped => cards::trapped_card(msg),
     }
 }

@@ -4,6 +4,7 @@ use super::kind::{AfflictionKind, BodyPart};
 use super::phobia::PhobiaMetadata;
 use super::severity::Severity;
 use super::source::{AfflictionKey, AfflictionSource};
+use super::trapped::TrappedMetadata;
 use super::trauma::TraumaMetadata;
 use serde::{Deserialize, Serialize};
 
@@ -33,6 +34,10 @@ pub struct Affliction {
     /// Only `Some` for `AfflictionKind::Addiction` variants.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub addiction_metadata: Option<AddictionMetadata>,
+    /// Optional trapped-specific metadata (trap kind, cycles trapped, escape progress).
+    /// Only `Some` for `AfflictionKind::Trapped` variants.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trapped_metadata: Option<TrappedMetadata>,
 }
 
 impl Affliction {
@@ -78,6 +83,7 @@ mod tests {
             phobia_metadata: None,
             fixation_metadata: None,
             addiction_metadata: None,
+            trapped_metadata: None,
         };
         assert_eq!(a.key(), (AfflictionKind::Wounded, Some(BodyPart::Arm)));
     }
@@ -97,6 +103,7 @@ mod tests {
             phobia_metadata: None,
             fixation_metadata: None,
             addiction_metadata: None,
+            trapped_metadata: None,
         };
         assert!(a.is_permanent());
     }
@@ -116,6 +123,7 @@ mod tests {
             phobia_metadata: None,
             fixation_metadata: None,
             addiction_metadata: None,
+            trapped_metadata: None,
         };
         assert!(a.is_permanent());
     }
@@ -133,6 +141,7 @@ mod tests {
             phobia_metadata: None,
             fixation_metadata: None,
             addiction_metadata: None,
+            trapped_metadata: None,
         };
         assert!(a.is_reversible());
     }
@@ -150,6 +159,7 @@ mod tests {
             phobia_metadata: Some(PhobiaMetadata::default()),
             fixation_metadata: None,
             addiction_metadata: None,
+            trapped_metadata: None,
         };
         let json = serde_json::to_string(&aff).unwrap();
         let restored: Affliction = serde_json::from_str(&json).unwrap();
@@ -171,7 +181,33 @@ mod tests {
             phobia_metadata: None,
             fixation_metadata: None,
             addiction_metadata: None,
+            trapped_metadata: None,
         };
         assert!(aff.phobia_metadata.is_none());
+    }
+
+    #[test]
+    fn affliction_with_trapped_metadata_serializes() {
+        use crate::afflictions::trapped::{TrapKind, TrappedMetadata};
+
+        let a = Affliction {
+            kind: AfflictionKind::Trapped(TrapKind::Drowning),
+            body_part: None,
+            severity: Severity::Severe,
+            source: AfflictionSource::Environmental,
+            acquired_cycle: 5,
+            last_progressed_cycle: 5,
+            trauma_metadata: None,
+            phobia_metadata: None,
+            fixation_metadata: None,
+            addiction_metadata: None,
+            trapped_metadata: Some(TrappedMetadata::fresh_for(TrapKind::Drowning, Some(0.30))),
+        };
+
+        let json = serde_json::to_string(&a).unwrap();
+        assert!(json.contains("trapped_metadata"));
+        assert!(json.contains("drowning"));
+        let restored: Affliction = serde_json::from_str(&json).unwrap();
+        assert_eq!(a, restored);
     }
 }

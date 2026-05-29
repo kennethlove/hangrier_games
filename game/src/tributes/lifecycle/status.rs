@@ -4,10 +4,16 @@ use crate::messages::{MessagePayload, TaggedEvent, TributeRef};
 use crate::output::GameOutput;
 use crate::tributes::AfflictionDraft;
 use crate::tributes::Tribute;
+use crate::tributes::afflictions::trapped::{
+    area_event_to_trap, escape_roll_target, get_escape_stat, severity_index, trap_tuning_for,
+};
 use crate::tributes::statuses::TributeStatus;
 use rand::RngExt;
 use rand::prelude::*;
-use shared::afflictions::{AfflictionKind, AfflictionSource, BodyPart, Severity};
+use shared::afflictions::{
+    AfflictionKind, AfflictionSource, BodyPart, Severity, TrapKind, TrappedMetadata,
+    escape_threshold,
+};
 
 /// Status effect damage constants
 const WOUNDED_DAMAGE: u32 = 1;
@@ -25,10 +31,7 @@ const BROKEN_BONE_SKULL_INTELLIGENCE_REDUCTION: u32 = 5;
 const BROKEN_BONE_RIB_DAMAGE: u32 = 5;
 const INFECTED_DAMAGE: u32 = 2;
 const INFECTED_MENTAL_DAMAGE: u32 = 5;
-const DROWNED_DAMAGE: u32 = 2;
-const DROWNED_MENTAL_DAMAGE: u32 = 2;
 const BURNED_DAMAGE: u32 = 5;
-const BURIED_DAMAGE: u32 = 5;
 
 impl Tribute {
     /// Set the tribute's status
@@ -46,31 +49,23 @@ impl Tribute {
                         body_part: None,
                         severity: Severity::Severe,
                         source: AfflictionSource::Environmental,
+                        trapped_metadata: None,
                     });
                 }
-                AreaEvent::Flood => {
-                    self.try_acquire_affliction(AfflictionDraft {
-                        kind: AfflictionKind::Drowned,
-                        body_part: None,
-                        severity: Severity::Moderate,
-                        source: AfflictionSource::Environmental,
-                    });
-                }
-                AreaEvent::Earthquake => {
-                    self.try_acquire_affliction(AfflictionDraft {
-                        kind: AfflictionKind::Buried,
-                        body_part: None,
-                        severity: Severity::Severe,
-                        source: AfflictionSource::Environmental,
-                    });
-                }
-                AreaEvent::Avalanche => {
-                    self.try_acquire_affliction(AfflictionDraft {
-                        kind: AfflictionKind::Buried,
-                        body_part: None,
-                        severity: Severity::Severe,
-                        source: AfflictionSource::Environmental,
-                    });
+                AreaEvent::Flood
+                | AreaEvent::Earthquake
+                | AreaEvent::Avalanche
+                | AreaEvent::Landslide
+                | AreaEvent::Rockslide => {
+                    if let Some((trap_kind, severity)) = area_event_to_trap(event.clone()) {
+                        self.try_acquire_affliction(AfflictionDraft {
+                            kind: AfflictionKind::Trapped(trap_kind),
+                            body_part: None,
+                            severity,
+                            source: AfflictionSource::Environmental,
+                            trapped_metadata: Some(TrappedMetadata::fresh_for(trap_kind, None)),
+                        });
+                    }
                 }
                 AreaEvent::Blizzard => {
                     self.try_acquire_affliction(AfflictionDraft {
@@ -78,14 +73,7 @@ impl Tribute {
                         body_part: None,
                         severity: Severity::Moderate,
                         source: AfflictionSource::Environmental,
-                    });
-                }
-                AreaEvent::Landslide => {
-                    self.try_acquire_affliction(AfflictionDraft {
-                        kind: AfflictionKind::Buried,
-                        body_part: None,
-                        severity: Severity::Severe,
-                        source: AfflictionSource::Environmental,
+                        trapped_metadata: None,
                     });
                 }
                 AreaEvent::Heatwave => {
@@ -94,6 +82,7 @@ impl Tribute {
                         body_part: None,
                         severity: Severity::Moderate,
                         source: AfflictionSource::Environmental,
+                        trapped_metadata: None,
                     });
                 }
                 AreaEvent::Sandstorm => {
@@ -102,6 +91,7 @@ impl Tribute {
                         body_part: Some(BodyPart::Arm),
                         severity: Severity::Mild,
                         source: AfflictionSource::Environmental,
+                        trapped_metadata: None,
                     });
                 }
                 AreaEvent::Drought => {
@@ -110,14 +100,7 @@ impl Tribute {
                         body_part: None,
                         severity: Severity::Moderate,
                         source: AfflictionSource::Environmental,
-                    });
-                }
-                AreaEvent::Rockslide => {
-                    self.try_acquire_affliction(AfflictionDraft {
-                        kind: AfflictionKind::Buried,
-                        body_part: None,
-                        severity: Severity::Severe,
-                        source: AfflictionSource::Environmental,
+                        trapped_metadata: None,
                     });
                 }
             }
@@ -206,17 +189,72 @@ impl Tribute {
                     self.takes_physical_damage(INFECTED_DAMAGE);
                     self.takes_mental_damage(INFECTED_MENTAL_DAMAGE);
                 }
-                AfflictionKind::Drowned => {
-                    self.takes_physical_damage(DROWNED_DAMAGE);
-                    self.takes_mental_damage(DROWNED_MENTAL_DAMAGE);
-                }
                 AfflictionKind::Burned => {
                     self.takes_physical_damage(BURNED_DAMAGE);
                 }
-                AfflictionKind::Buried => {
-                    self.takes_physical_damage(BURIED_DAMAGE);
+                AfflictionKind::Trapped(kind) => {
+                    let tuning = trap_tuning_for(*kind);
+                    let sev_idx = severity_index(
+                        self.afflictions
+                            .get(&(AfflictionKind::Trapped(*kind), None))
+                            .map(|a| a.severity)
+                            .unwrap_or(Severity::Mild),
+                    );
+                    // Extract all data before mutating to avoid borrow conflicts
+                    let (cycles_trapped, _disorientation_remaining) = self
+                        .afflictions
+                        .get(&(AfflictionKind::Trapped(*kind), None))
+                        .and_then(|a| a.trapped_metadata.as_ref())
+                        .map(|m| (m.cycles_trapped, m.disorientation_remaining))
+                        .unwrap_or((0, 0));
+                    let buried_severity = self
+                        .afflictions
+                        .get(&(AfflictionKind::Trapped(*kind), None))
+                        .map(|a| a.severity);
+                    let escape_stat = get_escape_stat(self, *kind);
+
+                    match kind {
+                        TrapKind::Drowning => {
+                            self.takes_mental_damage(tuning.mental_damage[sev_idx]);
+                        }
+                        TrapKind::Buried => {
+                            let progressive =
+                                tuning.progressive_damage_per_cycle * cycles_trapped as u32;
+                            self.takes_physical_damage(tuning.hp_damage[sev_idx] + progressive);
+                            self.takes_mental_damage(tuning.mental_damage[sev_idx]);
+                        }
+                    }
+
+                    // Update metadata (separate mutable borrow)
+                    if let Some(meta) = self
+                        .afflictions
+                        .get_mut(&(AfflictionKind::Trapped(*kind), None))
+                        .and_then(|a| a.trapped_metadata.as_mut())
+                    {
+                        match kind {
+                            TrapKind::Drowning => {
+                                if meta.disorientation_remaining > 0 {
+                                    meta.disorientation_remaining -= 1;
+                                }
+                            }
+                            TrapKind::Buried => {
+                                let target = escape_roll_target(
+                                    escape_stat,
+                                    buried_severity.unwrap_or(Severity::Mild),
+                                    meta,
+                                    0.0,
+                                );
+                                if rng.random_bool(target as f64) {
+                                    meta.escape_progress += 1;
+                                }
+                            }
+                        }
+                        meta.cycles_trapped += 1;
+                    }
                 }
-                AfflictionKind::MissingArm
+                AfflictionKind::Drowned
+                | AfflictionKind::Buried
+                | AfflictionKind::MissingArm
                 | AfflictionKind::MissingLeg
                 | AfflictionKind::Blind
                 | AfflictionKind::Deaf
@@ -233,6 +271,24 @@ impl Tribute {
             let damage = animal.damage() * number_of_animals;
             self.takes_physical_damage(damage);
         }
+
+        // Check for escaped Buried afflictions — remove them
+        let escaped: Vec<(AfflictionKind, Option<BodyPart>)> = self
+            .afflictions
+            .iter()
+            .filter_map(|((kind, bp), aff)| {
+                if let (AfflictionKind::Trapped(TrapKind::Buried), Some(meta)) =
+                    (kind, &aff.trapped_metadata)
+                    && meta.escape_progress >= escape_threshold(aff.severity)
+                {
+                    return Some((kind.clone(), *bp));
+                }
+                None
+            })
+            .collect();
+        for key in escaped {
+            self.afflictions.remove(&key);
+        }
     }
 }
 
@@ -248,7 +304,7 @@ mod tests {
     use rand::SeedableRng;
     use rand::rngs::SmallRng;
     use rstest::*;
-    use shared::afflictions::{AfflictionKind, AfflictionSource, Severity};
+    use shared::afflictions::{AfflictionKind, AfflictionSource, Severity, TrapKind};
 
     #[fixture]
     fn tribute() -> Tribute {
@@ -292,6 +348,7 @@ mod tests {
             body_part: None,
             severity: Severity::Severe,
             source: AfflictionSource::Environmental,
+            trapped_metadata: None,
         });
         let area_details =
             AreaDetails::new(Some("Forest".to_string()), crate::areas::Area::Cornucopia);
@@ -389,7 +446,7 @@ mod tests {
     }
 
     #[rstest]
-    fn flood_sets_drowned_affliction(mut tribute: Tribute) {
+    fn flood_sets_trapped_affliction(mut tribute: Tribute) {
         let mut area_details =
             AreaDetails::new(Some("River".to_string()), crate::areas::Area::Cornucopia);
         area_details.events.push(AreaEvent::Flood);
@@ -399,12 +456,12 @@ mod tests {
         assert!(
             tribute
                 .afflictions
-                .contains_key(&(AfflictionKind::Drowned, None))
+                .contains_key(&(AfflictionKind::Trapped(TrapKind::Drowning), None))
         );
     }
 
     #[rstest]
-    fn earthquake_sets_buried_affliction(mut tribute: Tribute) {
+    fn earthquake_sets_trapped_affliction(mut tribute: Tribute) {
         let mut area_details =
             AreaDetails::new(Some("Cave".to_string()), crate::areas::Area::Cornucopia);
         area_details.events.push(AreaEvent::Earthquake);
@@ -414,7 +471,7 @@ mod tests {
         assert!(
             tribute
                 .afflictions
-                .contains_key(&(AfflictionKind::Buried, None))
+                .contains_key(&(AfflictionKind::Trapped(TrapKind::Buried), None))
         );
     }
 }

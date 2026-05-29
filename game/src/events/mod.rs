@@ -242,13 +242,6 @@ mod tests {
                 GameOutput::TributePoisoned("Alice"),
             ),
             (
-                GameEvent::TributeDrowned {
-                    tribute_id: uid_a(),
-                    tribute_name: "Alice".into(),
-                },
-                GameOutput::TributeDrowned("Alice"),
-            ),
-            (
                 GameEvent::TributeMauled {
                     tribute_id: uid_a(),
                     tribute_name: "Alice".into(),
@@ -584,8 +577,8 @@ mod tests {
     #[test]
     fn parity_table_covers_every_variant() {
         // Bumps any time a variant is added without a parity row.
-        // 74 = current count of GameOutput variants in output.rs.
-        assert_eq!(parity_table().len(), 74);
+        // 73 = current count of GameEvent variants in types.rs.
+        assert_eq!(parity_table().len(), 73);
     }
 
     #[test]

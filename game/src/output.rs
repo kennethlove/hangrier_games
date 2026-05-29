@@ -2,6 +2,7 @@ use crate::items::Item;
 use crate::threats::animals::Animal;
 use indefinite::indefinite;
 use indefinite::indefinite_capitalized;
+use shared::afflictions::TrapKind;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
@@ -46,7 +47,10 @@ pub enum GameOutput<'a> {
     TributeDehydrated(&'a str),
     TributeStarving(&'a str),
     TributePoisoned(&'a str),
-    TributeDrowned(&'a str),
+    TributeDiedWhileTrapped {
+        tribute_name: &'a str,
+        kind: TrapKind,
+    },
     TributeMauled(&'a str, u32, &'a str, u32),
     TributeBurned(&'a str),
     TributeHorrified(&'a str, u32),
@@ -226,13 +230,6 @@ impl<'a> Display for GameOutput<'a> {
             GameOutput::TributePoisoned(tribute) => {
                 write!(f, "🧪 {} eats something poisonous, loses sanity", tribute)
             }
-            GameOutput::TributeDrowned(tribute) => {
-                write!(
-                    f,
-                    "🏊 {} partially drowns, loses health and sanity",
-                    tribute
-                )
-            }
             GameOutput::TributeMauled(tribute, count, animal, damage) => {
                 let animal = Animal::from_str(animal).unwrap();
                 write!(
@@ -247,6 +244,17 @@ impl<'a> Display for GameOutput<'a> {
             GameOutput::TributeBurned(tribute) => {
                 write!(f, "🔥 {} gets burned, loses health", tribute)
             }
+            GameOutput::TributeDiedWhileTrapped {
+                tribute_name,
+                kind,
+            } => match kind {
+                TrapKind::Drowning => {
+                    write!(f, "💧 {} drowned.", tribute_name)
+                }
+                TrapKind::Buried => {
+                    write!(f, "🪦 {} suffocated, buried alive.", tribute_name)
+                }
+            },
             GameOutput::TributeHorrified(tribute, damage) => {
                 write!(
                     f,

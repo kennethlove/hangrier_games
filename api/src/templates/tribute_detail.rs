@@ -71,14 +71,14 @@ pub fn tribute_detail_page(
                     }
                 }
 
-                // Afflictions (non-fixation)
-                @let non_fixation_afflictions: Vec<_> = tribute.afflictions.values()
-                    .filter(|a| !matches!(a.kind, AfflictionKind::Fixation(_)))
+                // Afflictions (non-fixation, non-addiction)
+                @let non_special_afflictions: Vec<_> = tribute.afflictions.values()
+                    .filter(|a| !matches!(a.kind, AfflictionKind::Fixation(_) | AfflictionKind::Addiction(_)))
                     .collect();
-                @if !non_fixation_afflictions.is_empty() {
+                @if !non_special_afflictions.is_empty() {
                     div class="card-afflictions" {
                         h3 { (icon("bandage")) " Afflictions" }
-                        @for affliction in &non_fixation_afflictions {
+                        @for affliction in &non_special_afflictions {
                             @let severity_class = match affliction.severity.to_string().as_str() {
                                 "severe" => "severity-severe",
                                 "moderate" => "severity-moderate",
@@ -88,6 +88,65 @@ pub fn tribute_detail_page(
                             span class=(format!("affliction-badge {}", severity_class)) {
                                 (icon("bandage"))
                                 " " (affliction.kind.to_string()) (body_part)
+                            }
+                        }
+                    }
+                }
+
+                // Addictions section
+                @let addictions: Vec<_> = tribute.afflictions.values()
+                    .filter(|a| matches!(a.kind, AfflictionKind::Addiction(_)))
+                    .collect();
+                @if !addictions.is_empty() {
+                    div class="addictions-section" {
+                        h3 { (icon("activity")) " Addictions" }
+                        @for affliction in &addictions {
+                            @let substance = match &affliction.kind {
+                                AfflictionKind::Addiction(s) => s,
+                                _ => unreachable!(),
+                            };
+                            @let meta = &affliction.addiction_metadata;
+                            @let severity = affliction.severity.to_string();
+                            @let severity_class = match severity.as_str() {
+                                "severe" => "severity-severe",
+                                "moderate" => "severity-moderate",
+                                _ => "severity-mild",
+                            };
+                            @let use_count = tribute.addiction_use_count.get(substance).copied().unwrap_or(0);
+                            @let bar_pct = ((use_count as f64) / 20.0_f64).min(1.0) * 100.0;
+
+                            div class="addiction-card" {
+                                div class="addiction-header" {
+                                    (icon(substance.icon_name()))
+                                    " " (substance.to_string())
+                                    span class=(format!("affliction-badge {}", severity_class)) { (severity) }
+                                }
+                                @if let Some(m) = meta {
+                                    div class="addiction-meta" {
+                                        @if m.high_cycles_remaining > 0 {
+                                            span class="badge-high" {
+                                                "HIGH \u{d7}" (m.high_cycles_remaining)
+                                            }
+                                        } @else {
+                                            span class="badge-withdrawal" {
+                                                (icon("withdrawal"))
+                                                " WITHDRAWAL"
+                                            }
+                                        }
+                                        span { "Cycles since last use: " (m.cycles_since_last_use) }
+                                    }
+                                    div class="addiction-observers" {
+                                        (icon("eye"))
+                                        " Observed by " (m.observed_by.len()) " tribute(s)"
+                                    }
+                                    // Use-count bar
+                                    div class="use-count-bar" {
+                                        span class="use-count-label" { "Total uses: " (use_count) }
+                                        div class="bar-track" {
+                                            div class="bar-fill" style=(format!("width: {:.0}%", bar_pct)) {}
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

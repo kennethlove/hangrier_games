@@ -1,4 +1,5 @@
 use maud::html;
+use shared::afflictions::AfflictionKind;
 use shared::{DisplayGame, GameStatus};
 
 use super::pages::status_color;
@@ -204,15 +205,47 @@ fn tribute_card(tribute: &game::tributes::Tribute) -> maud::Markup {
             @if !tribute.afflictions.is_empty() {
                 div class="card-afflictions" {
                     @for (_key, affliction) in &tribute.afflictions {
-                        @let severity_class = match affliction.severity.to_string().as_str() {
-                            "severe" => "severity-severe",
-                            "moderate" => "severity-moderate",
-                            _ => "severity-mild",
+                        @if !matches!(affliction.kind, AfflictionKind::Addiction(_)) {
+                            @let severity_class = match affliction.severity.to_string().as_str() {
+                                "severe" => "severity-severe",
+                                "moderate" => "severity-moderate",
+                                _ => "severity-mild",
+                            };
+                            @let body_part = affliction.body_part.map(|bp| format!(" ({bp})")).unwrap_or_default();
+                            span class=(format!("affliction-badge {}", severity_class)) {
+                                (icon("bandage"))
+                                " " (affliction.kind) (body_part)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Addiction state indicators
+            @let addictions: Vec<_> = tribute.afflictions.values()
+                .filter(|a| matches!(a.kind, AfflictionKind::Addiction(_)))
+                .collect();
+            @if !addictions.is_empty() {
+                div class="card-addiction-state" {
+                    @for affliction in &addictions {
+                        @let substance = match &affliction.kind {
+                            AfflictionKind::Addiction(s) => s,
+                            _ => unreachable!(),
                         };
-                        @let body_part = affliction.body_part.map(|bp| format!(" ({bp})")).unwrap_or_default();
-                        span class=(format!("affliction-badge {}", severity_class)) {
-                            (icon("bandage"))
-                            " " (affliction.kind) (body_part)
+                        @if let Some(meta) = &affliction.addiction_metadata {
+                            @if meta.high_cycles_remaining > 0 {
+                                span class="addiction-state-high" {
+                                    (icon(substance.icon_name()))
+                                    " HIGH"
+                                }
+                            } @else {
+                                @if affliction.severity >= shared::afflictions::Severity::Moderate {
+                                    span class="addiction-state-withdrawal" {
+                                        (icon("withdrawal"))
+                                        " WITHDRAWAL"
+                                    }
+                                }
+                            }
                         }
                     }
                 }

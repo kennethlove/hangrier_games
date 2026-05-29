@@ -162,8 +162,6 @@ pub enum AfflictionKind {
     Burned,
     Sick,
     Electrocuted,
-    Drowned,
-    Buried,
     Trapped(TrapKind),
     Trauma,
     Phobia(PhobiaTrigger),
@@ -189,8 +187,6 @@ impl fmt::Display for AfflictionKind {
             AfflictionKind::Burned => write!(f, "burned"),
             AfflictionKind::Sick => write!(f, "sick"),
             AfflictionKind::Electrocuted => write!(f, "electrocuted"),
-            AfflictionKind::Drowned => write!(f, "drowned"),
-            AfflictionKind::Buried => write!(f, "buried"),
             AfflictionKind::Trapped(kind) => write!(f, "trapped:{kind}"),
             AfflictionKind::Trauma => write!(f, "trauma"),
             AfflictionKind::Phobia(trigger) => write!(f, "phobia:{trigger}"),
@@ -220,8 +216,8 @@ impl FromStr for AfflictionKind {
             "burned" => Ok(AfflictionKind::Burned),
             "sick" => Ok(AfflictionKind::Sick),
             "electrocuted" => Ok(AfflictionKind::Electrocuted),
-            "drowned" => Ok(AfflictionKind::Drowned),
-            "buried" => Ok(AfflictionKind::Buried),
+            "drowned" => Ok(AfflictionKind::Trapped(TrapKind::Drowning)),
+            "buried" => Ok(AfflictionKind::Trapped(TrapKind::Buried)),
             "trauma" => Ok(AfflictionKind::Trauma),
             rest if rest.starts_with("phobia:") => {
                 let trigger_str = rest.strip_prefix("phobia:").unwrap();

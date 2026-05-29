@@ -244,10 +244,7 @@ impl<'a> Display for GameOutput<'a> {
             GameOutput::TributeBurned(tribute) => {
                 write!(f, "🔥 {} gets burned, loses health", tribute)
             }
-            GameOutput::TributeDiedWhileTrapped {
-                tribute_name,
-                kind,
-            } => match kind {
+            GameOutput::TributeDiedWhileTrapped { tribute_name, kind } => match kind {
                 TrapKind::Drowning => {
                     write!(f, "💧 {} drowned.", tribute_name)
                 }

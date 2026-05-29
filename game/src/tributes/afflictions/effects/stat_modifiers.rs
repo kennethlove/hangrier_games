@@ -64,8 +64,6 @@ fn base_penalties(kind: AfflictionKind) -> (i32, i32, i32, i32, i32, f64, i32, i
         | AfflictionKind::Burned
         | AfflictionKind::Sick
         | AfflictionKind::Electrocuted
-        | AfflictionKind::Drowned
-        | AfflictionKind::Buried
         | AfflictionKind::Phobia(_)
         | AfflictionKind::Fixation(_)
         | AfflictionKind::Addiction(_)

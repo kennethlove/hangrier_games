@@ -83,8 +83,8 @@ pub const PARTIAL_RESCUE_THRESHOLD: u8 = 2;
 /// Cap on total rescue contribution per cycle (prevents 4 rescuers from trivializing).
 pub const RESCUE_BONUS_CAP: f32 = 0.80;
 
-/// Escape progress needed to free self from Buried, indexed by severity.
-/// Retained as doc reference — single success escapes now (threshold always 1).
+// Escape progress needed to free self from Buried, indexed by severity.
+// Retained as doc reference — single success escapes now (threshold always 1).
 // const ESCAPE_THRESHOLD_MILD: u8 = 3;
 // const ESCAPE_THRESHOLD_MODERATE: u8 = 5;
 // const ESCAPE_THRESHOLD_SEVERE: u8 = 8;
@@ -124,6 +124,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn severity_bases_ordered() {
         assert!(SEVERITY_BASE_SEVERE < SEVERITY_BASE_MODERATE);
         assert!(SEVERITY_BASE_MODERATE < SEVERITY_BASE_MILD);

@@ -277,12 +277,11 @@ impl Tribute {
             .afflictions
             .iter()
             .filter_map(|((kind, bp), aff)| {
-                if let AfflictionKind::Trapped(TrapKind::Buried) = kind {
-                    if let Some(meta) = &aff.trapped_metadata {
-                        if meta.escape_progress >= escape_threshold(aff.severity) {
-                            return Some((kind.clone(), *bp));
-                        }
-                    }
+                if let (AfflictionKind::Trapped(TrapKind::Buried), Some(meta)) =
+                    (kind, &aff.trapped_metadata)
+                    && meta.escape_progress >= escape_threshold(aff.severity)
+                {
+                    return Some((kind.clone(), *bp));
                 }
                 None
             })

@@ -1459,6 +1459,7 @@ fn sleeping_wounded_tribute_does_not_regen_hp() {
             phobia_metadata: None,
             fixation_metadata: None,
             addiction_metadata: None,
+            trapped_metadata: None,
         },
     );
     let prior_hp = t.attributes.health;

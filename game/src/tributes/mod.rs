@@ -40,7 +40,7 @@ use rand::rngs::SmallRng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeSeq};
 use shared::afflictions::{
     Affliction, AfflictionKey, AfflictionKind, AfflictionSource, BodyPart, PhobiaTrigger, Severity,
-    Substance, TraumaSource,
+    Substance, TrappedMetadata, TraumaSource,
 };
 use statuses::TributeStatus;
 use uuid::Uuid;
@@ -1133,6 +1133,7 @@ impl Tribute {
             phobia_metadata: None,
             fixation_metadata: None,
             addiction_metadata: None,
+            trapped_metadata: draft.trapped_metadata.clone(),
         };
         let resolution = can_acquire(&self.afflictions, &provisional);
 
@@ -1174,6 +1175,7 @@ impl Tribute {
                     phobia_metadata: None,
                     fixation_metadata: None,
                     addiction_metadata: None,
+                    trapped_metadata: draft.trapped_metadata.clone(),
                 };
                 self.afflictions
                     .insert((draft.kind.clone(), draft.body_part), affliction);
@@ -1220,6 +1222,7 @@ pub struct AfflictionDraft {
     pub body_part: Option<BodyPart>,
     pub severity: Severity,
     pub source: AfflictionSource,
+    pub trapped_metadata: Option<TrappedMetadata>,
 }
 
 /// Calculates the stamina cost for a tribute action based on:
@@ -1903,6 +1906,7 @@ mod tests {
             source: AfflictionSource::Combat {
                 attacker_id: "tributes:test".into(),
             },
+            trapped_metadata: None,
         };
         let resolution = t.try_acquire_affliction(draft);
         assert_eq!(resolution, AcquireResolution::Insert);
@@ -1924,6 +1928,7 @@ mod tests {
             source: AfflictionSource::Combat {
                 attacker_id: "tributes:test".into(),
             },
+            trapped_metadata: None,
         });
         // Upgrade to moderate
         let draft = AfflictionDraft {
@@ -1933,6 +1938,7 @@ mod tests {
             source: AfflictionSource::Combat {
                 attacker_id: "tributes:test".into(),
             },
+            trapped_metadata: None,
         };
         let resolution = t.try_acquire_affliction(draft);
         assert_eq!(
@@ -1958,6 +1964,7 @@ mod tests {
             source: AfflictionSource::Combat {
                 attacker_id: "tributes:test".into(),
             },
+            trapped_metadata: None,
         });
         // Infected supersedes wounded at same body part
         let draft = AfflictionDraft {
@@ -1967,6 +1974,7 @@ mod tests {
             source: AfflictionSource::Combat {
                 attacker_id: "tributes:test".into(),
             },
+            trapped_metadata: None,
         };
         let resolution = t.try_acquire_affliction(draft);
         assert_eq!(resolution, AcquireResolution::Insert);
@@ -1992,6 +2000,7 @@ mod tests {
             source: AfflictionSource::Combat {
                 attacker_id: "tributes:test".into(),
             },
+            trapped_metadata: None,
         });
         // Can't wound a missing limb
         let draft = AfflictionDraft {
@@ -2001,6 +2010,7 @@ mod tests {
             source: AfflictionSource::Combat {
                 attacker_id: "tributes:test".into(),
             },
+            trapped_metadata: None,
         };
         let resolution = t.try_acquire_affliction(draft);
         assert_eq!(
@@ -2020,6 +2030,7 @@ mod tests {
             source: AfflictionSource::Combat {
                 attacker_id: "tributes:test".into(),
             },
+            trapped_metadata: None,
         };
         let resolution = t.try_acquire_affliction(draft);
         assert_eq!(
@@ -2039,6 +2050,7 @@ mod tests {
             source: AfflictionSource::Combat {
                 attacker_id: "tributes:test".into(),
             },
+            trapped_metadata: None,
         });
         // Same severity rejected
         let draft = AfflictionDraft {
@@ -2048,6 +2060,7 @@ mod tests {
             source: AfflictionSource::Combat {
                 attacker_id: "tributes:test".into(),
             },
+            trapped_metadata: None,
         };
         let resolution = t.try_acquire_affliction(draft);
         assert_eq!(

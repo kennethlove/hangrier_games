@@ -171,6 +171,7 @@ impl Tribute {
                 phobia_metadata: None,
                 fixation_metadata: None,
                 addiction_metadata: Some(meta),
+                trapped_metadata: None,
             };
             self.ever_addicted_to.insert(substance);
             self.afflictions.insert(key, aff);
@@ -218,6 +219,7 @@ impl Tribute {
                 phobia_metadata: None,
                 fixation_metadata: None,
                 addiction_metadata: Some(meta),
+                trapped_metadata: None,
             };
             self.ever_addicted_to.insert(substance);
             self.afflictions.insert(key, aff);

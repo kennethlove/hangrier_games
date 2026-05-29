@@ -199,6 +199,7 @@ mod tests {
             body_part: None,
             severity,
             source: AfflictionSource::Spawn,
+            trapped_metadata: None,
         };
         tribute.try_acquire_affliction(draft);
         if let Some((_, aff)) = tribute.afflictions.iter_mut().next() {
@@ -270,6 +271,7 @@ mod tests {
             body_part: None,
             severity: Severity::Mild,
             source: AfflictionSource::Spawn,
+            trapped_metadata: None,
         };
         tribute.try_acquire_affliction(draft);
         if let Some((_, aff)) = tribute

@@ -449,7 +449,8 @@ pub fn log_page(
         TraumaAcquired,TraumaReinforced,TraumaEscalated,TraumaFlashback,TraumaAvoidance,TraumaObserved,TraumaForgotten,TraumaHabituated,\
         PhobiaAcquired,PhobiaTriggered,        FixationAcquired,FixationEscalated,FixationFired,FixationConsummated,FixationThwarted,FixationFaded,\
         SubstanceUsed,AddictionAcquired,AddictionReinforced,AddictionEscalated,AddictionResisted,AddictionRelapse,\
-        AddictionCraving,AddictionObserved,AddictionForgotten,AddictionHabituated";
+        AddictionCraving,AddictionObserved,AddictionForgotten,AddictionHabituated,\
+        TributeTrapped,Struggling,TrappedEscaped,TributeDiedWhileTrapped";
 
     base_layout(
         "Log",
@@ -523,6 +524,7 @@ fn message_kind_label(payload: &shared::messages::MessagePayload) -> &'static st
         MessageKind::Affliction => "Health",
         MessageKind::Phobia => "Fear",
         MessageKind::Fixation => "Fixation",
+        MessageKind::Trapped => "Trapped",
     }
 }
 
@@ -593,6 +595,11 @@ fn message_kind_icon(payload: &shared::messages::MessagePayload) -> maud::Markup
         | MessagePayload::FixationConsummated { .. }
         | MessagePayload::FixationThwarted { .. }
         | MessagePayload::FixationFaded { .. } => "eye",
+        MessagePayload::TributeTrapped { .. } | MessagePayload::Struggling { .. } => {
+            "alert-triangle"
+        }
+        MessagePayload::TrappedEscaped { .. } => "check-circle",
+        MessagePayload::TributeDiedWhileTrapped { .. } => "skull",
     };
     icon(name)
 }
@@ -611,6 +618,7 @@ fn kind_color(payload: &shared::messages::MessagePayload) -> &'static str {
         MessageKind::Affliction => "kind-affliction",
         MessageKind::Phobia => "kind-phobia",
         MessageKind::Fixation => "kind-fixation",
+        MessageKind::Trapped => "kind-trapped",
     }
 }
 

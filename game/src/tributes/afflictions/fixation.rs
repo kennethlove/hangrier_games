@@ -87,6 +87,7 @@ pub fn roll_spawn_fixations(tribute: &mut Tribute, rng: &mut SmallRng) {
                 cycles_since_last_contact: 0,
             }),
             addiction_metadata: None,
+            trapped_metadata: None,
         };
         tribute.afflictions.insert(key, aff);
     }
@@ -131,6 +132,7 @@ pub fn maybe_acquire_item_fixation(tribute: &mut Tribute, item: &Item) {
             cycles_since_last_contact: 0,
         }),
         addiction_metadata: None,
+        trapped_metadata: None,
     };
     tribute.afflictions.insert(key, aff);
 }
@@ -365,6 +367,7 @@ mod tests {
                 cycles_since_last_contact: 6, // past decay threshold
             }),
             addiction_metadata: None,
+            trapped_metadata: None,
         };
         tribute.afflictions.insert(key, aff);
     }
@@ -406,6 +409,7 @@ mod tests {
                 cycles_since_last_contact: 0,
             }),
             addiction_metadata: None,
+            trapped_metadata: None,
         };
         tribute.afflictions.insert(key, aff);
     }
@@ -768,6 +772,7 @@ mod tests {
                 cycles_since_last_contact: 6, // past DECAY_THRESHOLD
             }),
             addiction_metadata: None,
+            trapped_metadata: None,
         };
         a.afflictions.insert(key, aff);
 
@@ -892,6 +897,7 @@ mod tests {
                 cycles_since_last_contact: 10, // well past DECAY_THRESHOLD
             }),
             addiction_metadata: None,
+            trapped_metadata: None,
         };
         t.afflictions.insert(key, aff);
 

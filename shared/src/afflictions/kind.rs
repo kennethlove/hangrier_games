@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
 
+use crate::afflictions::trapped::TrapKind;
+
 /// Categories of afflictions a tribute can carry. Permanent kinds
 /// (`MissingArm`, `MissingLeg`, `Blind`, `Deaf`) cannot be cured in v1;
 /// reversible kinds progress / heal via the cascade and cure paths.
@@ -162,6 +164,7 @@ pub enum AfflictionKind {
     Electrocuted,
     Drowned,
     Buried,
+    Trapped(TrapKind),
     Trauma,
     Phobia(PhobiaTrigger),
     Fixation(FixationTarget),
@@ -188,6 +191,7 @@ impl fmt::Display for AfflictionKind {
             AfflictionKind::Electrocuted => write!(f, "electrocuted"),
             AfflictionKind::Drowned => write!(f, "drowned"),
             AfflictionKind::Buried => write!(f, "buried"),
+            AfflictionKind::Trapped(kind) => write!(f, "trapped:{kind}"),
             AfflictionKind::Trauma => write!(f, "trauma"),
             AfflictionKind::Phobia(trigger) => write!(f, "phobia:{trigger}"),
             AfflictionKind::Fixation(target) => write!(f, "fixation:{target}"),
@@ -233,6 +237,14 @@ impl FromStr for AfflictionKind {
                 let sub_str = rest.strip_prefix("addiction:").unwrap();
                 let sub = Substance::from_str(sub_str)?;
                 Ok(AfflictionKind::Addiction(sub))
+            }
+            rest if rest.starts_with("trapped:") => {
+                let kind_str = rest.strip_prefix("trapped:").unwrap();
+                match kind_str {
+                    "drowning" => Ok(AfflictionKind::Trapped(TrapKind::Drowning)),
+                    "buried" => Ok(AfflictionKind::Trapped(TrapKind::Buried)),
+                    other => Err(format!("unknown TrapKind: {other}")),
+                }
             }
             other => Err(format!("unknown AfflictionKind: {other}")),
         }
@@ -407,5 +419,24 @@ mod tests {
     #[test]
     fn affliction_kind_fixation_from_str_invalid() {
         assert!(AfflictionKind::from_str("fixation:unknown:foo").is_err());
+    }
+
+    #[test]
+    fn affliction_kind_trapped_serializes_with_inner_kind() {
+        let kind = AfflictionKind::Trapped(TrapKind::Drowning);
+        let json = serde_json::to_string(&kind).unwrap();
+        assert_eq!(json, r#"{"trapped":"drowning"}"#);
+
+        let buried = AfflictionKind::Trapped(TrapKind::Buried);
+        let json = serde_json::to_string(&buried).unwrap();
+        assert_eq!(json, r#"{"trapped":"buried"}"#);
+    }
+
+    #[test]
+    fn affliction_kind_trapped_round_trips() {
+        let kind = AfflictionKind::Trapped(TrapKind::Drowning);
+        let json = serde_json::to_string(&kind).unwrap();
+        let back: AfflictionKind = serde_json::from_str(&json).unwrap();
+        assert_eq!(kind, back);
     }
 }

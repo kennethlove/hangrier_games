@@ -166,6 +166,7 @@ mod tests {
                 cycles_since_last_contact: 0,
             }),
             addiction_metadata: None,
+            trapped_metadata: None,
         }
     }
 

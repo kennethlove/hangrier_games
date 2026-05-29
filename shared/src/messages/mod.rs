@@ -176,6 +176,8 @@ pub enum MessageKind {
     /// Affliction acquired, progressed, healed, or cascaded.
     /// Fixation acquired, escalated, fired, consummated, thwarted, or faded.
     Fixation,
+    /// Trapped affliction events: tribute trapped, struggling, escaped, or died.
+    Trapped,
     Affliction,
 }
 
@@ -697,6 +699,31 @@ pub enum MessagePayload {
         substance: String,
         from_severity: String,
         to_severity: Option<String>,
+    },
+    /// Tribute became trapped by a hazard (drowning, buried, etc.).
+    TributeTrapped {
+        tribute: String,
+        kind: crate::afflictions::TrapKind,
+        severity: crate::afflictions::Severity,
+    },
+    /// Tribute is still trapped — ongoing struggle with cumulative effect.
+    Struggling {
+        tribute: String,
+        kind: crate::afflictions::TrapKind,
+        severity: crate::afflictions::Severity,
+        cycles_trapped: u8,
+    },
+    /// Tribute escaped the trap (may have been rescued).
+    TrappedEscaped {
+        tribute: String,
+        kind: crate::afflictions::TrapKind,
+        cycles_trapped: u8,
+        rescued_by: Vec<String>,
+    },
+    /// Tribute died while trapped — could not escape in time.
+    TributeDiedWhileTrapped {
+        tribute: String,
+        kind: crate::afflictions::TrapKind,
     },
 }
 

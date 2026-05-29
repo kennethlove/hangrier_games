@@ -17,6 +17,7 @@ fn test_full_acquisition_flow() {
         source: AfflictionSource::Combat {
             attacker_id: "tributes:test".into(),
         },
+        trapped_metadata: None,
     });
     assert!(matches!(resolution, AcquireResolution::Insert));
     assert_eq!(tribute.afflictions.len(), 1);
@@ -29,6 +30,7 @@ fn test_full_acquisition_flow() {
         source: AfflictionSource::Combat {
             attacker_id: "tributes:test".into(),
         },
+        trapped_metadata: None,
     });
     assert!(matches!(resolution, AcquireResolution::Upgrade(_)));
     assert_eq!(tribute.afflictions.len(), 1); // Still 1, upgraded in place
@@ -41,6 +43,7 @@ fn test_full_acquisition_flow() {
         source: AfflictionSource::Combat {
             attacker_id: "tributes:test".into(),
         },
+        trapped_metadata: None,
     });
     assert!(matches!(resolution, AcquireResolution::Insert));
     assert_eq!(tribute.afflictions.len(), 2);
@@ -59,12 +62,14 @@ fn test_affliction_serde_round_trip() {
         source: AfflictionSource::Combat {
             attacker_id: "tributes:test".into(),
         },
+        trapped_metadata: None,
     });
     tribute.try_acquire_affliction(AfflictionDraft {
         kind: AfflictionKind::Burned,
         body_part: None,
         severity: Severity::Severe,
         source: AfflictionSource::Environmental,
+        trapped_metadata: None,
     });
 
     assert_eq!(tribute.afflictions.len(), 2);

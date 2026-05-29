@@ -897,6 +897,77 @@ pub fn fixation_card(msg: &GameMessage) -> maud::Markup {
     }
 }
 
+/// Trapped event card. Handles 4 trapped message variants.
+pub fn trapped_card(msg: &GameMessage) -> maud::Markup {
+    use shared::messages::MessagePayload::*;
+    let (content, icon_name, label, label_color) = match &msg.payload {
+        TributeTrapped {
+            tribute,
+            kind,
+            severity,
+        } => (
+            format!("{tribute} trapped by {kind} ({severity})"),
+            "alert-triangle",
+            "Trapped",
+            "text-orange-400",
+        ),
+        Struggling {
+            tribute,
+            kind,
+            severity,
+            cycles_trapped,
+        } => (
+            format!("{tribute} struggling in {kind} ({severity}, cycle {cycles_trapped})"),
+            "alert-triangle",
+            "Trapped",
+            "text-orange-400",
+        ),
+        TrappedEscaped {
+            tribute,
+            kind,
+            cycles_trapped,
+            rescued_by,
+        } => {
+            let rescuer_text = if rescued_by.is_empty() {
+                String::new()
+            } else {
+                format!(" (rescued by {})", rescued_by.join(", "))
+            };
+            (
+                format!("{tribute} escaped {kind} after {cycles_trapped} cycles{rescuer_text}"),
+                "check-circle",
+                "Freed",
+                "text-green-400",
+            )
+        }
+        TributeDiedWhileTrapped { tribute, kind } => (
+            format!("{tribute} died while trapped in {kind}"),
+            "skull",
+            "Death",
+            "text-red-400",
+        ),
+        _ => return super::super::timeline::cards::fallback_card(msg),
+    };
+
+    let border_color = match &msg.payload {
+        TributeDiedWhileTrapped { .. } => "border-red-900/50",
+        TrappedEscaped { .. } => "border-green-900/50",
+        _ => "border-orange-900/50",
+    };
+
+    html! {
+        div class=(format!("bg-gray-900 border rounded-lg p-3 {}", border_color)) {
+            div class="flex items-center gap-2 text-xs text-gray-500 mb-1" {
+                (icon(icon_name))
+                span class=(format!("{} font-medium", label_color)) { (label) }
+                span { "\u{b7}" }
+                span { "Day " (msg.game_day) " " (msg.phase) }
+            }
+            p class="text-sm text-gray-200" { (content) }
+        }
+    }
+}
+
 /// Fallback card for unrecognized payloads.
 pub fn fallback_card(msg: &GameMessage) -> maud::Markup {
     html! {

@@ -14,6 +14,7 @@ pub mod effects;
 pub mod fixation;
 pub mod phobia;
 pub mod producers;
+pub mod trapped;
 pub mod trauma;
 pub mod tuning;
 
@@ -99,6 +100,7 @@ mod visibility_tests {
             phobia_metadata: None,
             fixation_metadata: None,
             addiction_metadata: None,
+            trapped_metadata: None,
         }
     }
 

@@ -105,6 +105,18 @@ pub enum Substance {
     Painkiller,
 }
 
+impl Substance {
+    /// Icon name for sprite-ui.svg lookups.
+    pub fn icon_name(&self) -> &'static str {
+        match self {
+            Substance::Stimulant => "stimulant",
+            Substance::Morphling => "morphling",
+            Substance::Alcohol => "alcohol",
+            Substance::Painkiller => "painkiller",
+        }
+    }
+}
+
 impl fmt::Display for Substance {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

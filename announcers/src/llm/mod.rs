@@ -5,7 +5,10 @@
 //! `features = ["ollama"]`).
 
 use async_trait::async_trait;
-use crate::types::{BroadcastPackage, CommentaryError, CommentarySegment};
+use futures::stream::Stream;
+use std::pin::Pin;
+
+use crate::types::{BroadcastPackage, CommentaryError, CommentaryLine, CommentarySegment};
 
 /// A commentator generates Verity/Rex broadcast dialogue from a
 /// [`BroadcastPackage`].
@@ -19,6 +22,17 @@ pub trait Commentator: Send + Sync {
     /// Takes a fully-structured [`BroadcastPackage`] and returns a
     /// [`CommentarySegment`] with interleaved Verity/Rex lines.
     async fn generate(&self, package: &BroadcastPackage) -> Result<CommentarySegment, CommentaryError>;
+
+    /// Stream commentary lines progressively.
+    ///
+    /// Yields [`CommentaryLine`]s as they become available. Backends that
+    /// support token-level streaming (e.g. Ollama) can parse lines from
+    /// the token stream in real time. Backends without streaming support
+    /// can collect from [`generate`] and yield all lines at once.
+    fn generate_stream(
+        &self,
+        package: &BroadcastPackage,
+    ) -> Pin<Box<dyn Stream<Item = Result<CommentaryLine, CommentaryError>> + Send>>;
 }
 
 #[cfg(feature = "ollama")]

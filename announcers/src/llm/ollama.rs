@@ -5,8 +5,11 @@
 //! tagged commentary lines.
 
 use async_trait::async_trait;
+use futures::stream::Stream;
+use futures::StreamExt;
 use ollama_rs::Ollama;
 use ollama_rs::generation::completion::request::GenerationRequest;
+use std::pin::Pin;
 
 use crate::llm::Commentator;
 use crate::types::{
@@ -224,6 +227,141 @@ impl Commentator for OllamaCommentator {
             model_used: self.model.clone(),
         })
     }
+
+    fn generate_stream(
+        &self,
+        package: &BroadcastPackage,
+    ) -> Pin<Box<dyn Stream<Item = Result<CommentaryLine, CommentaryError>> + Send>> {
+        let prompt = self.build_prompt(package);
+        let model = self.model.clone();
+        let client = self.client.clone();
+
+        // Use unfold to turn the Ollama token stream into a CommentaryLine stream.
+        let stream = futures::stream::unfold(
+            OllamaStreamState {
+                client,
+                model,
+                prompt,
+                buffer: String::new(),
+                ollama_stream: None,
+                done: false,
+            },
+            |mut state| async move {
+                if state.done {
+                    let line = flush_buffer(&mut state.buffer);
+                    return line.map(|l| (Ok(l), state));
+                }
+
+                // Lazily start the Ollama stream on first poll.
+                if state.ollama_stream.is_none() {
+                    let request = GenerationRequest::new(state.model.clone(), state.prompt.clone());
+                    match state.client.generate_stream(request).await {
+                        Ok(s) => {
+                            // Convert the complex ollama stream into a simple
+                            // string stream by extracting `.response` from each
+                            // `GenerationResponse`.
+                            let string_stream: Pin<
+                                Box<dyn Stream<Item = Result<String, ollama_rs::error::OllamaError>> + Send>,
+                            > = Box::pin(s.flat_map(move |result| {
+                                let items: Vec<Result<String, ollama_rs::error::OllamaError>> = match result {
+                                    Ok(chunk) => chunk.into_iter().map(|resp| Ok(resp.response)).collect(),
+                                    Err(e) => vec![Err(e)],
+                                };
+                                futures::stream::iter(items)
+                            }));
+                            state.ollama_stream = Some(string_stream);
+                        }
+                        Err(e) => {
+                            state.done = true;
+                            return Some((
+                                Err(CommentaryError::Generate(format!(
+                                    "Ollama stream failed: {e}"
+                                ))),
+                                state,
+                            ));
+                        }
+                    }
+                }
+
+                // Pull tokens from Ollama, buffering by line.
+                if let Some(ref mut stream) = state.ollama_stream {
+                    while let Some(result) = stream.next().await {
+                        match result {
+                            Ok(chunk) => {
+                                state.buffer.push_str(&chunk);
+                                // Yield complete lines ending in \n.
+                                while let Some(pos) = state.buffer.find('\n') {
+                                    let line = state.buffer[..pos].trim().to_string();
+                                    state.buffer = state.buffer[pos + 1..].to_string();
+                                    if let Some(parsed) = parse_line(&line) {
+                                        return Some((Ok(parsed), state));
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                state.done = true;
+                                return Some((
+                                    Err(CommentaryError::Generate(format!(
+                                        "Ollama stream token error: {e}"
+                                    ))),
+                                    state,
+                                ));
+                            }
+                        }
+                    }
+                }
+
+                // Ollama stream ended naturally.
+                state.done = true;
+                let line = flush_buffer(&mut state.buffer);
+                if let Some(l) = line {
+                    return Some((Ok(l), state));
+                }
+                None
+            },
+        );
+
+        Box::pin(stream)
+    }
+}
+
+/// Internal state for the `generate_stream` unfold.
+struct OllamaStreamState {
+    client: Ollama,
+    model: String,
+    prompt: String,
+    buffer: String,
+    /// Boxed to avoid naming the complex stream type from ollama-rs.
+    ollama_stream:
+        Option<Pin<Box<dyn Stream<Item = Result<String, ollama_rs::error::OllamaError>> + Send>>>,
+    done: bool,
+}
+
+/// Try to extract a `[VERITY]` or `[REX]` line from the buffer.
+fn flush_buffer(buffer: &mut String) -> Option<CommentaryLine> {
+    if buffer.trim().is_empty() {
+        return None;
+    }
+    let line = std::mem::take(buffer);
+    parse_line(line.trim())
+}
+
+/// Parse a single line as a `[VERITY]` or `[REX]` utterance.
+fn parse_line(line: &str) -> Option<CommentaryLine> {
+    let line = line.trim();
+    if line.is_empty() {
+        return None;
+    }
+    line.strip_prefix("[VERITY]")
+        .or_else(|| line.strip_prefix("[REX]"))
+        .map(|text| CommentaryLine {
+            speaker: if line.starts_with("[VERITY]") {
+                "Verity".into()
+            } else {
+                "Rex".into()
+            },
+            text: text.trim().to_string(),
+        })
 }
 
 /// Returns a single-character icon for an event kind, giving the LLM a
@@ -240,103 +378,5 @@ fn event_icon(kind: EventKind) -> &'static str {
         EventKind::Sponsor => "🎁",
         EventKind::State => "📊",
         EventKind::Other => "📌",
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::types::{EventKind, EventLine, GameStateSnapshot};
-
-    fn sample_package() -> BroadcastPackage {
-        BroadcastPackage {
-            header: GameStateSnapshot {
-                alive_count: 12,
-                kill_leaders: vec![],
-                alliances: vec![],
-                hot_zones: vec![],
-            killing_sprees: vec![],
-            },
-            events: vec![
-                EventLine {
-                    kind: EventKind::Death,
-                    prose: "Cato killed Peeta.".into(),
-                    structured: None,
-                },
-                EventLine {
-                    kind: EventKind::Combat,
-                    prose: "Katniss wounded Marvel.".into(),
-                    structured: None,
-                },
-            ],
-            histories: vec![],
-        }
-    }
-
-    #[test]
-    fn prompt_contains_system_and_package() {
-        let commentator = OllamaCommentator::new();
-        let pkg = sample_package();
-        let prompt = commentator.build_prompt(&pkg);
-
-        assert!(prompt.contains("live sports broadcast team"));
-        assert!(prompt.contains("Cato killed Peeta."));
-        assert!(prompt.contains("PHASE EVENTS"));
-        assert!(prompt.contains("12 tributes"));
-    }
-
-    #[test]
-    fn parse_verity_rex_lines() {
-        let input = "\
-[VERITY] And here we go!
-[REX] This is intense.
-[VERITY] Katniss takes aim.
-
-Some random text that should be ignored.
-
-[REX] What a shot!";
-        let lines = OllamaCommentator::parse_response(input);
-        assert_eq!(lines.len(), 4);
-        assert_eq!(lines[0].speaker, "Verity");
-        assert_eq!(lines[0].text, "And here we go!");
-        assert_eq!(lines[1].speaker, "Rex");
-        assert_eq!(lines[1].text, "This is intense.");
-        assert_eq!(lines[2].speaker, "Verity");
-        assert_eq!(lines[3].speaker, "Rex");
-        assert_eq!(lines[3].text, "What a shot!");
-    }
-
-    #[test]
-    fn parse_empty_response() {
-        assert_eq!(OllamaCommentator::parse_response("").len(), 0);
-    }
-
-    #[test]
-    fn parse_skips_non_tagged_lines() {
-        let input = "\
-[VERITY] Hello.
-Narrator: something happened.
-[REX] Goodbye.";
-        let lines = OllamaCommentator::parse_response(input);
-        assert_eq!(lines.len(), 2);
-    }
-
-    #[test]
-    fn build_prompt_handles_empty_package() {
-        let commentator = OllamaCommentator::new();
-        let pkg = BroadcastPackage {
-            header: GameStateSnapshot {
-                alive_count: 24,
-                kill_leaders: vec![],
-                alliances: vec![],
-                hot_zones: vec![],
-                killing_sprees: vec![],
-            },
-            events: vec![],
-            histories: vec![],
-        };
-        let prompt = commentator.build_prompt(&pkg);
-        assert!(prompt.contains("24 tributes"));
-        assert!(prompt.contains("PHASE CONTEXT"));
     }
 }

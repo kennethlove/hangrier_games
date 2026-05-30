@@ -4,9 +4,11 @@
 //! logic directly, avoiding the `tokio::spawn` race that makes
 //! HTTP-level testing of the background task flaky.
 
-use announcers::{CommentaryError, CommentarySegment};
+use announcers::{CommentaryError, CommentaryLine, CommentarySegment};
 use async_trait::async_trait;
+use futures::stream::Stream;
 use shared::messages::{MessagePayload, MessageSource, Phase, TributeRef};
+use std::pin::Pin;
 use std::sync::Arc;
 
 /// A mock commentator that records invocations.
@@ -51,6 +53,25 @@ impl announcers::Commentator for MockCommentator {
             generated_at: chrono::Utc::now(),
             model_used: "test-mock".into(),
         })
+    }
+
+    fn generate_stream(
+        &self,
+        _package: &announcers::BroadcastPackage,
+    ) -> Pin<Box<dyn Stream<Item = Result<CommentaryLine, CommentaryError>> + Send>> {
+        self.invocation_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let lines = vec![
+            CommentaryLine {
+                speaker: "Verity".into(),
+                text: "What a day in the arena!".into(),
+            },
+            CommentaryLine {
+                speaker: "Rex".into(),
+                text: "Absolutely brutal, Verity.".into(),
+            },
+        ];
+        let items: Vec<_> = lines.into_iter().map(Ok).collect();
+        Box::pin(futures::stream::iter(items))
     }
 }
 

@@ -65,6 +65,8 @@ mod tests {
     use super::*;
     use crate::types::{CommentaryError, CommentaryLine, CommentarySegment};
     use async_trait::async_trait;
+    use futures::stream::Stream;
+    use std::pin::Pin;
     use shared::messages::{GameMessage, MessagePayload, MessageSource, Phase, TributeRef};
 
     /// A mock commentator that returns a fixed segment.
@@ -122,6 +124,19 @@ mod tests {
                 generated_at: chrono::Utc::now(),
                 model_used: "mock".into(),
             })
+        }
+
+        fn generate_stream(
+            &self,
+            _package: &BroadcastPackage,
+        ) -> Pin<Box<dyn Stream<Item = Result<CommentaryLine, CommentaryError>> + Send>> {
+            let lines: Vec<Result<CommentaryLine, CommentaryError>> = self
+                .lines
+                .clone()
+                .into_iter()
+                .map(Ok)
+                .collect();
+            Box::pin(futures::stream::iter(lines))
         }
     }
 

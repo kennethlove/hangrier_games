@@ -161,6 +161,7 @@ version = "0.2.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "futures",
  "ollama-rs",
  "serde",
  "serde_json",

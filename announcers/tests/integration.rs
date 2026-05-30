@@ -8,10 +8,12 @@
 //!   5. Assert package structure and accumulated history
 
 use announcers::{
-    BroadcastPackageBuilder, Commentator, CommentaryError, CommentarySegment, GameStateSnapshot,
-    TributeDigest, TributeHistories,
+    BroadcastPackageBuilder, Commentator, CommentaryError, CommentaryLine, CommentarySegment,
+    GameStateSnapshot, TributeDigest, TributeHistories,
 };
 use async_trait::async_trait;
+use futures::stream::Stream;
+use std::pin::Pin;
 use shared::messages::{
     AreaRef, GameMessage, ItemRef, MessagePayload, MessageSource,
     Phase, TributeRef,
@@ -103,6 +105,19 @@ impl Commentator for MockCommentator {
             generated_at: chrono::Utc::now(),
             model_used: "mock".into(),
         })
+    }
+
+    fn generate_stream(
+        &self,
+        _package: &announcers::BroadcastPackage,
+    ) -> Pin<Box<dyn Stream<Item = Result<CommentaryLine, CommentaryError>> + Send>> {
+        // Collect from batch generate and yield all lines at once.
+        let segment = match futures::executor::block_on(self.generate(_package)) {
+            Ok(s) => s,
+            Err(e) => return Box::pin(futures::stream::iter(vec![Err(e)])),
+        };
+        let items: Vec<_> = segment.lines.into_iter().map(Ok).collect();
+        Box::pin(futures::stream::iter(items))
     }
 }
 

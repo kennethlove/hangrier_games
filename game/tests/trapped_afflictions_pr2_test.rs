@@ -75,7 +75,10 @@ fn rescue_bonus_applied_to_trapped_target() {
     target.area = game::areas::Area::Cornucopia;
     add_buried(&mut target, Severity::Mild);
 
-    let area = AreaDetails { area: Some(game::areas::Area::Cornucopia), ..Default::default() };
+    let area = AreaDetails {
+        area: Some(game::areas::Area::Cornucopia),
+        ..Default::default()
+    };
 
     let mut rng = SmallRng::seed_from_u64(0);
     let mut events = Vec::new();

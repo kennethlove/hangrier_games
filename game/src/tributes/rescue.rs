@@ -198,7 +198,10 @@ mod tests {
     }
 
     fn same_area_details() -> AreaDetails {
-        AreaDetails { area: Some(Area::Cornucopia), ..Default::default() }
+        AreaDetails {
+            area: Some(Area::Cornucopia),
+            ..Default::default()
+        }
     }
 
     // -- compute_rescue_bonus tests --

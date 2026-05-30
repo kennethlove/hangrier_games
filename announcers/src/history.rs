@@ -82,6 +82,10 @@ impl TributeHistories {
                             &k.identifier,
                             &format!("Killed {} (cause: {cause})", victim.name),
                         );
+                        self.push_highlight(
+                            &k.identifier,
+                            &format!("Killed {} ({})", victim.name, cause),
+                        );
                         // Bump killer's spree streak; victim's resets on death.
                         self.bump_streak(&k.identifier);
                     }
@@ -211,6 +215,10 @@ impl TributeHistories {
                             &m.identifier,
                             &format!("Formed alliance with {}", join_names(&allies)),
                         );
+                        self.push_highlight(
+                            &m.identifier,
+                            &format!("Allied with {}", join_names(&allies)),
+                        );
                     }
                 }
 
@@ -239,7 +247,15 @@ impl TributeHistories {
                         &betrayer.identifier,
                         &format!("Betrayed {}", victim.name),
                     );
+                    self.push_highlight(
+                        &betrayer.identifier,
+                        &format!("Betrayed {}", victim.name),
+                    );
                     self.push_event(
+                        &victim.identifier,
+                        &format!("Betrayed by {}", betrayer.name),
+                    );
+                    self.push_highlight(
                         &victim.identifier,
                         &format!("Betrayed by {}", betrayer.name),
                     );
@@ -574,6 +590,18 @@ impl TributeHistories {
         }
     }
 
+    /// Append a permanent highlight for a tribute. Capped at `MAX_HIGHLIGHTS`
+    /// (20); oldest prunes first. Highlights persist across phases alongside
+    /// the rolling `notable_events`.
+    fn push_highlight(&mut self, id: &str, event: &str) {
+        if let Some(digest) = self.inner.get_mut(id) {
+            digest.highlights.push(event.to_string());
+            if digest.highlights.len() > crate::types::MAX_HIGHLIGHTS {
+                digest.highlights.remove(0);
+            }
+        }
+    }
+
     /// Increment a tribute's kill streak (they scored a kill this phase).
     /// Fires a milestone event when crossing a spree tier boundary
     /// (2 → "heating up", 4 → "on fire", 6 → "dominating", 8 → "unstoppable").
@@ -670,6 +698,7 @@ mod tests {
             location: "Cornucopia".into(),
             allies: vec![],
             kill_streak: 0,
+            highlights: vec![],
             notable_events: vec![],
         }
     }

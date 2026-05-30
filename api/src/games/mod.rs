@@ -463,16 +463,16 @@ async fn run_game_cycles(
                     *area_counts.entry(name.clone()).or_insert(0) += 1;
                 }
             }
-            let mut hot_zones: Vec<announcers::AreaActivity> = area_counts
+            let mut sorted: Vec<(String, u32, &str)> = area_counts
                 .into_iter()
                 .map(|(name, count)| {
                     let level = announcers::severity::describe_area_activity(count);
                     (name, count, level)
                 })
-                .collect::<Vec<_>>();
+                .collect();
             // Sort by count descending so the hottest areas come first.
-            hot_zones.sort_by(|a, b| b.1.cmp(&a.1));
-            let hot_zones: Vec<announcers::AreaActivity> = hot_zones
+            sorted.sort_by(|a, b| b.1.cmp(&a.1));
+            let hot_zones: Vec<announcers::AreaActivity> = sorted
                 .into_iter()
                 .map(|(name, _count, level)| announcers::AreaActivity {
                     name,
@@ -516,7 +516,7 @@ async fn run_game_cycles(
                                 "Commentary generated"
                             );
 
-                            // Persist commentary segment to SurrealDB.
+                            // Persist commentary segment to SurrealDB (with retry).
                             let body = match serde_json::to_value(&segment) {
                                 Ok(v) => v,
                                 Err(e) => {
@@ -524,12 +524,21 @@ async fn run_game_cycles(
                                     return;
                                 }
                             };
-                            if let Err(e) = db
-                                .query("CREATE commentary_segments CONTENT $body")
-                                .bind(("body", body))
-                                .await
+                            let body_clone = body.clone();
+                            let dbc = db.clone();
+                            if let Err(e) = retry(move || {
+                                let b = body_clone.clone();
+                                let db2 = dbc.clone();
+                                async move {
+                                    db2.query("CREATE commentary_segments CONTENT $b")
+                                        .bind(("b", b))
+                                        .await
+                                        .map_err(|e| e.to_string())
+                                }
+                            })
+                            .await
                             {
-                                tracing::error!(error = %e, "Failed to save commentary segment");
+                                tracing::error!(error = %e, "Failed to save commentary segment after retries");
                             }
 
                             // Broadcast via WebSocket/SSE (only when content exists).
@@ -544,15 +553,28 @@ async fn run_game_cycles(
                         // accumulate across cycles, even when the LLM returns
                         // an empty response.
                         if let Some(ref digests_json) = digests_json
-                            && let Err(e) = db
-                                .query(
-                                    "UPSERT tribute_histories CONTENT { game_id: $game_id, digests: $digests }",
-                                )
-                                .bind(("game_id", game_id.clone()))
-                                .bind(("digests", digests_json.clone()))
+                            && let Err(e) = {
+                                let dj = digests_json.clone();
+                                let gid = game_id.clone();
+                                let dbc = db.clone();
+                                retry(move || {
+                                    let d = dj.clone();
+                                    let g = gid.clone();
+                                    let db2 = dbc.clone();
+                                    async move {
+                                        db2.query(
+                                            "UPSERT tribute_histories CONTENT { game_id: $g, digests: $d }",
+                                        )
+                                        .bind(("g", g))
+                                        .bind(("d", d))
+                                        .await
+                                        .map_err(|e| e.to_string())
+                                    }
+                                })
                                 .await
+                            }
                         {
-                            tracing::error!(error = %e, "Failed to save tribute histories");
+                            tracing::error!(error = %e, "Failed to save tribute histories after retries");
                         }
                     }
                     Err(e) => {
@@ -652,6 +674,41 @@ fn build_tribute_digest(t: &game::tributes::Tribute) -> announcers::TributeDiges
         location: t.area.to_string(),
         allies: vec![],
         kill_streak: 0,
+        highlights: vec![],
         notable_events: vec![],
     }
+}
+
+/// Retry a fallible async operation up to `MAX_RETRIES` times with
+/// exponential backoff (100ms, 200ms, 400ms). Returns `Ok(value)` on the
+/// first success, or the last error after all retries are exhausted.
+const MAX_RETRIES: u32 = 3;
+const BASE_DELAY_MS: u64 = 100;
+
+async fn retry<F, Fut, T>(op: F) -> Result<T, String>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = Result<T, String>>,
+{
+    let mut last_err = String::new();
+    for attempt in 0..=MAX_RETRIES {
+        match op().await {
+            Ok(val) => return Ok(val),
+            Err(e) => {
+                last_err = e;
+                if attempt < MAX_RETRIES {
+                    let delay = BASE_DELAY_MS * 2u64.pow(attempt);
+                    tracing::warn!(
+                        attempt = attempt + 1,
+                        max = MAX_RETRIES + 1,
+                        delay_ms = delay,
+                        error = %last_err,
+                        "Retrying DB operation"
+                    );
+                    tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+                }
+            }
+        }
+    }
+    Err(last_err)
 }

@@ -71,6 +71,7 @@ fn make_tribute(name: &str, district: u8) -> TributeDigest {
         location: "Cornucopia".into(),
         allies: vec![],
         kill_streak: 0,
+            highlights: vec![],
         notable_events: vec![],
     }
 }
@@ -501,4 +502,40 @@ fn severity_area_activity_labels() {
     assert_eq!(announcers::severity::describe_area_activity(0), "quiet");
     assert_eq!(announcers::severity::describe_area_activity(2), "active");
     assert_eq!(announcers::severity::describe_area_activity(5), "hot");
+}
+
+/// Highlights persist for kills, betrayals, and alliances — they survive
+/// beyond the rolling 30-event cap.
+#[tokio::test]
+async fn permanent_highlights() {
+    let roster = vec![make_tribute("Cato", 2)];
+    let mut histories = TributeHistories::new(roster);
+
+    // Cato kills 35 tributes (overflows the 30-event rolling cap).
+    for i in 1..=35 {
+        histories.update(&[make_msg(MessagePayload::TributeKilled {
+            victim: tr(&format!("Victim{i}")),
+            killer: Some(tr("Cato")),
+            cause: "combat".into(),
+        })]);
+    }
+
+    let d = histories.digests();
+    let cato = d.iter().find(|d| d.name == "Cato").unwrap();
+
+    // Rolling events capped at 30.
+    assert_eq!(cato.notable_events.len(), 30);
+
+    // Highlights still have all 20 (capped at MAX_HIGHLIGHTS).
+    assert_eq!(cato.highlights.len(), 20);
+
+    // Each highlight mentions a kill.
+    assert!(cato.highlights[0].contains("Killed"));
+
+    // Highlights survive serde_json round-trip (as they would through
+    // SurrealDB persistence).
+    let json = serde_json::to_value(&cato).unwrap();
+    let restored: TributeDigest = serde_json::from_value(json).unwrap();
+    assert_eq!(restored.highlights.len(), 20);
+    assert!(restored.highlights[0].contains("Killed"));
 }

@@ -1,6 +1,11 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+/// Maximum number of permanent highlights retained per tribute.
+/// Keeps prompt size bounded while preserving a tribute's full arc-defining
+/// moments (kills, betrayals, alliances, survivals). Oldest prunes first.
+pub const MAX_HIGHLIGHTS: usize = 20;
+
 // ---------------------------------------------------------------------------
 // Event kinds — the category labels the broadcast builder assigns to each
 // phase event so the LLM prompt can dispatch on kind + prose.
@@ -139,6 +144,11 @@ pub struct TributeDigest {
     /// Capped at 30 entries (prunes oldest).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub notable_events: Vec<String>,
+    /// Permanent highlights — kills, betrayals, alliances, and other pivotal
+    /// moments that survive the rolling cap. Never pruned except by a hard
+    /// cap of MAX_HIGHLIGHTS (currently 20) to keep prompt size bounded.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub highlights: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------

@@ -103,6 +103,9 @@ impl Tribute {
                         trapped_metadata: None,
                     });
                 }
+                // Sinkhole is handled as instant-death in process_event_for_area.
+                // This arm is unreachable for alive tributes but required for exhaustive match.
+                AreaEvent::Sinkhole => { /* no-op — instant death handled upstream */ }
             }
         }
     }
@@ -231,6 +234,23 @@ impl Tribute {
                             self.takes_physical_damage(tuning.hp_damage[sev_idx] + progressive);
                             self.takes_mental_damage(tuning.mental_damage[sev_idx]);
                         }
+                        // Pitfall: HP + mental damage per cycle
+                        TrapKind::Pitfall => {
+                            self.takes_physical_damage(tuning.hp_damage[sev_idx]);
+                            self.takes_mental_damage(tuning.mental_damage[sev_idx]);
+                        }
+                        // SpikedPitfall: stub — instant death handled upstream
+                        TrapKind::SpikedPitfall => { /* no-op */ }
+                        // Snared: HP + mental damage per cycle
+                        TrapKind::Snared => {
+                            self.takes_physical_damage(tuning.hp_damage[sev_idx]);
+                            self.takes_mental_damage(tuning.mental_damage[sev_idx]);
+                        }
+                        // Pinned: HP + mental damage per cycle
+                        TrapKind::Pinned => {
+                            self.takes_physical_damage(tuning.hp_damage[sev_idx]);
+                            self.takes_mental_damage(tuning.mental_damage[sev_idx]);
+                        }
                     }
 
                     // Update metadata (separate mutable borrow)
@@ -256,6 +276,10 @@ impl Tribute {
                                     meta.escape_progress += 1;
                                 }
                             }
+                            TrapKind::Pitfall
+                            | TrapKind::SpikedPitfall
+                            | TrapKind::Snared
+                            | TrapKind::Pinned => { /* no per-cycle metadata update */ }
                         }
                         meta.cycles_trapped += 1;
                         meta.rescue_bonus_accumulated = 0.0;

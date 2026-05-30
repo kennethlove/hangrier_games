@@ -14,6 +14,17 @@ pub enum TrapKind {
     /// Trapped under cave-in/debris. Escape via cumulative dig-out progress
     /// rolls. Progressive HP loss while trapped. Others can assist (PR2).
     Buried,
+    /// Pitfall: immobilizes, can still fight, defense halved.
+    /// Escape via Strength. No terrain floor.
+    Pitfall,
+    /// Spiked Pitfall: instant death — not an affliction, handled separately.
+    SpikedPitfall,
+    /// Snared: tangled but can still fight. No defense penalty.
+    /// Escape via Intelligence.
+    Snared,
+    /// Pinned: fully immobilized. Most HP-intensive.
+    /// Escape via Strength.
+    Pinned,
 }
 
 impl fmt::Display for TrapKind {
@@ -21,6 +32,10 @@ impl fmt::Display for TrapKind {
         match self {
             TrapKind::Drowning => write!(f, "drowning"),
             TrapKind::Buried => write!(f, "buried"),
+            TrapKind::Pitfall => write!(f, "pitfall"),
+            TrapKind::SpikedPitfall => write!(f, "spiked_pitfall"),
+            TrapKind::Snared => write!(f, "snared"),
+            TrapKind::Pinned => write!(f, "pinned"),
         }
     }
 }
@@ -56,7 +71,11 @@ impl TrappedMetadata {
     pub fn fresh_for(kind: TrapKind, terrain_hazard_floor: Option<f32>) -> Self {
         let disorientation_remaining = match kind {
             TrapKind::Drowning => 2,
-            TrapKind::Buried => 0,
+            TrapKind::Buried
+            | TrapKind::Pitfall
+            | TrapKind::SpikedPitfall
+            | TrapKind::Snared
+            | TrapKind::Pinned => 0,
         };
         Self {
             cycles_trapped: 0,
@@ -112,6 +131,14 @@ mod tests {
         assert_eq!(drowning, "\"drowning\"");
         let buried = serde_json::to_string(&TrapKind::Buried).unwrap();
         assert_eq!(buried, "\"buried\"");
+        let pitfall = serde_json::to_string(&TrapKind::Pitfall).unwrap();
+        assert_eq!(pitfall, "\"pitfall\"");
+        let spiked = serde_json::to_string(&TrapKind::SpikedPitfall).unwrap();
+        assert_eq!(spiked, "\"spiked_pitfall\"");
+        let snared = serde_json::to_string(&TrapKind::Snared).unwrap();
+        assert_eq!(snared, "\"snared\"");
+        let pinned = serde_json::to_string(&TrapKind::Pinned).unwrap();
+        assert_eq!(pinned, "\"pinned\"");
     }
 
     #[test]
@@ -131,10 +158,35 @@ mod tests {
     }
 
     #[test]
+    fn trapped_metadata_fresh_for_new_kinds_no_disorientation() {
+        for kind in &[
+            TrapKind::Pitfall,
+            TrapKind::SpikedPitfall,
+            TrapKind::Snared,
+            TrapKind::Pinned,
+        ] {
+            let m = TrappedMetadata::fresh_for(*kind, None);
+            assert_eq!(
+                m.disorientation_remaining, 0,
+                "{} should have 0 disorientation",
+                kind
+            );
+        }
+    }
+
+    #[test]
     #[allow(clippy::assertions_on_constants)]
     fn severity_bases_ordered() {
         assert!(SEVERITY_BASE_SEVERE < SEVERITY_BASE_MODERATE);
         assert!(SEVERITY_BASE_MODERATE < SEVERITY_BASE_MILD);
+    }
+
+    #[test]
+    fn trap_kind_display_all_variants() {
+        assert_eq!(TrapKind::Pitfall.to_string(), "pitfall");
+        assert_eq!(TrapKind::SpikedPitfall.to_string(), "spiked_pitfall");
+        assert_eq!(TrapKind::Snared.to_string(), "snared");
+        assert_eq!(TrapKind::Pinned.to_string(), "pinned");
     }
 
     #[test]

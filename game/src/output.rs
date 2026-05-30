@@ -251,6 +251,18 @@ impl<'a> Display for GameOutput<'a> {
                 TrapKind::Buried => {
                     write!(f, "🪦 {} suffocated, buried alive.", tribute_name)
                 }
+                TrapKind::Pitfall => {
+                    write!(f, "🕳️ {} fell into a pitfall.", tribute_name)
+                }
+                TrapKind::SpikedPitfall => {
+                    write!(f, "🕳️ {} impaled by a spiked pitfall.", tribute_name)
+                }
+                TrapKind::Snared => {
+                    write!(f, "🪢 {} caught in a snare.", tribute_name)
+                }
+                TrapKind::Pinned => {
+                    write!(f, "⛰️ {} pinned by debris.", tribute_name)
+                }
             },
             GameOutput::TributeHorrified(tribute, damage) => {
                 write!(

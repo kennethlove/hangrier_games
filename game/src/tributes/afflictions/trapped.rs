@@ -56,6 +56,51 @@ pub const TRAP_KIND_TABLE: &[TrapKindTuning] = &[
         initial_hp_loss: 0,
         progressive_damage_per_cycle: 0,
     },
+    TrapKindTuning {
+        kind: TrapKind::Pitfall,
+        // Pitfall: immobilizes, can still fight, defense halved
+        hp_damage: [2, 4, 7],
+        mental_damage: [2, 4, 6],
+        escape_stat: EscapeStat::Strength,
+        rescue_stat: EscapeStat::Strength,
+        allows_terrain_floor: false,
+        initial_hp_loss: 0,
+        progressive_damage_per_cycle: 0,
+    },
+    TrapKindTuning {
+        kind: TrapKind::SpikedPitfall,
+        // Not an affliction — tuning row is a stub for trap_tuning_for completeness.
+        // Trigger logic kills directly (Sinkhole area event in process_event_for_area).
+        hp_damage: [0, 0, 0],
+        mental_damage: [0, 0, 0],
+        escape_stat: EscapeStat::Strength,
+        rescue_stat: EscapeStat::Strength,
+        allows_terrain_floor: false,
+        initial_hp_loss: 0,
+        progressive_damage_per_cycle: 0,
+    },
+    TrapKindTuning {
+        kind: TrapKind::Snared,
+        // Snared: tangled but can still fight. No defense penalty.
+        hp_damage: [1, 2, 3],
+        mental_damage: [3, 5, 8],
+        escape_stat: EscapeStat::Intelligence,
+        rescue_stat: EscapeStat::Strength,
+        allows_terrain_floor: false,
+        initial_hp_loss: 0,
+        progressive_damage_per_cycle: 0,
+    },
+    TrapKindTuning {
+        kind: TrapKind::Pinned,
+        // Pinned: fully immobilized, most HP-intensive.
+        hp_damage: [3, 6, 10],
+        mental_damage: [4, 7, 12],
+        escape_stat: EscapeStat::Strength,
+        rescue_stat: EscapeStat::Strength,
+        allows_terrain_floor: false,
+        initial_hp_loss: 0,
+        progressive_damage_per_cycle: 0,
+    },
 ];
 
 pub fn trap_tuning_for(kind: TrapKind) -> &'static TrapKindTuning {
@@ -82,6 +127,7 @@ pub fn area_event_to_trap(event: AreaEvent) -> Option<(TrapKind, Severity)> {
         AreaEvent::Avalanche => Some((TrapKind::Buried, Severity::Moderate)),
         AreaEvent::Landslide => Some((TrapKind::Buried, Severity::Moderate)),
         AreaEvent::Rockslide => Some((TrapKind::Buried, Severity::Mild)),
+        AreaEvent::Sinkhole => None, // Instant kill — handled in process_event_for_area
         _ => None,
     }
 }
@@ -159,6 +205,10 @@ mod tests {
     #[rstest]
     #[case(TrapKind::Drowning)]
     #[case(TrapKind::Buried)]
+    #[case(TrapKind::Pitfall)]
+    #[case(TrapKind::SpikedPitfall)]
+    #[case(TrapKind::Snared)]
+    #[case(TrapKind::Pinned)]
     fn trap_tuning_for_returns_matching_row(#[case] kind: TrapKind) {
         let t = trap_tuning_for(kind);
         assert_eq!(t.kind, kind);
@@ -190,6 +240,53 @@ mod tests {
         assert!(!trap_tuning_for(TrapKind::Buried).allows_terrain_floor);
     }
 
+    #[test]
+    fn pitfall_uses_strength_for_escape() {
+        assert_eq!(
+            trap_tuning_for(TrapKind::Pitfall).escape_stat,
+            EscapeStat::Strength
+        );
+    }
+
+    #[test]
+    fn snared_uses_intelligence_for_escape() {
+        assert_eq!(
+            trap_tuning_for(TrapKind::Snared).escape_stat,
+            EscapeStat::Intelligence
+        );
+    }
+
+    #[test]
+    fn pinned_uses_strength_for_escape() {
+        assert_eq!(
+            trap_tuning_for(TrapKind::Pinned).escape_stat,
+            EscapeStat::Strength
+        );
+    }
+
+    #[test]
+    fn pitfall_disallows_terrain_floor() {
+        assert!(!trap_tuning_for(TrapKind::Pitfall).allows_terrain_floor);
+    }
+
+    #[test]
+    fn snared_disallows_terrain_floor() {
+        assert!(!trap_tuning_for(TrapKind::Snared).allows_terrain_floor);
+    }
+
+    #[test]
+    fn pinned_disallows_terrain_floor() {
+        assert!(!trap_tuning_for(TrapKind::Pinned).allows_terrain_floor);
+    }
+
+    #[test]
+    fn spiked_pitfall_tuning_is_stub() {
+        let t = trap_tuning_for(TrapKind::SpikedPitfall);
+        assert_eq!(t.hp_damage, [0, 0, 0]);
+        assert_eq!(t.mental_damage, [0, 0, 0]);
+        assert!(!t.allows_terrain_floor);
+    }
+
     #[rstest]
     #[case(AreaEvent::Flood, Some((TrapKind::Drowning, Severity::Severe)))]
     #[case(AreaEvent::Earthquake, Some((TrapKind::Buried, Severity::Severe)))]
@@ -199,6 +296,7 @@ mod tests {
     #[case(AreaEvent::Wildfire, None)]
     #[case(AreaEvent::Blizzard, None)]
     #[case(AreaEvent::Drought, None)]
+    #[case(AreaEvent::Sinkhole, None)]
     fn area_event_mapping_matches_spec(
         #[case] event: AreaEvent,
         #[case] expected: Option<(TrapKind, Severity)>,

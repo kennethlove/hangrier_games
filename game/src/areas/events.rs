@@ -18,6 +18,7 @@ pub enum AreaEvent {
     Sandstorm,
     Drought,
     Rockslide,
+    Sinkhole,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -58,6 +59,7 @@ impl FromStr for AreaEvent {
             "sandstorm" => Ok(AreaEvent::Sandstorm),
             "drought" => Ok(AreaEvent::Drought),
             "rockslide" => Ok(AreaEvent::Rockslide),
+            "sinkhole" => Ok(AreaEvent::Sinkhole),
             _ => Err("Invalid area event".to_string()),
         }
     }
@@ -76,6 +78,7 @@ impl Display for AreaEvent {
             AreaEvent::Sandstorm => write!(f, "sandstorm"),
             AreaEvent::Drought => write!(f, "drought"),
             AreaEvent::Rockslide => write!(f, "rockslide"),
+            AreaEvent::Sinkhole => write!(f, "sinkhole"),
         }
     }
 }
@@ -92,17 +95,19 @@ impl AreaEvent {
         // Define weights for each terrain (percentages out of 100)
         let weights: Vec<(AreaEvent, u32)> = match terrain {
             Desert => vec![
-                (AreaEvent::Sandstorm, 40),
+                (AreaEvent::Sandstorm, 38),
                 (AreaEvent::Heatwave, 30),
                 (AreaEvent::Drought, 20),
                 (AreaEvent::Wildfire, 5),
-                (AreaEvent::Earthquake, 5),
+                (AreaEvent::Earthquake, 2),
+                (AreaEvent::Sinkhole, 5),
             ],
             Mountains => vec![
-                (AreaEvent::Avalanche, 35),
+                (AreaEvent::Avalanche, 33),
                 (AreaEvent::Rockslide, 30),
                 (AreaEvent::Earthquake, 20),
-                (AreaEvent::Blizzard, 15),
+                (AreaEvent::Blizzard, 12),
+                (AreaEvent::Sinkhole, 5),
             ],
             Wetlands => vec![
                 (AreaEvent::Flood, 50),
@@ -126,32 +131,36 @@ impl AreaEvent {
                 (AreaEvent::Blizzard, 5),
             ],
             Grasslands => vec![
-                (AreaEvent::Wildfire, 35),
+                (AreaEvent::Wildfire, 33),
                 (AreaEvent::Drought, 25),
                 (AreaEvent::Flood, 20),
                 (AreaEvent::Heatwave, 15),
-                (AreaEvent::Sandstorm, 5),
+                (AreaEvent::Sandstorm, 2),
+                (AreaEvent::Sinkhole, 5),
             ],
             Clearing => vec![
-                (AreaEvent::Wildfire, 30),
+                (AreaEvent::Wildfire, 28),
                 (AreaEvent::Flood, 25),
                 (AreaEvent::Heatwave, 20),
                 (AreaEvent::Drought, 15),
-                (AreaEvent::Earthquake, 10),
+                (AreaEvent::Earthquake, 7),
+                (AreaEvent::Sinkhole, 5),
             ],
             Badlands => vec![
-                (AreaEvent::Sandstorm, 35),
+                (AreaEvent::Sandstorm, 33),
                 (AreaEvent::Rockslide, 25),
                 (AreaEvent::Drought, 20),
                 (AreaEvent::Heatwave, 15),
-                (AreaEvent::Earthquake, 5),
+                (AreaEvent::Earthquake, 2),
+                (AreaEvent::Sinkhole, 5),
             ],
             Highlands => vec![
-                (AreaEvent::Rockslide, 30),
+                (AreaEvent::Rockslide, 28),
                 (AreaEvent::Landslide, 25),
                 (AreaEvent::Blizzard, 20),
                 (AreaEvent::Earthquake, 15),
-                (AreaEvent::Avalanche, 10),
+                (AreaEvent::Avalanche, 7),
+                (AreaEvent::Sinkhole, 5),
             ],
             Jungle => vec![
                 (AreaEvent::Wildfire, 35),
@@ -161,11 +170,12 @@ impl AreaEvent {
                 (AreaEvent::Earthquake, 5),
             ],
             UrbanRuins => vec![
-                (AreaEvent::Earthquake, 35),
+                (AreaEvent::Earthquake, 33),
                 (AreaEvent::Wildfire, 25),
                 (AreaEvent::Rockslide, 20),
                 (AreaEvent::Flood, 15),
-                (AreaEvent::Landslide, 5),
+                (AreaEvent::Landslide, 2),
+                (AreaEvent::Sinkhole, 5),
             ],
             Geothermal => vec![
                 (AreaEvent::Heatwave, 40),
@@ -273,6 +283,12 @@ impl AreaEvent {
                 AreaEvent::Rockslide,
                 Grasslands | Clearing | Desert | Tundra | Wetlands | Forest | Jungle,
             ) => Minor,
+
+            // Sinkhole
+            (AreaEvent::Sinkhole, Badlands | Mountains) => Catastrophic,
+            (AreaEvent::Sinkhole, UrbanRuins | Highlands) => Major,
+            (AreaEvent::Sinkhole, Grasslands | Clearing | Desert) => Moderate,
+            (AreaEvent::Sinkhole, Forest | Tundra | Wetlands | Jungle | Geothermal) => Minor,
         }
     }
 
@@ -425,6 +441,7 @@ mod tests {
     #[case(AreaEvent::Sandstorm, "sandstorm")]
     #[case(AreaEvent::Drought, "drought")]
     #[case(AreaEvent::Rockslide, "rockslide")]
+    #[case(AreaEvent::Sinkhole, "sinkhole")]
     fn area_event_to_string(#[case] event: AreaEvent, #[case] expected: &str) {
         assert_eq!(event.to_string(), expected.to_string());
     }
@@ -440,6 +457,7 @@ mod tests {
     #[case("sandstorm", AreaEvent::Sandstorm)]
     #[case("drought", AreaEvent::Drought)]
     #[case("rockslide", AreaEvent::Rockslide)]
+    #[case("sinkhole", AreaEvent::Sinkhole)]
     fn area_event_from_str(#[case] input: &str, #[case] event: AreaEvent) {
         let area_event = AreaEvent::from_str(input).unwrap();
         assert_eq!(area_event, event);

@@ -160,6 +160,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // Apply commentary and tribute histories schemas (non-critical — failures
+    // are logged but don't block startup).
+    let extras_paths = ["../schemas/commentary.surql", "../schemas/tribute_histories.surql"];
+    let _ = db
+        .use_ns(&surreal_namespace)
+        .use_db(&surreal_database)
+        .await;
+    for rel_path in &extras_paths {
+        let abs_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(rel_path);
+        match tokio::fs::read_to_string(&abs_path).await {
+            Ok(sql) => {
+                if let Err(sqlerr) = db.query(sql).await {
+                    tracing::warn!("Schema apply failed for {}: {sqlerr}", rel_path);
+                } else {
+                    tracing::info!("Applied schema: {rel_path}");
+                }
+            }
+            Err(read_err) => tracing::warn!("Cannot read schema {rel_path}: {read_err}"),
+        }
+    }
+
     // CORS Configuration
     let env_mode = env::var("ENV").unwrap_or_else(|_| "production".to_string());
     let is_production = env_mode == "production";
@@ -265,6 +286,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         db: db.clone(),
         storage,
         broadcaster,
+        commentator: None, // Enable with `--features ollama` on announcers
         namespace: surreal_namespace,
         database: surreal_database,
     };

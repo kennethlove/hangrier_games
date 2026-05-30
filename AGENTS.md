@@ -17,7 +17,7 @@ Rust workspace with 4 crates:
 - `game/` - Core simulation logic (pure Rust, no I/O)
 - `api/` - Axum REST API (SurrealDB backend)
 - `shared/` - Shared types
-- `announcers/` - Ollama LLM integration for game commentary
+- `announcers/` - Commentary pipeline: BroadcastPackageBuilder → Commentator trait → persisted segments
 
 ## Quick Commands
 
@@ -69,7 +69,13 @@ SURREAL_PASS=root
 
 **SurrealDB migrations**: `schemas/*.surql` files + `migrations/definitions/_initial.json` define schema. Migrations run via `surrealdb-migrations` crate at API startup.
 
-**Announcer LLM**: Expects Ollama running locally with model named `announcers`. Create from `announcers/src/Modelfile.qwen`:
+**Announcer Commentary**: The `announcers/` crate transforms structured game events into Capitol broadcast commentary.
+  - `BroadcastPackageBuilder` classifies 55+ `MessagePayload` variants into typed `EventLine`s
+  - `Commentator` trait abstracts over LLM backends (Ollama behind `features = ["ollama"]`)
+  - `TributeHistories` tracks rolling per-tribute digests
+  - API integration: background task after each `run_game_cycles` → persists to `commentary_segments` table → pushes via SSE/WebSocket
+
+**Ollama setup** (optional, requires `features = ["ollama"]` on the `announcers` crate):
 ```bash
 cd announcers/src
 ollama create announcers -f Modelfile.qwen

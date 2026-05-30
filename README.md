@@ -45,9 +45,9 @@
                    │ Event log
                    ▼
 ┌─────────────────────────────────────────────┐
-│  Announcers - Ollama LLM Integration        │
-│  • Streaming commentary generation          │
-│  • Dual-commentator narrative               │
+│  Announcers - Commentary Pipeline            │
+│  • BroadcastPackage → Commentator trait     │
+│  • Structured EventLine classification      │
 └─────────────────────────────────────────────┘
 ```
 
@@ -56,7 +56,7 @@
 2. API renders HTML with Maud templates, hydrating state from SurrealDB
 3. Game engine runs pure simulation logic
 4. API persists updated state to database
-5. Announcers generate commentary from event log (optional)
+5. Announcers generate commentary from structured events (background task, optional)
 6. HTMX swaps in updated HTML via SSE push or hx-trigger
 
 ##  Prerequisites
@@ -99,7 +99,7 @@ If you don't have `just` installed:
 # Install dependencies
 cd api/assets && npm install && cd ../..
 
-# Create Ollama model (optional)
+# Create Ollama model for commentary (optional, `features = ["ollama"]`)
 cd announcers/src
 ollama create announcers -f Modelfile.qwen
 cd ../..
@@ -161,7 +161,7 @@ hangrier_games/
 │   ├── templates/ # Maud HTML templates
 │   └── assets/    # Tailwind CSS and static files
 ├── shared/        # Shared data types (DTOs, enums)
-├── announcers/    # Ollama LLM integration
+├── announcers/    # Commentary pipeline (BroadcastPackageBuilder + Commentator trait)
 ├── schemas/       # SurrealDB schema definitions
 └── migrations/    # Database migration tracking
 ```
@@ -188,9 +188,8 @@ See [`codemap.md`](codemap.md) for detailed architecture documentation.
 - **RNG**: rand crate (procedural generation)
 
 ### AI/LLM
-- **LLM**: Ollama with custom `announcers` model (qwen2.5:1.5b)
-- **Client**: ollama-rs
-- **Streaming**: async_stream for progressive commentary
+- **Commentary Pipeline**: BroadcastPackageBuilder → Commentator trait → CommentarySegment
+- **Default Backend**: Ollama (optional, behind `features = ["ollama"]`)
 
 ##  Configuration
 

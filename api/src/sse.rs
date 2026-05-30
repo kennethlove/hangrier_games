@@ -21,7 +21,7 @@ pub async fn sse_handler(
 }
 
 /// Subscribe to the broadcast channel, filter by `game_id`, and convert
-/// each matching `GameEvent` into an SSE [`Event`].
+/// each matching event into an SSE [`Event`].
 fn game_event_stream(
     broadcaster: Arc<crate::websocket::GameBroadcaster>,
     game_id: String,
@@ -32,6 +32,13 @@ fn game_event_stream(
             game_id: msg_game_id,
             message,
         }) if msg_game_id == game_id => Some(Ok(message_to_sse_event(&message))),
+        Ok(WebSocketMessage::Commentary {
+            game_id: msg_game_id,
+            data,
+        }) if msg_game_id == game_id => {
+            let data_str = serde_json::to_string(&data).unwrap_or_default();
+            Some(Ok(Event::default().event("Commentary").data(&data_str)))
+        }
         Ok(_) => None,
         Err(e) => {
             debug!("SSE broadcast lag: {e}");

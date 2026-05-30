@@ -137,11 +137,12 @@ quality: fmt check clippy test
 # Setup recipes
 # ============
 
-# Create Ollama announcer model
+# Create Ollama model for commentary (optional; requires `features = ["ollama"]`)
 setup-ollama:
     #!/usr/bin/env bash
     cd announcers/src
     ollama create announcers -f Modelfile.qwen
+    echo "✓ Model created. Enable with: cargo build --features announcers/ollama"
 
 # Install Node dependencies for Tailwind CSS
 setup-node:
@@ -214,7 +215,7 @@ tree:
     @echo "  game/       - Core simulation logic (pure Rust)"
     @echo "  api/        - Axum REST API + HTMX pages (SurrealDB backend)"
     @echo "  shared/     - Shared types"
-    @echo "  announcers/ - Ollama LLM integration"
+    @echo "  announcers/ - Commentary pipeline (BroadcastPackageBuilder + Commentator trait)"
 
 # Show helpful development tips
 tips:

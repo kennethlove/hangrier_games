@@ -32,12 +32,14 @@
                        │ emits event log
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│          AI Commentary Layer (Ollama)                       │
+│          Commentary Pipeline                                │
 │  ┌───────────────────────────────────────────────────────┐  │
-│  │  announcers/ - LLM Integration                        │  │
-│  │  • Transforms game logs → sports commentary          │  │
-│  │  • Dual-commentator narrative (Verity & Rex)         │  │
-│  │  • Streaming or batch generation                     │  │
+│  │  announcers/ - BroadcastPackage → Commentator trait   │  │
+│  │  • BroadcastPackageBuilder: typed EventLines          │  │
+│  │  • Commentator trait (Ollama default, swappable)      │  │
+│  │  • TributeHistories rolling digests                   │  │
+│  │  • Background task after each game phase              │  │
+│  │  • Persisted to SurrealDB + pushed via SSE/WS         │  │
 │  └───────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 
@@ -81,7 +83,7 @@ just api  # API server only (http://localhost:3000) - requires SurrealDB running
 |-------------|------|---------|
 | **API Server** | [`api/src/main.rs`](api/src/main.rs) | Axum server setup, CORS, JWT middleware, route mounting |
 | **Game Engine** | [`game/src/lib.rs`](game/src/lib.rs) | Module aggregator (exposes `Game`, `Tribute`, `Item`, etc.) |
-| **LLM Commentary** | [`announcers/src/lib.rs`](announcers/src/lib.rs) | Public API (`summarize`, `summarize_stream`, `prompt`) |
+| **Commentary** | [`announcers/src/lib.rs`](announcers/src/lib.rs) | `generate_commentary()` convenience fn, `Commentator` trait |
 | **Shared Types** | [`shared/src/lib.rs`](shared/src/lib.rs) | All shared types in single-file crate |
 
 ### Development Workflow
@@ -112,8 +114,8 @@ just api  # API server only (http://localhost:3000) - requires SurrealDB running
 | **`api/src/`** | REST endpoints for game lifecycle, tributes, users, and authentication | [api/src/codemap.md](api/src/codemap.md) |
 | **`shared/`** | Shared data types and API contracts between backend and game core | [shared/codemap.md](shared/codemap.md) |
 | **`shared/src/`** | Single-file crate with all shared types (DisplayGame, EditGame, GameStatus, etc.) | [shared/src/codemap.md](shared/src/codemap.md) |
-| **`announcers/`** | Ollama LLM integration transforming game logs into Capitol-style sports commentary | [announcers/codemap.md](announcers/codemap.md) |
-| **`announcers/src/`** | LLM client, prompt engineering, and streaming generation support | [announcers/src/codemap.md](announcers/src/codemap.md) |
+| **`announcers/`** | Commentary pipeline: BroadcastPackageBuilder → Commentator trait → persisted CommentarySegments | [announcers/codemap.md](announcers/codemap.md) |
+| **`announcers/src/`** | Broadcast package builder, rolling history tracker, severity mappings, Commentator trait + Ollama impl | [announcers/src/codemap.md](announcers/src/codemap.md) |
 | **`schemas/`** | SurrealDB database schema definitions with graph relations and custom query functions | [schemas/codemap.md](schemas/codemap.md) |
 | **`migrations/`** | Database migration tracking and schema evolution management | [migrations/codemap.md](migrations/codemap.md) |
 | **`migrations/definitions/`** | Initial schema state and migration definitions for surrealdb-migrations | [migrations/definitions/codemap.md](migrations/definitions/codemap.md) |
@@ -138,9 +140,9 @@ just api  # API server only (http://localhost:3000) - requires SurrealDB running
 
 ### AI/LLM
 
-- **LLM**: Ollama with custom `announcers` model (based on qwen2.5:1.5b)
-- **Client**: ollama-rs (Rust SDK for Ollama API)
-- **Streaming**: async_stream for progressive commentary generation
+- **Commentary Pipeline**: `BroadcastPackageBuilder` → `Commentator::generate()` → `CommentarySegment`
+- **Default Backend**: Ollama (optional, behind `features = ["ollama"]`)
+- **Trait**: `Commentator` — swap Ollama for any LLM backend
 
 ### Build Tools
 
@@ -227,7 +229,8 @@ surreal sql --conn ws://localhost:8000 --user root --pass root --ns hangry-games
 ### LLM Setup
 
 ```bash
-# Create custom Ollama model for commentary
+# Create custom Ollama model for commentary (optional)
+# Requires `features = ["ollama"]` on the announcers crate
 cd announcers/src
 ollama create announcers -f Modelfile.qwen
 
@@ -357,7 +360,7 @@ Services defined in `docker-compose.yml`:
 - **AGENTS.md**: Project-specific instructions for AI agents
 - **Cargo.toml**: Workspace configuration and dependency versions
 - **docker-compose.yml**: Container orchestration
-- **Modelfile.qwen**: Ollama model definition for announcers
+- **Modelfile.qwen**: Ollama model definition for announcers (only needed for `features = ["ollama"]`)
 
 ---
 

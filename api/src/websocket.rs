@@ -197,3 +197,16 @@ pub fn broadcast_game_finished(
     );
     broadcast_game_message(broadcaster, game_id, msg);
 }
+
+/// Broadcast a commentary segment to subscribed clients.
+pub fn broadcast_commentary(
+    broadcaster: &GameBroadcaster,
+    game_id: &str,
+    segment: &announcers::CommentarySegment,
+) {
+    let data = serde_json::to_value(segment).unwrap_or_else(|_| serde_json::Value::Null);
+    broadcaster.broadcast(WebSocketMessage::Commentary {
+        game_id: game_id.to_string(),
+        data,
+    });
+}

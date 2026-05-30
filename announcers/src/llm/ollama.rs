@@ -10,7 +10,7 @@ use ollama_rs::generation::completion::request::GenerationRequest;
 
 use crate::llm::Commentator;
 use crate::types::{
-    BroadcastPackage, CommentaryError, CommentaryLine, CommentarySegment,
+    BroadcastPackage, CommentaryError, CommentaryLine, CommentarySegment, EventKind,
 };
 
 /// Default Ollama model name to use for commentary generation.
@@ -64,17 +64,106 @@ impl OllamaCommentator {
 
     /// Build the full prompt from a broadcast package.
     fn build_prompt(&self, package: &BroadcastPackage) -> String {
-        let serialized = serde_json::to_string_pretty(package)
-            .unwrap_or_else(|_| "<serialization error>".into());
+        let mut body = String::new();
+
+        // ── Phase context ──
+        body.push_str(&format!(
+            "=== PHASE CONTEXT ===\n\
+             {} tributes remaining\n\n",
+            package.header.alive_count,
+        ));
+
+        // ── Hot streaks ──
+        if !package.header.killing_sprees.is_empty() {
+            body.push_str("=== 🔥 HOT STREAKS ===\n");
+            for spree in &package.header.killing_sprees {
+                body.push_str(&format!(
+                    "🔥 {} (D{}) is {} — {} kills in a row!\n",
+                    spree.name, spree.district, spree.label, spree.streak,
+                ));
+            }
+            body.push('\n');
+        }
+
+        // ── Hot zones ──
+        if !package.header.hot_zones.is_empty() {
+            body.push_str("=== HOT ZONES ===\n");
+            for zone in &package.header.hot_zones {
+                body.push_str(&format!(
+                    "• {} — {}\n",
+                    zone.name, zone.activity_level,
+                ));
+            }
+            body.push('\n');
+        }
+
+        // ── Kill leaders (this phase) ──
+        if !package.header.kill_leaders.is_empty() {
+            body.push_str("=== KILL LEADERS ===\n");
+            for leader in &package.header.kill_leaders {
+                body.push_str(&format!(
+                    "• {} (D{}) — {} kill{}\n",
+                    leader.name,
+                    leader.district,
+                    leader.kill_count,
+                    if leader.kill_count == 1 { "" } else { "s" },
+                ));
+            }
+            body.push('\n');
+        }
+
+        // ── Phase events ──
+        body.push_str("=== PHASE EVENTS ===\n");
+        for event in &package.events {
+            let icon = event_icon(event.kind);
+            body.push_str(&format!("{} {}\n", icon, event.prose));
+            if let Some(ref structured) = event.structured {
+                // Only include structured data for complex events (death, combat).
+                if matches!(event.kind, EventKind::Death | EventKind::Combat | EventKind::Betrayal) {
+                    if let Some(s) = structured.as_str() {
+                        body.push_str(&format!("  ({s})\n"));
+                    }
+                }
+            }
+        }
+        body.push('\n');
+
+        // ── Tribute histories ──
+        if !package.histories.is_empty() {
+            body.push_str("=== TRIBUTE HISTORIES ===\n");
+            for t in &package.histories {
+                let status_icon = if t.status == "alive" { "🟢" } else { "💀" };
+                body.push_str(&format!(
+                    "{} {} (D{}) — {}, {}, at {}\n",
+                    status_icon, t.name, t.district, t.status, t.injury_level, t.location,
+                ));
+                // Highlights (permanent).
+                for h in &t.highlights {
+                    body.push_str(&format!("  ★ {h}\n"));
+                }
+                // Recent notable events (first 5, newest first).
+                let recent: Vec<&String> = t.notable_events.iter().take(5).collect();
+                if !recent.is_empty() {
+                    for (i, ev) in recent.iter().enumerate() {
+                        body.push_str(&format!("  {}. {ev}\n", i + 1));
+                    }
+                }
+                if t.notable_events.len() > 5 {
+                    body.push_str(&format!(
+                        "  ... ({} more events)\n",
+                        t.notable_events.len() - 5
+                    ));
+                }
+                body.push('\n');
+            }
+        }
 
         format!(
             r#"{SYSTEM_PROMPT}
 
 Here is the current phase data:
 
-{serialized}
-
-Generate the interleaved broadcast script now, using [VERITY] and [REX] tags.
+{body}Generate the interleaved broadcast script now, using [VERITY] and [REX] tags.
 "#,
         )
     }
@@ -137,6 +226,23 @@ impl Commentator for OllamaCommentator {
     }
 }
 
+/// Returns a single-character icon for an event kind, giving the LLM a
+/// visual cue about the event type in the formatted prompt.
+fn event_icon(kind: EventKind) -> &'static str {
+    match kind {
+        EventKind::Death => "☠️",
+        EventKind::Combat => "⚔️",
+        EventKind::Allied => "🤝",
+        EventKind::Betrayal => "🗡️",
+        EventKind::Hazard => "🌪️",
+        EventKind::Item => "🎒",
+        EventKind::Movement => "🚶",
+        EventKind::Sponsor => "🎁",
+        EventKind::State => "📊",
+        EventKind::Other => "📌",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -175,7 +281,8 @@ mod tests {
 
         assert!(prompt.contains("live sports broadcast team"));
         assert!(prompt.contains("Cato killed Peeta."));
-        assert!(prompt.contains("alive_count"));
+        assert!(prompt.contains("PHASE EVENTS"));
+        assert!(prompt.contains("12 tributes"));
     }
 
     #[test]
@@ -223,13 +330,13 @@ Narrator: something happened.
                 kill_leaders: vec![],
                 alliances: vec![],
                 hot_zones: vec![],
-            killing_sprees: vec![],
+                killing_sprees: vec![],
             },
             events: vec![],
             histories: vec![],
         };
         let prompt = commentator.build_prompt(&pkg);
-        assert!(prompt.contains("alive_count"));
-        assert!(prompt.contains("24"));
+        assert!(prompt.contains("24 tributes"));
+        assert!(prompt.contains("PHASE CONTEXT"));
     }
 }

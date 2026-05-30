@@ -1,11 +1,9 @@
-DEFINE TABLE commentary_segments SCHEMAFULL
+DEFINE TABLE OVERWRITE commentary_segments SCHEMAFULL
     PERMISSIONS
         FOR select
             WHERE game_id IN (SELECT identifier FROM game WHERE created_by.id = $auth.id)
-        FOR create
-            NONE -- Server-side only
-        FOR update, delete
-            NONE;
+        FOR create, update, delete
+            NONE; -- Server-side only
 
 DEFINE FIELD OVERWRITE game_id ON commentary_segments TYPE string;
 DEFINE FIELD OVERWRITE day ON commentary_segments TYPE int;

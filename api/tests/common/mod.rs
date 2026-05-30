@@ -106,6 +106,25 @@ impl TestDb {
             db: self.db.clone(),
             storage: Arc::new(LocalStorage::new("test_uploads", "/uploads")),
             broadcaster: Arc::new(GameBroadcaster::default()),
+            commentator: None,
+            namespace: self.namespace.clone(),
+            database: self.database.clone(),
+        }
+    }
+
+    /// Create an AppState with a mock commentator for testing.
+    pub fn app_state_with_commentator(
+        &self,
+        commentator: Arc<dyn announcers::Commentator>,
+    ) -> AppState {
+        use api::storage::LocalStorage;
+        use api::websocket::GameBroadcaster;
+
+        AppState {
+            db: self.db.clone(),
+            storage: Arc::new(LocalStorage::new("test_uploads", "/uploads")),
+            broadcaster: Arc::new(GameBroadcaster::default()),
+            commentator: Some(commentator),
             namespace: self.namespace.clone(),
             database: self.database.clone(),
         }

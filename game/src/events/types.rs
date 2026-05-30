@@ -168,10 +168,6 @@ pub enum GameEvent {
         tribute_id: Uuid,
         tribute_name: String,
     },
-    TributeDrowned {
-        tribute_id: Uuid,
-        tribute_name: String,
-    },
     TributeMauled {
         tribute_id: Uuid,
         tribute_name: String,

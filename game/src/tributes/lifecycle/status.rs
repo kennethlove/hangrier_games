@@ -252,9 +252,7 @@ impl Tribute {
                         meta.cycles_trapped += 1;
                     }
                 }
-                AfflictionKind::Drowned
-                | AfflictionKind::Buried
-                | AfflictionKind::MissingArm
+                AfflictionKind::MissingArm
                 | AfflictionKind::MissingLeg
                 | AfflictionKind::Blind
                 | AfflictionKind::Deaf

@@ -78,8 +78,6 @@ fn base_bias(kind: AfflictionKind) -> (f64, f64, f64, f64, f64) {
         | AfflictionKind::Burned
         | AfflictionKind::Sick
         | AfflictionKind::Electrocuted
-        | AfflictionKind::Drowned
-        | AfflictionKind::Buried
         | AfflictionKind::Phobia(_)
         | AfflictionKind::Addiction(_)
         | AfflictionKind::Trapped(_) => (1.0, 1.0, 1.0, 1.0, 1.0),

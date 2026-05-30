@@ -193,13 +193,6 @@ impl Display for GameEvent {
                     tribute_name
                 )
             }
-            GameEvent::TributeDrowned { tribute_name, .. } => {
-                write!(
-                    f,
-                    "🏊 {} partially drowns, loses health and sanity",
-                    tribute_name
-                )
-            }
             GameEvent::TributeMauled {
                 tribute_name,
                 animal_count,

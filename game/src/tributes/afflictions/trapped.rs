@@ -214,6 +214,7 @@ mod tests {
             escape_progress: 0,
             terrain_hazard_floor: floor,
             disorientation_remaining: 0,
+            rescue_bonus_accumulated: 0.0,
         }
     }
 

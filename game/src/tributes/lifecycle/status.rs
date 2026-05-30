@@ -242,7 +242,7 @@ impl Tribute {
                                     escape_stat,
                                     buried_severity.unwrap_or(Severity::Mild),
                                     meta,
-                                    0.0,
+                                    meta.rescue_bonus_accumulated,
                                 );
                                 if rng.random_bool(target as f64) {
                                     meta.escape_progress += 1;
@@ -250,6 +250,7 @@ impl Tribute {
                             }
                         }
                         meta.cycles_trapped += 1;
+                        meta.rescue_bonus_accumulated = 0.0;
                     }
                 }
                 AfflictionKind::MissingArm

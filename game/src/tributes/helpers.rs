@@ -122,6 +122,7 @@ pub fn calculate_stamina_cost(
         // Sleep is free at the action layer; phase scheduler handles it.
         Action::Sleep { .. } => 0.0,
         // Frozen tribute takes no action — no stamina cost.
+        Action::Rescue { .. } => 15.0,
         Action::Frozen | Action::Flashback { .. } | Action::Avoidance | Action::SearchForSubstance { .. } => 0.0,
     };
 

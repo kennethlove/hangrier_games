@@ -224,6 +224,18 @@ pub fn attack_contest(
         defense_roll += penalty;
     }
 
+    // Trapped tributes cannot dodge effectively — halve defense
+    if target
+        .afflictions
+        .values()
+        .any(|a| matches!(a.kind, shared::afflictions::AfflictionKind::Trapped(_)))
+    {
+        defense_roll = (defense_roll as f32 / 2.0).ceil() as i32;
+    }
+
+    // TODO(dvd): apply sponsor_affinity_penalty(attacker, SPONSOR_PENALTY_ATTACK_TRAPPED)
+    //            when attacking a tribute with any AfflictionKind::Trapped(_)
+
     // If the defender has a shield, use it
     let shield_outcome = if let Some(shield) = target.equipped_shield_mut() {
         defense_roll += shield.effect; // Add shield defense
@@ -371,6 +383,9 @@ pub fn attack_contest(
             (target_inflicts, attacker_inflicts)
         };
 
+    // TODO(dvd): emit SponsorEvent::AttackOnTrapped when attacker wins against
+    //            a trapped target, so the sponsorship system can apply affinity
+    //            penalties and generate audience-disapproval narration.
     AttackContestOutcome {
         result,
         wear,

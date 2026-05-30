@@ -725,6 +725,29 @@ pub enum MessagePayload {
         tribute: String,
         kind: crate::afflictions::TrapKind,
     },
+    /// Rescuer attempted to free a trapped tribute this cycle.
+    /// Emitted every cycle a tribute performs Action::Rescue.
+    RescueAttempted {
+        rescuer: String,
+        target: String,
+        kind: crate::afflictions::TrapKind,
+        severity: crate::afflictions::Severity,
+        bonus: f32,
+    },
+    /// Partial rescue progress accumulated — rescue bonus increased.
+    /// Emitted when a rescue attempt contributes toward the escape threshold,
+    /// but the target is not yet freed.
+    PartialRescueProgress {
+        rescuer: String,
+        target: String,
+        kind: crate::afflictions::TrapKind,
+        severity: crate::afflictions::Severity,
+        bonus: f32,
+        progress: u8,
+        /// How many rescue cycles are needed before the rescue bonus applies.
+        /// Only meaningful at Severe; always `PARTIAL_RESCUE_THRESHOLD` (2).
+        threshold: u8,
+    },
 }
 
 pub mod impls;

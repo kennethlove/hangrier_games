@@ -9,6 +9,7 @@ pub mod events;
 pub mod inventory;
 pub mod lifecycle;
 pub mod movement;
+pub mod rescue;
 pub mod stamina_band;
 pub mod statuses;
 pub mod survival;
@@ -602,6 +603,7 @@ impl Tribute {
             | Action::Flashback { .. }
             | Action::Avoidance
             | Action::SearchForSubstance { .. } => {}
+            Action::Rescue { .. } => {}
         }
     }
 
@@ -1253,6 +1255,7 @@ pub fn calculate_stamina_cost(
         Action::Eat(_) | Action::DrinkItem(_) => 0.0,
         // Sleep is free at the action layer; phase scheduler handles it.
         Action::Sleep { .. } => 0.0,
+        Action::Rescue { .. } => 15.0,
         Action::Frozen
         | Action::Flashback { .. }
         | Action::Avoidance

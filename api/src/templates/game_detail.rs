@@ -600,6 +600,9 @@ fn message_kind_icon(payload: &shared::messages::MessagePayload) -> maud::Markup
         }
         MessagePayload::TrappedEscaped { .. } => "check-circle",
         MessagePayload::TributeDiedWhileTrapped { .. } => "skull",
+        MessagePayload::RescueAttempted { .. } | MessagePayload::PartialRescueProgress { .. } => {
+            "hand"
+        }
     };
     icon(name)
 }

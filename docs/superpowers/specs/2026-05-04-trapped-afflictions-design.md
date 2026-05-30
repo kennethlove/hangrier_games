@@ -1,6 +1,6 @@
 # Trapped Afflictions — Design Spec
 
-**Status:** Draft
+**Status:** Living
 **Date:** 2026-05-04
 **Bead:** `hangrier_games-zzjv`
 **Discovered from:** `hangrier_games-4o8a` (afflictions epic)
@@ -13,7 +13,7 @@
 
 ## 1. Summary
 
-Replace the existing `TributeStatus::Drowned` and `TributeStatus::Buried` markers with a unified `AfflictionKind::Trapped(TrapKind)` affliction. Trapped tributes are movement-locked, take per-cycle attrition damage, and must escape via a hybrid self-roll + ally-rescue mechanic before HP runs out. The design uses a `TrapKind` sub-enum so future trap types (Pitfall, Snared, Pinned, Bound) plug in without refactoring the brain layer or escape mechanic.
+Replace the existing `TributeStatus::Drowned` and `TributeStatus::Buried` markers with a unified `AfflictionKind::Trapped(TrapKind)` affliction. Trapped tributes are movement-locked, take per-cycle attrition damage (symbolic — not a death timer), and must escape via a hybrid self-roll + ally-rescue mechanic. No trap affliction is a slow death sentence — per-cycle damage represents ongoing hazard exposure, not a countdown. The design uses a `TrapKind` sub-enum so future trap types (Pitfall, Snared, Pinned, Bound) plug in without refactoring the brain layer or escape mechanic.
 
 This is the third afflicition family to land (after trauma and addiction), and it pairs with the legacy `TributeStatus` retirement work — the Drowned/Buried variants are deleted as part of PR1.
 
@@ -43,7 +43,7 @@ This is the third afflicition family to land (after trauma and addiction), and i
 
 ## 3. Conceptual Model
 
-A **Trapped affliction** represents a tribute caught in an environmental hazard from which they may escape, be rescued, or die. Unlike chronic afflictions (trauma, addiction, phobia) which persist across the campaign and modulate decisions, Trapped is acute and time-bounded: it resolves in one of three ways within a few cycles.
+A **Trapped affliction** represents a tribute caught in an environmental hazard from which they may escape or be rescued. Unlike chronic afflictions (trauma, addiction, phobia) which persist across the campaign and modulate decisions, Trapped is acute and time-bounded: it resolves in one of two ways within a few cycles.
 
 **Lifecycle:**
 
@@ -55,23 +55,23 @@ try_acquire_affliction(Trapped(kind), severity)
     │
     ▼
 [Trapped state — per-cycle loop]
-    ├─ Apply per-cycle HP & mental damage (TRAP_KIND_TABLE × severity)
+    ├─ Apply per-cycle HP & mental damage (symbolic attrition)
     ├─ Brain layer: skip all action choice; only escape attempt allowed
     ├─ Combat gate: movement-locked, defense halved, self-medicate-only
     ├─ Co-located tributes may take Action::Rescue
     ├─ Roll escape (self-roll + accumulated rescue bonus, capped 0.95)
     │
     ├─► Escape succeeds → remove affliction, emit TrappedEscaped
-    ├─► HP hits 0 → emit TributeDiedWhileTrapped, kill tribute
     └─► Otherwise → cycles_trapped += 1, continue
 ```
 
 **Key properties:**
 
-- **Static severity** — assigned at acquisition by AreaEvent magnitude, never changes until escape/death
+- **Static severity** — assigned at acquisition by AreaEvent magnitude, never changes until escape
 - **Cycles_trapped counter** — drives escape-roll decay (harder over time)
 - **Escape_progress field** — only used for Severe entrapment with single-rescuer-over-multiple-cycles partial rescues
 - **TrapKind-parameterized tuning** — damage rates, terrain hazard floor, escape stat, rescue stat per-kind via `TRAP_KIND_TABLE`
+- **No death timer** — damage is symbolic attrition, never lethal on its own. Instant-death traps (Pitfall with spikes) use a separate non-affliction mechanic
 
 ---
 
@@ -173,7 +173,7 @@ pub struct TrapKindTuning {
 pub const TRAP_KIND_TABLE: &[TrapKindTuning] = &[
     TrapKindTuning {
         kind: TrapKind::Drowning,
-        hp_damage: [15, 30, 50],
+        hp_damage: [2, 5, 8],       // symbolic — not a death timer
         mental_damage: [3, 6, 10],
         escape_stat: TributeStat::Intelligence,
         rescue_stat: TributeStat::Strength,
@@ -181,7 +181,7 @@ pub const TRAP_KIND_TABLE: &[TrapKindTuning] = &[
     },
     TrapKindTuning {
         kind: TrapKind::Buried,
-        hp_damage: [15, 30, 50],
+        hp_damage: [2, 5, 8],       // symbolic — being buried hurts but doesn't kill
         mental_damage: [3, 6, 10],
         escape_stat: TributeStat::Strength,
         rescue_stat: TributeStat::Strength,
@@ -192,10 +192,8 @@ pub const TRAP_KIND_TABLE: &[TrapKindTuning] = &[
 
 **Tuning rationale:**
 
-- **Severe = ~2 cycles survival** for an avg 80-HP tribute (50 HP/cycle × 2 = death by cycle 3 at latest)
-- **Moderate = ~3 cycles** (30 × 3 = 90)
-- **Mild = ~5 cycles** (15 × 5 = 75) — survivable with luck
-- **Mental damage** is small compared to HP but compounds: a tribute who barely survives a Severe trap still has lasting mental scars
+- **HP damage is symbolic** — 2-8 HP/cycle is noticeable but not lethal for a typical 80-HP tribute. Damage exists to make being trapped feel bad, not to create a death timer.
+- **Mental damage compounds** — being trapped is psychologically taxing; this is the primary consequence.
 - **Drowning escape uses Intelligence** (panic management, holding breath strategically); **Buried escape uses Strength** (digging out, lifting debris)
 - **Drowning has terrain floor** (active rapids cap escape at 0.30 until water recedes); Buried doesn't (debris is static once settled)
 
@@ -423,16 +421,11 @@ for affliction in tribute.afflictions.iter() {
     tribute.take_mental_damage(tuning.mental_damage[severity_idx]);
 }
 
-// Death check (after damage, before escape attempt):
-if tribute.hp == 0 && tribute.has_affliction_kind(AfflictionKindDiscriminant::Trapped) {
-    let trap_kind = tribute.first_trapped_kind();  // for narration
-    emit(MessagePayload::TributeDiedWhileTrapped { tribute: tribute.id, trap_kind });
-    tribute.kill();
-    continue;  // skip escape attempt
-}
+// Escape attempt runs after damage application — survivors only.
+// No death check: trapped afflictions are never lethal via HP attrition.
+// Instant-death traps (future: Pitfall with spikes) use a separate
+// non-affliction mechanic.
 ```
-
-**Escape attempt** runs after death check — survivors only.
 
 ---
 
@@ -482,7 +475,8 @@ pub enum MessagePayload {
         bonus: f32,
     },
 
-    /// Tribute died while trapped (HP attrition).
+    /// Tribute died while trapped (instant-death traps only, e.g. Pitfall with spikes).
+    /// Not emitted for HP attrition — trapped afflictions are never a death timer.
     TributeDiedWhileTrapped {
         tribute: TributeId,
         kind: TrapKind,
@@ -595,7 +589,7 @@ Scope:
   - proptest: escape roll always in [0, 0.95]; never panics
   - insta yaml: AreaEvent → Trapped affliction snapshots for all 5 mappings (Flood, Earthquake, Avalanche, Landslide, Rockslide)
   - insta yaml: save migration snapshot (legacy save → migrated game)
-  - integration: full lifecycle (acquire → cycles of damage → death) with insta snapshot of message stream
+  - integration: full lifecycle (acquire → cycles of damage → escape) with insta snapshot of message stream
 
 **Hard prereq:** `lsis` (afflictions PR1)
 
@@ -627,7 +621,7 @@ Scope:
   - rstest unit: defense halving on trapped target
   - rstest unit: held-consumable use allowed; new-item pickup denied
   - integration: trapped tribute + co-located ally → rescue success path snapshot
-  - integration: trapped tribute + negative-affinity attacker → attack-while-trapped damage path snapshot
+  - integration: trapped tribute + negative-affinity attacker → attack-while-trapped snapshot
 
 **Hard prereq:** `lsis` (afflictions PR1), this spec's PR1
 **Soft dep:** `hbox` (brain pipeline unification)
@@ -657,7 +651,7 @@ Do NOT drop Buried (defeats the TrapKind abstraction proof).
 
 - [x] No placeholders / unresolved TODOs in spec body (deferred items explicitly tagged §19)
 - [x] All numeric constants named and listed in one place per concern (escape constants §9, damage table §7)
-- [x] Lifecycle diagram covers all three exit paths (escape, death, continue)
+- [x] Lifecycle diagram covers all exit paths (escape, continue — no death-timer path)
 - [x] Brain pipeline ordering documented with explicit slot
 - [x] Save migration has explicit test plan
 - [x] PR breakdown matches recommended split with cut order

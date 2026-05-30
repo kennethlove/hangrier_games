@@ -73,6 +73,11 @@ pub enum Action {
     SearchForSubstance {
         substance: shared::afflictions::Substance,
     },
+    /// Spend the turn rescuing a trapped co-located tribute.
+    /// Emits `RescueAttempted` / `PartialRescueProgress` on resolution.
+    Rescue {
+        target: String,
+    },
 }
 
 impl Display for Action {
@@ -96,6 +101,7 @@ impl Display for Action {
             Action::Flashback { .. } => write!(f, "flashback"),
             Action::Avoidance => write!(f, "avoidance"),
             Action::SearchForSubstance { .. } => write!(f, "search for substance"),
+            Action::Rescue { .. } => write!(f, "rescue"),
         }
     }
 }
@@ -123,6 +129,9 @@ impl FromStr for Action {
             "flashback" | "avoidance" => Ok(Action::Avoidance),
             "search for substance" => Ok(Action::SearchForSubstance {
                 substance: shared::afflictions::Substance::Stimulant,
+            }),
+            "rescue" => Ok(Action::Rescue {
+                target: String::new(),
             }),
             _ => Err(()),
         }
@@ -162,6 +171,7 @@ mod tests {
     #[case(Action::Attack, "attack")]
     #[case(Action::Hide, "hide")]
     #[case(Action::TakeItem, "take item")]
+    #[case(Action::Rescue { target: "tribute-1".into() }, "rescue")]
     fn action_to_string(#[case] action: Action, #[case] expected: &str) {
         assert_eq!(action.to_string(), expected.to_string());
     }
@@ -223,6 +233,9 @@ mod survival_action_tests {
             Action::Eat(None),
             Action::DrinkItem(None),
             Action::Frozen,
+            Action::Rescue {
+                target: "tribute-1".into(),
+            },
         ] {
             let json = serde_json::to_string(&a).unwrap();
             let back: Action = serde_json::from_str(&json).unwrap();
@@ -238,6 +251,13 @@ mod survival_action_tests {
         assert_eq!(Action::Eat(None).to_string(), "eat");
         assert_eq!(Action::DrinkItem(None).to_string(), "drink item");
         assert_eq!(Action::Frozen.to_string(), "frozen");
+        assert_eq!(
+            Action::Rescue {
+                target: "tribute-1".into()
+            }
+            .to_string(),
+            "rescue"
+        );
         assert!(matches!(
             "seek shelter".parse::<Action>(),
             Ok(Action::SeekShelter)
@@ -253,5 +273,9 @@ mod survival_action_tests {
             Ok(Action::DrinkItem(None))
         ));
         assert!(matches!("frozen".parse::<Action>(), Ok(Action::Frozen)));
+        assert!(matches!(
+            "rescue".parse::<Action>(),
+            Ok(Action::Rescue { .. })
+        ));
     }
 }

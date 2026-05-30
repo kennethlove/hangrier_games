@@ -44,6 +44,12 @@ pub struct TrappedMetadata {
     /// Buried always has this as 0.
     #[serde(default)]
     pub disorientation_remaining: u8,
+    /// Rescue bonus accumulated from co-located tributes this cycle.
+    /// Reset to 0.0 after each escape roll. Cumulated via
+    /// `crate::tributes::rescue::resolve_rescue` and consumed by
+    /// escape rolls. Capped at `RESCUE_BONUS_CAP` (0.80).
+    #[serde(default)]
+    pub rescue_bonus_accumulated: f32,
 }
 
 impl TrappedMetadata {
@@ -57,6 +63,7 @@ impl TrappedMetadata {
             escape_progress: 0,
             terrain_hazard_floor,
             disorientation_remaining,
+            rescue_bonus_accumulated: 0.0,
         }
     }
 }
@@ -135,5 +142,20 @@ mod tests {
         assert_eq!(escape_threshold(Severity::Mild), 1);
         assert_eq!(escape_threshold(Severity::Moderate), 1);
         assert_eq!(escape_threshold(Severity::Severe), 1);
+    }
+
+    #[test]
+    fn trapped_metadata_rescue_bonus_defaults_to_zero() {
+        let m = TrappedMetadata::fresh_for(TrapKind::Buried, None);
+        assert_eq!(m.rescue_bonus_accumulated, 0.0);
+    }
+
+    #[test]
+    fn trapped_metadata_rescue_bonus_round_trips() {
+        let mut m = TrappedMetadata::fresh_for(TrapKind::Buried, None);
+        m.rescue_bonus_accumulated = 0.55;
+        let json = serde_json::to_string(&m).unwrap();
+        let back: TrappedMetadata = serde_json::from_str(&json).unwrap();
+        assert!((back.rescue_bonus_accumulated - 0.55).abs() < 1e-6);
     }
 }

@@ -20,6 +20,14 @@ use crate::tributes::Tribute;
 use crate::tributes::actions::Action;
 use shared::afflictions::{AfflictionKind, Severity};
 
+/// Check if a tribute has any Trapped affliction (any severity).
+fn tribute_has_any_trapped(tribute: &Tribute) -> bool {
+    tribute
+        .afflictions
+        .values()
+        .any(|a| matches!(a.kind, AfflictionKind::Trapped(_)))
+}
+
 /// Check if a tribute has a specific affliction at or above the given severity.
 pub fn tribute_has_affliction(
     tribute: &Tribute,
@@ -60,6 +68,9 @@ pub fn hard_gates_with_terrain(
         // Action::Attack is currently melee+ranged combined; gate fires
         // only when a distinct ranged variant exists.
         _ if has_blind && is_ranged_action(action) => Some(Action::Move(None)),
+
+        // Trapped: cannot move to a new area at all
+        Action::Move(_) if tribute_has_any_trapped(tribute) => Some(Action::None),
 
         // Missing leg: cannot enter cliff/swamp terrain.
         Action::Move(_) if has_missing_leg => {
@@ -125,6 +136,11 @@ pub fn affliction_override(tribute: &Tribute, _action: &Action) -> Option<Action
     // These are deferred to action-execution time. See
     // `Tribute::affliction_action_gate`.
 
+    // Trapped tributes cannot move — override to idle if they chose Move
+    if matches!(_action, Action::Move(_)) && tribute_has_any_trapped(tribute) {
+        return Some(Action::None);
+    }
+
     // Brain bias is computed for callers to apply at the scoring level.
     // The bias itself does not produce an override action — it modifies
     // weights in decide_base. For the pre-decision pipeline, we return
@@ -138,7 +154,7 @@ mod tests {
     use super::*;
     use crate::areas::Area;
     use crate::tributes::Tribute;
-    use shared::afflictions::{Affliction, AfflictionSource, BodyPart};
+    use shared::afflictions::{Affliction, AfflictionSource, BodyPart, TrapKind};
 
     fn make_affliction(kind: AfflictionKind, severity: Severity) -> Affliction {
         let body_part = Some(match &kind {
@@ -273,5 +289,53 @@ mod tests {
             Some(BaseTerrain::Mountains),
         );
         assert_eq!(result, Some(Action::Rest));
+    }
+
+    #[test]
+    fn trapped_tribute_move_blocked() {
+        let mut tribute = Tribute::new("Trapped".to_string(), None, None);
+        let aff = make_affliction(
+            AfflictionKind::Trapped(TrapKind::Buried),
+            Severity::Moderate,
+        );
+        tribute.afflictions.insert(aff.key(), aff);
+        let result = affliction_override(&tribute, &Action::Move(Some(Area::Cornucopia)));
+        assert_eq!(result, Some(Action::None));
+    }
+
+    #[test]
+    fn trapped_tribute_attack_allowed() {
+        let mut tribute = Tribute::new("Trapped".to_string(), None, None);
+        let aff = make_affliction(
+            AfflictionKind::Trapped(TrapKind::Buried),
+            Severity::Moderate,
+        );
+        tribute.afflictions.insert(aff.key(), aff);
+        let result = affliction_override(&tribute, &Action::Attack);
+        assert!(result.is_none(), "trapped tribute should be able to attack");
+    }
+
+    #[test]
+    fn trapped_tribute_rest_allowed() {
+        let mut tribute = Tribute::new("Trapped".to_string(), None, None);
+        let aff = make_affliction(
+            AfflictionKind::Trapped(TrapKind::Buried),
+            Severity::Moderate,
+        );
+        tribute.afflictions.insert(aff.key(), aff);
+        let result = affliction_override(&tribute, &Action::Rest);
+        assert!(result.is_none(), "trapped tribute should be able to rest");
+    }
+
+    #[test]
+    fn trapped_tribute_gate_via_hard_gates() {
+        let mut tribute = Tribute::new("Trapped".to_string(), None, None);
+        let aff = make_affliction(
+            AfflictionKind::Trapped(TrapKind::Buried),
+            Severity::Moderate,
+        );
+        tribute.afflictions.insert(aff.key(), aff);
+        let result = hard_gates_with_terrain(&tribute, &Action::Move(Some(Area::Cornucopia)), None);
+        assert_eq!(result, Some(Action::None));
     }
 }

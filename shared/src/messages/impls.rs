@@ -74,7 +74,9 @@ impl MessagePayload {
             TributeTrapped { .. }
             | Struggling { .. }
             | TrappedEscaped { .. }
-            | TributeDiedWhileTrapped { .. } => MessageKind::Trapped,
+            | TributeDiedWhileTrapped { .. }
+            | RescueAttempted { .. }
+            | PartialRescueProgress { .. } => MessageKind::Trapped,
         }
     }
 
@@ -196,6 +198,12 @@ impl MessagePayload {
             | Struggling { tribute, .. }
             | TrappedEscaped { tribute, .. }
             | TributeDiedWhileTrapped { tribute, .. } => tribute == id,
+            RescueAttempted {
+                rescuer, target, ..
+            } => rescuer == id || target == id,
+            PartialRescueProgress {
+                rescuer, target, ..
+            } => rescuer == id || target == id,
             SponsorGift { recipient, .. } => r(recipient),
             AreaClosed { .. } | AreaEvent { .. } => false,
             CycleStart { .. } | CycleEnd { .. } | PhaseStarted { .. } | PhaseEnded { .. } => false,

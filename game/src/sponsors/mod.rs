@@ -1,3 +1,4 @@
+use shared::afflictions::AfflictionKind;
 use shared::audience::AudienceEvent;
 use shared::sponsors::ArchetypeId;
 
@@ -65,7 +66,7 @@ impl ArchetypeModifiers for AestheteModifiers {
 /// Translate raw payloads into 0..N audience events.
 pub fn translate(
     payload: &shared::messages::MessagePayload,
-    _ctx: &SponsorContext,
+    ctx: &SponsorContext,
 ) -> Vec<AudienceEvent> {
     use shared::messages::MessagePayload;
 
@@ -106,6 +107,23 @@ pub fn translate(
                 actor: attacker.clone(),
                 victim: victim.clone(),
             });
+
+            // Check if the victim actually has a Trapped affliction
+            // (extra disapproval for attacking defenseless tributes)
+            let is_victim_trapped = ctx.tributes.iter().any(|t| {
+                t.identifier == victim.identifier
+                    && t.afflictions
+                        .values()
+                        .any(|a| matches!(a.kind, AfflictionKind::Trapped(_)))
+            });
+
+            if is_victim_trapped {
+                // Extra disapproval: attacking a defenseless trapped tribute
+                // is considered cowardly by the audience.
+                out.push(AudienceEvent::Cowardice {
+                    tribute: attacker.clone(),
+                });
+            }
         }
         // Other variants intentionally not mapped in PR1.
         // Future affliction specs add: TrappedEscaped → RescueAlly,

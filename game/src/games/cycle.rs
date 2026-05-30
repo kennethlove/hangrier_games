@@ -718,9 +718,26 @@ impl Game {
                 total_living_tributes: living_tributes_count as u32,
             };
 
+            // ── Brain rescue priority override ──
+            // Before executing, check if this tribute should rescue a
+            // co-located trapped tribute instead of their chosen action.
+            let mut override_suggestion = action_suggestion.clone();
+            if tribute.is_alive()
+                && let Some(target_id) = crate::tributes::rescue::evaluate_rescue_opportunity(
+                    tribute,
+                    environment_details.area_details,
+                    nearby_tributes,
+                    rng,
+                )
+            {
+                override_suggestion = Some(ActionSuggestion {
+                    action: Action::Rescue { target: target_id },
+                    probability: Some(1.0),
+                });
+            }
             let mut tribute_events: Vec<crate::messages::TaggedEvent> = Vec::new();
             tribute.process_turn_phase(
-                action_suggestion.clone(),
+                override_suggestion,
                 &mut environment_details,
                 encounter_context,
                 rng,

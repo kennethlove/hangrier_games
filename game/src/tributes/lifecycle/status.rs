@@ -119,7 +119,7 @@ impl Tribute {
         self.apply_area_effects(area_details);
 
         // Apply per-cycle affliction effects
-        self.apply_affliction_cycle_effects(rng);
+        self.apply_affliction_cycle_effects(rng, events);
 
         self.events.clear();
 
@@ -145,7 +145,11 @@ impl Tribute {
 
     /// Apply per-cycle effects for each affliction the tribute carries.
     /// Replaces the legacy TributeStatus-based damage loop.
-    fn apply_affliction_cycle_effects(&mut self, rng: &mut impl Rng) {
+    fn apply_affliction_cycle_effects(
+        &mut self,
+        rng: &mut impl Rng,
+        events: &mut Vec<TaggedEvent>,
+    ) {
         // Collect affliction kinds first to avoid borrow conflicts
         let kinds: Vec<AfflictionKind> = self.afflictions.keys().map(|(k, _)| k.clone()).collect();
 
@@ -211,6 +215,10 @@ impl Tribute {
                         .afflictions
                         .get(&(AfflictionKind::Trapped(*kind), None))
                         .map(|a| a.severity);
+                    // Clone identifiers for events before mutable borrow
+                    let tribute_name = self.name.clone();
+                    let tribute_id = self.identifier.clone();
+                    let kind_copy = *kind;
                     let escape_stat = get_escape_stat(self, *kind);
 
                     match kind {
@@ -252,6 +260,16 @@ impl Tribute {
                         meta.cycles_trapped += 1;
                         meta.rescue_bonus_accumulated = 0.0;
                     }
+                    // Emit Struggling message per cycle
+                    events.push(TaggedEvent::new(
+                        format!("{} is still trapped", tribute_name),
+                        MessagePayload::Struggling {
+                            tribute: tribute_id,
+                            kind: kind_copy,
+                            severity: buried_severity.unwrap_or(Severity::Mild),
+                            cycles_trapped: cycles_trapped + 1,
+                        },
+                    ));
                 }
                 AfflictionKind::MissingArm
                 | AfflictionKind::MissingLeg
@@ -272,7 +290,7 @@ impl Tribute {
         }
 
         // Check for escaped Buried afflictions — remove them
-        let escaped: Vec<(AfflictionKind, Option<BodyPart>)> = self
+        let escaped: Vec<(AfflictionKind, Option<BodyPart>, u8)> = self
             .afflictions
             .iter()
             .filter_map(|((kind, bp), aff)| {
@@ -280,12 +298,24 @@ impl Tribute {
                     (kind, &aff.trapped_metadata)
                     && meta.escape_progress >= escape_threshold(aff.severity)
                 {
-                    return Some((kind.clone(), *bp));
+                    return Some((kind.clone(), *bp, meta.cycles_trapped));
                 }
                 None
             })
             .collect();
-        for key in escaped {
+        for (kind, bp, cycles) in escaped {
+            let key = (kind.clone(), bp);
+            if let AfflictionKind::Trapped(trap_kind) = &kind {
+                events.push(TaggedEvent::new(
+                    format!("{} escaped!", self.name),
+                    MessagePayload::TrappedEscaped {
+                        tribute: self.identifier.clone(),
+                        kind: *trap_kind,
+                        cycles_trapped: cycles,
+                        rescued_by: Vec::new(),
+                    },
+                ));
+            }
             self.afflictions.remove(&key);
         }
     }

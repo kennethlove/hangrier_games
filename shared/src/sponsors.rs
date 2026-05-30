@@ -9,6 +9,9 @@ pub const MAX_AFFINITY: i32 = 100;
 pub const AFFINITY_FLOOR: i32 = 25;
 pub const TRIGGER_FLOOR: u32 = 8;
 
+/// Affinity penalty applied when attacking a trapped (defenseless) target.
+pub const SPONSOR_PENALTY_ATTACK_TRAPPED: i32 = -15;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ArchetypeId {
     Aesthete,

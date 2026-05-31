@@ -1,6 +1,7 @@
 use super::*;
 use crate::areas::{Area, AreaDetails};
 use crate::items::{Item, OwnsItems};
+use crate::messages::{AreaRef, ItemRef, MessagePayload, TributeRef};
 use crate::tributes::events::TributeEvent;
 use crate::tributes::incidents::{SleepIncident, apply_sleep_incident};
 use crate::tributes::statuses::TributeStatus;
@@ -714,7 +715,21 @@ impl Game {
         });
 
         // --- Phase 2: Execute actions with liveness checks ---
+        let mut pending_thefts: Vec<(usize, Uuid)> = Vec::new();
         for idx in tributes_to_act {
+            // Build sleeping_nearby BEFORE the mutable tribute borrow so
+            // the self.tributes.iter() doesn't conflict (ls5a).
+            // Wasted work on dead tributes (continue'd below) but harmless.
+            let tribute_area = self.tributes[idx].area;
+            let sleeping_nearby: Vec<(Uuid, String)> = self
+                .tributes
+                .iter()
+                .filter(|t| {
+                    t.is_alive() && t.sleeping && t.area == tribute_area && !t.items.is_empty()
+                })
+                .map(|t| (t.id, t.name.clone()))
+                .collect();
+
             let tribute = &mut self.tributes[idx];
 
             // Liveness gate: tribute may have been killed by an earlier
@@ -734,7 +749,7 @@ impl Game {
             }
 
             let area_index = match area_details_map.get(&tribute.area) {
-                Some(&idx) => idx,
+                Some(&old_area_idx) => old_area_idx,
                 None => continue,
             };
 
@@ -776,6 +791,7 @@ impl Game {
                 enemy_density: &enemy_density,
                 current_day,
                 combat_tuning: &combat_tuning_snapshot,
+                sleeping_nearby,
             };
 
             // Get nearby tributes using the pre-computed map
@@ -835,6 +851,72 @@ impl Game {
                 ));
             }
             drained_alliance_events.append(&mut tribute.drain_alliance_events());
+
+            // Collect pending theft from sleeping tribute (ls5a).
+            // The pending_theft_target was set by act_take_item during
+            // process_turn_phase. Actual item transfer happens after the
+            // tribute borrow is released (below) to avoid conflicting
+            // &mut self.tributes borrows.
+            if let Some(sleeper_uuid) = tribute.pending_theft_target.take() {
+                pending_thefts.push((idx, sleeper_uuid));
+            }
+        }
+
+        // ── Process pending sleep theft (ls5a) ──
+        // Iterate thefts collected during Phase 2. The tribute borrow is
+        // released by now so we can split_at_mut on self.tributes freely.
+        for (thief_idx, sleeper_uuid) in &pending_thefts {
+            let sleeper_idx = match self.tributes.iter().position(|t| t.id == *sleeper_uuid) {
+                Some(idx) => idx,
+                None => continue, // sleeper died or vanished
+            };
+            if sleeper_idx == *thief_idx {
+                continue; // shouldn't happen
+            }
+
+            // split_at_mut for simultaneous mutable access to thief + sleeper
+            let (thief, sleeper) = if *thief_idx < sleeper_idx {
+                let (left, right) = self.tributes.split_at_mut(sleeper_idx);
+                (&mut left[*thief_idx], &mut right[0])
+            } else {
+                let (left, right) = self.tributes.split_at_mut(*thief_idx);
+                (&mut right[0], &mut left[sleeper_idx])
+            };
+
+            if sleeper.items.is_empty() {
+                continue;
+            }
+            let item_idx = rng.random_range(0..sleeper.items.len());
+            let stolen = sleeper.items.remove(item_idx);
+            let item_name = stolen.name.clone();
+            let thief_name = thief.name.clone();
+            let sleeper_name = sleeper.name.clone();
+            thief.add_item(stolen.clone());
+
+            let line = format!(
+                "{} steals {} from sleeping {}!",
+                thief_name, item_name, sleeper_name
+            );
+            collected_events.push((
+                thief.identifier.clone(),
+                thief.name.clone(),
+                line,
+                Some(MessagePayload::ItemFound {
+                    tribute: TributeRef {
+                        identifier: thief.identifier.clone(),
+                        name: thief.name.clone(),
+                    },
+                    item: ItemRef {
+                        identifier: stolen.identifier.clone(),
+                        name: item_name,
+                    },
+                    area: AreaRef {
+                        identifier: thief.area.to_string(),
+                        name: thief.area.to_string(),
+                    },
+                }),
+                None,
+            ));
         }
 
         // ── Fixation processing ──

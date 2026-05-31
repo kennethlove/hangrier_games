@@ -148,6 +148,10 @@ pub struct EnvironmentContext<'a> {
     /// `Tribute::attacks` and `attack_contest` can read constants from a
     /// single owned source instead of file-level `const`s.
     pub combat_tuning: &'a crate::tributes::combat_tuning::CombatTuning,
+    /// Sleeping tributes in the current area with items that can be stolen.
+    /// Tuple of (tribute UUID, tribute name). Populated by the game cycle
+    /// in `execute_cycle`; consumed by `act_take_item` for target selection.
+    pub sleeping_nearby: Vec<(Uuid, String)>,
 }
 
 #[derive(Clone, Debug)]
@@ -305,6 +309,12 @@ pub struct Tribute {
     /// Reset to `false` after each combat resolution. Not persisted.
     #[serde(default, skip)]
     pub was_ambushed: bool,
+    /// UUID of a sleeping tribute to steal from. Set by `act_take_item`
+    /// when an awake tribute chooses to steal from a sleeper instead of
+    /// looting the area. Consumed by the game cycle after
+    /// `process_turn_phase`. Transient — never persisted.
+    #[serde(default, skip)]
+    pub pending_theft_target: Option<Uuid>,
 }
 
 impl Default for Tribute {
@@ -371,6 +381,7 @@ impl Tribute {
             addiction_use_count: BTreeMap::new(),
             ever_addicted_to: BTreeSet::new(),
             was_ambushed: false,
+            pending_theft_target: None,
         }
     }
 
@@ -435,6 +446,7 @@ impl Tribute {
             addiction_use_count: BTreeMap::new(),
             ever_addicted_to: BTreeSet::new(),
             was_ambushed: false,
+            pending_theft_target: None,
         }
     }
 
@@ -599,7 +611,12 @@ impl Tribute {
                 );
             }
             Action::TakeItem => {
-                self.act_take_item(area_details, events);
+                self.act_take_item(
+                    area_details,
+                    &environment_details.sleeping_nearby,
+                    rng,
+                    events,
+                );
             }
             Action::UseItem(maybe_item) => {
                 self.act_use_item(&maybe_item, events);
@@ -971,7 +988,29 @@ impl Tribute {
         }
     }
 
-    fn act_take_item(&mut self, area_details: &mut AreaDetails, events: &mut Vec<TaggedEvent>) {
+    fn act_take_item(
+        &mut self,
+        area_details: &mut AreaDetails,
+        sleeping_nearby: &[(Uuid, String)],
+        rng: &mut impl Rng,
+        events: &mut Vec<TaggedEvent>,
+    ) {
+        // Sleep theft (ls5a): if there are sleeping tributes with items
+        // in the area, mark one as theft target. The actual item transfer
+        // happens in execute_cycle after process_turn_phase returns.
+        if !sleeping_nearby.is_empty() {
+            let idx = rng.random_range(0..sleeping_nearby.len());
+            let (sleeper_id, sleeper_name) = &sleeping_nearby[idx];
+            self.pending_theft_target = Some(*sleeper_id);
+            let line = format!(
+                "{} rummages through sleeping {}'s belongings",
+                self.name, sleeper_name
+            );
+            events.push(TaggedEvent::new(line, MessagePayload::Generic));
+            return;
+        }
+
+        // Original area item logic
         if let Some(item) = self.take_nearby_item(area_details) {
             let tribute_ref = TributeRef {
                 identifier: self.identifier.clone(),

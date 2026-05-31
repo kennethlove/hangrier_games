@@ -14,6 +14,7 @@ pub mod stamina_band;
 pub mod statuses;
 pub mod survival;
 pub mod traits;
+pub mod traps;
 
 // Re-export key items from sub-modules
 pub use combat::inflict_table::{
@@ -604,6 +605,52 @@ impl Tribute {
             | Action::Avoidance
             | Action::SearchForSubstance { .. } => {}
             Action::Rescue { .. } => {}
+            Action::SetTrap {
+                trap_kind,
+                severity,
+            } => {
+                self.act_set_trap(trap_kind, severity, area_details, rng, events);
+            }
+            Action::Search => {
+                self.act_search(area_details, rng, events);
+            }
+        }
+
+        // ── Trap trigger check ──
+        // After resolving the chosen action, check if any traps in the area trigger.
+        // Setter auto-passes (no friendly fire).
+        for idx in (0..area_details.placed_traps.len()).rev() {
+            let triggered = area_details.placed_traps[idx].triggered;
+            if triggered {
+                continue;
+            }
+            let set_by = area_details.placed_traps[idx].set_by.clone();
+            if set_by == self.identifier {
+                continue; // Setter auto-passes
+            }
+
+            // Passive Perception check
+            let perception_mod = (self.attributes.intelligence as f32 / 10.0).floor() as i32;
+            let roll: i32 = rng.random_range(1..=20);
+            let concealment = area_details.placed_traps[idx].concealment;
+            if roll + perception_mod < concealment as i32 {
+                // Trigger the trap!
+                // Remove the trap from the area and apply its effect
+                let trap = area_details.placed_traps.swap_remove(idx);
+                let line = format!("{} triggers a {} trap!", self.name, trap.kind);
+                events.push(TaggedEvent::new(line, MessagePayload::Generic));
+
+                // Apply affliction based on trap kind
+                use shared::afflictions::{AfflictionKind, AfflictionSource, TrappedMetadata};
+                self.try_acquire_affliction(crate::tributes::AfflictionDraft {
+                    kind: AfflictionKind::Trapped(trap.kind),
+                    body_part: None,
+                    severity: trap.severity,
+                    source: AfflictionSource::Environmental,
+                    trapped_metadata: Some(TrappedMetadata::fresh_for(trap.kind, None)),
+                });
+                break; // First trigger stops — no chain-traps
+            }
         }
     }
 
@@ -762,6 +809,100 @@ impl Tribute {
                 area: area_ref(current_area),
             },
         ));
+    }
+
+    /// Execute a SetTrap action.
+    fn act_set_trap(
+        &mut self,
+        _trap_kind: Option<shared::afflictions::TrapKind>,
+        _severity: Option<shared::afflictions::Severity>,
+        _area_details: &mut AreaDetails,
+        _rng: &mut impl Rng,
+        _events: &mut Vec<TaggedEvent>,
+    ) {
+        // Check area cap: max 3 traps per area
+        let untriggered_count = _area_details
+            .placed_traps
+            .iter()
+            .filter(|t| !t.triggered)
+            .count();
+        if untriggered_count >= 3 {
+            let line = format!("{} can't set another trap here — area is full.", self.name);
+            _events.push(TaggedEvent::new(line, MessagePayload::Generic));
+            return;
+        }
+
+        let kind = _trap_kind.unwrap_or(shared::afflictions::TrapKind::Snared);
+        let severity = _severity.unwrap_or(shared::afflictions::Severity::Mild);
+
+        // Intelligence check for concealment (d20 + int modifier)
+        let int_val = self.attributes.intelligence as f32;
+        let int_mod = (int_val / 10.0).floor() as u32;
+        let roll: u32 = _rng.random_range(1..=20);
+        let concealment = 10 + int_mod + roll / 2; // Base 10 + int bonus + luck
+
+        let trap = crate::tributes::traps::PlacedTrap {
+            id: uuid::Uuid::new_v4().to_string(),
+            kind,
+            severity,
+            set_by: self.identifier.clone(),
+            concealment,
+            triggered: false,
+        };
+
+        _area_details.placed_traps.push(trap);
+
+        let line = format!("{} sets a {} trap in the area.", self.name, kind);
+        _events.push(TaggedEvent::new(line, MessagePayload::Generic));
+    }
+
+    /// Execute a Search action — reveals hidden traps in current area.
+    fn act_search(
+        &mut self,
+        area_details: &mut AreaDetails,
+        rng: &mut impl Rng,
+        events: &mut Vec<TaggedEvent>,
+    ) {
+        let untriggered: Vec<usize> = area_details
+            .placed_traps
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| !t.triggered)
+            .map(|(i, _)| i)
+            .collect();
+
+        if untriggered.is_empty() {
+            let line = format!("{} searches the area but finds no traps.", self.name);
+            events.push(TaggedEvent::new(line, MessagePayload::Generic));
+            return;
+        }
+
+        // Perception check vs concealment
+        let perception_mod = (self.attributes.intelligence as f32 / 10.0).floor() as u32;
+        let mut found_any = false;
+
+        for &idx in &untriggered {
+            let concealment = area_details.placed_traps[idx].concealment;
+            let kind = area_details.placed_traps[idx].kind;
+            let roll: u32 = rng.random_range(1..=20);
+            if roll + perception_mod >= concealment {
+                found_any = true;
+                let line = format!("{} spots a {} trap! (DC {})", self.name, kind, concealment);
+                events.push(TaggedEvent::new(line, MessagePayload::Generic));
+                // Free disarm
+                area_details.placed_traps[idx].triggered = true;
+                let disarm_line = format!("{} disarms the {} trap.", self.name, kind);
+                events.push(TaggedEvent::new(disarm_line, MessagePayload::Generic));
+            }
+        }
+
+        if !found_any {
+            let line = format!(
+                "{} searches carefully but finds nothing suspicious.",
+                self.name
+            );
+            events.push(TaggedEvent::new(line, MessagePayload::Generic));
+        }
     }
 
     fn act_attack(
@@ -1256,6 +1397,8 @@ pub fn calculate_stamina_cost(
         // Sleep is free at the action layer; phase scheduler handles it.
         Action::Sleep { .. } => 0.0,
         Action::Rescue { .. } => 15.0,
+        Action::SetTrap { .. } => 15.0,
+        Action::Search => 10.0,
         Action::Frozen
         | Action::Flashback { .. }
         | Action::Avoidance

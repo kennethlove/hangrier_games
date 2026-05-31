@@ -301,6 +301,8 @@ pub enum PhobiaEffect {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum MessagePayload {
+    /// Generic narrative event — prose-only, no structured payload consumers.
+    Generic,
     TributeKilled {
         victim: TributeRef,
         killer: Option<TributeRef>,

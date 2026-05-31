@@ -77,6 +77,7 @@ impl MessagePayload {
             | TributeDiedWhileTrapped { .. }
             | RescueAttempted { .. }
             | PartialRescueProgress { .. } => MessageKind::Trapped,
+            Generic => MessageKind::State,
         }
     }
 
@@ -205,7 +206,7 @@ impl MessagePayload {
                 rescuer, target, ..
             } => rescuer == id || target == id,
             SponsorGift { recipient, .. } => r(recipient),
-            AreaClosed { .. } | AreaEvent { .. } => false,
+            Generic | AreaClosed { .. } | AreaEvent { .. } => false,
             CycleStart { .. } | CycleEnd { .. } | PhaseStarted { .. } | PhaseEnded { .. } => false,
             GameEnded { winner } => winner.as_ref().is_some_and(r),
         }

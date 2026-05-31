@@ -17,7 +17,7 @@ use crate::types::{
 /// Default Ollama model name to use for commentary generation.
 /// Uses the base model directly (not a custom Modelfile) so the qwen3
 /// chat template + think/no_think toggle work correctly.
-const DEFAULT_MODEL: &str = "qwen3:1.7b";
+const DEFAULT_MODEL: &str = "announcers";
 
 /// System prompt establishing the commentator voices.
 const SYSTEM_PROMPT: &str = r#"You are the Capitol's Hunger Games broadcast team:
@@ -220,9 +220,6 @@ impl Commentator for OllamaCommentator {
             "model": self.model,
             "prompt": prompt,
             "stream": false,
-            "options": {
-                "think": false
-            }
         });
 
         let resp = self
@@ -288,9 +285,6 @@ impl Commentator for OllamaCommentator {
                         "model": state.model,
                         "prompt": state.prompt,
                         "stream": true,
-                        "options": {
-                            "think": false
-                        }
                     });
                     let client = reqwest::Client::new();
                     match client

@@ -29,6 +29,11 @@ pub enum GameOutput<'a> {
     /// Tribute is forcibly woken by an interruption (ambush, area event,
     /// alliance summons). PR2c.2 / bd-1zju.
     TributeWakesInterrupted(&'a str),
+    /// Tribute wakes due to a sleep incident (theft, animal, etc.). Description
+    /// is pre-formatted by the incident system.
+    TributeWakesFromIncident(&'a str, &'a str),
+    /// Non-waking incident flavor text (annoying only). Tribute stays asleep.
+    TributeSleepFlavor(&'a str, &'a str),
     TributeHide(&'a str),
     TributeTravel(&'a str, &'a str, &'a str),
     TributeTakeItem(&'a str, &'a str),
@@ -153,6 +158,12 @@ impl<'a> Display for GameOutput<'a> {
             }
             GameOutput::TributeWakesInterrupted(tribute) => {
                 write!(f, "⚡ {} jolts awake", tribute)
+            }
+            GameOutput::TributeWakesFromIncident(tribute, description) => {
+                write!(f, "⚡ {} wakes abruptly — {}", tribute, description)
+            }
+            GameOutput::TributeSleepFlavor(tribute, description) => {
+                write!(f, "💤 {} stirs in their sleep — {}", tribute, description)
             }
             GameOutput::TributeHide(tribute) => {
                 write!(f, "🫥 {} tries to hide", tribute)
@@ -464,6 +475,28 @@ mod tests {
         assert_eq!(
             s,
             "Rue is shaken by their ally's death and breaks the bond."
+        );
+    }
+
+    #[test]
+    fn display_tribute_wakes_from_incident() {
+        let s = GameOutput::TributeWakesFromIncident(
+            "Katniss",
+            "Katniss's sword is stolen while they sleep!",
+        )
+        .to_string();
+        assert_eq!(
+            s,
+            "⚡ Katniss wakes abruptly — Katniss's sword is stolen while they sleep!"
+        );
+    }
+
+    #[test]
+    fn display_tribute_sleep_flavor() {
+        let s = GameOutput::TributeSleepFlavor("Peeta", "a squirrel on their chest").to_string();
+        assert_eq!(
+            s,
+            "💤 Peeta stirs in their sleep — a squirrel on their chest"
         );
     }
 }

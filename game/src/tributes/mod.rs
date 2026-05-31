@@ -6,6 +6,7 @@ pub mod combat;
 pub mod combat_beat;
 pub mod combat_tuning;
 pub mod events;
+pub mod incidents;
 pub mod inventory;
 pub mod lifecycle;
 pub mod movement;
@@ -44,6 +45,7 @@ use shared::afflictions::{
     Affliction, AfflictionKey, AfflictionKind, AfflictionSource, BodyPart, PhobiaTrigger, Severity,
     Substance, TrappedMetadata, TraumaSource,
 };
+use shared::messages::SleepIncidentKind;
 use statuses::TributeStatus;
 use uuid::Uuid;
 
@@ -276,6 +278,11 @@ pub struct Tribute {
     /// `WakeReason::Rested`.
     #[serde(default)]
     pub sleep_remaining: u8,
+    /// Tracks a non-waking sleep incident (flavor only) that occurred this
+    /// sleep session. Included in the natural-wake message so the narrative
+    /// reflects the experience. Reset to `None` on sleep end.
+    #[serde(default, skip)]
+    pub pending_sleep_incident: Option<SleepIncidentKind>,
     /// Active afflictions keyed by (kind, body_part). Empty by default;
     /// serde skips serialization when empty to keep payloads lean.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -353,6 +360,7 @@ impl Tribute {
             cycles_awake: 0,
             sleeping: false,
             sleep_remaining: 0,
+            pending_sleep_incident: None,
             afflictions: BTreeMap::new(),
             game_day: None,
             addiction_use_count: BTreeMap::new(),
@@ -415,6 +423,7 @@ impl Tribute {
             cycles_awake: 0,
             sleeping: false,
             sleep_remaining: 0,
+            pending_sleep_incident: None,
             afflictions: BTreeMap::new(),
             game_day: None,
             addiction_use_count: BTreeMap::new(),

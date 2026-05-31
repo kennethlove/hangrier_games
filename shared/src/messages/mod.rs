@@ -286,6 +286,29 @@ pub enum InterruptionKind {
     AreaEvent { kind: AreaEventKind },
     /// An ally summoned the tribute (alliance event cascade).
     AllianceSummons { ally: TributeRef },
+    /// A sleep incident (theft, relocation, animal, etc.) woke the tribute.
+    Incident { kind: SleepIncidentKind },
+}
+
+/// Category of sleep incident that can occur while a tribute is unconscious.
+/// Carried in `InterruptionKind::Incident` for typed wire format.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "incident", rename_all = "snake_case")]
+pub enum SleepIncidentKind {
+    /// Annoying but harmless (squirrel on chest, weird dream). No mechanical effect.
+    Annoying,
+    /// A random item was stolen from the sleeper.
+    Theft,
+    /// The sleeper was relocated to a different area while unconscious.
+    Relocation,
+    /// An animal (named) disturbed the sleep.
+    AnimalEncounter { animal: String },
+    /// Hallucination or bad dream — sanity damage.
+    Hallucination,
+    /// An ally abandoned the sleeper during the night.
+    AllyAbandonment,
+    /// Comedic limb issue (leg fell asleep, etc.) — temporary affliction.
+    LimbInjury,
 }
 
 /// Effect category for a `PhobiaTriggered` event. Mirrors the game-layer

@@ -382,6 +382,20 @@ impl BroadcastPackageBuilder {
                 prose,
                 structured: None,
             }),
+            // Sleep incident / trapped variants from later PRs.
+            MessagePayload::Generic
+            | MessagePayload::TributeTrapped { .. }
+            | MessagePayload::Struggling { .. }
+            | MessagePayload::TrappedEscaped { .. }
+            | MessagePayload::TributeDiedWhileTrapped { .. }
+            | MessagePayload::TrapSet { .. }
+            | MessagePayload::TrapTriggered { .. }
+            | MessagePayload::RescueAttempted { .. }
+            | MessagePayload::PartialRescueProgress { .. } => Some(EventLine {
+                kind: EventKind::State,
+                prose,
+                structured: None,
+            }),
         }
     }
 

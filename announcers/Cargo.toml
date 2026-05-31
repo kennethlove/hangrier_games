@@ -16,6 +16,10 @@ thiserror = "2.0.18"
 tokio = { version = "1.52.1", features = ["macros", "rt", "rt-multi-thread"] }
 uuid = { version = "1", features = ["v4"] }
 
+[[example]]
+name = "sample-prompt"
+required-features = ["ollama"]
+
 [features]
 ollama = ["dep:reqwest"]
 cloudflare = ["dep:reqwest"]

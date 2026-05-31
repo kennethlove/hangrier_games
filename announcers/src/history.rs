@@ -125,10 +125,7 @@ impl TributeHistories {
                     // successfully so their streak holds.
                     self.reset_streak(&victim.identifier);
                     if let Some(a) = attacker {
-                        self.push_event(
-                            &a.identifier,
-                            &format!("Attacked {}", victim.name),
-                        );
+                        self.push_event(&a.identifier, &format!("Attacked {}", victim.name));
                     }
                 }
 
@@ -243,14 +240,8 @@ impl TributeHistories {
                 }
 
                 MessagePayload::BetrayalTriggered { betrayer, victim } => {
-                    self.push_event(
-                        &betrayer.identifier,
-                        &format!("Betrayed {}", victim.name),
-                    );
-                    self.push_highlight(
-                        &betrayer.identifier,
-                        &format!("Betrayed {}", victim.name),
-                    );
+                    self.push_event(&betrayer.identifier, &format!("Betrayed {}", victim.name));
+                    self.push_highlight(&betrayer.identifier, &format!("Betrayed {}", victim.name));
                     self.push_event(
                         &victim.identifier,
                         &format!("Betrayed by {}", betrayer.name),
@@ -271,21 +262,19 @@ impl TributeHistories {
                 // ------- Movement -------
                 MessagePayload::TributeMoved { tribute, to, .. } => {
                     self.set_location(&tribute.identifier, &to.name);
-                    self.push_event(
-                        &tribute.identifier,
-                        &format!("Moved to {}", to.name),
-                    );
+                    self.push_event(&tribute.identifier, &format!("Moved to {}", to.name));
                 }
 
                 MessagePayload::TributeHidden { tribute, area } => {
-                    self.push_event(
-                        &tribute.identifier,
-                        &format!("Hiding in {}", area.name),
-                    );
+                    self.push_event(&tribute.identifier, &format!("Hiding in {}", area.name));
                 }
 
                 // ------- Items -------
-                MessagePayload::ItemFound { tribute, item, area } => {
+                MessagePayload::ItemFound {
+                    tribute,
+                    item,
+                    area,
+                } => {
                     self.push_event(
                         &tribute.identifier,
                         &format!("Found {} in {}", item.name, area.name),
@@ -293,13 +282,14 @@ impl TributeHistories {
                 }
 
                 MessagePayload::ItemUsed { tribute, item } => {
-                    self.push_event(
-                        &tribute.identifier,
-                        &format!("Used {}", item.name),
-                    );
+                    self.push_event(&tribute.identifier, &format!("Used {}", item.name));
                 }
 
-                MessagePayload::ItemDropped { tribute, item, area } => {
+                MessagePayload::ItemDropped {
+                    tribute,
+                    item,
+                    area,
+                } => {
                     self.push_event(
                         &tribute.identifier,
                         &format!("Dropped {} in {}", item.name, area.name),
@@ -333,27 +323,20 @@ impl TributeHistories {
                 }
 
                 MessagePayload::HungerBandChanged { tribute, to, .. } => {
-                    self.push_event(
-                        &tribute.identifier,
-                        &format!("Hunger level: {to:?}"),
-                    );
+                    self.push_event(&tribute.identifier, &format!("Hunger level: {to:?}"));
                 }
 
                 MessagePayload::ThirstBandChanged { tribute, to, .. } => {
-                    self.push_event(
-                        &tribute.identifier,
-                        &format!("Thirst level: {to:?}"),
-                    );
+                    self.push_event(&tribute.identifier, &format!("Thirst level: {to:?}"));
                 }
 
                 MessagePayload::StaminaBandChanged { tribute, to, .. } => {
-                    self.push_event(
-                        &tribute.identifier,
-                        &format!("Stamina level: {to:?}"),
-                    );
+                    self.push_event(&tribute.identifier, &format!("Stamina level: {to:?}"));
                 }
 
-                MessagePayload::ShelterSought { tribute, success, .. } => {
+                MessagePayload::ShelterSought {
+                    tribute, success, ..
+                } => {
                     if *success {
                         self.push_event(&tribute.identifier, "Found shelter");
                     } else {
@@ -361,7 +344,9 @@ impl TributeHistories {
                     }
                 }
 
-                MessagePayload::Foraged { tribute, success, .. } => {
+                MessagePayload::Foraged {
+                    tribute, success, ..
+                } => {
                     if *success {
                         self.push_event(&tribute.identifier, "Successfully foraged");
                     } else {
@@ -382,20 +367,21 @@ impl TributeHistories {
                     self.push_event(&tribute.identifier, "Went to sleep");
                 }
 
-                MessagePayload::TributeWoke { tribute, reason, .. } => {
+                MessagePayload::TributeWoke {
+                    tribute, reason, ..
+                } => {
                     let label = match reason {
                         shared::messages::WakeReason::Rested => "after resting",
                         shared::messages::WakeReason::Interrupted { .. } => "interrupted",
                     };
-                    self.push_event(
-                        &tribute.identifier,
-                        &format!("Woke up ({label})"),
-                    );
+                    self.push_event(&tribute.identifier, &format!("Woke up ({label})"));
                 }
 
                 // ------- Afflictions (string-keyed) -------
                 MessagePayload::AfflictionAcquired {
-                    tribute_id, affliction, ..
+                    tribute_id,
+                    affliction,
+                    ..
                 } => {
                     self.push_event(tribute_id, &format!("Acquired affliction: {affliction}"));
                 }
@@ -413,7 +399,9 @@ impl TributeHistories {
                 }
 
                 MessagePayload::AfflictionHealed {
-                    tribute_id, affliction, ..
+                    tribute_id,
+                    affliction,
+                    ..
                 } => {
                     self.push_event(tribute_id, &format!("Affliction healed: {affliction}"));
                 }
@@ -442,10 +430,7 @@ impl TributeHistories {
                     to_severity,
                     ..
                 } => {
-                    self.push_event(
-                        tribute,
-                        &format!("Trauma reinforced to {to_severity}"),
-                    );
+                    self.push_event(tribute, &format!("Trauma reinforced to {to_severity}"));
                 }
 
                 MessagePayload::TraumaFlashback {
@@ -457,10 +442,7 @@ impl TributeHistories {
                 MessagePayload::TraumaAvoidance {
                     tribute, source, ..
                 } => {
-                    self.push_event(
-                        tribute,
-                        &format!("Avoided action due to {source} trauma"),
-                    );
+                    self.push_event(tribute, &format!("Avoided action due to {source} trauma"));
                 }
 
                 // ------- Phobia (string-keyed) -------
@@ -541,8 +523,16 @@ impl TributeHistories {
                 | MessagePayload::FixationFaded { .. }
                 | MessagePayload::FixationThwarted { .. }
                 | MessagePayload::AreaEvent { .. }
-                | MessagePayload::AreaClosed { .. } => {}
-
+                | MessagePayload::AreaClosed { .. }
+                | MessagePayload::Generic
+                | MessagePayload::TributeTrapped { .. }
+                | MessagePayload::Struggling { .. }
+                | MessagePayload::TrappedEscaped { .. }
+                | MessagePayload::TributeDiedWhileTrapped { .. }
+                | MessagePayload::TrapSet { .. }
+                | MessagePayload::TrapTriggered { .. }
+                | MessagePayload::RescueAttempted { .. }
+                | MessagePayload::PartialRescueProgress { .. } => {}
             }
         }
     }
@@ -615,10 +605,7 @@ impl TributeHistories {
             let new_label = crate::types::spree_label(new);
             if !new_label.is_empty() && new_label != old_label {
                 let name = digest.name.clone();
-                let milestone = format!(
-                    "{name} is {new_label} — {} kills in a row!",
-                    new
-                );
+                let milestone = format!("{name} is {new_label} — {} kills in a row!", new);
                 // Push directly (can't call self.push_event recursively
                 // in the same scope).
                 digest.notable_events.insert(0, milestone);

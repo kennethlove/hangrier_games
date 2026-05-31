@@ -162,7 +162,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Apply commentary and tribute histories schemas (non-critical — failures
     // are logged but don't block startup).
-    let extras_paths = ["../schemas/commentary.surql", "../schemas/tribute_histories.surql"];
+    let extras_paths = [
+        "../schemas/commentary.surql",
+        "../schemas/tribute_histories.surql",
+    ];
     let _ = db
         .use_ns(&surreal_namespace)
         .use_db(&surreal_database)

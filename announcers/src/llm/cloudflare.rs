@@ -15,9 +15,7 @@ use futures::stream::Stream;
 use std::pin::Pin;
 
 use crate::llm::{Commentator, SYSTEM_PROMPT, parse_response};
-use crate::types::{
-    BroadcastPackage, CommentaryError, CommentaryLine, CommentarySegment,
-};
+use crate::types::{BroadcastPackage, CommentaryError, CommentaryLine, CommentarySegment};
 
 /// Default model — 3B params, cheapest option on Cloudflare AI.
 const DEFAULT_MODEL: &str = "@cf/meta/llama-3.2-3b-instruct";
@@ -38,14 +36,10 @@ impl CloudflareCommentator {
     /// `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` env vars.
     pub fn from_env() -> Result<Self, CommentaryError> {
         let api_token = std::env::var("CLOUDFLARE_API_TOKEN").map_err(|_| {
-            CommentaryError::Generate(
-                "CLOUDFLARE_API_TOKEN env var not set".into(),
-            )
+            CommentaryError::Generate("CLOUDFLARE_API_TOKEN env var not set".into())
         })?;
         let account_id = std::env::var("CLOUDFLARE_ACCOUNT_ID").map_err(|_| {
-            CommentaryError::Generate(
-                "CLOUDFLARE_ACCOUNT_ID env var not set".into(),
-            )
+            CommentaryError::Generate("CLOUDFLARE_ACCOUNT_ID env var not set".into())
         })?;
         Ok(Self {
             model: DEFAULT_MODEL.into(),
@@ -56,10 +50,7 @@ impl CloudflareCommentator {
     }
 
     /// Create a new Cloudflare commentator with explicit credentials.
-    pub fn new(
-        account_id: impl Into<String>,
-        api_token: impl Into<String>,
-    ) -> Self {
+    pub fn new(account_id: impl Into<String>, api_token: impl Into<String>) -> Self {
         Self {
             model: DEFAULT_MODEL.into(),
             account_id: account_id.into(),
@@ -81,7 +72,7 @@ impl CloudflareCommentator {
 
     /// Build the chat messages from a broadcast package.
     fn build_messages(&self, package: &BroadcastPackage) -> serde_json::Value {
-        let system = crate::llm::SYSTEM_PROMPT;
+        let system = SYSTEM_PROMPT;
         let phase_data = ollama_format_prompt(package);
 
         serde_json::json!({
@@ -99,12 +90,12 @@ impl CloudflareCommentator {
 
 #[async_trait]
 impl Commentator for CloudflareCommentator {
-    async fn generate(&self, package: &BroadcastPackage) -> Result<CommentarySegment, CommentaryError> {
+    async fn generate(
+        &self,
+        package: &BroadcastPackage,
+    ) -> Result<CommentarySegment, CommentaryError> {
         let body = self.build_messages(package);
-        let url = format!(
-            "{}/{}/ai/run/{}",
-            API_BASE, self.account_id, self.model
-        );
+        let url = format!("{}/{}/ai/run/{}", API_BASE, self.account_id, self.model);
 
         let resp = self
             .client
@@ -115,10 +106,9 @@ impl Commentator for CloudflareCommentator {
             .await
             .map_err(|e| CommentaryError::Generate(format!("Cloudflare request failed: {e}")))?;
 
-        let data: serde_json::Value = resp
-            .json()
-            .await
-            .map_err(|e| CommentaryError::Generate(format!("Cloudflare response parse failed: {e}")))?;
+        let data: serde_json::Value = resp.json().await.map_err(|e| {
+            CommentaryError::Generate(format!("Cloudflare response parse failed: {e}"))
+        })?;
 
         // Cloudflare returns { success: bool, result: { response: str } }
         let text = data["result"]["response"]
@@ -126,7 +116,7 @@ impl Commentator for CloudflareCommentator {
             .unwrap_or("")
             .to_string();
 
-        let lines = crate::llm::parse_response(&text);
+        let lines = parse_response(&text);
         let generated_at = chrono::Utc::now();
 
         Ok(CommentarySegment {
@@ -163,9 +153,7 @@ fn ollama_format_prompt(package: &BroadcastPackage) -> String {
         "=== PHASE CONTEXT ===\n\
          Day {} — {} phase\n\
          {} tributes remaining\n\n",
-        package.header.day,
-        package.header.phase,
-        package.header.alive_count,
+        package.header.day, package.header.phase, package.header.alive_count,
     ));
 
     if !package.header.killing_sprees.is_empty() {
@@ -234,7 +222,10 @@ fn ollama_format_prompt(package: &BroadcastPackage) -> String {
                 body.push_str(&format!("  • {ev}\n"));
             }
             if t.notable_events.len() > 5 {
-                body.push_str(&format!("  ... ({} more events)\n", t.notable_events.len() - 5));
+                body.push_str(&format!(
+                    "  ... ({} more events)\n",
+                    t.notable_events.len() - 5
+                ));
             }
             body.push('\n');
         }

@@ -8,16 +8,15 @@
 //!   5. Assert package structure and accumulated history
 
 use announcers::{
-    BroadcastPackageBuilder, Commentator, CommentaryError, CommentaryLine, CommentarySegment,
+    BroadcastPackageBuilder, CommentaryError, CommentaryLine, CommentarySegment, Commentator,
     GameStateSnapshot, TributeDigest, TributeHistories,
 };
 use async_trait::async_trait;
 use futures::stream::Stream;
-use std::pin::Pin;
 use shared::messages::{
-    AreaRef, GameMessage, ItemRef, MessagePayload, MessageSource,
-    Phase, TributeRef,
+    AreaRef, GameMessage, ItemRef, MessagePayload, MessageSource, Phase, TributeRef,
 };
+use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 // ---------------------------------------------------------------------------
@@ -73,7 +72,7 @@ fn make_tribute(name: &str, district: u8) -> TributeDigest {
         location: "Cornucopia".into(),
         allies: vec![],
         kill_streak: 0,
-            highlights: vec![],
+        highlights: vec![],
         notable_events: vec![],
     }
 }
@@ -178,7 +177,7 @@ async fn full_pipeline_from_roster_to_package() {
         kill_leaders: vec![],
         alliances: vec![],
         hot_zones: vec![],
-            killing_sprees: vec![],
+        killing_sprees: vec![],
     };
     let package = BroadcastPackageBuilder::build(header, &phase1, digests);
 
@@ -232,10 +231,7 @@ async fn histories_accumulate_across_phases() {
     assert!(cato2.notable_events.iter().any(|e| e.contains("Killed")));
 
     // Katniss has phase 2's item find.
-    assert!(katniss2
-        .notable_events
-        .iter()
-        .any(|e| e.contains("Found")));
+    assert!(katniss2.notable_events.iter().any(|e| e.contains("Found")));
 }
 
 /// Noteworthy events are capped at 8 — excess oldest entries are pruned.
@@ -283,8 +279,7 @@ async fn package_includes_kill_leaders() {
     ];
 
     // Build kill leaders the same way the API does.
-    let mut kill_counts: std::collections::HashMap<String, u32> =
-        std::collections::HashMap::new();
+    let mut kill_counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
     for msg in &phase1 {
         if let MessagePayload::TributeKilled {
             killer: Some(k), ..
@@ -316,7 +311,7 @@ async fn package_includes_kill_leaders() {
         kill_leaders: kill_leaders.clone(),
         alliances: vec![],
         hot_zones: vec![],
-            killing_sprees: vec![],
+        killing_sprees: vec![],
     };
     let package = BroadcastPackageBuilder::build(header, &phase1, vec![]);
     assert_eq!(package.header.kill_leaders.len(), 2);
@@ -341,7 +336,7 @@ async fn generate_commentary_integration() {
         kill_leaders: vec![],
         alliances: vec![],
         hot_zones: vec![],
-            killing_sprees: vec![],
+        killing_sprees: vec![],
     };
 
     let segment = announcers::generate_commentary(
@@ -484,10 +479,11 @@ async fn spree_milestone_and_break_events() {
     let d = histories.digests();
     let cato = d.iter().find(|d| d.name == "Cato").unwrap();
     assert_eq!(cato.kill_streak, 0);
-    assert!(cato
-        .notable_events
-        .iter()
-        .any(|e| e.contains("spree has been broken")));
+    assert!(
+        cato.notable_events
+            .iter()
+            .any(|e| e.contains("spree has been broken"))
+    );
 }
 
 /// Hot zones in the snapshot header survive through package construction.
@@ -557,7 +553,7 @@ async fn permanent_highlights() {
 
     // Highlights survive serde_json round-trip (as they would through
     // SurrealDB persistence).
-    let json = serde_json::to_value(&cato).unwrap();
+    let json = serde_json::to_value(cato).unwrap();
     let restored: TributeDigest = serde_json::from_value(json).unwrap();
     assert_eq!(restored.highlights.len(), 20);
     assert!(restored.highlights[0].contains("Killed"));

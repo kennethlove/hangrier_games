@@ -9,7 +9,6 @@ use async_trait::async_trait;
 use futures::stream::Stream;
 use shared::messages::{MessagePayload, MessageSource, Phase, TributeRef};
 use std::pin::Pin;
-use std::sync::Arc;
 
 /// A mock commentator that records invocations.
 struct MockCommentator {
@@ -24,7 +23,8 @@ impl MockCommentator {
     }
 
     fn invoked(&self) -> u32 {
-        self.invocation_count.load(std::sync::atomic::Ordering::SeqCst)
+        self.invocation_count
+            .load(std::sync::atomic::Ordering::SeqCst)
     }
 }
 
@@ -34,7 +34,8 @@ impl announcers::Commentator for MockCommentator {
         &self,
         _package: &announcers::BroadcastPackage,
     ) -> Result<CommentarySegment, CommentaryError> {
-        self.invocation_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.invocation_count
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Ok(CommentarySegment {
             id: "mock-test-id".into(),
             game_id: String::new(),
@@ -59,7 +60,8 @@ impl announcers::Commentator for MockCommentator {
         &self,
         _package: &announcers::BroadcastPackage,
     ) -> Pin<Box<dyn Stream<Item = Result<CommentaryLine, CommentaryError>> + Send>> {
-        self.invocation_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.invocation_count
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let lines = vec![
             CommentaryLine {
                 speaker: "Verity".into(),
@@ -124,7 +126,11 @@ async fn generate_commentary_pipeline() {
     assert_eq!(segment.phase, "day");
     assert_eq!(segment.lines.len(), 2);
     assert_eq!(segment.model_used, "test-mock");
-    assert_eq!(mock.invoked(), 1, "Commentator should be called exactly once");
+    assert_eq!(
+        mock.invoked(),
+        1,
+        "Commentator should be called exactly once"
+    );
 }
 
 /// Broadcast package building with kill leaders and sprees produces
@@ -154,11 +160,10 @@ fn broadcast_package_with_leaders_and_sprees() {
     };
 
     let events = vec![make_msg(MessagePayload::TributeKilled {
-            victim: tr("Marvel"),
-            killer: Some(tr("Cato")),
-            cause: "combat".into(),
-        },
-    )];
+        victim: tr("Marvel"),
+        killer: Some(tr("Cato")),
+        cause: "combat".into(),
+    })];
 
     let package = announcers::BroadcastPackageBuilder::build(header, &events, vec![]);
     assert_eq!(package.header.kill_leaders.len(), 1);

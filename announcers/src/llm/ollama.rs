@@ -5,8 +5,8 @@
 //! tagged commentary lines.
 
 use async_trait::async_trait;
-use futures::stream::Stream;
 use futures::StreamExt;
+use futures::stream::Stream;
 use std::pin::Pin;
 
 use crate::llm::{Commentator, SYSTEM_PROMPT, parse_response};
@@ -55,9 +55,7 @@ impl OllamaCommentator {
             "=== PHASE CONTEXT ===\n\
              Day {} — {} phase\n\
              {} tributes remaining\n\n",
-            package.header.day,
-            package.header.phase,
-            package.header.alive_count,
+            package.header.day, package.header.phase, package.header.alive_count,
         ));
 
         // ── Hot streaks ──
@@ -76,10 +74,7 @@ impl OllamaCommentator {
         if !package.header.hot_zones.is_empty() {
             body.push_str("=== HOT ZONES ===\n");
             for zone in &package.header.hot_zones {
-                body.push_str(&format!(
-                    "• {} — {}\n",
-                    zone.name, zone.activity_level,
-                ));
+                body.push_str(&format!("• {} — {}\n", zone.name, zone.activity_level,));
             }
             body.push('\n');
         }
@@ -104,13 +99,14 @@ impl OllamaCommentator {
         for event in &package.events {
             let icon = event_icon(event.kind);
             body.push_str(&format!("{} {}\n", icon, event.prose));
-            if let Some(ref structured) = event.structured {
-                // Only include structured data for complex events (death, combat).
-                if matches!(event.kind, EventKind::Death | EventKind::Combat | EventKind::Betrayal) {
-                    if let Some(s) = structured.as_str() {
-                        body.push_str(&format!("  ({s})\n"));
-                    }
-                }
+            // Only include structured data for complex events (death, combat).
+            if matches!(
+                event.kind,
+                EventKind::Death | EventKind::Combat | EventKind::Betrayal
+            ) && let Some(ref structured) = event.structured
+                && let Some(s) = structured.as_str()
+            {
+                body.push_str(&format!("  ({s})\n"));
             }
         }
         body.push('\n');
@@ -153,7 +149,7 @@ Here is the current phase data:
 {body}Generate the interleaved broadcast script now, using [VERITY], [REX], and [FLASH] tags.
 "#,
         )
-        }
+    }
 }
 
 impl Default for OllamaCommentator {
@@ -164,7 +160,10 @@ impl Default for OllamaCommentator {
 
 #[async_trait]
 impl Commentator for OllamaCommentator {
-    async fn generate(&self, package: &BroadcastPackage) -> Result<CommentarySegment, CommentaryError> {
+    async fn generate(
+        &self,
+        package: &BroadcastPackage,
+    ) -> Result<CommentarySegment, CommentaryError> {
         let prompt = self.build_prompt(package);
         let body = serde_json::json!({
             "model": self.model,
@@ -189,10 +188,7 @@ impl Commentator for OllamaCommentator {
             .await
             .map_err(|e| CommentaryError::Generate(format!("Ollama response parse failed: {e}")))?;
 
-        let text = data["response"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
+        let text = data["response"].as_str().unwrap_or("").to_string();
 
         let lines = parse_response(&text);
         let generated_at = chrono::Utc::now();
@@ -208,6 +204,7 @@ impl Commentator for OllamaCommentator {
         })
     }
 
+    #[allow(clippy::type_complexity)]
     fn generate_stream(
         &self,
         package: &BroadcastPackage,
@@ -256,13 +253,18 @@ impl Commentator for OllamaCommentator {
                             // reading each JSON line and extracting .response.
                             let byte_stream = response.bytes_stream();
                             let string_stream: Pin<
-                                Box<dyn Stream<Item = Result<String, Box<dyn std::error::Error + Send>>> + Send>,
-                            > = Box::pin(
-                                byte_stream.map(|chunk_result| match chunk_result {
-                                    Ok(bytes) => Ok(String::from_utf8_lossy(&bytes).to_string()),
-                                    Err(e) => Err(Box::new(e) as Box<dyn std::error::Error + Send>),
-                                }),
-                            );
+                                Box<
+                                    dyn Stream<
+                                            Item = Result<
+                                                String,
+                                                Box<dyn std::error::Error + Send>,
+                                            >,
+                                        > + Send,
+                                >,
+                            > = Box::pin(byte_stream.map(|chunk_result| match chunk_result {
+                                Ok(bytes) => Ok(String::from_utf8_lossy(&bytes).to_string()),
+                                Err(e) => Err(Box::new(e) as Box<dyn std::error::Error + Send>),
+                            }));
 
                             // Parse SSE JSON lines, extract .response fields.
                             let parsed = string_stream.flat_map(move |chunk_result| {
@@ -342,14 +344,16 @@ impl Commentator for OllamaCommentator {
 }
 
 /// Internal state for the `generate_stream` unfold.
+#[allow(clippy::type_complexity)]
 struct OllamaStreamState {
     base_url: String,
     model: String,
     prompt: String,
     buffer: String,
     /// SSE-parsed token stream from the Ollama REST API.
-    ollama_stream:
-        Option<Pin<Box<dyn Stream<Item = Result<String, Box<dyn std::error::Error + Send>>> + Send>>>,
+    ollama_stream: Option<
+        Pin<Box<dyn Stream<Item = Result<String, Box<dyn std::error::Error + Send>>> + Send>>,
+    >,
     done: bool,
 }
 

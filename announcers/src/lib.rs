@@ -69,8 +69,8 @@ mod tests {
     use crate::types::{CommentaryError, CommentaryLine, CommentarySegment};
     use async_trait::async_trait;
     use futures::stream::Stream;
-    use std::pin::Pin;
     use shared::messages::{GameMessage, MessagePayload, MessageSource, Phase, TributeRef};
+    use std::pin::Pin;
 
     /// A mock commentator that returns a fixed segment.
     struct MockCommentator {
@@ -133,12 +133,8 @@ mod tests {
             &self,
             _package: &BroadcastPackage,
         ) -> Pin<Box<dyn Stream<Item = Result<CommentaryLine, CommentaryError>> + Send>> {
-            let lines: Vec<Result<CommentaryLine, CommentaryError>> = self
-                .lines
-                .clone()
-                .into_iter()
-                .map(Ok)
-                .collect();
+            let lines: Vec<Result<CommentaryLine, CommentaryError>> =
+                self.lines.clone().into_iter().map(Ok).collect();
             Box::pin(futures::stream::iter(lines))
         }
     }
@@ -176,8 +172,8 @@ mod tests {
         let commentator = MockCommentator::ok(vec!["Hello!", "Great shot!"]);
         let header = GameStateSnapshot {
             day: 1,
-        phase: "day".into(),
-        alive_count: 12,
+            phase: "day".into(),
+            alive_count: 12,
             kill_leaders: vec![],
             alliances: vec![],
             hot_zones: vec![],
@@ -187,7 +183,13 @@ mod tests {
         let histories = vec![];
 
         let segment = generate_commentary(
-            &commentator, "game-abc", 3, "day", header, &events, histories,
+            &commentator,
+            "game-abc",
+            3,
+            "day",
+            header,
+            &events,
+            histories,
         )
         .await
         .unwrap();
@@ -205,16 +207,17 @@ mod tests {
         let commentator = MockCommentator::empty();
         let header = GameStateSnapshot {
             day: 1,
-        phase: "day".into(),
-        alive_count: 24,
+            phase: "day".into(),
+            alive_count: 24,
             kill_leaders: vec![],
             alliances: vec![],
             hot_zones: vec![],
             killing_sprees: vec![],
         };
-        let segment = generate_commentary(&commentator, "game-xyz", 1, "night", header, &[], vec![])
-            .await
-            .unwrap();
+        let segment =
+            generate_commentary(&commentator, "game-xyz", 1, "night", header, &[], vec![])
+                .await
+                .unwrap();
 
         assert_eq!(segment.game_id, "game-xyz");
         assert!(segment.lines.is_empty());
@@ -225,8 +228,8 @@ mod tests {
         let commentator = MockCommentator::error();
         let header = GameStateSnapshot {
             day: 1,
-        phase: "day".into(),
-        alive_count: 12,
+            phase: "day".into(),
+            alive_count: 12,
             kill_leaders: vec![],
             alliances: vec![],
             hot_zones: vec![],

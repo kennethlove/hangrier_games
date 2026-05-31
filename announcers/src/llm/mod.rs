@@ -11,6 +11,7 @@ use std::pin::Pin;
 use crate::types::{BroadcastPackage, CommentaryError, CommentaryLine, CommentarySegment};
 
 /// Shared system prompt used by both Ollama and Cloudflare backends.
+#[cfg(any(feature = "ollama", feature = "cloudflare"))]
 pub(crate) const SYSTEM_PROMPT: &str = r#"You are the Capitol's Hunger Games broadcast team:
 
 VERITY — play-by-play. Sharp, dramatic, paints the picture. Calls the action.
@@ -35,6 +36,7 @@ Examples:
 
 /// Parse a response text into commentary lines by extracting `[VERITY]`,
 /// `[REX]`, and `[FLASH]` tagged lines.
+#[cfg(any(feature = "ollama", feature = "cloudflare"))]
 pub(crate) fn parse_response(text: &str) -> Vec<CommentaryLine> {
     text.lines()
         .filter_map(|line| {
@@ -74,7 +76,10 @@ pub trait Commentator: Send + Sync {
     ///
     /// Takes a fully-structured [`BroadcastPackage`] and returns a
     /// [`CommentarySegment`] with interleaved Verity/Rex lines.
-    async fn generate(&self, package: &BroadcastPackage) -> Result<CommentarySegment, CommentaryError>;
+    async fn generate(
+        &self,
+        package: &BroadcastPackage,
+    ) -> Result<CommentarySegment, CommentaryError>;
 
     /// Stream commentary lines progressively.
     ///

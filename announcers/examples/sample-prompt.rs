@@ -141,12 +141,8 @@ async fn main() {
             location: "Forest".into(),
             allies: vec![],
             kill_streak: 1,
-            notable_events: vec![
-                "Found bow in Forest".into(),
-            ],
-            highlights: vec![
-                "Killed Marvel (combat)".into(),
-            ],
+            notable_events: vec!["Found bow in Forest".into()],
+            highlights: vec!["Killed Marvel (combat)".into()],
         },
         TributeDigest {
             identifier: "id-Peeta".into(),
@@ -157,12 +153,8 @@ async fn main() {
             location: "Cornucopia".into(),
             allies: vec![],
             kill_streak: 0,
-            notable_events: vec![
-                "Killed by Cato".into(),
-            ],
-            highlights: vec![
-                "Killed by Cato (combat)".into(),
-            ],
+            notable_events: vec!["Killed by Cato".into()],
+            highlights: vec!["Killed by Cato (combat)".into()],
         },
     ];
 
@@ -179,7 +171,11 @@ async fn main() {
             for line in &segment.lines {
                 println!("[{}] {}", line.speaker, line.text);
             }
-            println!("\n({} lines, model: {})", segment.lines.len(), segment.model_used);
+            println!(
+                "\n({} lines, model: {})",
+                segment.lines.len(),
+                segment.model_used
+            );
         }
         Err(e) => {
             eprintln!("Error generating commentary: {e}");

@@ -78,7 +78,7 @@ SURREAL_PASS=root
 **Ollama setup** (optional, requires `features = ["ollama"]` on the `announcers` crate):
 ```bash
 cd announcers/src
-ollama create announcers -f Modelfile.qwen
+ollama create announcers -f Modelfile
 ```
 
 ## Non-Interactive Shell Commands

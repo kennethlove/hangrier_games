@@ -101,7 +101,7 @@ cd api/assets && npm install && cd ../..
 
 # Create Ollama model for commentary (optional, `features = ["ollama"]`)
 cd announcers/src
-ollama create announcers -f Modelfile.qwen
+ollama create announcers -f Modelfile
 cd ../..
 
 # Build Tailwind CSS

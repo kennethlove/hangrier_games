@@ -62,4 +62,4 @@ Persisted to SurrealDB (commentary_segments table) + pushed via SSE/WS
 - `src/history.rs`: Rolling per-tribute digest tracker
 - `src/llm/mod.rs`: Commentator trait definition
 - `src/llm/ollama.rs`: Ollama-backed implementation
-- `Modelfile.qwen`: Ollama model definition (only for `ollama` feature)
+- `Modelfile`: Ollama model definition (only for `ollama` feature)

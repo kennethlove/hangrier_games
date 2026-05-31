@@ -140,6 +140,7 @@ quality: fmt check clippy test
 # Pull Ollama model for commentary (optional; requires `features = ["ollama"]`)
 setup-ollama:
     ollama pull qwen3:1.7b
+    cd announcers/src && ollama create announcers -f Modelfile
     @echo "✓ Model ready. Enable with: cargo build --features announcers/ollama"
 
 # Install Node dependencies for Tailwind CSS

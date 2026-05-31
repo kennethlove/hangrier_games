@@ -232,7 +232,7 @@ surreal sql --conn ws://localhost:8000 --user root --pass root --ns hangry-games
 # Create custom Ollama model for commentary (optional)
 # Requires `features = ["ollama"]` on the announcers crate
 cd announcers/src
-ollama create announcers -f Modelfile.qwen
+ollama create announcers -f Modelfile
 
 # Verify model exists
 ollama list | grep announcers
@@ -360,7 +360,7 @@ Services defined in `docker-compose.yml`:
 - **AGENTS.md**: Project-specific instructions for AI agents
 - **Cargo.toml**: Workspace configuration and dependency versions
 - **docker-compose.yml**: Container orchestration
-- **Modelfile.qwen**: Ollama model definition for announcers (only needed for `features = ["ollama"]`)
+- **Modelfile**: Ollama model definition for announcers (only needed for `features = ["ollama"]`)
 
 ---
 

@@ -14,9 +14,8 @@ use crate::types::{
     BroadcastPackage, CommentaryError, CommentaryLine, CommentarySegment, EventKind,
 };
 
-/// Default Ollama model name to use for commentary generation.
-/// Uses the base model directly (not a custom Modelfile) so the qwen3
-/// chat template + think/no_think toggle work correctly.
+/// Default Ollama model name — a custom `announcers` Modelfile built
+/// from phi3:3.8b. Created via: ollama create announcers -f Modelfile
 const DEFAULT_MODEL: &str = "announcers";
 
 /// System prompt establishing the commentator voices.
@@ -29,9 +28,11 @@ FLASH — technical analyst. Analytical, precise. Comments on combat technique, 
 Tone: Ancient Rome colosseum meets pro wrestling. Theatrical, bloodthirsty, gripping. Refer to tributes by name and district. Build tension.
 
 RULES:
-- 6-10 exchanges (12-20 lines). Rotate through all three commentators.
+- 4-6 exchanges (8-12 lines). Rotate through all three commentators.
 - ONLY spoken dialogue — NO stage directions, actions, or descriptions in asterisks or parentheses.
 - Do NOT write *screams*, *laughs*, *voice trembling*, etc. Just the words they say.
+- ONLY use English. Do NOT output Chinese characters or any non-English text.
+
 - End with a hook: what happens next, who to watch.
 - Only reference events in the data. Do NOT invent kills. Dead tributes are dead.
 - Vary your vocabulary. Do NOT repeat the same phrases across different exchanges.
@@ -39,7 +40,7 @@ RULES:
 Examples of the right TONE (not scripts to copy):
 
 [VERITY] Cato from District 2 has his FOURTH kill! The Cornucopia is a slaughterhouse!
-[REX] I haven't seen a feeding frenzy like this since the 63rd! Cato is possessed!
+[REX] Cato is possessed! I haven't seen a feeding frenzy this brutal since the 63rd Games!
 [FLASH] He's switching his grip mid-swing — that's not brute force, that's District 2 combat training. Textbook.
 
 Now cover this phase.
@@ -222,7 +223,7 @@ impl Commentator for OllamaCommentator {
             "prompt": prompt,
             "stream": false,
             "options": {
-                "repeat_penalty": 1.3,
+                "repeat_penalty": 1.5,
                 "temperature": 0.8,
             },
         });
@@ -291,7 +292,7 @@ impl Commentator for OllamaCommentator {
                         "prompt": state.prompt,
                         "stream": true,
                         "options": {
-                            "repeat_penalty": 1.3,
+                            "repeat_penalty": 1.5,
                             "temperature": 0.8,
                         },
                     });

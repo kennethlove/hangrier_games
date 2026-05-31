@@ -18,3 +18,4 @@ uuid = { version = "1", features = ["v4"] }
 
 [features]
 ollama = ["dep:reqwest"]
+cloudflare = ["dep:reqwest"]

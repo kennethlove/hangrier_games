@@ -37,6 +37,9 @@ pub use types::*;
 #[cfg(feature = "ollama")]
 pub use llm::ollama::OllamaCommentator;
 
+#[cfg(feature = "cloudflare")]
+pub use llm::cloudflare::CloudflareCommentator;
+
 /// One-shot convenience: build a [`BroadcastPackage`] and generate commentary.
 ///
 /// This is the primary entry point for the API integration layer. It:

@@ -2,8 +2,8 @@
 FROM qwen3:1.7b
 
 # Parameters
-PARAMETER temperature 0.8
-PARAMETER repeat_penalty 1.5
+PARAMETER temperature 0.9
+PARAMETER repeat_penalty 1.2
 PARAMETER num_ctx 8192
 
 # The announcers crate builds the full instruction in

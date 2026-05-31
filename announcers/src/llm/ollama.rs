@@ -9,7 +9,7 @@ use futures::stream::Stream;
 use futures::StreamExt;
 use std::pin::Pin;
 
-use crate::llm::Commentator;
+use crate::llm::{Commentator, SYSTEM_PROMPT, parse_response};
 use crate::types::{
     BroadcastPackage, CommentaryError, CommentaryLine, CommentarySegment, EventKind,
 };
@@ -17,34 +17,6 @@ use crate::types::{
 /// Default Ollama model name — a custom `announcers` Modelfile built
 /// from phi3:3.8b. Created via: ollama create announcers -f Modelfile
 const DEFAULT_MODEL: &str = "announcers";
-
-/// System prompt establishing the commentator voices.
-const SYSTEM_PROMPT: &str = r#"You are the Capitol's Hunger Games broadcast team:
-
-VERITY — play-by-play. Sharp, dramatic, paints the picture. Calls the action.
-REX — color commentator. Cynical, theatrical, darkly amused. Reacts to the drama.
-FLASH — technical analyst. Analytical, precise. Comments on combat technique, weaponry, gear, injuries, and arena tactics. Notices the details.
-
-Tone: Ancient Rome colosseum meets pro wrestling. Theatrical, bloodthirsty, gripping. Refer to tributes by name and district. Build tension.
-
-RULES:
-- 4-6 exchanges (8-12 lines). Rotate through all three commentators.
-- ONLY spoken dialogue — NO stage directions, actions, or descriptions in asterisks or parentheses.
-- Do NOT write *screams*, *laughs*, *voice trembling*, etc. Just the words they say.
-- ONLY use English. Do NOT output Chinese characters or any non-English text.
-
-- End with a hook: what happens next, who to watch.
-- Only reference events in the data. Do NOT invent kills. Dead tributes are dead.
-- Vary your vocabulary. Do NOT repeat the same phrases across different exchanges.
-
-Examples of the right TONE (not scripts to copy):
-
-[VERITY] Cato from District 2 has his FOURTH kill! The Cornucopia is a slaughterhouse!
-[REX] Cato is possessed! I haven't seen a feeding frenzy this brutal since the 63rd Games!
-[FLASH] He's switching his grip mid-swing — that's not brute force, that's District 2 combat training. Textbook.
-
-Now cover this phase.
-"#;
 
 /// An Ollama-backed commentator. Communicates with Ollama's REST API directly
 /// via reqwest so we can pass `think: false` and other options not exposed by
@@ -181,31 +153,7 @@ Here is the current phase data:
 {body}Generate the interleaved broadcast script now, using [VERITY], [REX], and [FLASH] tags.
 "#,
         )
-    }
-
-    /// Parse the raw LLM response into commentary lines.
-    fn parse_response(text: &str) -> Vec<CommentaryLine> {
-        text.lines()
-            .filter_map(|line| {
-                let line = line.trim();
-                if line.is_empty() {
-                    return None;
-                }
-
-                line.strip_prefix("[VERITY]")
-                    .map(|text| CommentaryLine {
-                        speaker: "Verity".into(),
-                        text: text.trim().to_string(),
-                    })
-                    .or_else(|| {
-                        line.strip_prefix("[REX]").map(|text| CommentaryLine {
-                            speaker: "Rex".into(),
-                            text: text.trim().to_string(),
-                        })
-                    })
-            })
-            .collect()
-    }
+        }
 }
 
 impl Default for OllamaCommentator {
@@ -246,7 +194,7 @@ impl Commentator for OllamaCommentator {
             .unwrap_or("")
             .to_string();
 
-        let lines = Self::parse_response(&text);
+        let lines = parse_response(&text);
         let generated_at = chrono::Utc::now();
 
         Ok(CommentarySegment {

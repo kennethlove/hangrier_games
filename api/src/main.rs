@@ -286,7 +286,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         db: db.clone(),
         storage,
         broadcaster,
-        commentator: None, // Enable with `--features ollama` on announcers
+        commentator: {
+            #[cfg(feature = "cloudflare")]
+            {
+                match announcers::CloudflareCommentator::from_env() {
+                    Ok(c) => {
+                        tracing::info!("Cloudflare AI commentator initialized");
+                        Some(Arc::new(c) as Arc<dyn announcers::Commentator>)
+                    }
+                    Err(e) => {
+                        tracing::warn!("Cloudflare AI not configured: {e}");
+                        None
+                    }
+                }
+            }
+            #[cfg(not(feature = "cloudflare"))]
+            {
+                tracing::info!("No AI commentator configured (enable with --features cloudflare)");
+                None
+            }
+        },
         namespace: surreal_namespace,
         database: surreal_database,
     };

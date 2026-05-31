@@ -868,7 +868,7 @@ impl Brain {
             _ => {
                 // Deterministic: use tribute id hash to decide trap setting
                 let hash: u32 = tribute.identifier.bytes().map(|b| b as u32).sum();
-                if tribute.attributes.movement > 0 && hash % 7 == 0 {
+                if tribute.attributes.movement > 0 && hash.is_multiple_of(7) {
                     Action::SetTrap {
                         trap_kind: None,
                         severity: None,

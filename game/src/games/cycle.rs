@@ -11,6 +11,7 @@ use crate::tributes::{
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
+use shared::messages::SleepIncidentKind;
 use std::collections::HashMap;
 
 impl Game {
@@ -563,8 +564,13 @@ impl Game {
                     let incident_suffix = tribute
                         .pending_sleep_incident
                         .take()
-                        .map(|_| " — but their sleep was not peaceful")
-                        .unwrap_or("");
+                        .map(|kind| match kind {
+                            SleepIncidentKind::Hallucination => {
+                                " — still shaken by strange dreams".to_string()
+                            }
+                            _ => " — though their sleep was restless".to_string(),
+                        })
+                        .unwrap_or_default();
                     let line = format!(
                         "{} {}",
                         crate::output::GameOutput::TributeWakesRested(tribute.name.as_str()),

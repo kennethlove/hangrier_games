@@ -59,6 +59,7 @@ impl Tribute {
         // emission. The ambush still lands — sleeping targets still take
         // the swing — but at least the timeline reflects the rude awakening.
         if !is_self_attack && target.sleeping {
+            target.was_ambushed = true; // Signal to attack_contest: 0 defense
             let attacker_ref = TributeRef {
                 identifier: self.identifier.clone(),
                 name: self.name.clone(),

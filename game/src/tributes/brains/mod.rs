@@ -269,7 +269,7 @@ impl Brain {
         }
 
         let action = if nearby_tributes == 0 {
-            self.decide_action_no_enemies(tribute)
+            self.decide_action_no_enemies(tribute, rng)
         } else if nearby_tributes < LOW_ENEMY_LIMIT {
             self.decide_action_few_enemies(tribute)
         } else {
@@ -479,7 +479,7 @@ impl Brain {
 
         // Decide base action
         let base_action = if nearby_tributes == 0 {
-            self.decide_action_no_enemies(tribute)
+            self.decide_action_no_enemies(tribute, rng)
         } else if nearby_tributes < LOW_ENEMY_LIMIT {
             self.decide_action_few_enemies_with_terrain(tribute, is_concealed)
         } else {
@@ -847,7 +847,7 @@ impl Brain {
         rng.random_bool(chance)
     }
 
-    fn decide_action_no_enemies(&self, tribute: &Tribute) -> Action {
+    fn decide_action_no_enemies(&self, tribute: &Tribute, _rng: &mut impl Rng) -> Action {
         let low_health = self.thresholds.low_health;
         let mid_health = self.thresholds.mid_health;
         let low_sanity = self.thresholds.low_sanity;
@@ -866,7 +866,9 @@ impl Brain {
             }
             // health is good, move (or set a trap)
             _ => {
-                // Deterministic: use tribute id hash to decide trap setting
+                // Trap setting: use tribute identifier hash for a
+                // deterministic ~1/7 chance per tribute. Tests that
+                // need deterministic behavior set a fixed identifier.
                 let hash: u32 = tribute.identifier.bytes().map(|b| b as u32).sum();
                 if tribute.attributes.movement > 0 && hash.is_multiple_of(7) {
                     Action::SetTrap {

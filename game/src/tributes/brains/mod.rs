@@ -269,7 +269,7 @@ impl Brain {
         }
 
         let action = if nearby_tributes == 0 {
-            self.decide_action_no_enemies(tribute)
+            self.decide_action_no_enemies(tribute, rng)
         } else if nearby_tributes < LOW_ENEMY_LIMIT {
             self.decide_action_few_enemies(tribute)
         } else {
@@ -479,7 +479,7 @@ impl Brain {
 
         // Decide base action
         let base_action = if nearby_tributes == 0 {
-            self.decide_action_no_enemies(tribute)
+            self.decide_action_no_enemies(tribute, rng)
         } else if nearby_tributes < LOW_ENEMY_LIMIT {
             self.decide_action_few_enemies_with_terrain(tribute, is_concealed)
         } else {
@@ -847,7 +847,7 @@ impl Brain {
         rng.random_bool(chance)
     }
 
-    fn decide_action_no_enemies(&self, tribute: &Tribute) -> Action {
+    fn decide_action_no_enemies(&self, tribute: &Tribute, rng: &mut impl Rng) -> Action {
         let low_health = self.thresholds.low_health;
         let mid_health = self.thresholds.mid_health;
         let low_sanity = self.thresholds.low_sanity;
@@ -866,9 +866,10 @@ impl Brain {
             }
             // health is good, move (or set a trap)
             _ => {
-                // Deterministic: use tribute id hash to decide trap setting
-                let hash: u32 = tribute.identifier.bytes().map(|b| b as u32).sum();
-                if tribute.attributes.movement > 0 && hash.is_multiple_of(7) {
+                // RNG-based trap setting (~1/7 chance). Using rng instead
+                // of a hash of the tribute identifier avoids test flakiness
+                // from random tribute names.
+                if tribute.attributes.movement > 0 && rng.random_bool(1.0 / 7.0) {
                     Action::SetTrap {
                         trap_kind: None,
                         severity: None,

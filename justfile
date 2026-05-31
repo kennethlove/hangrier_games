@@ -137,19 +137,27 @@ quality: fmt check clippy test
 # Setup recipes
 # ============
 
-# Create Ollama announcer model
-setup-ollama:
-    #!/usr/bin/env bash
-    cd announcers/src
-    ollama create announcers -f Modelfile.qwen
-
 # Install Node dependencies for Tailwind CSS
 setup-node:
     cd api/assets && npm install
 
-# Run all setup tasks
-setup: setup-node setup-ollama
+# Set up Cloudflare AI for commentary (recommended — free tier, no local GPU)
+# Requires CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in .env
+setup-cloudflare:
+    @echo "✓ Cloudflare AI configured via .env"
+    @echo "  Run with: cargo run --package api --features cloudflare"
+
+# Pull Ollama model for local commentary (optional, requires Ollama running)
+setup-ollama:
+    ollama pull qwen3:1.7b
+    cd announcers/src && ollama create announcers -f Modelfile
+    @echo "✓ Local model ready (qwen3:1.7b)"
+    @echo "  Run with: cargo run --package api --features ollama"
+
+# Run all setup tasks (excludes setup-ollama — run separately if using local LLM)
+setup: setup-node
     @echo "✓ Setup complete!"
+    @echo "  Commentary:   just setup-ollama (local)  |  just setup-cloudflare"
     @echo ""
     @echo "Quick start:"
     @echo "  1. just build-css"
@@ -214,7 +222,7 @@ tree:
     @echo "  game/       - Core simulation logic (pure Rust)"
     @echo "  api/        - Axum REST API + HTMX pages (SurrealDB backend)"
     @echo "  shared/     - Shared types"
-    @echo "  announcers/ - Ollama LLM integration"
+    @echo "  announcers/ - Commentary pipeline (BroadcastPackageBuilder + Commentator trait)"
 
 # Show helpful development tips
 tips:

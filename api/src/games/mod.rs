@@ -16,10 +16,11 @@ use game::messages::{GameMessage, MessageSource};
 use game::terrain::BaseTerrain;
 use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
+use shared::messages::MessagePayload;
 use shared::{GameArea, GameStatus, PaginationMetadata};
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 use surrealdb::engine::any::Any;
 use surrealdb::sql::Thing;
 use surrealdb::{RecordId, Surreal};
@@ -349,15 +350,235 @@ async fn run_game_cycles(
     game: &mut Game,
     db: &Surreal<Any>,
     broadcaster: &crate::websocket::GameBroadcaster,
+    commentator: Option<Arc<dyn announcers::Commentator>>,
 ) -> Result<(), AppError> {
     game.run_full_day()
         .map_err(|e| AppError::InternalServerError(format!("Failed to run game day: {}", e)))?;
+
+    // Clone messages before save_game drains them for commentary.
+    let phase_events: Vec<GameMessage> = game.messages.clone();
+
     let _ = persist::save_game(game, db, broadcaster).await?;
-    // Persistence has happened; the cycle's `CycleStart`/`CycleEnd`
-    // GameMessages were broadcast by `save_game` as it drained
-    // `game.messages`, so the frontend's `GamePage` already invalidates
-    // the per-period timeline summary on `MessagePayload::CycleStart`/
-    // `CycleEnd`/`GameEnded` without any extra synthesised broadcasts here.
+
+    // Spawn commentary generation as a non-blocking background task.
+    if let (Some(commentator), Some(day)) = (commentator, game.day)
+        && !phase_events.is_empty()
+    {
+        let game_id = game.identifier.clone();
+        let db = db.clone(); // Surreal<Any> is Clone
+        let broadcaster = broadcaster.clone();
+        let phase_label = format!("{}", game.current_phase);
+
+        // Build kill leaders from phase events.
+        let mut kill_counts: HashMap<String, u32> = HashMap::new();
+        for msg in &phase_events {
+            if let MessagePayload::TributeKilled {
+                killer: Some(k), ..
+            } = &msg.payload
+            {
+                *kill_counts.entry(k.name.clone()).or_insert(0) += 1;
+            }
+        }
+        let mut kill_leaders: Vec<announcers::KillLeader> = kill_counts
+            .into_iter()
+            .map(|(name, count)| {
+                let district = game
+                    .tributes
+                    .iter()
+                    .find(|t| t.name == name)
+                    .map(|t| t.district as u8)
+                    .unwrap_or(0);
+                announcers::KillLeader {
+                    name,
+                    district,
+                    kill_count: count,
+                }
+            })
+            .collect();
+        kill_leaders.sort_by_key(|k| std::cmp::Reverse(k.kill_count));
+
+        // Try to load persisted tribute histories from SurrealDB, or build fresh.
+        let mut history_tracker: announcers::TributeHistories = {
+            let persisted: Option<serde_json::Value> = db
+                .query("SELECT * FROM tribute_histories WHERE game_id = $game_id LIMIT 1")
+                .bind(("game_id", game_id.clone()))
+                .await
+                .ok()
+                .and_then(|mut r| r.take::<Option<serde_json::Value>>(0).ok().flatten());
+
+            if let Some(val) = persisted {
+                // Try to deserialize persisted digests.
+                if let Ok(digests) = serde_json::from_value::<Vec<announcers::TributeDigest>>(
+                    val.get("digests")
+                        .cloned()
+                        .unwrap_or(serde_json::Value::Null),
+                ) {
+                    announcers::TributeHistories::new(digests)
+                } else {
+                    // Fall back to fresh build from roster.
+                    let digests: Vec<announcers::TributeDigest> =
+                        game.tributes.iter().map(build_tribute_digest).collect();
+                    announcers::TributeHistories::new(digests)
+                }
+            } else {
+                let digests: Vec<announcers::TributeDigest> =
+                    game.tributes.iter().map(build_tribute_digest).collect();
+                announcers::TributeHistories::new(digests)
+            }
+        };
+        history_tracker.update(&phase_events);
+        let digests = history_tracker.digests();
+
+        // Build state snapshot from the game's current state.
+        let alive_count = game.tributes.iter().filter(|t| t.is_alive()).count() as u32;
+
+        // Build killing sprees from active streaks in the updated digests.
+        let killing_sprees: Vec<announcers::KillingSpree> = digests
+            .iter()
+            .filter(|d| d.kill_streak >= 2)
+            .map(|d| announcers::KillingSpree {
+                name: d.name.clone(),
+                district: d.district,
+                streak: d.kill_streak,
+                label: announcers::spree_label(d.kill_streak).to_string(),
+            })
+            .collect();
+
+        // Build hot zones — areas with the most activity this phase.
+        let mut area_counts: HashMap<String, u32> = HashMap::new();
+        for msg in &phase_events {
+            use shared::messages::MessagePayload::*;
+            let area_name = match &msg.payload {
+                TributeMoved { to, .. } => Some(&to.name),
+                TributeHidden { area, .. } => Some(&area.name),
+                AreaEvent { area, .. } => Some(&area.name),
+                AreaClosed { area } => Some(&area.name),
+                ItemFound { area, .. } => Some(&area.name),
+                _ => None,
+            };
+            if let Some(name) = area_name {
+                *area_counts.entry(name.clone()).or_insert(0) += 1;
+            }
+        }
+        let mut sorted: Vec<(String, u32, &str)> = area_counts
+            .into_iter()
+            .map(|(name, count)| {
+                let level = announcers::severity::describe_area_activity(count);
+                (name, count, level)
+            })
+            .collect();
+        // Sort by count descending so the hottest areas come first.
+        sorted.sort_by_key(|b| std::cmp::Reverse(b.1));
+        let hot_zones: Vec<announcers::AreaActivity> = sorted
+            .into_iter()
+            .map(|(name, _count, level)| announcers::AreaActivity {
+                name,
+                activity_level: level.to_string(),
+            })
+            .collect();
+
+        // Serialize digests for persistence (clone before moving into spawn).
+        let digests_json = serde_json::to_value(&digests).ok();
+
+        let header = announcers::GameStateSnapshot {
+            day,
+            phase: phase_label.clone(),
+            alive_count,
+            kill_leaders,
+            alliances: vec![],
+            hot_zones,
+            killing_sprees,
+        };
+
+        tokio::spawn(async move {
+            match announcers::generate_commentary(
+                &*commentator,
+                &game_id,
+                day,
+                &phase_label,
+                header,
+                &phase_events,
+                digests,
+            )
+            .await
+            {
+                Ok(segment) => {
+                    if segment.lines.is_empty() {
+                        tracing::warn!(
+                            game_id = %game_id,
+                            "Commentary generated 0 lines — skipping save and broadcast"
+                        );
+                    } else {
+                        tracing::debug!(
+                            game_id = %game_id,
+                            lines = %segment.lines.len(),
+                            "Commentary generated"
+                        );
+
+                        // Persist commentary segment to SurrealDB (with retry).
+                        let body = match serde_json::to_value(&segment) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                tracing::error!(error = %e, "Failed to serialize commentary");
+                                return;
+                            }
+                        };
+                        let body_clone = body.clone();
+                        let dbc = db.clone();
+                        if let Err(e) = retry(move || {
+                            let b = body_clone.clone();
+                            let db2 = dbc.clone();
+                            async move {
+                                db2.query("CREATE commentary_segments CONTENT $b")
+                                    .bind(("b", b))
+                                    .await
+                                    .map_err(|e| e.to_string())
+                            }
+                        })
+                        .await
+                        {
+                            tracing::error!(error = %e, "Failed to save commentary segment after retries");
+                        }
+
+                        // Broadcast via WebSocket/SSE (only when content exists).
+                        crate::websocket::broadcast_commentary(&broadcaster, &game_id, &segment);
+                    }
+
+                    // Always persist updated tribute histories so digests
+                    // accumulate across cycles, even when the LLM returns
+                    // an empty response.
+                    if let Some(ref digests_json) = digests_json
+                        && let Err(e) = {
+                            let dj = digests_json.clone();
+                            let gid = game_id.clone();
+                            let dbc = db.clone();
+                            retry(move || {
+                                    let d = dj.clone();
+                                    let g = gid.clone();
+                                    let db2 = dbc.clone();
+                                    async move {
+                                        db2.query(
+                                            "UPSERT tribute_histories CONTENT { game_id: $g, digests: $d }",
+                                        )
+                                        .bind(("g", g))
+                                        .bind(("d", d))
+                                        .await
+                                        .map_err(|e| e.to_string())
+                                    }
+                                })
+                                .await
+                        }
+                    {
+                        tracing::error!(error = %e, "Failed to save tribute histories after retries");
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "Commentary generation skipped");
+                }
+            }
+        });
+    }
+
     Ok(())
 }
 
@@ -431,4 +652,58 @@ impl From<GameLog> for GameMessage {
             payload,
         }
     }
+}
+
+/// Build a fresh [`announcers::TributeDigest`] from a game Tribute.
+fn build_tribute_digest(t: &game::tributes::Tribute) -> announcers::TributeDigest {
+    announcers::TributeDigest {
+        identifier: t.identifier.clone(),
+        name: t.name.clone(),
+        district: t.district as u8,
+        status: if t.is_alive() {
+            "alive".into()
+        } else {
+            "deceased".into()
+        },
+        injury_level: "unknown".into(),
+        location: t.area.to_string(),
+        allies: vec![],
+        kill_streak: 0,
+        highlights: vec![],
+        notable_events: vec![],
+    }
+}
+
+/// Retry a fallible async operation up to `MAX_RETRIES` times with
+/// exponential backoff (100ms, 200ms, 400ms). Returns `Ok(value)` on the
+/// first success, or the last error after all retries are exhausted.
+const MAX_RETRIES: u32 = 3;
+const BASE_DELAY_MS: u64 = 100;
+
+async fn retry<F, Fut, T>(op: F) -> Result<T, String>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = Result<T, String>>,
+{
+    let mut last_err = String::new();
+    for attempt in 0..=MAX_RETRIES {
+        match op().await {
+            Ok(val) => return Ok(val),
+            Err(e) => {
+                last_err = e;
+                if attempt < MAX_RETRIES {
+                    let delay = BASE_DELAY_MS * 2u64.pow(attempt);
+                    tracing::warn!(
+                        attempt = attempt + 1,
+                        max = MAX_RETRIES + 1,
+                        delay_ms = delay,
+                        error = %last_err,
+                        "Retrying DB operation"
+                    );
+                    tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+                }
+            }
+        }
+    }
+    Err(last_err)
 }

@@ -2,50 +2,64 @@
 
 ## Responsibility
 
-Provides AI-generated sports commentary for Hunger Games events using local LLM (Ollama). Transforms raw game log entries into engaging broadcast-style dialogue between two commentators (Verity and Rex) following Capitol entertainment show conventions.
+Structured commentary pipeline for Hunger Games events. Transforms typed game messages into Capitol broadcast-style commentary between Verity (play-by-play) and Rex (color commentary). Not an LLM-only crate — the `Commentator` trait abstracts over any backend.
 
-## Design
+## Architecture
 
-**LLM Integration Pattern:**
-- Uses `ollama-rs` client to interact with local Ollama service
-- Custom model `announcers` based on `qwen2.5:1.5b` (defined in `Modelfile.qwen`)
-- Two generation modes: batch (`summarize`) and streaming (`summarize_stream`)
-
-**Prompt Engineering:**
-- `ANNOUNCER_PROMPT`: System prompt defining Verity (play-by-play) and Rex (color commentary) personas
-- `prompt()`: Combines system prompt with game log to create complete generation request
-- Prompt instructs model to produce markdown script with banter between commentators
-
-**Error Handling:**
-- Custom `AnnouncerError::FailedToGenerateResponse` for generation failures
-- Stream implementation yields `Result<String, String>` for gradual error handling
-
-## Flow
-
-**Batch Generation:**
 ```
-Game log → prompt(log) → Ollama.generate() → String response
+Phase events (Vec<GameMessage>)
+         │
+         ▼
+BroadcastPackageBuilder::build(header, events, histories)
+         │
+         ▼
+BroadcastPackage { header: GameStateSnapshot, events: Vec<EventLine>, histories: Vec<TributeDigest> }
+         │
+         ▼
+Commentator::generate(package) → CommentarySegment { lines: Vec<CommentaryLine> }
+         │
+         ▼
+Persisted to SurrealDB (commentary_segments table) + pushed via SSE/WS
 ```
 
-**Streaming Generation:**
-```
-Game log → prompt(log) → Ollama.generate_stream() → 
-  async_stream → Pin<Box<dyn Stream<Item = Result<String, String>>>>
-```
+## Module Structure
 
-Stream yields tokens as they're generated, allowing for progressive UI updates.
+| Module | File | Responsibility |
+|---|---|---|
+| `types` | `src/types.rs` | Core types: EventKind, EventLine, GameStateSnapshot, TributeDigest, BroadcastPackage, CommentaryLine, CommentarySegment, CommentaryError |
+| `severity` | `src/severity.rs` | Raw-value→narrative-descriptor mappings (damage, injury, hit quality, area activity) |
+| `broadcast` | `src/broadcast.rs` | BroadcastPackageBuilder — iterates 55+ MessagePayload variants, produces typed EventLines |
+| `history` | `src/history.rs` | TributeHistories — rolling per-tribute digest (status, location, allies, notable events) |
+| `llm` | `src/llm/mod.rs` | Commentator trait (`async fn generate(&self, package) -> Result<CommentarySegment>`) |
+| `llm/ollama` | `src/llm/ollama.rs` | OllamaCommentator — feature-gated behind `features = ["ollama"]` |
+
+## Key Types
+
+- **`BroadcastPackage`**: Full structured input to the LLM (header + events + histories)
+- **`EventLine`**: Hybrid format — typed `EventKind` + prose + optional structured data
+- **`CommentaryLine`**: One utterance (`speaker: String`, `text: String`)
+- **`CommentarySegment`**: Persisted output with id, game_id, day, phase, lines, timestamp
+- **`TributeDigest`**: Rolling per-tribute summary (capped at 8 notable events)
 
 ## Integration
 
-**Consumers:**
-- `api/` crate (declared dependency, not yet actively used in routes)
-- Intended for future real-time commentary endpoint
+**API Trigger** (`api/src/games/mod.rs`):
+- After `save_game()` drains phase messages, spawns `tokio::spawn` background task
+- Builds `GameStateSnapshot` + `TributeHistories` from current game state
+- Calls `announcers::generate_commentary()`
+- Persists `CommentarySegment` to SurrealDB (`commentary_segments` table)
+- Broadcasts via `WebSocketMessage::Commentary` (relayed through both WebSocket and SSE)
 
-**External Dependencies:**
-- Ollama server (expected on default host/port via `Ollama::default()`)
-- Custom model installation required: `ollama create announcers -f Modelfile.qwen`
+**LLM Backend** (optional):
+- Default: `OllamaCommentator` behind `features = ["ollama"]`
+- Custom: implement `Commentator` for any LLM (OpenAI, Anthropic, etc.)
+- Prompt: system prompt establishing Verity/Rex voices + serialized `BroadcastPackage`
 
-**Key Files:**
-- `lib.rs`: Public API (`summarize`, `summarize_stream`, `prompt`)
-- `main.rs`: Example usage (currently commented out)
-- `Modelfile.qwen`: Ollama model definition with system prompt and parameters
+## Key Files
+- `src/lib.rs`: Module declarations, re-exports, `generate_commentary()` convenience fn
+- `src/types.rs`: All core data types
+- `src/broadcast.rs`: MessagePayload → EventLine classification
+- `src/history.rs`: Rolling per-tribute digest tracker
+- `src/llm/mod.rs`: Commentator trait definition
+- `src/llm/ollama.rs`: Ollama-backed implementation
+- `Modelfile`: Ollama model definition (only for `ollama` feature)

@@ -37,6 +37,7 @@ pub struct AppState {
     pub db: Arc<Surreal<Any>>,
     pub storage: Arc<dyn storage::StorageBackend>,
     pub broadcaster: Arc<websocket::GameBroadcaster>,
+    pub commentator: Option<Arc<dyn announcers::Commentator>>,
     pub namespace: String,
     pub database: String,
 }

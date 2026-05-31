@@ -31,6 +31,12 @@ pub enum WebSocketMessage {
     },
     /// Server sends error message
     Error { message: String },
+    /// Server sends a commentary segment to subscribed clients.
+    /// The `data` field is the serialized CommentarySegment JSON.
+    Commentary {
+        game_id: String,
+        data: serde_json::Value,
+    },
 }
 
 /// Item quantity preset for game customization.

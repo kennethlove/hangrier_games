@@ -473,7 +473,13 @@ pub async fn next_step(
                 Ok(Json(None))
             } else {
                 let mut game = super::get_full_game(identifier, &db).await?.0;
-                super::run_game_cycles(&mut game, &db, &state.broadcaster).await?;
+                super::run_game_cycles(
+                    &mut game,
+                    &db,
+                    &state.broadcaster,
+                    state.commentator.clone(),
+                )
+                .await?;
 
                 Ok(Json(Some(game)))
             }

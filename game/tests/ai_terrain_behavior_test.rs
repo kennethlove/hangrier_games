@@ -5,6 +5,7 @@ use game::tributes::Tribute;
 use game::tributes::brains::Brain;
 use rand::prelude::*;
 use rstest::{fixture, rstest};
+use serial_test::serial;
 
 #[fixture]
 fn small_rng() -> SmallRng {
@@ -113,6 +114,7 @@ fn test_concealed_terrain_boosts_hiding(mut small_rng: SmallRng) {
 
 /// Test that resource-scarce terrain boosts search behavior
 #[rstest]
+#[serial]
 fn test_resource_scarce_terrain_boosts_search(mut small_rng: SmallRng) {
     let brain = Brain::default();
     let mut tribute = Tribute::new("Foxface".to_string(), Some(5), None);

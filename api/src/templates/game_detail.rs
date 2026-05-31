@@ -429,11 +429,12 @@ fn area_card(area: &game::areas::AreaDetails) -> maud::Markup {
     }
 }
 
-/// Game log page — scrollable message list with SSE real-time updates.
+/// Game log page — scrollable message list with SSE real-time updates and commentary.
 pub fn log_page(
     auth: AuthState,
     game_id: &str,
     messages: &[shared::messages::GameMessage],
+    segments: &[announcers::CommentarySegment],
 ) -> maud::Markup {
     // All MessagePayload variant names for SSE event filtering
     let sse_events = "TributeKilled,TributeWounded,TributeAttacked,Combat,CombatSwing,\
@@ -451,7 +452,7 @@ pub fn log_page(
         SubstanceUsed,AddictionAcquired,AddictionReinforced,AddictionEscalated,AddictionResisted,AddictionRelapse,\
         AddictionCraving,AddictionObserved,AddictionForgotten,AddictionHabituated,\
         TributeTrapped,Struggling,TrappedEscaped,TributeDiedWhileTrapped,\
-        TrapSet,TrapTriggered";
+        TrapSet,TrapTriggered,Commentary";
 
     base_layout(
         "Log",
@@ -465,7 +466,7 @@ pub fn log_page(
                 }
                 h2 style="font-family:var(--font-display);font-size:var(--fs-h3);font-weight:600;margin:0 0 var(--gap-md);" { "Game Log" }
 
-                @if messages.is_empty() {
+                @if messages.is_empty() && segments.is_empty() {
                     p class="empty-state" { "No messages yet." }
                 } @else {
                     div id="log-entries"
@@ -477,11 +478,39 @@ pub fn log_page(
                         @for msg in messages {
                             (log_entry(msg))
                         }
+                        @for seg in segments {
+                            (commentary_segment(seg))
+                        }
                     }
                 }
             }
         },
     )
+}
+
+/// Render a commentary segment as a sportscast-style block.
+fn commentary_segment(seg: &announcers::CommentarySegment) -> maud::Markup {
+    html! {
+        div class="commentary-segment" {
+            div class="commentary-header" {
+                (icon("mic"))
+                " Day " (seg.day) " " (seg.phase) " \u{2014} Commentary"
+            }
+            div class="commentary-body" {
+                @for line in &seg.lines {
+                    div class="commentary-line" {
+                        span class="commentary-speaker" { (line.speaker) }
+                        span class="commentary-text" { (line.text) }
+                    }
+                }
+            }
+            div class="commentary-footer" {
+                (seg.model_used)
+                " \u{00B7} "
+                (seg.generated_at.format("%H:%M:%S"))
+            }
+        }
+    }
 }
 
 /// Single log entry.

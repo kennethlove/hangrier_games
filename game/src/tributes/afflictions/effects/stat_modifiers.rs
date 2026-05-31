@@ -77,10 +77,19 @@ fn base_penalties(kind: AfflictionKind) -> (i32, i32, i32, i32, i32, f64, i32, i
 /// then clamped so atk/def/forage/escape/ambush_detect never drop
 /// below their negative baseline (i.e. the penalty is capped at the
 /// magnitude of the raw spec values — no double-Severe overflow).
+///
+/// Addiction effects are handled separately because they depend on
+/// metadata (High vs Withdrawal mode) not just kind + severity.
 pub fn compute_stat_modifiers(afflictions: &[Affliction]) -> StatModifiers {
     let mut mods = StatModifiers::default();
 
     for aff in afflictions {
+        // Addiction penalties are computed after the main loop
+        // (they depend on metadata beyond kind + severity).
+        if matches!(aff.kind, AfflictionKind::Addiction(_)) {
+            continue;
+        }
+
         let m = severity_multiplier(aff.severity);
         let (atk, def, forage, escape, ambush_detect, stamina_move, stamina_max, hp) =
             base_penalties(aff.kind.clone());
@@ -93,6 +102,46 @@ pub fn compute_stat_modifiers(afflictions: &[Affliction]) -> StatModifiers {
         mods.stamina_move_pct += stamina_move * m;
         mods.stamina_max += (stamina_max as f64 * m).round() as i32;
         mods.hp_per_cycle += (hp as f64 * m).round() as i32;
+    }
+
+    // ── Addiction stat effects ──
+    // Handled outside the main loop because they depend on addiction_metadata
+    // (High mode vs Withdrawal mode) which isn't accessible from base_penalties.
+    for aff in afflictions {
+        let AfflictionKind::Addiction(ref substance) = aff.kind else {
+            continue;
+        };
+        let Some(ref meta) = aff.addiction_metadata else {
+            continue;
+        };
+
+        if meta.high_cycles_remaining > 0 {
+            // High mode: substance-specific bonuses.
+            match substance {
+                shared::afflictions::Substance::Stimulant => {
+                    mods.atk += 2;
+                    mods.escape += 2;
+                    mods.forage -= 1; // -1 int (distracted by high)
+                }
+                // Painkiller: suppress wound stat penalties (handled elsewhere)
+                // Morphling: suppress all affliction stat penalties (handled elsewhere)
+                // Alcohol: -1 escape, -1 forage, immune to phobia (handled elsewhere)
+                _ => {}
+            }
+        } else {
+            // Withdrawal mode: severity-tiered penalties.
+            let m = severity_multiplier(aff.severity);
+            match substance {
+                shared::afflictions::Substance::Stimulant => {
+                    let penalty = (aff.severity as i32) + 1; // 1/2/3 for Mild/Mod/Severe
+                    mods.atk -= penalty;
+                    mods.def -= (penalty as f64 * 0.5).round() as i32;
+                    mods.forage -= (penalty as f64 * 0.5).round() as i32;
+                    mods.stamina_move_pct += 0.25 * m; // increased move cost
+                }
+                _ => {}
+            }
+        }
     }
 
     // Clamp: penalties should not reduce effective stats below zero.

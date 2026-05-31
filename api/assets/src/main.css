@@ -653,6 +653,57 @@ h1, h2, h3, h4 { text-wrap: balance; }
 }
 .capitalize { text-transform: capitalize; }
 
+/* Commentary segment — sportscast-style block */
+.commentary-segment {
+  padding: var(--gap-sm);
+  background: oklch(25% 0.03 260);
+  border: 1px solid oklch(35% 0.06 260);
+  border-radius: var(--radius);
+  margin-bottom: var(--gap-sm);
+}
+.commentary-header {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-xs);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: oklch(75% 0.12 260);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--gap-xs);
+  padding-bottom: var(--gap-xs);
+  border-bottom: 1px solid oklch(35% 0.06 260 / 0.5);
+}
+.commentary-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.commentary-line {
+  display: flex;
+  gap: var(--gap-xs);
+  align-items: baseline;
+}
+.commentary-speaker {
+  font-weight: 700;
+  font-size: var(--fs-xs);
+  color: oklch(75% 0.12 260);
+  min-width: 5em;
+  text-align: right;
+  flex-shrink: 0;
+}
+.commentary-text {
+  font-style: italic;
+  line-height: 1.5;
+}
+.commentary-footer {
+  font-size: var(--fs-xs);
+  color: oklch(50% 0.02 260);
+  margin-top: var(--gap-xs);
+  padding-top: var(--gap-xs);
+  border-top: 1px solid oklch(35% 0.06 260 / 0.3);
+}
+
 /* Kind colors for log entries */
 .kind-death { color: oklch(55% 0.2 25); }
 .kind-combat { color: var(--waiting); }

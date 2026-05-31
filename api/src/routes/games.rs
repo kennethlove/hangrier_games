@@ -198,7 +198,7 @@ SELECT (
     html_with_csrf(game_detail::areas_page(auth, &identifier, &areas), &csrf)
 }
 
-/// GET /games/{id}/log — event log for a game.
+/// GET /games/{id}/log — event log for a game with commentary.
 pub async fn game_log_handler(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
@@ -226,7 +226,27 @@ pub async fn game_log_handler(
         Err(_) => vec![],
     };
 
-    html_with_csrf(game_detail::log_page(auth, &identifier, &messages), &csrf)
+    let commentary_result = state
+        .db
+        .query(
+            r#"SELECT * FROM commentary_segments
+            WHERE game_id = $identifier
+            ORDER BY day, phase;"#,
+        )
+        .bind(("identifier", identifier.clone()))
+        .await;
+
+    let segments = match commentary_result {
+        Ok(mut result) => {
+            result.take::<Vec<announcers::CommentarySegment>>(0).unwrap_or_default()
+        }
+        Err(_) => vec![],
+    };
+
+    html_with_csrf(
+        game_detail::log_page(auth, &identifier, &messages, &segments),
+        &csrf,
+    )
 }
 
 /// GET /account — account dashboard (requires auth).

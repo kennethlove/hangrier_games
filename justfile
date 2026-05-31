@@ -139,7 +139,7 @@ quality: fmt check clippy test
 
 # Pull Ollama model for commentary (optional; requires `features = ["ollama"]`)
 setup-ollama:
-    ollama pull qwen3.5:2b
+    ollama pull qwen3:1.7b
     @echo "✓ Model ready. Enable with: cargo build --features announcers/ollama"
 
 # Install Node dependencies for Tailwind CSS

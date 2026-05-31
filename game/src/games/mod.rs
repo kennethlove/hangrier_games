@@ -45,7 +45,8 @@ fn area_event_to_kind(ev: &AreaEvent) -> shared::messages::AreaEventKind {
         AreaEvent::Earthquake
         | AreaEvent::Avalanche
         | AreaEvent::Landslide
-        | AreaEvent::Rockslide => K::Earthquake,
+        | AreaEvent::Rockslide
+        | AreaEvent::Sinkhole => K::Earthquake,
         AreaEvent::Blizzard | AreaEvent::Heatwave => K::Storm,
     }
 }
@@ -691,6 +692,46 @@ impl Game {
 
         // Process each tribute's survival check
         for tribute_idx in tribute_indices {
+            // Sinkhole — instant death, no survival roll
+            if matches!(most_severe_event, AreaEvent::Sinkhole) {
+                let (name, id, cause) = {
+                    let tribute = &mut self.tributes[tribute_idx];
+                    let name = tribute.name.clone();
+                    let id = tribute.identifier.clone();
+                    tribute.attributes.health = 0;
+                    let cause = most_severe_event.to_string();
+                    tribute.statistics.killed_by = Some(cause.clone());
+                    tribute.status = crate::tributes::statuses::TributeStatus::RecentlyDead;
+                    (name, id, cause)
+                };
+
+                let content = format!("{} falls into a sinkhole and dies.", name);
+                let source = crate::messages::MessageSource::Tribute(id.clone());
+                let subject = format!("tribute:{}", id);
+                let tick = self.tick_counter.next();
+                let payload = crate::messages::MessagePayload::TributeKilled {
+                    victim: crate::messages::TributeRef {
+                        identifier: id.clone(),
+                        name: name.clone(),
+                    },
+                    killer: None,
+                    cause: cause.clone(),
+                };
+                // Also log to the area channel so the timeline shows the death
+                let area_source =
+                    crate::messages::MessageSource::Area(most_severe_event.to_string());
+                let area_subject = format!("area:{}", most_severe_event);
+                self.push_message(
+                    area_source,
+                    area_subject,
+                    content.clone(),
+                    payload.clone(),
+                    tick,
+                );
+                self.push_message(source, subject, content, payload, tick);
+                continue;
+            }
+
             // Outcome messages we'll log after the tribute borrow is released.
             // Each entry carries an optional typed payload so death lines
             // become `MessagePayload::TributeKilled` (and render as

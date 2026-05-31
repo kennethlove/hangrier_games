@@ -2,6 +2,7 @@ use super::*;
 use crate::areas::{Area, AreaDetails};
 use crate::items::{Item, OwnsItems};
 use crate::tributes::events::TributeEvent;
+use crate::tributes::incidents::{SleepIncident, apply_sleep_incident};
 use crate::tributes::statuses::TributeStatus;
 use crate::tributes::{
     ActionSuggestion, EncounterContext, EnvironmentContext, Tribute, calculate_stamina_cost,
@@ -447,6 +448,79 @@ impl Game {
                     }
                 }
 
+                // ── Sleep incident roll (we6l) ──
+                // While unconscious, the tribute is vulnerable. Roll for a
+                // random sleep incident each sleeping phase. Wake-causing
+                // incidents (theft, relocation, animal, ally abandonment,
+                // limb injury) interrupt sleep immediately. Flavor-only
+                // incidents (annoying) are remembered for the natural wake.
+                if let Some(incident) = SleepIncident::roll(rng) {
+                    let description = apply_sleep_incident(tribute, &incident, rng);
+                    let incident_kind: shared::messages::SleepIncidentKind = (&incident).into();
+
+                    if incident.wakes_tribute() {
+                        // Wake-causing incident: emit flavor event, then
+                        // wake the tribute with the incident as the reason.
+                        let flavor_line = crate::output::GameOutput::TributeSleepFlavor(
+                            tribute.name.as_str(),
+                            &description,
+                        )
+                        .to_string();
+                        collected_events.push((
+                            tribute.identifier.clone(),
+                            tribute.name.clone(),
+                            flavor_line,
+                            None,
+                            None,
+                        ));
+
+                        let incident_msg = crate::output::GameOutput::TributeWakesFromIncident(
+                            tribute.name.as_str(),
+                            &description,
+                        )
+                        .to_string();
+                        collected_events.push((
+                            tribute.identifier.clone(),
+                            tribute.name.clone(),
+                            incident_msg,
+                            Some(MessagePayload::TributeWoke {
+                                tribute: TributeRef {
+                                    identifier: tribute.identifier.clone(),
+                                    name: tribute.name.clone(),
+                                },
+                                phase,
+                                reason: shared::messages::WakeReason::Interrupted {
+                                    event: shared::messages::InterruptionKind::Incident {
+                                        kind: incident_kind,
+                                    },
+                                },
+                            }),
+                            None,
+                        ));
+                        tribute.sleeping = false;
+                        tribute.sleep_remaining = 0;
+                        tribute.cycles_awake = 0;
+                        tribute.pending_sleep_incident = None;
+                        continue;
+                    } else {
+                        // Flavor-only incident: emit flavor, remember it,
+                        // then continue with regen as normal.
+                        let flavor_line = crate::output::GameOutput::TributeSleepFlavor(
+                            tribute.name.as_str(),
+                            &description,
+                        )
+                        .to_string();
+                        collected_events.push((
+                            tribute.identifier.clone(),
+                            tribute.name.clone(),
+                            flavor_line,
+                            None,
+                            None,
+                        ));
+                        tribute.pending_sleep_incident = Some(incident_kind);
+                    }
+                }
+
                 let blocked = tribute.afflictions.keys().any(|(kind, _)| {
                     matches!(
                         kind,
@@ -485,8 +559,16 @@ impl Game {
                         identifier: tribute.identifier.clone(),
                         name: tribute.name.clone(),
                     };
-                    let line = crate::output::GameOutput::TributeWakesRested(tribute.name.as_str())
-                        .to_string();
+                    let incident_suffix = tribute
+                        .pending_sleep_incident
+                        .take()
+                        .map(|_| " — but their sleep was not peaceful")
+                        .unwrap_or("");
+                    let line = format!(
+                        "{} {}",
+                        crate::output::GameOutput::TributeWakesRested(tribute.name.as_str()),
+                        incident_suffix,
+                    );
                     collected_events.push((
                         tribute.identifier.clone(),
                         tribute.name.clone(),

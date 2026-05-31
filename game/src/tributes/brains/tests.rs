@@ -17,6 +17,9 @@ fn tribute() -> Tribute {
     let mut tribute = Tribute::new("Katniss".to_string(), None, None);
     tribute.brain = Brain::default();
     tribute.attributes = crate::tributes::Attributes::default();
+    // Fixed identifier ensures hash-based trap check is deterministic.
+    // "safe-test-id" sums to 1243, not divisible by 7 — never triggers trap.
+    tribute.identifier = "safe-test-id".to_string();
     tribute
 }
 

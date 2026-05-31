@@ -847,7 +847,7 @@ impl Brain {
         rng.random_bool(chance)
     }
 
-    fn decide_action_no_enemies(&self, tribute: &Tribute, rng: &mut impl Rng) -> Action {
+    fn decide_action_no_enemies(&self, tribute: &Tribute, _rng: &mut impl Rng) -> Action {
         let low_health = self.thresholds.low_health;
         let mid_health = self.thresholds.mid_health;
         let low_sanity = self.thresholds.low_sanity;
@@ -866,10 +866,11 @@ impl Brain {
             }
             // health is good, move (or set a trap)
             _ => {
-                // RNG-based trap setting (~1/7 chance). Using rng instead
-                // of a hash of the tribute identifier avoids test flakiness
-                // from random tribute names.
-                if tribute.attributes.movement > 0 && rng.random_bool(1.0 / 7.0) {
+                // Trap setting: use tribute identifier hash for a
+                // deterministic ~1/7 chance per tribute. Tests that
+                // need deterministic behavior set a fixed identifier.
+                let hash: u32 = tribute.identifier.bytes().map(|b| b as u32).sum();
+                if tribute.attributes.movement > 0 && hash.is_multiple_of(7) {
                     Action::SetTrap {
                         trap_kind: None,
                         severity: None,

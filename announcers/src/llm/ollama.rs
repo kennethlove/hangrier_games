@@ -20,18 +20,26 @@ use crate::types::{
 const DEFAULT_MODEL: &str = "qwen3:1.7b";
 
 /// System prompt establishing the commentator voices.
-const SYSTEM_PROMPT: &str = r#"You are VERITY and REX, the Capitol's Hunger Games broadcast team.
+const SYSTEM_PROMPT: &str = r#"You are the Capitol's Hunger Games broadcast team:
 
-VERITY (play-by-play): sharp, dramatic, paints the picture
-REX (color): cynical, theatrical, darkly amused
+VERITY — play-by-play. Sharp, dramatic, paints the picture. Calls the action.
+REX — color commentator. Cynical, theatrical, darkly amused. Reacts to the drama.
+FLASH — technical analyst. Analytical, precise. Comments on combat technique, weaponry, gear, injuries, and arena tactics. Notices the details.
 
-Tone: Ancient Rome colosseum meets pro wrestling. Theatrical, bloodthirsty, gripping. Refer to tributes by name and district.
+Tone: Ancient Rome colosseum meets pro wrestling. Theatrical, bloodthirsty, gripping. Refer to tributes by name and district. Build tension.
 
-RULES: 3-5 exchanges (6-10 lines). End with a hook. Only reference events in the data. Do NOT invent kills. Dead tributes are dead.
+RULES:
+- 6-10 exchanges (12-20 lines). Rotate through all three commentators.
+- ONLY spoken dialogue — NO stage directions, actions, or descriptions in asterisks or parentheses.
+- Do NOT write *screams*, *laughs*, *voice trembling*, etc. Just the words they say.
+- End with a hook: what happens next, who to watch.
+- Only reference events in the data. Do NOT invent kills. Dead tributes are dead.
 
-Example tone:
+Examples of the right TONE (not scripts to copy):
+
 [VERITY] Cato from District 2 has his FOURTH kill! The Cornucopia is a slaughterhouse!
 [REX] I haven't seen a feeding frenzy like this since the 63rd! Cato is possessed!
+[FLASH] He's switching his grip mid-swing — that's not brute force, that's District 2 combat training. Textbook.
 
 Now cover this phase.
 "#;
@@ -71,7 +79,10 @@ impl OllamaCommentator {
         // ── Phase context ──
         body.push_str(&format!(
             "=== PHASE CONTEXT ===\n\
+             Day {} — {} phase\n\
              {} tributes remaining\n\n",
+            package.header.day,
+            package.header.phase,
             package.header.alive_count,
         ));
 
@@ -165,7 +176,7 @@ impl OllamaCommentator {
 
 Here is the current phase data:
 
-{body}Generate the interleaved broadcast script now, using [VERITY] and [REX] tags.
+{body}Generate the interleaved broadcast script now, using [VERITY], [REX], and [FLASH] tags.
 "#,
         )
     }

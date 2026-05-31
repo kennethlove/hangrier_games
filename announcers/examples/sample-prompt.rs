@@ -7,6 +7,8 @@ async fn main() {
 
     // Simulate mid-game state: Day 5, 12 tributes left, Cato on a streak.
     let header = GameStateSnapshot {
+        day: 5,
+        phase: "day".into(),
         alive_count: 12,
         kill_leaders: vec![KillLeader {
             name: "Cato".into(),

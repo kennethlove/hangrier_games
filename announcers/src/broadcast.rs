@@ -55,6 +55,8 @@ impl BroadcastPackageBuilder {
         hot_zones: Vec<AreaActivity>,
     ) -> GameStateSnapshot {
         GameStateSnapshot {
+            day: 1,
+            phase: "day".into(),
             alive_count,
             kill_leaders,
             alliances,
@@ -583,6 +585,8 @@ mod tests {
     #[test]
     fn build_package_includes_all_events() {
         let header = GameStateSnapshot {
+            day: 1,
+            phase: "day".into(),
             alive_count: 12,
             kill_leaders: vec![],
             alliances: vec![],
@@ -671,6 +675,8 @@ mod tests {
     #[test]
     fn build_empty_package() {
         let header = GameStateSnapshot {
+            day: 1,
+            phase: "day".into(),
             alive_count: 24,
             kill_leaders: vec![],
             alliances: vec![],

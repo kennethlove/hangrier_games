@@ -172,7 +172,9 @@ mod tests {
     async fn generate_populates_game_context() {
         let commentator = MockCommentator::ok(vec!["Hello!", "Great shot!"]);
         let header = GameStateSnapshot {
-            alive_count: 12,
+            day: 1,
+        phase: "day".into(),
+        alive_count: 12,
             kill_leaders: vec![],
             alliances: vec![],
             hot_zones: vec![],
@@ -199,7 +201,9 @@ mod tests {
     async fn generate_handles_empty_lines() {
         let commentator = MockCommentator::empty();
         let header = GameStateSnapshot {
-            alive_count: 24,
+            day: 1,
+        phase: "day".into(),
+        alive_count: 24,
             kill_leaders: vec![],
             alliances: vec![],
             hot_zones: vec![],
@@ -217,7 +221,9 @@ mod tests {
     async fn generate_propagates_commentator_error() {
         let commentator = MockCommentator::error();
         let header = GameStateSnapshot {
-            alive_count: 12,
+            day: 1,
+        phase: "day".into(),
+        alive_count: 12,
             kill_leaders: vec![],
             alliances: vec![],
             hot_zones: vec![],

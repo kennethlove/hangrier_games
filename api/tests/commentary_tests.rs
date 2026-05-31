@@ -82,6 +82,8 @@ async fn generate_commentary_pipeline() {
 
     // Build a realistic game snapshot.
     let header = announcers::GameStateSnapshot {
+        day: 1,
+        phase: "day".into(),
         alive_count: 22,
         kill_leaders: vec![announcers::KillLeader {
             name: "Cato".into(),
@@ -130,6 +132,8 @@ async fn generate_commentary_pipeline() {
 #[test]
 fn broadcast_package_with_leaders_and_sprees() {
     let header = announcers::GameStateSnapshot {
+        day: 1,
+        phase: "day".into(),
         alive_count: 20,
         kill_leaders: vec![announcers::KillLeader {
             name: "Cato".into(),

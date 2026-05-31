@@ -172,6 +172,8 @@ async fn full_pipeline_from_roster_to_package() {
 
     // Step 4: Build the broadcast package.
     let header = GameStateSnapshot {
+        day: 1,
+        phase: "day".into(),
         alive_count: 2,
         kill_leaders: vec![],
         alliances: vec![],
@@ -308,6 +310,8 @@ async fn package_includes_kill_leaders() {
     assert_eq!(kill_leaders[1].kill_count, 1);
 
     let header = GameStateSnapshot {
+        day: 1,
+        phase: "day".into(),
         alive_count: 21,
         kill_leaders: kill_leaders.clone(),
         alliances: vec![],
@@ -331,6 +335,8 @@ async fn generate_commentary_integration() {
     })]);
 
     let header = GameStateSnapshot {
+        day: 1,
+        phase: "day".into(),
         alive_count: 1,
         kill_leaders: vec![],
         alliances: vec![],
@@ -488,6 +494,8 @@ async fn spree_milestone_and_break_events() {
 #[tokio::test]
 async fn hot_zones_round_trip() {
     let header = GameStateSnapshot {
+        day: 1,
+        phase: "day".into(),
         alive_count: 12,
         kill_leaders: vec![],
         alliances: vec![],

@@ -484,6 +484,8 @@ async fn run_game_cycles(
             let digests_json = serde_json::to_value(&digests).ok();
 
             let header = announcers::GameStateSnapshot {
+                day,
+                phase: phase_label.clone(),
                 alive_count,
                 kill_leaders,
                 alliances: vec![],

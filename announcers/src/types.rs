@@ -101,6 +101,10 @@ pub struct AreaActivity {
 /// as the "header" section of the broadcast package.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameStateSnapshot {
+    /// Current game day (1-indexed).
+    pub day: u32,
+    /// Current phase name (e.g. "dawn", "day", "dusk", "night").
+    pub phase: String,
     /// How many tributes are still alive.
     pub alive_count: u32,
     /// Tributes with kills this phase (sorted by kill count descending).

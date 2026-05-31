@@ -34,6 +34,7 @@ RULES:
 - Do NOT write *screams*, *laughs*, *voice trembling*, etc. Just the words they say.
 - End with a hook: what happens next, who to watch.
 - Only reference events in the data. Do NOT invent kills. Dead tributes are dead.
+- Vary your vocabulary. Do NOT repeat the same phrases across different exchanges.
 
 Examples of the right TONE (not scripts to copy):
 
@@ -220,6 +221,10 @@ impl Commentator for OllamaCommentator {
             "model": self.model,
             "prompt": prompt,
             "stream": false,
+            "options": {
+                "repeat_penalty": 1.3,
+                "temperature": 0.8,
+            },
         });
 
         let resp = self
@@ -285,6 +290,10 @@ impl Commentator for OllamaCommentator {
                         "model": state.model,
                         "prompt": state.prompt,
                         "stream": true,
+                        "options": {
+                            "repeat_penalty": 1.3,
+                            "temperature": 0.8,
+                        },
                     });
                     let client = reqwest::Client::new();
                     match client

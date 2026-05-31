@@ -33,8 +33,40 @@ pub fn death_card(msg: &GameMessage) -> maud::Markup {
     }
 }
 
-/// Combat event card.
+/// Combat event card. Also handles trap events (MessageKind::Combat).
 pub fn combat_card(msg: &GameMessage) -> maud::Markup {
+    // Handle trap variants
+    if let MessagePayload::TrapSet { tribute, trap_kind } = &msg.payload {
+        return html! {
+            div class="bg-gray-900 border border-orange-900/50 rounded-lg p-3" {
+                div class="flex items-center gap-2 text-xs text-gray-500 mb-1" {
+                    (icon("skull"))
+                    span class="text-orange-400 font-medium" { "Trap" }
+                    span { "·" }
+                    span { "Day " (msg.game_day) " " (msg.phase) }
+                }
+                p class="text-sm text-gray-200" {
+                    (tribute.name) " set a " (trap_kind) " trap"
+                }
+            }
+        };
+    }
+    if let MessagePayload::TrapTriggered { victim, trap_kind } = &msg.payload {
+        return html! {
+            div class="bg-gray-900 border border-orange-900/50 rounded-lg p-3" {
+                div class="flex items-center gap-2 text-xs text-gray-500 mb-1" {
+                    (icon("skull"))
+                    span class="text-orange-400 font-medium" { "Trap" }
+                    span { "·" }
+                    span { "Day " (msg.game_day) " " (msg.phase) }
+                }
+                p class="text-sm text-gray-200" {
+                    (victim.name) " triggered a " (trap_kind) " trap"
+                }
+            }
+        };
+    }
+
     let (attacker, target, outcome) = match &msg.payload {
         MessagePayload::Combat(engagement) => (
             &engagement.attacker,

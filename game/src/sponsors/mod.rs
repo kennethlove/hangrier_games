@@ -125,6 +125,16 @@ pub fn translate(
                 });
             }
         }
+        MessagePayload::TrapSet { tribute, .. } => {
+            out.push(AudienceEvent::TrapSet {
+                tribute: tribute.clone(),
+            });
+        }
+        MessagePayload::TrapTriggered { victim, .. } => {
+            out.push(AudienceEvent::TrapTriggered {
+                victim: victim.clone(),
+            });
+        }
         // Other variants intentionally not mapped in PR1.
         // Future affliction specs add: TrappedEscaped → RescueAlly,
         // AfflictionAcquired → AfflictionAcquired,

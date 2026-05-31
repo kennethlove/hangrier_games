@@ -638,7 +638,16 @@ impl Tribute {
                 // Remove the trap from the area and apply its effect
                 let trap = area_details.placed_traps.swap_remove(idx);
                 let line = format!("{} triggers a {} trap!", self.name, trap.kind);
-                events.push(TaggedEvent::new(line, MessagePayload::Generic));
+                events.push(TaggedEvent::new(
+                    line,
+                    MessagePayload::TrapTriggered {
+                        victim: crate::messages::TributeRef {
+                            identifier: self.identifier.clone(),
+                            name: self.name.clone(),
+                        },
+                        trap_kind: trap.kind.to_string(),
+                    },
+                ));
 
                 // Apply affliction based on trap kind
                 use shared::afflictions::{AfflictionKind, AfflictionSource, TrappedMetadata};
@@ -853,7 +862,16 @@ impl Tribute {
         _area_details.placed_traps.push(trap);
 
         let line = format!("{} sets a {} trap in the area.", self.name, kind);
-        _events.push(TaggedEvent::new(line, MessagePayload::Generic));
+        _events.push(TaggedEvent::new(
+            line,
+            MessagePayload::TrapSet {
+                tribute: crate::messages::TributeRef {
+                    identifier: self.identifier.clone(),
+                    name: self.name.clone(),
+                },
+                trap_kind: kind.to_string(),
+            },
+        ));
     }
 
     /// Execute a Search action — reveals hidden traps in current area.

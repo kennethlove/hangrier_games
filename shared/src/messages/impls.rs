@@ -77,6 +77,8 @@ impl MessagePayload {
             | TributeDiedWhileTrapped { .. }
             | RescueAttempted { .. }
             | PartialRescueProgress { .. } => MessageKind::Trapped,
+            MessagePayload::TrapSet { .. } => MessageKind::Combat,
+            MessagePayload::TrapTriggered { .. } => MessageKind::Combat,
             Generic => MessageKind::State,
         }
     }
@@ -205,6 +207,8 @@ impl MessagePayload {
             PartialRescueProgress {
                 rescuer, target, ..
             } => rescuer == id || target == id,
+            MessagePayload::TrapSet { tribute, .. } => r(tribute),
+            MessagePayload::TrapTriggered { victim, .. } => r(victim),
             SponsorGift { recipient, .. } => r(recipient),
             Generic | AreaClosed { .. } | AreaEvent { .. } => false,
             CycleStart { .. } | CycleEnd { .. } | PhaseStarted { .. } | PhaseEnded { .. } => false,

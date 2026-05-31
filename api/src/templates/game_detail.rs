@@ -450,7 +450,8 @@ pub fn log_page(
         PhobiaAcquired,PhobiaTriggered,        FixationAcquired,FixationEscalated,FixationFired,FixationConsummated,FixationThwarted,FixationFaded,\
         SubstanceUsed,AddictionAcquired,AddictionReinforced,AddictionEscalated,AddictionResisted,AddictionRelapse,\
         AddictionCraving,AddictionObserved,AddictionForgotten,AddictionHabituated,\
-        TributeTrapped,Struggling,TrappedEscaped,TributeDiedWhileTrapped";
+        TributeTrapped,Struggling,TrappedEscaped,TributeDiedWhileTrapped,\
+        TrapSet,TrapTriggered";
 
     base_layout(
         "Log",
@@ -603,6 +604,8 @@ fn message_kind_icon(payload: &shared::messages::MessagePayload) -> maud::Markup
         MessagePayload::RescueAttempted { .. } | MessagePayload::PartialRescueProgress { .. } => {
             "hand"
         }
+        MessagePayload::TrapSet { .. } => "skull",
+        MessagePayload::TrapTriggered { .. } => "skull",
         MessagePayload::Generic => "info",
     };
     icon(name)

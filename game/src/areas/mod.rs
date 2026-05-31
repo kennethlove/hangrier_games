@@ -131,6 +131,9 @@ pub struct AreaDetails {
     pub events: Vec<AreaEvent>,
     #[serde(default = "default_terrain")]
     pub terrain: TerrainType,
+    /// Traps placed by tributes in this area.
+    #[serde(default)]
+    pub placed_traps: Vec<crate::tributes::traps::PlacedTrap>,
     /// Per-tribute sub-tile slot assignments within this area-hex.
     /// Presentation/positioning only — game logic operates at the area
     /// level. Keys are tribute identifiers; values are area-local sub
@@ -151,6 +154,7 @@ impl Default for AreaDetails {
             area: None,
             items: vec![],
             events: vec![],
+            placed_traps: vec![],
             terrain: TerrainType::new(BaseTerrain::Clearing, vec![]).unwrap(),
             tribute_slots: HashMap::new(),
         }
@@ -199,6 +203,7 @@ impl AreaDetails {
             area: Some(area),
             items: vec![],
             events: vec![],
+            placed_traps: vec![],
             terrain: TerrainType::new(BaseTerrain::Clearing, vec![]).unwrap(),
             tribute_slots: HashMap::new(),
         }
@@ -211,6 +216,7 @@ impl AreaDetails {
             area: Some(area),
             items: vec![],
             events: vec![],
+            placed_traps: vec![],
             terrain,
             tribute_slots: HashMap::new(),
         }

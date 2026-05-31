@@ -78,6 +78,15 @@ pub enum Action {
     Rescue {
         target: String,
     },
+    /// Spend the turn setting a trap in the current area.
+    /// `None` for trap_kind or severity lets the brain pick defaults.
+    SetTrap {
+        trap_kind: Option<shared::afflictions::TrapKind>,
+        severity: Option<shared::afflictions::Severity>,
+    },
+    /// Spend the turn actively searching for traps in the current area.
+    /// Reveals hidden PlacedTraps; allows free disarm on spot.
+    Search,
 }
 
 impl Display for Action {
@@ -102,6 +111,8 @@ impl Display for Action {
             Action::Avoidance => write!(f, "avoidance"),
             Action::SearchForSubstance { .. } => write!(f, "search for substance"),
             Action::Rescue { .. } => write!(f, "rescue"),
+            Action::SetTrap { .. } => write!(f, "set trap"),
+            Action::Search => write!(f, "search"),
         }
     }
 }
@@ -133,6 +144,11 @@ impl FromStr for Action {
             "rescue" => Ok(Action::Rescue {
                 target: String::new(),
             }),
+            "set trap" => Ok(Action::SetTrap {
+                trap_kind: None,
+                severity: None,
+            }),
+            "search" => Ok(Action::Search),
             _ => Err(()),
         }
     }
@@ -172,6 +188,8 @@ mod tests {
     #[case(Action::Hide, "hide")]
     #[case(Action::TakeItem, "take item")]
     #[case(Action::Rescue { target: "tribute-1".into() }, "rescue")]
+    #[case(Action::SetTrap { trap_kind: None, severity: None }, "set trap")]
+    #[case(Action::Search, "search")]
     fn action_to_string(#[case] action: Action, #[case] expected: &str) {
         assert_eq!(action.to_string(), expected.to_string());
     }
@@ -184,6 +202,8 @@ mod tests {
     #[case("attack", Action::Attack)]
     #[case("hide", Action::Hide)]
     #[case("take item", Action::TakeItem)]
+    #[case("set trap", Action::SetTrap { trap_kind: None, severity: None })]
+    #[case("search", Action::Search)]
     fn action_from_str(#[case] input: &str, #[case] action: Action) {
         assert_eq!(Action::from_str(input).unwrap(), action);
     }
@@ -236,6 +256,11 @@ mod survival_action_tests {
             Action::Rescue {
                 target: "tribute-1".into(),
             },
+            Action::SetTrap {
+                trap_kind: Some(shared::afflictions::TrapKind::Pitfall),
+                severity: Some(shared::afflictions::Severity::Moderate),
+            },
+            Action::Search,
         ] {
             let json = serde_json::to_string(&a).unwrap();
             let back: Action = serde_json::from_str(&json).unwrap();
@@ -277,5 +302,19 @@ mod survival_action_tests {
             "rescue".parse::<Action>(),
             Ok(Action::Rescue { .. })
         ));
+        assert_eq!(
+            Action::SetTrap {
+                trap_kind: None,
+                severity: None
+            }
+            .to_string(),
+            "set trap"
+        );
+        assert_eq!(Action::Search.to_string(), "search");
+        assert!(matches!(
+            "set trap".parse::<Action>(),
+            Ok(Action::SetTrap { .. })
+        ));
+        assert!(matches!("search".parse::<Action>(), Ok(Action::Search)));
     }
 }

@@ -603,6 +603,7 @@ fn message_kind_icon(payload: &shared::messages::MessagePayload) -> maud::Markup
         MessagePayload::RescueAttempted { .. } | MessagePayload::PartialRescueProgress { .. } => {
             "hand"
         }
+        MessagePayload::Generic => "info",
     };
     icon(name)
 }

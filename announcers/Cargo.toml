@@ -8,13 +8,13 @@ publish = false
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 futures = "0.3"
-ollama-rs = { version = "0.3.4", features = ["stream"], optional = true }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream"], optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 shared = { path = "../shared" }
 thiserror = "2.0.18"
-tokio = { version = "1.52.1", features = ["macros", "rt"] }
+tokio = { version = "1.52.1", features = ["macros", "rt", "rt-multi-thread"] }
 uuid = { version = "1", features = ["v4"] }
 
 [features]
-ollama = ["dep:ollama-rs"]
+ollama = ["dep:reqwest"]

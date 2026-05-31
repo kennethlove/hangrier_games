@@ -7,8 +7,6 @@
 use async_trait::async_trait;
 use futures::stream::Stream;
 use futures::StreamExt;
-use ollama_rs::Ollama;
-use ollama_rs::generation::completion::request::GenerationRequest;
 use std::pin::Pin;
 
 use crate::llm::Commentator;
@@ -17,7 +15,9 @@ use crate::types::{
 };
 
 /// Default Ollama model name to use for commentary generation.
-const DEFAULT_MODEL: &str = "announcers";
+/// Uses the base model directly (not a custom Modelfile) so the qwen3
+/// chat template + think/no_think toggle work correctly.
+const DEFAULT_MODEL: &str = "qwen3.5:2b";
 
 /// System prompt establishing the commentator voices.
 const SYSTEM_PROMPT: &str = r#"You are a live sports broadcast team covering the Hunger Games.
@@ -31,21 +31,25 @@ Format each line with [VERITY] or [REX] at the start, like:
 
 Generate 4-8 lines of interleaved back-and-forth dialogue covering the highlights.
 No narration, no descriptions, no stage directions — just the spoken script.
+Do NOT reason or think out loud. Do NOT output thinking tags. Just the dialogue.
 "#;
 
-/// An Ollama-backed commentator.
+/// An Ollama-backed commentator. Communicates with Ollama's REST API directly
+/// via reqwest so we can pass `think: false` and other options not exposed by
+/// the `ollama-rs` crate.
 pub struct OllamaCommentator {
     model: String,
-    client: Ollama,
+    base_url: String,
+    client: reqwest::Client,
 }
 
 impl OllamaCommentator {
-    /// Create a new Ollama commentator with the default model and localhost
-    /// Ollama instance.
+    /// Create a new Ollama commentator with the default model and localhost.
     pub fn new() -> Self {
         Self {
             model: DEFAULT_MODEL.into(),
-            client: Ollama::default(),
+            base_url: "http://localhost:11434".into(),
+            client: reqwest::Client::new(),
         }
     }
 
@@ -53,20 +57,13 @@ impl OllamaCommentator {
     pub fn with_model(model: impl Into<String>) -> Self {
         Self {
             model: model.into(),
-            client: Ollama::default(),
-        }
-    }
-
-    /// Create a new Ollama commentator with a custom model and client.
-    pub fn new_with_client(model: impl Into<String>, client: Ollama) -> Self {
-        Self {
-            model: model.into(),
-            client,
+            base_url: "http://localhost:11434".into(),
+            client: reqwest::Client::new(),
         }
     }
 
     /// Build the full prompt from a broadcast package.
-    fn build_prompt(&self, package: &BroadcastPackage) -> String {
+    pub fn build_prompt(&self, package: &BroadcastPackage) -> String {
         let mut body = String::new();
 
         // ── Phase context ──
@@ -206,22 +203,41 @@ impl Default for OllamaCommentator {
 impl Commentator for OllamaCommentator {
     async fn generate(&self, package: &BroadcastPackage) -> Result<CommentarySegment, CommentaryError> {
         let prompt = self.build_prompt(package);
-        let request = GenerationRequest::new(self.model.clone(), prompt);
+        let body = serde_json::json!({
+            "model": self.model,
+            "prompt": prompt,
+            "stream": false,
+            "options": {
+                "think": false
+            }
+        });
 
-        let response = self
+        let resp = self
             .client
-            .generate(request)
+            .post(format!("{}/api/generate", self.base_url))
+            .json(&body)
+            .send()
             .await
-            .map_err(|e| CommentaryError::Generate(format!("Ollama generation failed: {e}")))?;
+            .map_err(|e| CommentaryError::Generate(format!("Ollama request failed: {e}")))?;
 
-        let lines = Self::parse_response(&response.response);
+        let data: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| CommentaryError::Generate(format!("Ollama response parse failed: {e}")))?;
+
+        let text = data["response"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
+
+        let lines = Self::parse_response(&text);
         let generated_at = chrono::Utc::now();
 
         Ok(CommentarySegment {
             id: uuid::Uuid::new_v4().to_string(),
-            game_id: String::new(),                       // filled by caller
-            day: 0,                                        // filled by caller
-            phase: String::new(),                          // filled by caller
+            game_id: String::new(),
+            day: 0,
+            phase: String::new(),
             lines,
             generated_at,
             model_used: self.model.clone(),
@@ -233,13 +249,13 @@ impl Commentator for OllamaCommentator {
         package: &BroadcastPackage,
     ) -> Pin<Box<dyn Stream<Item = Result<CommentaryLine, CommentaryError>> + Send>> {
         let prompt = self.build_prompt(package);
+        let base_url = self.base_url.clone();
         let model = self.model.clone();
-        let client = self.client.clone();
 
         // Use unfold to turn the Ollama token stream into a CommentaryLine stream.
         let stream = futures::stream::unfold(
             OllamaStreamState {
-                client,
+                base_url,
                 model,
                 prompt,
                 buffer: String::new(),
@@ -254,22 +270,57 @@ impl Commentator for OllamaCommentator {
 
                 // Lazily start the Ollama stream on first poll.
                 if state.ollama_stream.is_none() {
-                    let request = GenerationRequest::new(state.model.clone(), state.prompt.clone());
-                    match state.client.generate_stream(request).await {
-                        Ok(s) => {
-                            // Convert the complex ollama stream into a simple
-                            // string stream by extracting `.response` from each
-                            // `GenerationResponse`.
+                    // Start a streaming request via the Ollama REST API.
+                    let body = serde_json::json!({
+                        "model": state.model,
+                        "prompt": state.prompt,
+                        "stream": true,
+                        "options": {
+                            "think": false
+                        }
+                    });
+                    let client = reqwest::Client::new();
+                    match client
+                        .post(format!("{}/api/generate", state.base_url))
+                        .json(&body)
+                        .send()
+                        .await
+                    {
+                        Ok(response) => {
+                            // Convert the SSE stream into a string stream by
+                            // reading each JSON line and extracting .response.
+                            let byte_stream = response.bytes_stream();
                             let string_stream: Pin<
-                                Box<dyn Stream<Item = Result<String, ollama_rs::error::OllamaError>> + Send>,
-                            > = Box::pin(s.flat_map(move |result| {
-                                let items: Vec<Result<String, ollama_rs::error::OllamaError>> = match result {
-                                    Ok(chunk) => chunk.into_iter().map(|resp| Ok(resp.response)).collect(),
-                                    Err(e) => vec![Err(e)],
-                                };
+                                Box<dyn Stream<Item = Result<String, Box<dyn std::error::Error + Send>>> + Send>,
+                            > = Box::pin(
+                                byte_stream.map(|chunk_result| match chunk_result {
+                                    Ok(bytes) => Ok(String::from_utf8_lossy(&bytes).to_string()),
+                                    Err(e) => Err(Box::new(e) as Box<dyn std::error::Error + Send>),
+                                }),
+                            );
+
+                            // Parse SSE JSON lines, extract .response fields.
+                            let parsed = string_stream.flat_map(move |chunk_result| {
+                                let items: Vec<Result<String, Box<dyn std::error::Error + Send>>> =
+                                    match chunk_result {
+                                        Ok(text) => text
+                                            .lines()
+                                            .filter_map(|line| {
+                                                let line = line.trim();
+                                                if line.is_empty() {
+                                                    return None;
+                                                }
+                                                let val: serde_json::Value =
+                                                    serde_json::from_str(line).ok()?;
+                                                let token = val["response"].as_str()?.to_string();
+                                                Some(Ok(token))
+                                            })
+                                            .collect(),
+                                        Err(e) => vec![Err(e)],
+                                    };
                                 futures::stream::iter(items)
-                            }));
-                            state.ollama_stream = Some(string_stream);
+                            });
+                            state.ollama_stream = Some(Box::pin(parsed));
                         }
                         Err(e) => {
                             state.done = true;
@@ -327,13 +378,13 @@ impl Commentator for OllamaCommentator {
 
 /// Internal state for the `generate_stream` unfold.
 struct OllamaStreamState {
-    client: Ollama,
+    base_url: String,
     model: String,
     prompt: String,
     buffer: String,
-    /// Boxed to avoid naming the complex stream type from ollama-rs.
+    /// SSE-parsed token stream from the Ollama REST API.
     ollama_stream:
-        Option<Pin<Box<dyn Stream<Item = Result<String, ollama_rs::error::OllamaError>> + Send>>>,
+        Option<Pin<Box<dyn Stream<Item = Result<String, Box<dyn std::error::Error + Send>>> + Send>>>,
     done: bool,
 }
 

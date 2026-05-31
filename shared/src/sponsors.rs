@@ -99,6 +99,8 @@ const AESTHETE_WEIGHTS: &[(AudienceEventKind, i32)] = &[
     (AudienceEventKind::AttackTrapped, -6),
     (AudienceEventKind::BetrayalCommitted, -3),
     (AudienceEventKind::Cowardice, -5),
+    (AudienceEventKind::TrapSet, -2),
+    (AudienceEventKind::TrapTriggered, -3),
 ];
 const AESTHETE_PREFS: &[(ItemKindTag, u32)] = &[
     (ItemKindTag::WeaponRare, 6),
@@ -110,6 +112,8 @@ const GAMBLER_WEIGHTS: &[(AudienceEventKind, i32)] = &[
     (AudienceEventKind::UnderdogVictory, 12),
     (AudienceEventKind::SurvivedAreaEvent, 4),
     (AudienceEventKind::Cowardice, -2),
+    (AudienceEventKind::TrapSet, 0),
+    (AudienceEventKind::TrapTriggered, 0),
 ];
 const GAMBLER_PREFS: &[(ItemKindTag, u32)] = &[
     (ItemKindTag::WeaponBasic, 4),
@@ -134,6 +138,8 @@ const SADIST_WEIGHTS: &[(AudienceEventKind, i32)] = &[
     (AudienceEventKind::BetrayalCommitted, 9),
     (AudienceEventKind::AllianceFormed, -3),
     (AudienceEventKind::RescueAlly, -4),
+    (AudienceEventKind::TrapSet, 3),
+    (AudienceEventKind::TrapTriggered, 5),
 ];
 const SADIST_PREFS: &[(ItemKindTag, u32)] =
     &[(ItemKindTag::WeaponRare, 5), (ItemKindTag::WeaponBasic, 4)];
@@ -144,6 +150,8 @@ const COMPASSIONATE_WEIGHTS: &[(AudienceEventKind, i32)] = &[
     (AudienceEventKind::SurvivedAreaEvent, 3),
     (AudienceEventKind::AttackTrapped, -7),
     (AudienceEventKind::BetrayalCommitted, -8),
+    (AudienceEventKind::TrapSet, -3),
+    (AudienceEventKind::TrapTriggered, -5),
 ];
 const COMPASSIONATE_PREFS: &[(ItemKindTag, u32)] = &[
     (ItemKindTag::Food, 5),
@@ -157,6 +165,8 @@ const STRATEGIST_WEIGHTS: &[(AudienceEventKind, i32)] = &[
     (AudienceEventKind::AllianceFormed, 4),
     (AudienceEventKind::Cowardice, -3),
     (AudienceEventKind::BetrayalCommitted, 2),
+    (AudienceEventKind::TrapSet, 4),
+    (AudienceEventKind::TrapTriggered, 2),
 ];
 const STRATEGIST_PREFS: &[(ItemKindTag, u32)] = &[
     (ItemKindTag::Map, 5),

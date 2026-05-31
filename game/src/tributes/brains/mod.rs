@@ -864,12 +864,20 @@ impl Brain {
                     Action::Move(None)
                 }
             }
-            // health is good, move
+            // health is good, move (or set a trap)
             _ => {
-                // If the tribute has movement, move
-                match tribute.attributes.movement {
-                    0 => Action::Rest,
-                    _ => Action::Move(None),
+                // Deterministic: use tribute id hash to decide trap setting
+                let hash: u32 = tribute.identifier.bytes().map(|b| b as u32).sum();
+                if tribute.attributes.movement > 0 && hash.is_multiple_of(7) {
+                    Action::SetTrap {
+                        trap_kind: None,
+                        severity: None,
+                    }
+                } else {
+                    match tribute.attributes.movement {
+                        0 => Action::Rest,
+                        _ => Action::Move(None),
+                    }
                 }
             }
         }

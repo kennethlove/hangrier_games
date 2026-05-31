@@ -15,6 +15,8 @@ pub enum AudienceEventKind {
     UnderdogVictory,
     DistrictLoyaltyAct,
     Cowardice,
+    TrapSet,
+    TrapTriggered,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -64,6 +66,14 @@ pub enum AudienceEvent {
     Cowardice {
         tribute: TributeRef,
     },
+    /// A tribute sets a trap in an area.
+    TrapSet {
+        tribute: TributeRef,
+    },
+    /// A tribute triggers a trap.
+    TrapTriggered {
+        victim: TributeRef,
+    },
 }
 
 impl AudienceEvent {
@@ -80,6 +90,8 @@ impl AudienceEvent {
             Self::UnderdogVictory { .. } => AudienceEventKind::UnderdogVictory,
             Self::DistrictLoyaltyAct { .. } => AudienceEventKind::DistrictLoyaltyAct,
             Self::Cowardice { .. } => AudienceEventKind::Cowardice,
+            Self::TrapSet { .. } => AudienceEventKind::TrapSet,
+            Self::TrapTriggered { .. } => AudienceEventKind::TrapTriggered,
         }
     }
 
@@ -105,6 +117,8 @@ impl AudienceEvent {
             Self::UnderdogVictory { .. } => (10, 1.0),
             Self::DistrictLoyaltyAct { .. } => (5, 1.0),
             Self::Cowardice { .. } => (2, 1.0),
+            Self::TrapSet { .. } => (3, 1.0),
+            Self::TrapTriggered { .. } => (4, 1.0),
         };
         ((base as f32 * modifier).max(1.0)) as u32
     }
@@ -126,6 +140,8 @@ impl AudienceEvent {
             | Self::SurvivedAreaEvent { tribute }
             | Self::Cowardice { tribute } => vec![tribute],
             Self::DistrictLoyaltyAct { actor, .. } => vec![actor],
+            Self::TrapSet { tribute } => vec![tribute],
+            Self::TrapTriggered { victim } => vec![victim],
         }
     }
 }

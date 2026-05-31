@@ -727,6 +727,16 @@ pub enum MessagePayload {
         tribute: String,
         kind: crate::afflictions::TrapKind,
     },
+    /// A tribute set a trap.
+    TrapSet {
+        tribute: TributeRef,
+        trap_kind: String,
+    },
+    /// A tribute triggered a trap.
+    TrapTriggered {
+        victim: TributeRef,
+        trap_kind: String,
+    },
     /// Rescuer attempted to free a trapped tribute this cycle.
     /// Emitted every cycle a tribute performs Action::Rescue.
     RescueAttempted {

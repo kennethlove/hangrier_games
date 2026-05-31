@@ -233,6 +233,13 @@ pub fn attack_contest(
         defense_roll = (defense_roll as f32 / 2.0).ceil() as i32;
     }
 
+    // Sleep ambush bonus (40t7): sleeping targets can't defend at all.
+    // They just woke up (was_ambushed flag set by attacks()) but haven't
+    // had time to react — treat as 0 defense.
+    if target.was_ambushed {
+        defense_roll = 0;
+    }
+
     // TODO(dvd): apply sponsor_affinity_penalty(attacker, SPONSOR_PENALTY_ATTACK_TRAPPED)
     //            when attacking a tribute with any AfflictionKind::Trapped(_)
 
@@ -386,6 +393,10 @@ pub fn attack_contest(
     // TODO(dvd): emit SponsorEvent::AttackOnTrapped when attacker wins against
     //            a trapped target, so the sponsorship system can apply affinity
     //            penalties and generate audience-disapproval narration.
+
+    // Reset transient ambush flag for next combat
+    target.was_ambushed = false;
+
     AttackContestOutcome {
         result,
         wear,

@@ -300,6 +300,11 @@ pub struct Tribute {
     /// of `s` auto-acquires at Mild.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub ever_addicted_to: BTreeSet<Substance>,
+    /// Transient flag set by `attacks()` when this tribute was sleeping and
+    /// got ambushed. `attack_contest` reads it to apply a 0-defense penalty.
+    /// Reset to `false` after each combat resolution. Not persisted.
+    #[serde(default, skip)]
+    pub was_ambushed: bool,
 }
 
 impl Default for Tribute {
@@ -365,6 +370,7 @@ impl Tribute {
             game_day: None,
             addiction_use_count: BTreeMap::new(),
             ever_addicted_to: BTreeSet::new(),
+            was_ambushed: false,
         }
     }
 
@@ -428,6 +434,7 @@ impl Tribute {
             game_day: None,
             addiction_use_count: BTreeMap::new(),
             ever_addicted_to: BTreeSet::new(),
+            was_ambushed: false,
         }
     }
 
@@ -726,8 +733,18 @@ impl Tribute {
             return None;
         }
 
+        // Sleep ambush preference: prefer defenseless sleeping targets.
+        // If any enemies are sleeping, choose randomly among them. Otherwise
+        // choose randomly from all enemies as before.
+        let sleeping_enemies: Vec<Tribute> =
+            enemies.iter().filter(|t| t.sleeping).cloned().collect();
+        let pool = if sleeping_enemies.is_empty() {
+            enemies.clone()
+        } else {
+            sleeping_enemies
+        };
         let mut rng = SmallRng::from_rng(&mut rand::rng());
-        Some(enemies.choose(&mut rng).unwrap().clone())
+        Some(pool.choose(&mut rng).unwrap().clone())
     }
 
     // --- Per-Action executor helpers (extracted from process_turn_phase) ---

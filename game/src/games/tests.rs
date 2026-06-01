@@ -1,5 +1,6 @@
 use super::*;
 use crate::tributes::Attributes;
+use serial_test::serial;
 
 fn create_test_game_with_tributes(tributes: Vec<Tribute>) -> Game {
     Game {
@@ -1385,6 +1386,7 @@ fn survival_tick_routes_dehydration_death_through_tribute_killed() {
 // ---- Sleep tick (PR2c.1, bd-9sjj) ----
 
 #[test]
+#[serial]
 fn sleeping_tribute_naturally_wakes_after_duration_emits_tribute_woke() {
     use crate::messages::{MessagePayload, Phase};
     let mut t = create_tribute("Sleeper", true);
@@ -1416,6 +1418,7 @@ fn sleeping_tribute_naturally_wakes_after_duration_emits_tribute_woke() {
 }
 
 #[test]
+#[serial]
 fn sleeping_tribute_regenerates_stamina_each_phase() {
     use crate::messages::Phase;
     let mut t = create_tribute("Sleeper", true);
@@ -1437,6 +1440,7 @@ fn sleeping_tribute_regenerates_stamina_each_phase() {
 }
 
 #[test]
+#[serial]
 fn sleeping_wounded_tribute_does_not_regen_hp() {
     use crate::messages::Phase;
     use shared::afflictions::{Affliction, AfflictionKind, AfflictionSource, Severity};
@@ -1475,6 +1479,7 @@ fn sleeping_wounded_tribute_does_not_regen_hp() {
 }
 
 #[test]
+#[serial]
 fn cycles_awake_does_not_increment_while_sleeping() {
     use crate::messages::Phase;
     let mut t = create_tribute("Sleeper", true);

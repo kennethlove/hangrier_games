@@ -633,10 +633,38 @@ impl Tribute {
             Action::Sleep { duration_phases } => {
                 self.act_sleep(duration_phases, environment_details.phase, events);
             }
-            Action::Frozen
-            | Action::Flashback { .. }
-            | Action::Avoidance
-            | Action::SearchForSubstance { .. } => {}
+            Action::Frozen | Action::Flashback { .. } | Action::Avoidance => {}
+            Action::SearchForSubstance { substance } => {
+                // Scan inventory for an item matching the craving substance.
+                let matching_item = self
+                    .items
+                    .iter()
+                    .find(|item| item.attribute.substance() == Some(substance))
+                    .cloned();
+
+                if let Some(item) = matching_item {
+                    // Found — auto-use it.
+                    self.try_use_consumable(&item, events, None).ok();
+                } else {
+                    // Not found — emit visible craving.
+                    let craving_severity = self
+                        .afflictions
+                        .values()
+                        .find(|a| matches!(a.kind, AfflictionKind::Addiction(s) if s == substance))
+                        .map(|a| a.severity.to_string())
+                        .unwrap_or_else(|| "moderate".to_string());
+
+                    let line = format!("{} craves {} but has none", self.name, substance);
+                    events.push(TaggedEvent::new(
+                        line,
+                        MessagePayload::AddictionCraving {
+                            tribute: self.identifier.clone(),
+                            substance: substance.to_string(),
+                            severity: craving_severity,
+                        },
+                    ));
+                }
+            }
             Action::Rescue { .. } => {}
             Action::SetTrap {
                 trap_kind,
@@ -1188,6 +1216,30 @@ impl Tribute {
             0.0
         };
 
+        // Addiction penalty (PR3 spec §11):
+        // -0.10 per severity tier per known addiction the target has.
+        let addiction_penalty: f64 = self
+            .afflictions
+            .values()
+            .filter(|aff| matches!(aff.kind, AfflictionKind::Addiction(_)))
+            .filter_map(|aff| aff.addiction_metadata.as_ref())
+            .filter(|meta| meta.observed_by.contains(&target.identifier))
+            .map(|meta| {
+                let aff = self
+                    .afflictions
+                    .values()
+                    .find(|a| {
+                        matches!(a.kind, AfflictionKind::Addiction(_))
+                            && a.addiction_metadata
+                                .as_ref()
+                                .is_some_and(|m| m.substance == meta.substance)
+                    })
+                    .unwrap();
+                -0.10 * (aff.severity as i32) as f64
+            })
+            .sum::<f64>()
+            .abs();
+
         let same_district = self.district == target.district;
         let formed = try_form_alliance(
             &self.traits,
@@ -1197,6 +1249,7 @@ impl Tribute {
             target.allies.len(),
             phobia_penalty,
             trauma_penalty - trauma_observer_bonus,
+            addiction_penalty,
             rng,
         );
         if formed {

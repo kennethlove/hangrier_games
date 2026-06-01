@@ -24,6 +24,7 @@ criterion = "0.8"
 insta = { version = "1.40", features = ["yaml"] }
 proptest = "1.5"
 rstest = "0.26"
+serial_test = "3"
 tokio = { version = "1.52.1", features = ["macros", "rt"] }
 
 [[bench]]

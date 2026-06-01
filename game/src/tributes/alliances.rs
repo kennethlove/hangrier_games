@@ -181,6 +181,7 @@ pub fn try_form_alliance(
     target_allies_len: usize,
     phobia_penalty: f64,
     trauma_penalty: f64,
+    addiction_penalty: f64,
     rng: &mut impl rand::Rng,
 ) -> bool {
     if !passes_gate(self_traits, target_traits) {
@@ -193,7 +194,7 @@ pub fn try_form_alliance(
         self_allies_len,
         target_allies_len,
     );
-    let chance = (base_chance - phobia_penalty - trauma_penalty).max(0.0);
+    let chance = (base_chance - phobia_penalty - trauma_penalty - addiction_penalty).max(0.0);
     if chance <= 0.0 {
         return false;
     }
@@ -439,6 +440,7 @@ mod tests {
             0,
             0.0,
             0.0,
+            0.0,
             &mut rng,
         );
         assert!(!formed);
@@ -455,6 +457,7 @@ mod tests {
             0,
             0.0,
             0.0,
+            0.0,
             &mut rng,
         );
         assert!(!r1, "self at cap blocks");
@@ -464,6 +467,7 @@ mod tests {
             true,
             0,
             MAX_ALLIES,
+            0.0,
             0.0,
             0.0,
             &mut rng,
@@ -484,6 +488,7 @@ mod tests {
                 true,
                 0,
                 0,
+                0.0,
                 0.0,
                 0.0,
                 &mut rng,
@@ -508,6 +513,7 @@ mod tests {
                 false,
                 MAX_ALLIES,
                 MAX_ALLIES,
+                0.0,
                 0.0,
                 0.0,
                 &mut rng

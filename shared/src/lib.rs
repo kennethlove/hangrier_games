@@ -258,6 +258,9 @@ pub struct UserSession {
     /// cache keys and for matching `created_by` ownership on games.
     pub id: String,
     pub username: String,
+    /// Avatar URL (if the user has set one), stored in R2.
+    #[serde(default)]
+    pub avatar: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]

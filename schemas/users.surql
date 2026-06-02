@@ -16,6 +16,10 @@ DEFINE FIELD OVERWRITE email_verified ON user TYPE bool DEFAULT false
         FOR select FULL
         FOR update WHERE id = $auth.id;
 DEFINE FIELD OVERWRITE password on user TYPE string;
+DEFINE FIELD OVERWRITE avatar ON user TYPE string DEFAULT NONE;
+DEFINE FIELD OVERWRITE account_status ON user TYPE string DEFAULT "active";
+DEFINE FIELD OVERWRITE ban_reason ON user TYPE string DEFAULT NONE;
+DEFINE FIELD OVERWRITE banned_at ON user TYPE datetime DEFAULT NONE;
 
 DEFINE INDEX OVERWRITE unique_email ON user FIELDS email UNIQUE;
 

@@ -73,6 +73,7 @@ async fn session(Extension(AuthDb(db)): Extension<AuthDb>) -> Result<Json<UserSe
     Ok(Json(UserSession {
         id: row.id.to_string(),
         username: row.username,
+        avatar: None,
     }))
 }
 

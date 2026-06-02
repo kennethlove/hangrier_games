@@ -761,6 +761,7 @@ async fn require_auth(
         return Ok(UserSession {
             id,
             username: username.to_owned(),
+            avatar: None,
         });
     }
 
@@ -805,6 +806,7 @@ async fn require_auth(
     Ok(UserSession {
         id: row.id.to_string(),
         username: row.username,
+        avatar: None,
     })
 }
 

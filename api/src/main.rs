@@ -128,9 +128,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !migration_ok {
         tracing::warn!("Migration runner failed; resetting state and retrying...");
         // Migration state corrupted; drop the tracking table and retry.
-        let _ = db
+        if let Err(e) = db
             .query("REMOVE TABLE IF EXISTS _surrealdb_migrations;")
-            .await;
+            .await
+        {
+            tracing::error!("Failed to remove migration tracking table: {e}");
+            return Err("Migration state corrupted and cannot be reset; aborting startup".into());
+        }
         migration_ok = MigrationRunner::new(&db).up().await.is_ok();
         if migration_ok {
             tracing::info!("Migration runner succeeded after resetting state");
@@ -141,23 +145,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Last resort: apply critical schemas directly so auth still works.
         tracing::warn!("Migration still failing; applying critical schemas directly");
         let schema_paths = ["../schemas/users.surql", "../schemas/refresh_tokens.surql"];
-        let _ = db
+        if let Err(e) = db
             .use_ns(&surreal_namespace)
             .use_db(&surreal_database)
-            .await;
+            .await
+        {
+            return Err(format!(
+                "Failed to select namespace/db for direct schema application: {e}"
+            )
+            .into());
+        }
+        let mut all_critical_ok = true;
         for rel_path in &schema_paths {
             let abs_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(rel_path);
             match tokio::fs::read_to_string(&abs_path).await {
                 Ok(sql) => {
                     if let Err(sqlerr) = db.query(sql).await {
-                        tracing::warn!("Direct-schema apply failed for {}: {sqlerr}", rel_path);
+                        tracing::error!("Direct-schema apply failed for {}: {sqlerr}", rel_path);
+                        all_critical_ok = false;
                     } else {
                         tracing::info!("Applied schema: {rel_path}");
                     }
                 }
-                Err(read_err) => tracing::warn!("Cannot read schema {rel_path}: {read_err}"),
+                Err(read_err) => {
+                    tracing::error!("Cannot read schema {rel_path}: {read_err}");
+                    all_critical_ok = false;
+                }
             }
         }
+        if !all_critical_ok {
+            return Err(
+                "Failed to apply critical schemas — cannot boot with half-applied schema. \
+                 Check database state and retry."
+                    .into(),
+            );
+        }
+        tracing::info!("Critical schemas applied directly (migration runner unavailable)");
     }
 
     // Apply commentary and tribute histories schemas (non-critical — failures
@@ -166,10 +189,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "../schemas/commentary.surql",
         "../schemas/tribute_histories.surql",
     ];
-    let _ = db
+    if let Err(e) = db
         .use_ns(&surreal_namespace)
         .use_db(&surreal_database)
-        .await;
+        .await
+    {
+        tracing::warn!("Failed to re-select namespace/db for extras schemas: {e}");
+    }
     for rel_path in &extras_paths {
         let abs_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(rel_path);
         match tokio::fs::read_to_string(&abs_path).await {

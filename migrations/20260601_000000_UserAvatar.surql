@@ -9,3 +9,5 @@ DEFINE FIELD OVERWRITE ban_reason ON user TYPE string DEFAULT NONE;
 
 -- Add banned_at field (optional datetime)
 DEFINE FIELD OVERWRITE banned_at ON user TYPE datetime DEFAULT NONE;
+
+-- CI trigger

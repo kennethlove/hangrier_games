@@ -167,9 +167,12 @@ bd close <id>         # Complete work
 
 ### Rules
 
+- Use the beads MCP if possible
 - Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
 - Run `bd prime` for detailed command reference and session close protocol
 - Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
+
+<!-- END BEADS INTEGRATION -->
 
 ## Session Completion
 
@@ -195,10 +198,10 @@ bd close <id>         # Complete work
 7. **Hand off** - Provide the PR URL plus context for next session
 
 **CRITICAL RULES:**
+- A branch is NOT ready for a PR until all CI gates pass locally. Use `just quality` to run the full gamut.
 - Work is NOT complete until a PR is open on GitHub
 - NEVER push directly to `main`; always go through a feature bookmark + PR
 - NEVER merge PRs locally; let the GitHub UI (or maintainer) do the merge
 - NEVER stop before opening the PR - that leaves work stranded on a local bookmark
 - NEVER say "ready to push when you are" - YOU must push the bookmark and open the PR
 - If push or `gh pr create` fails, resolve and retry until it succeeds
-<!-- END BEADS INTEGRATION -->

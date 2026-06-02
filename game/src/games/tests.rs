@@ -442,7 +442,7 @@ fn test_run_tribute_cycle() {
         .collect::<Vec<Area>>();
 
     // Run the tribute cycle
-    let mut rng = SmallRng::from_rng(&mut rand::rng());
+    let mut rng = SmallRng::seed_from_u64(42);
     let _ = game.run_tribute_cycle(
         crate::messages::Phase::Day,
         &mut rng,
@@ -1397,7 +1397,7 @@ fn sleeping_tribute_naturally_wakes_after_duration_emits_tribute_woke() {
     let mut game = create_test_game_with_tributes(vec![t.clone()]);
     let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
     game.areas.push(area);
-    let mut rng = SmallRng::from_rng(&mut rand::rng());
+    let mut rng = SmallRng::seed_from_u64(42);
     let _ = game.run_tribute_cycle(Phase::Night, &mut rng, vec![], vec![t], 1);
 
     let woken = &game.tributes[0];
@@ -1430,7 +1430,7 @@ fn sleeping_tribute_regenerates_stamina_each_phase() {
     let mut game = create_test_game_with_tributes(vec![t.clone()]);
     let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
     game.areas.push(area);
-    let mut rng = SmallRng::from_rng(&mut rand::rng());
+    let mut rng = SmallRng::seed_from_u64(42);
     let _ = game.run_tribute_cycle(Phase::Night, &mut rng, vec![], vec![t], 1);
 
     let after = &game.tributes[0];
@@ -1470,7 +1470,7 @@ fn sleeping_wounded_tribute_does_not_regen_hp() {
     let mut game = create_test_game_with_tributes(vec![t.clone()]);
     let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
     game.areas.push(area);
-    let mut rng = SmallRng::from_rng(&mut rand::rng());
+    let mut rng = SmallRng::seed_from_u64(42);
     let _ = game.run_tribute_cycle(Phase::Night, &mut rng, vec![], vec![t], 1);
     assert_eq!(
         game.tributes[0].attributes.health, prior_hp,
@@ -1489,7 +1489,7 @@ fn cycles_awake_does_not_increment_while_sleeping() {
     let mut game = create_test_game_with_tributes(vec![t.clone()]);
     let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
     game.areas.push(area);
-    let mut rng = SmallRng::from_rng(&mut rand::rng());
+    let mut rng = SmallRng::seed_from_u64(42);
     let _ = game.run_tribute_cycle(Phase::Night, &mut rng, vec![], vec![t], 1);
     assert_eq!(game.tributes[0].cycles_awake, 4);
 }
@@ -1510,7 +1510,7 @@ fn area_event_interrupts_sleeping_tribute() {
     let mut area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
     area.events.push(AreaEvent::Wildfire);
     game.areas.push(area);
-    let mut rng = SmallRng::from_rng(&mut rand::rng());
+    let mut rng = SmallRng::seed_from_u64(42);
     let _ = game.run_tribute_cycle(Phase::Night, &mut rng, vec![], vec![t], 1);
 
     let woken = &game.tributes[0];
@@ -1564,7 +1564,7 @@ fn alliance_summons_wakes_sleeping_target() {
             summoner: summoner_id,
             target: target_id,
         });
-    let mut rng = SmallRng::from_rng(&mut rand::rng());
+    let mut rng = SmallRng::seed_from_u64(42);
     game.process_alliance_events(&mut rng);
 
     let woken = &game.tributes[1];

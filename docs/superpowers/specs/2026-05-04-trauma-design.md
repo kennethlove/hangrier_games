@@ -428,3 +428,87 @@ Rollout: ship behind a `trauma_enabled: bool` config flag on `Game`, default `tr
 - **Open questions resolved by punt to follow-up:**
   - Trait modifiers (`Resilient`/`Fragile` etc) on trauma — listed in §13.1 unit tests as "if relevant"; recommend mirroring phobia trait table but defer the exact numbers to PR3 implementation.
   - Whether `MassCasualty` should distinguish the witnessing tribute's own faction — deferred; producer scans all area deaths uniformly in v1.
+
+## 18. Amendment: Current-conditions severity re-evaluation (flare-up)
+
+**Bead:** `hangrier_games-m3is`
+**Status:** Pending implementation
+**Motivation:** Trauma severity is currently static (set on acquisition, changes only via reinforcement or decay). A tribute with `NearDeath { cause: Drowning }` trauma should experience *worse* symptoms when standing in a flood zone, not the same baseline as when relaxing on dry ground.
+
+### 18.1 Effective severity
+
+Replace the static severity model with a two-layer severity:
+
+```rust
+/// Stored severity. Incremented by reinforcement, decremented by decay.
+pub stored_severity: Severity,
+
+/// Computed per-cycle. May exceed stored_severity when conditions match.
+pub fn effective_severity(affliction: &Affliction, context: &CycleContext) -> Severity
+```
+
+Rules:
+- Base = `stored_severity`
+- If any trauma source (per §7.1 matching rules) matches the current-cycle context, bump by one tier: Mild→Moderate, Moderate→Severe, Severe stays Severe.
+- The bump is **temporary** — it lasts only while the matching condition is present. Next cycle without a match: effective severity drops back to stored.
+- Flare-up does NOT count as reinforcement (no escalation roll, no counter reset, no `TraumaEscalated` event). It decays the moment the stimulus leaves.
+
+### 18.2 What effective severity affects
+
+| System | Before (used stored_severity) | After (uses effective_severity) |
+|---|---|---|
+| Stat penalties (§7) | stored | effective — temporary crunch while in trigger zone |
+| Flashback chance (§7) | stored, with stimulus co-location check | effective determines baseline; co-location check already redundant with flare-up tier bump |
+| Avoidance bias (§7.1) | stored | effective — Mild can temporarily act like Moderate when in trigger zone |
+| Sleep penalty (§7) | stored | effective |
+| Decay processing | stored (unchanged) | stored (unchanged — flare-up doesn't reset decay timer) |
+| Reinforcement processing | stored (unchanged) | stored (unchanged — reinforcement fires on stored severity) |
+
+### 18.3 Implementation
+
+```rust
+// In game/src/tributes/afflictions/trauma.rs or a new effects helper:
+
+pub fn compute_effective_severity(
+    stored_severity: Severity,
+    trauma_metadata: &TraumaMetadata,
+    context: &CycleContext,
+) -> Severity {
+    let any_match = trauma_metadata.sources.iter().any(|source| source_matches_context(source, context));
+    if any_match {
+        stored_severity.bump()  // Mild→Moderate→Severe, Severe stays Severe
+    } else {
+        stored_severity
+    }
+}
+```
+
+`source_matches_context` reuses the §7.1 matching rules verbatim.
+
+### 18.4 Changes to existing code
+
+1. **`process_traumas`** in `game/src/tributes/afflictions/trauma.rs` — add effective_severity computation at the top. Flashback chance reads effective, not stored.
+2. **`trauma_override`** in `game/src/tributes/brains/trauma_override.rs` — pass effective severity to the override decision.
+3. **`base_penalties` caller** — `compute_stat_modifiers` already iterates afflictions; the trauma stat branch should use a `compute_effective_severity` helper.
+4. **Brain bias** — `compute_brain_bias` should also use effective severity for trauma's avoidance weight.
+5. **Sleep recovery multiplier** — `sleep_recovery_multiplier` in `trauma_effects.rs` should use effective severity.
+
+### 18.5 What does NOT change
+
+- `TraumaMetadata.sources` — the BTreeSet of stored sources is unchanged.
+- Decay threshold (10 cycles) — unaffected by flare-up.
+- Reinforcement contract — reinforcement still fires on producer events and bumps stored severity.
+- Single-Trauma-per-tribute invariant.
+- Observer/visibility logic — flashback still emits `TraumaFlashback` when it fires; the payload reports stored severity + flare-up status.
+
+### 18.6 Tests
+
+| Test | What it verifies |
+|---|---|
+| `flare_up_bumps_effective` | Mild trauma + matching context → effective Moderate |
+| `flare_up_no_bump_on_severe` | Severe trauma + matching context → effective stays Severe |
+| `no_flare_up_without_match` | Mild trauma + non-matching context → effective stays Mild |
+| `flare_up_reverts_on_clean_cycle` | After 1 cycle with match (Moderate effective), next cycle without match → effective reverts to stored |
+| `flare_up_affects_flashback_chance` | Effective Moderate has 10% flashback, not Mild's 5% |
+| `flare_up_does_not_reset_decay` | cycles_since_last_event unchanged by flare-up (only producer fires reset it) |
+| `effective_severity_no_trauma_metadata` | No-op when trauma_metadata is None |

@@ -304,6 +304,11 @@ pub struct Tribute {
     /// of `s` auto-acquires at Mild.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub ever_addicted_to: BTreeSet<Substance>,
+    /// Cycles remaining in hangover (alcohol after-effect).
+    /// Set to 2 on alcohol use, ticks down each cycle.
+    /// While > 0, tribute suffers -1 atk, -1 forage.
+    #[serde(default, skip)]
+    pub hangover_cycles_remaining: u32,
     /// Transient flag set by `attacks()` when this tribute was sleeping and
     /// got ambushed. `attack_contest` reads it to apply a 0-defense penalty.
     /// Reset to `false` after each combat resolution. Not persisted.
@@ -380,6 +385,7 @@ impl Tribute {
             game_day: None,
             addiction_use_count: BTreeMap::new(),
             ever_addicted_to: BTreeSet::new(),
+            hangover_cycles_remaining: 0,
             was_ambushed: false,
             pending_theft_target: None,
         }
@@ -445,6 +451,7 @@ impl Tribute {
             game_day: None,
             addiction_use_count: BTreeMap::new(),
             ever_addicted_to: BTreeSet::new(),
+            hangover_cycles_remaining: 0,
             was_ambushed: false,
             pending_theft_target: None,
         }
@@ -455,6 +462,18 @@ impl Tribute {
         let mut rng = SmallRng::from_rng(&mut rand::rng());
         let district = rng.random_range(1..=12);
         Tribute::new(name, Some(district), None)
+    }
+
+    /// Builder: add a pre-existing affliction (addiction, missing limb, trauma, etc.).
+    /// Also populates `ever_addicted_to` for Addiction kinds so relapse semantics work.
+    pub fn with_affliction(mut self, affliction: Affliction) -> Self {
+        if let (AfflictionKind::Addiction(_), Some(meta)) =
+            (&affliction.kind, &affliction.addiction_metadata)
+        {
+            self.ever_addicted_to.insert(meta.substance);
+        }
+        self.afflictions.insert(affliction.key(), affliction);
+        self
     }
 
     pub fn avatar(&self) -> String {

@@ -3,6 +3,13 @@
 Beads: `hangrier_games-opzj`
 Related: afflictions epic (`4o8a`), phobias spec (`2026-05-03-phobias-design.md`), fixations spec (`2026-05-03-fixations-design.md`), trauma spec (`2026-05-04-trauma-design.md`), sponsorship epic (`hangrier_games-dvd`)
 
+> **Amendment (2026-06-09):** Design re-scoped per playability review. Changes:
+> - **Painkiller → harmless.** No addiction path. Immediate stat-suppression effect only (suppresses Wounded/BrokenBone/Burned penalties).
+> - **Alcohol → immediate effects + hangover, no withdrawal.** Drunk: -1 escape, -1 forage, phobia immunity. Sets `hangover_cycles_remaining = 2`. Hangover fades after 2 cycles with a message. No acquisition roll, no addiction affliction, no withdrawal.
+> - **Stimulant & Morphling → faster acquisition, faster crash.** Acquisition curve boosted (15%/35%/60%/85% at uses 1-4+). Decay threshold reduced from 15 to 8 cycles. High duration shortened (Stimulant Mild=1, Severe=0; Morphling Mild=2, Severe=0). Morphling multiplier 1.3×.
+> - **Pre-existing afflictions** supported via `Tribute::with_affliction()` builder. Tributes can spawn with addictions, missing limbs, trauma, etc.
+> - Full implementation done across PR1-PR4 (all ✓). Only Stimulant is v1-reachable via items.
+
 ## 1. Purpose
 
 Model substance dependence as a stored, durable affliction acquired through repeated consumable use. Addiction sits as a peer to trauma and phobia in the affliction system: it has its own producer pipeline (the consumable-use hook), its own metadata struct, its own brain layer, and the same observer-aware visibility infrastructure. Unlike trauma (event-triggered) and phobia (stimulus-keyed reaction), addiction is **use-triggered** — consuming an addictive substance probabilistically acquires the affliction, and once acquired the tribute oscillates between **High** (substance recently consumed) and **Withdrawal** (no recent dose) effect modes.

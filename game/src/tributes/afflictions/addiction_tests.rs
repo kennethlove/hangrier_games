@@ -43,28 +43,28 @@ mod tests {
 
     #[test]
     fn acquisition_curve_use_count_1() {
-        assert_eq!(acquisition_probability(1, Substance::Stimulant), 0.05);
+        assert_eq!(acquisition_probability(1, Substance::Stimulant), 0.15);
     }
 
     #[test]
     fn acquisition_curve_use_count_2() {
-        assert_eq!(acquisition_probability(2, Substance::Stimulant), 0.15);
+        assert_eq!(acquisition_probability(2, Substance::Stimulant), 0.35);
     }
 
     #[test]
     fn acquisition_curve_use_count_3() {
-        assert_eq!(acquisition_probability(3, Substance::Stimulant), 0.30);
+        assert_eq!(acquisition_probability(3, Substance::Stimulant), 0.60);
     }
 
     #[test]
     fn acquisition_curve_use_count_4() {
-        assert_eq!(acquisition_probability(4, Substance::Stimulant), 0.50);
+        assert_eq!(acquisition_probability(4, Substance::Stimulant), 0.85);
     }
 
     #[test]
     fn acquisition_curve_use_count_5_plus() {
-        assert_eq!(acquisition_probability(5, Substance::Stimulant), 0.75);
-        assert_eq!(acquisition_probability(100, Substance::Stimulant), 0.75);
+        assert_eq!(acquisition_probability(5, Substance::Stimulant), 0.85);
+        assert_eq!(acquisition_probability(100, Substance::Stimulant), 0.85);
     }
 
     // ── Substance multiplier tests (spec §5.2 table) ────────────────
@@ -72,19 +72,13 @@ mod tests {
     #[test]
     fn morphling_multiplier_at_use_1() {
         let p = acquisition_probability(1, Substance::Morphling);
-        assert!((p - 0.075).abs() < f64::EPSILON);
+        assert!((p - 0.195).abs() < f64::EPSILON);
     }
 
     #[test]
     fn morphling_multiplier_caps_at_95_percent() {
         let p = acquisition_probability(5, Substance::Morphling);
         assert!((p - 0.95).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn alcohol_multiplier_reduces_chance() {
-        let p = acquisition_probability(4, Substance::Alcohol);
-        assert!((p - 0.35).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -98,40 +92,23 @@ mod tests {
 
     #[test]
     fn high_duration_stimulant_mild() {
-        assert_eq!(high_duration(Substance::Stimulant, Severity::Mild), 2);
+        assert_eq!(high_duration(Substance::Stimulant, Severity::Mild), 1);
     }
 
     #[test]
     fn high_duration_stimulant_moderate_severe() {
         assert_eq!(high_duration(Substance::Stimulant, Severity::Moderate), 1);
-        assert_eq!(high_duration(Substance::Stimulant, Severity::Severe), 1);
-    }
-
-    #[test]
-    fn high_duration_painkiller_mild() {
-        assert_eq!(high_duration(Substance::Painkiller, Severity::Mild), 3);
-    }
-
-    #[test]
-    fn high_duration_painkiller_severe() {
-        assert_eq!(high_duration(Substance::Painkiller, Severity::Severe), 1);
+        assert_eq!(high_duration(Substance::Stimulant, Severity::Severe), 0);
     }
 
     #[test]
     fn high_duration_morphling_mild() {
-        assert_eq!(high_duration(Substance::Morphling, Severity::Mild), 4);
+        assert_eq!(high_duration(Substance::Morphling, Severity::Mild), 2);
     }
 
     #[test]
     fn high_duration_morphling_severe() {
-        assert_eq!(high_duration(Substance::Morphling, Severity::Severe), 1);
-    }
-
-    #[test]
-    fn high_duration_alcohol_always_1() {
-        assert_eq!(high_duration(Substance::Alcohol, Severity::Mild), 1);
-        assert_eq!(high_duration(Substance::Alcohol, Severity::Moderate), 1);
-        assert_eq!(high_duration(Substance::Alcohol, Severity::Severe), 1);
+        assert_eq!(high_duration(Substance::Morphling, Severity::Severe), 0);
     }
 
     // ── Acquisition: first use, roll hits ───────────────────────────
@@ -139,7 +116,7 @@ mod tests {
     #[test]
     fn first_use_acquires_on_lucky_roll() {
         let mut t = fresh_tribute();
-        let seed = seed_hits(0.75); // use_count=100 → p=0.75
+        let seed = seed_hits(0.85); // use_count=100 → p=0.85
         let mut rng = SmallRng::seed_from_u64(seed);
         t.addiction_use_count.insert(Substance::Stimulant, 100);
 
@@ -162,7 +139,7 @@ mod tests {
         assert_eq!(aff.severity, Severity::Mild);
         let meta = aff.addiction_metadata.as_ref().expect("metadata");
         assert_eq!(meta.substance, Substance::Stimulant);
-        assert_eq!(meta.high_cycles_remaining, 2); // Stimulant Mild
+        assert_eq!(meta.high_cycles_remaining, 1); // Stimulant Mild
 
         // Verify ever_addicted_to is populated.
         assert!(t.ever_addicted_to.contains(&Substance::Stimulant));
@@ -173,7 +150,7 @@ mod tests {
     #[test]
     fn first_use_misses_on_unlucky_roll() {
         let mut t = fresh_tribute();
-        let seed = seed_misses(0.05); // use_count=1 → p=0.05
+        let seed = seed_misses(0.15); // use_count=1 → p=0.15
         let mut rng = SmallRng::seed_from_u64(seed);
         t.addiction_use_count.insert(Substance::Stimulant, 1);
 

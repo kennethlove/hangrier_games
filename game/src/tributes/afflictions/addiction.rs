@@ -55,15 +55,12 @@ pub enum AddictionAcquisition {
 pub fn high_duration(substance: Substance, severity: Severity) -> u32 {
     use Severity::*;
     match (substance, severity) {
-        (Substance::Stimulant, Mild) => 2,
-        (Substance::Stimulant, Moderate | Severe) => 1,
-        (Substance::Painkiller, Mild) => 3,
-        (Substance::Painkiller, Moderate) => 2,
-        (Substance::Painkiller, Severe) => 1,
-        (Substance::Morphling, Mild) => 4,
-        (Substance::Morphling, Moderate) => 2,
-        (Substance::Morphling, Severe) => 1,
-        (Substance::Alcohol, _) => 1,
+        (Substance::Stimulant, Mild | Moderate) => 1,
+        (Substance::Stimulant, Severe) => 0,
+        (Substance::Morphling, Mild) => 2,
+        (Substance::Morphling, Moderate) => 1,
+        (Substance::Morphling, Severe) => 0,
+        _ => 0,
     }
 }
 
@@ -72,20 +69,19 @@ pub fn high_duration(substance: Substance, severity: Severity) -> u32 {
 /// Returns the base chance (0.0–1.0) for a given lifetime use count.
 fn acquisition_base_chance(use_count: u32) -> f64 {
     match use_count {
-        1 => 0.05,
-        2 => 0.15,
-        3 => 0.30,
-        4 => 0.50,
-        _ => 0.75,
+        1 => 0.15,
+        2 => 0.35,
+        3 => 0.60,
+        4 => 0.85,
+        _ => 0.85,
     }
 }
 
 /// Substance multiplier on acquisition probability — spec §5.2 table.
 fn substance_multiplier(substance: Substance) -> f64 {
     match substance {
-        Substance::Morphling => 1.5,
-        Substance::Alcohol => 0.7,
-        Substance::Stimulant | Substance::Painkiller => 1.0,
+        Substance::Morphling => 1.3,
+        _ => 1.0,
     }
 }
 
@@ -317,8 +313,8 @@ pub fn process_addictions(
             }
         }
 
-        // ── Check decay threshold (15 cycles) ───────────
-        if meta.cycles_since_last_use >= 15 {
+        // ── Check decay threshold (8 cycles) ────────────
+        if meta.cycles_since_last_use >= 8 {
             if aff.severity == Severity::Mild {
                 // Cured
                 let substance = meta.substance;
@@ -347,11 +343,11 @@ pub fn process_addictions(
             continue;
         }
 
-        // ── Observer decay (15-cycle threshold) ─────────
+        // ── Observer decay (8-cycle threshold) ──────────
         let forgotten: Vec<String> = meta
             .observer_seen_cycle
             .iter()
-            .filter(|&(_, seen)| cycle.saturating_sub(*seen) >= 15)
+            .filter(|&(_, seen)| cycle.saturating_sub(*seen) >= 8)
             .map(|(id, _)| id.clone())
             .collect();
         for observer_id in &forgotten {

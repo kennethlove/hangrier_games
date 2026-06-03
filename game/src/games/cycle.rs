@@ -714,6 +714,18 @@ impl Game {
             }
         }
 
+        // ── Hangover tick-down ──────────────────────────────────────
+        for &idx in &tributes_to_act {
+            let t = &mut self.tributes[idx];
+            if t.hangover_cycles_remaining > 0 {
+                t.hangover_cycles_remaining -= 1;
+                if t.hangover_cycles_remaining == 0 {
+                    let line = format!("{}'s hangover fades — rough night, clear head", t.name);
+                    collected_events.push((t.identifier.clone(), t.name.clone(), line, None, None));
+                }
+            }
+        }
+
         // Sort by initiative so faster tributes act first (tm6a).
         tributes_to_act.sort_by_cached_key(|&idx| {
             let agility = self.tributes[idx].attributes.agility;

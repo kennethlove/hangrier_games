@@ -164,82 +164,105 @@ impl Tribute {
                 },
             ));
 
-            // Roll for acquisition / reinforcement / relapse.
-            let mut rng = match rng_seed {
-                Some(seed) => SmallRng::seed_from_u64(seed),
-                None => SmallRng::from_rng(&mut rand::rng()),
-            };
-            let outcome = self.try_acquire_addiction(substance, &mut rng);
+            // ── Per-substance behavior ─────────────────────────────────
+            // Stimulant/Morphling: roll for addiction acquisition.
+            // Alcohol: no addiction — triggers hangover instead.
+            // Painkiller: harmless (SubstanceUsed emitted above, no further effect).
+            match substance {
+                shared::afflictions::Substance::Stimulant
+                | shared::afflictions::Substance::Morphling => {
+                    let mut rng = match rng_seed {
+                        Some(seed) => SmallRng::seed_from_u64(seed),
+                        None => SmallRng::from_rng(&mut rand::rng()),
+                    };
+                    let outcome = self.try_acquire_addiction(substance, &mut rng);
 
-            match outcome {
-                AddictionAcquisition::Acquired {
-                    substance: s,
-                    use_count: uc,
-                } => {
-                    events.push(TaggedEvent::new(
-                        format!("{} acquired {} addiction (use #{})", self.name, s, uc),
-                        MessagePayload::AddictionAcquired {
-                            tribute: self.identifier.clone(),
-                            substance: s.to_string(),
-                            severity: "mild".to_string(),
+                    match outcome {
+                        AddictionAcquisition::Acquired {
+                            substance: s,
                             use_count: uc,
-                        },
-                    ));
-                }
-                AddictionAcquisition::Reinforced {
-                    substance: s,
-                    severity,
-                    escalated,
-                } => {
-                    events.push(TaggedEvent::new(
-                        format!(
-                            "{}'s {} addiction reinforced (now {})",
-                            self.name, s, severity
-                        ),
-                        MessagePayload::AddictionReinforced {
-                            tribute: self.identifier.clone(),
-                            substance: s.to_string(),
-                            severity: severity.to_string(),
-                        },
-                    ));
-                    if escalated {
-                        events.push(TaggedEvent::new(
-                            format!("{}'s {} addiction escalated to {}", self.name, s, severity),
-                            MessagePayload::AddictionEscalated {
-                                tribute: self.identifier.clone(),
-                                substance: s.to_string(),
-                                from_severity: "moderate".to_string(),
-                                to_severity: severity.to_string(),
-                            },
-                        ));
+                        } => {
+                            events.push(TaggedEvent::new(
+                                format!("{} acquired {} addiction (use #{})", self.name, s, uc),
+                                MessagePayload::AddictionAcquired {
+                                    tribute: self.identifier.clone(),
+                                    substance: s.to_string(),
+                                    severity: "mild".to_string(),
+                                    use_count: uc,
+                                },
+                            ));
+                        }
+                        AddictionAcquisition::Reinforced {
+                            substance: s,
+                            severity,
+                            escalated,
+                        } => {
+                            events.push(TaggedEvent::new(
+                                format!(
+                                    "{}'s {} addiction reinforced (now {})",
+                                    self.name, s, severity
+                                ),
+                                MessagePayload::AddictionReinforced {
+                                    tribute: self.identifier.clone(),
+                                    substance: s.to_string(),
+                                    severity: severity.to_string(),
+                                },
+                            ));
+                            if escalated {
+                                events.push(TaggedEvent::new(
+                                    format!(
+                                        "{}'s {} addiction escalated to {}",
+                                        self.name, s, severity
+                                    ),
+                                    MessagePayload::AddictionEscalated {
+                                        tribute: self.identifier.clone(),
+                                        substance: s.to_string(),
+                                        from_severity: "moderate".to_string(),
+                                        to_severity: severity.to_string(),
+                                    },
+                                ));
+                            }
+                        }
+                        AddictionAcquisition::Relapse {
+                            substance: s,
+                            prior_uses,
+                        } => {
+                            events.push(TaggedEvent::new(
+                                format!("{} relapsed into {} addiction", self.name, s),
+                                MessagePayload::AddictionRelapse {
+                                    tribute: self.identifier.clone(),
+                                    substance: s.to_string(),
+                                    prior_uses,
+                                },
+                            ));
+                        }
+                        AddictionAcquisition::Resisted {
+                            substance: s,
+                            reason,
+                        } => {
+                            events.push(TaggedEvent::new(
+                                format!("{} resisted {} addiction ({:?})", self.name, s, reason),
+                                MessagePayload::AddictionResisted {
+                                    tribute: self.identifier.clone(),
+                                    substance: s.to_string(),
+                                    reason: format!("{:?}", reason),
+                                },
+                            ));
+                        }
                     }
                 }
-                AddictionAcquisition::Relapse {
-                    substance: s,
-                    prior_uses,
-                } => {
+                shared::afflictions::Substance::Alcohol => {
+                    self.hangover_cycles_remaining = 2;
                     events.push(TaggedEvent::new(
-                        format!("{} relapsed into {} addiction", self.name, s),
-                        MessagePayload::AddictionRelapse {
+                        format!("{} is drunk — staggering and bold", self.name),
+                        MessagePayload::SubstanceUsed {
                             tribute: self.identifier.clone(),
-                            substance: s.to_string(),
-                            prior_uses,
+                            item: item.name.clone(),
+                            substance: "alcohol".to_string(),
                         },
                     ));
                 }
-                AddictionAcquisition::Resisted {
-                    substance: s,
-                    reason,
-                } => {
-                    events.push(TaggedEvent::new(
-                        format!("{} resisted {} addiction ({:?})", self.name, s, reason),
-                        MessagePayload::AddictionResisted {
-                            tribute: self.identifier.clone(),
-                            substance: s.to_string(),
-                            reason: format!("{:?}", reason),
-                        },
-                    ));
-                }
+                _ => {} // Painkiller: no further effect
             }
         }
 

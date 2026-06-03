@@ -116,24 +116,67 @@ pub fn compute_stat_modifiers(afflictions: &[Affliction]) -> StatModifiers {
         };
 
         if meta.high_cycles_remaining > 0 {
-            // High mode: substance-specific bonuses.
+            // High mode: substance-specific bonuses + suppression (spec §7.1).
             if *substance == shared::afflictions::Substance::Stimulant {
                 mods.atk += 2;
                 mods.escape += 2;
-                mods.forage -= 1; // -1 int (distracted by high)
+                mods.forage -= 1;
+            } else if *substance == shared::afflictions::Substance::Painkiller {
+                for aff2 in afflictions {
+                    if !matches!(
+                        aff2.kind,
+                        AfflictionKind::Wounded
+                            | AfflictionKind::BrokenBone
+                            | AfflictionKind::Burned
+                    ) {
+                        continue;
+                    }
+                    let m = severity_multiplier(aff2.severity);
+                    let (atk, def, forage, escape, ambush, stamina_move, stamina_max, hp) =
+                        base_penalties(aff2.kind.clone());
+                    mods.atk -= (atk as f64 * m).round() as i32;
+                    mods.def -= (def as f64 * m).round() as i32;
+                    mods.forage -= (forage as f64 * m).round() as i32;
+                    mods.escape -= (escape as f64 * m).round() as i32;
+                    mods.ambush_detect -= (ambush as f64 * m).round() as i32;
+                    mods.stamina_move_pct -= stamina_move * m;
+                    mods.stamina_max -= (stamina_max as f64 * m).round() as i32;
+                    mods.hp_per_cycle -= (hp as f64 * m).round() as i32;
+                }
+            } else if *substance == shared::afflictions::Substance::Morphling {
+                for aff2 in afflictions {
+                    if matches!(aff2.kind, AfflictionKind::Addiction(_)) {
+                        continue;
+                    }
+                    let m = severity_multiplier(aff2.severity);
+                    let (atk, def, forage, escape, ambush, stamina_move, stamina_max, hp) =
+                        base_penalties(aff2.kind.clone());
+                    mods.atk -= (atk as f64 * m).round() as i32;
+                    mods.def -= (def as f64 * m).round() as i32;
+                    mods.forage -= (forage as f64 * m).round() as i32;
+                    mods.escape -= (escape as f64 * m).round() as i32;
+                    mods.ambush_detect -= (ambush as f64 * m).round() as i32;
+                    mods.stamina_move_pct -= stamina_move * m;
+                    mods.stamina_max -= (stamina_max as f64 * m).round() as i32;
+                    mods.hp_per_cycle -= (hp as f64 * m).round() as i32;
+                }
+            } else if *substance == shared::afflictions::Substance::Alcohol {
+                mods.escape -= 1;
+                mods.forage -= 1;
             }
-            // Painkiller: suppress wound stat penalties (handled elsewhere)
-            // Morphling: suppress all affliction stat penalties (handled elsewhere)
-            // Alcohol: -1 escape, -1 forage, immune to phobia (handled elsewhere)
         } else {
-            // Withdrawal mode: severity-tiered penalties.
+            // Withdrawal: only Stimulant and Morphling are addictive.
             let m = severity_multiplier(aff.severity);
+            let penalty = (aff.severity as i32) + 1;
             if *substance == shared::afflictions::Substance::Stimulant {
-                let penalty = (aff.severity as i32) + 1; // 1/2/3 for Mild/Mod/Severe
                 mods.atk -= penalty;
                 mods.def -= (penalty as f64 * 0.5).round() as i32;
                 mods.forage -= (penalty as f64 * 0.5).round() as i32;
-                mods.stamina_move_pct += 0.25 * m; // increased move cost
+                mods.stamina_move_pct += 0.25 * m;
+            } else if *substance == shared::afflictions::Substance::Morphling {
+                mods.def -= penalty;
+                mods.atk -= (penalty as f64 * 0.5).round() as i32;
+                mods.forage -= (penalty as f64 * 0.5).round() as i32;
             }
         }
     }

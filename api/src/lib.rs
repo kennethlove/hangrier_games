@@ -91,7 +91,7 @@ impl IntoResponse for AppError {
                 error!(error = %message, "database error");
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    "Internal server error".to_string(),
+                    format!("Internal server error: {message}"),
                 )
             }
             AppError::Conflict(message) => (StatusCode::CONFLICT, message),

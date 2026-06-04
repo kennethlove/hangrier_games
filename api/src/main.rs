@@ -784,10 +784,14 @@ async fn require_auth(
             .and_then(|v| v.as_str())
             .map(String::from)
             .unwrap_or_default();
+        let avatar = payload
+            .get("avatar")
+            .and_then(|v| v.as_str())
+            .map(String::from);
         return Ok(UserSession {
             id,
             username: username.to_owned(),
-            avatar: None,
+            avatar,
         });
     }
 
@@ -814,9 +818,13 @@ async fn require_auth(
     struct AuthRow {
         id: surrealdb::sql::Thing,
         username: String,
+        avatar: Option<String>,
     }
 
-    let mut response = match user_db.query("SELECT id, username FROM $auth").await {
+    let mut response = match user_db
+        .query("SELECT id, username, avatar FROM $auth")
+        .await
+    {
         Ok(r) => r,
         Err(_) => return Err(()),
     };
@@ -832,7 +840,7 @@ async fn require_auth(
     Ok(UserSession {
         id: row.id.to_string(),
         username: row.username,
-        avatar: None,
+        avatar: row.avatar,
     })
 }
 

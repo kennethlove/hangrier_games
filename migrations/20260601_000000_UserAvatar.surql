@@ -1,5 +1,5 @@
 -- Add avatar field to user table (optional URL string)
-DEFINE FIELD OVERWRITE avatar ON user TYPE string
+DEFINE FIELD OVERWRITE avatar ON user TYPE option<string>
     PERMISSIONS FOR select FULL FOR update WHERE id = $auth.id;
 
 -- Add account_status field (default "active")
@@ -7,15 +7,15 @@ DEFINE FIELD OVERWRITE account_status ON user TYPE string DEFAULT "active"
     PERMISSIONS FOR select FULL FOR update WHERE id = $auth.id;
 
 -- Add ban_reason field (optional string)
-DEFINE FIELD OVERWRITE ban_reason ON user TYPE string DEFAULT NONE;
+DEFINE FIELD OVERWRITE ban_reason ON user TYPE option<string>;
 
 -- Add banned_at field (optional datetime)
-DEFINE FIELD OVERWRITE banned_at ON user TYPE datetime DEFAULT NONE;
+DEFINE FIELD OVERWRITE banned_at ON user TYPE option<datetime>;
 
--- Re-assert user ACCESS to avoid AccessRecordSignupQueryFailed
--- SurrealDB: adding fields to a SCHEMAFULL table without also redefining
--- the ACCESS causes the signup query to fail. Must redefine ACCESS
--- alongside any field additions. See PR #349 for debug history.
+-- Re-assert user ACCESS to ensure signup works after adding fields
+-- SurrealDB: fields defined as TYPE string (without DEFAULT)
+-- reject NONE when the ACCESS SIGNUP doesn't explicitly set them.
+-- Redefine ACCESS alongside field additions for consistency.
 DEFINE ACCESS OVERWRITE user ON DATABASE TYPE RECORD
     SIGNUP (
         CREATE user CONTENT {

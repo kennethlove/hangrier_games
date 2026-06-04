@@ -60,10 +60,11 @@ async fn session(Extension(AuthDb(db)): Extension<AuthDb>) -> Result<Json<UserSe
     struct AuthRow {
         id: Thing,
         username: String,
+        avatar: Option<String>,
     }
 
     let mut response = db
-        .query("SELECT id, username FROM $auth")
+        .query("SELECT id, username, avatar FROM $auth")
         .await
         .map_err(|e| AppError::DbError(format!("Failed to query session: {e}")))?;
     let row: Option<AuthRow> = response
@@ -73,7 +74,7 @@ async fn session(Extension(AuthDb(db)): Extension<AuthDb>) -> Result<Json<UserSe
     Ok(Json(UserSession {
         id: row.id.to_string(),
         username: row.username,
-        avatar: None,
+        avatar: row.avatar,
     }))
 }
 
@@ -110,6 +111,7 @@ async fn user_create(
             .into_response()),
         Err(e) => {
             let combined = format!("{e} {e:?}").to_lowercase();
+            eprintln!("DEBUG_SIGNUP_ERROR: {e} {e:?}");
             if combined.contains("unique_email") {
                 Err(AppError::Conflict("Email already taken".to_string()))
             } else {

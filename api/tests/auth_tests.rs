@@ -4,6 +4,30 @@ use axum_test::TestServer;
 use common::{TestDb, TestUser, create_test_router};
 use serde_json::json;
 
+/// Verify that the full schema (with avatar + account_status fields) does not
+/// break user signup. This validates that the UserAvatar migration is
+/// compatible with the existing ACCESS definition.
+#[tokio::test]
+async fn signup_works_with_avatar_fields() {
+    let test_db = TestDb::new().await;
+    let app_state = test_db.app_state();
+    let router = create_test_router(app_state);
+    let server = TestServer::new(router);
+
+    let response = server
+        .post("/api/users")
+        .json(&serde_json::json!({
+            "display_name": "avatartest",
+            "email": "avatar@test.com",
+            "password": "TestPass123!",
+        }))
+        .await;
+
+    response.assert_status(axum::http::StatusCode::CREATED);
+
+    test_db.cleanup().await;
+}
+
 /// Test user registration (signup)
 #[tokio::test]
 async fn test_user_registration() {

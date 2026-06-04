@@ -5,19 +5,37 @@ use common::{TestDb, TestUser, create_test_router};
 use serde_json::json;
 
 /// Helper to create an authenticated test user
-async fn create_authenticated_user(server: &TestServer, username: &str) -> TestUser {
+async fn create_authenticated_user(
+    test_db: &TestDb,
+    server: &TestServer,
+    username: &str,
+) -> TestUser {
     let test_user = TestUser::new(username);
 
     let response = server
         .post("/api/users")
         .json(&json!({
-            "username": test_user.username,
+            "display_name": test_user.username,
             "email": test_user.email,
             "password": test_user.password,
         }))
         .await;
 
-    let body = response.json::<serde_json::Value>();
+    response.assert_status(axum::http::StatusCode::CREATED);
+
+    // Verify email
+    test_db.verify_email(&test_user.email).await;
+
+    // Authenticate to get tokens
+    let auth_response = server
+        .post("/api/users/authenticate")
+        .json(&json!({
+            "email": test_user.email,
+            "password": test_user.password,
+        }))
+        .await;
+
+    let body = auth_response.json::<serde_json::Value>();
     let access_token = body["access_token"].as_str().unwrap().to_string();
     let refresh_token = body["refresh_token"].as_str().unwrap().to_string();
 
@@ -70,7 +88,7 @@ async fn test_advance_game() {
     let router = create_test_router(app_state);
     let server = TestServer::new(router);
 
-    let user = create_authenticated_user(&server, "game_advancer").await;
+    let user = create_authenticated_user(&test_db, &server, "game_advancer").await;
     let game_id = create_game_with_tributes(&server, &user, 4).await;
 
     // Advance the game
@@ -100,7 +118,7 @@ async fn test_game_status_transitions() {
     let router = create_test_router(app_state);
     let server = TestServer::new(router);
 
-    let user = create_authenticated_user(&server, "status_tester").await;
+    let user = create_authenticated_user(&test_db, &server, "status_tester").await;
     let game_id = create_game_with_tributes(&server, &user, 2).await;
 
     // Check initial status
@@ -134,7 +152,7 @@ async fn test_game_day_logs() {
     let router = create_test_router(app_state);
     let server = TestServer::new(router);
 
-    let user = create_authenticated_user(&server, "log_viewer").await;
+    let user = create_authenticated_user(&test_db, &server, "log_viewer").await;
     let game_id = create_game_with_tributes(&server, &user, 4).await;
 
     // Advance game to generate logs
@@ -167,7 +185,7 @@ async fn test_tribute_day_logs() {
     let router = create_test_router(app_state);
     let server = TestServer::new(router);
 
-    let user = create_authenticated_user(&server, "tribute_log_viewer").await;
+    let user = create_authenticated_user(&test_db, &server, "tribute_log_viewer").await;
     let game_id = create_game_with_tributes(&server, &user, 4).await;
 
     // Get tribute ID
@@ -210,7 +228,7 @@ async fn test_multiple_game_cycles() {
     let router = create_test_router(app_state);
     let server = TestServer::new(router);
 
-    let user = create_authenticated_user(&server, "cycle_tester").await;
+    let user = create_authenticated_user(&test_db, &server, "cycle_tester").await;
     let game_id = create_game_with_tributes(&server, &user, 4).await;
 
     // Advance game 3 times
@@ -249,7 +267,7 @@ async fn test_game_finishes_with_winner() {
     let router = create_test_router(app_state);
     let server = TestServer::new(router);
 
-    let user = create_authenticated_user(&server, "winner_tester").await;
+    let user = create_authenticated_user(&test_db, &server, "winner_tester").await;
     let game_id = create_game_with_tributes(&server, &user, 2).await;
 
     // Advance game multiple times until it finishes (or max 50 iterations)
@@ -287,7 +305,7 @@ async fn test_advance_finished_game() {
     let router = create_test_router(app_state);
     let server = TestServer::new(router);
 
-    let user = create_authenticated_user(&server, "finished_game_tester").await;
+    let user = create_authenticated_user(&test_db, &server, "finished_game_tester").await;
     let game_id = create_game_with_tributes(&server, &user, 2).await;
 
     // Advance game until finished
@@ -331,7 +349,7 @@ async fn test_game_state_persistence() {
     let router = create_test_router(app_state);
     let server = TestServer::new(router);
 
-    let user = create_authenticated_user(&server, "persistence_tester").await;
+    let user = create_authenticated_user(&test_db, &server, "persistence_tester").await;
     let game_id = create_game_with_tributes(&server, &user, 4).await;
 
     // Advance game

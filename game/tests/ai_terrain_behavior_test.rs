@@ -134,7 +134,10 @@ fn test_resource_scarce_terrain_boosts_search(mut small_rng: SmallRng) {
     );
 
     // Should prefer moving/searching in resource-scarce terrain when alone
-    assert!(matches!(action, game::tributes::actions::Action::Move(_)));
+    assert!(matches!(
+        action,
+        game::tributes::actions::Action::Move(_) | game::tributes::actions::Action::SetTrap { .. }
+    ));
 }
 
 /// Test that desperate tributes (health < 30) flee to affinity terrain

@@ -283,6 +283,52 @@ pub async fn account_handler(
     )
 }
 
+/// GET /account/settings — account settings page (requires auth).
+pub async fn account_settings_handler(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+) -> Response {
+    let (auth, csrf) = extract_auth(&headers);
+    let session = match require_auth(&state, &headers).await {
+        Ok(s) => s,
+        Err(_) => return Redirect::to("/auth?tab=login").into_response(),
+    };
+
+    // Clone and authenticate DB to query email
+    let token = match read_cookie(&headers, SESSION_COOKIE) {
+        Some(t) => t.to_owned(),
+        None => return Redirect::to("/auth?tab=login").into_response(),
+    };
+    let user_db = match authenticate_db(&state, &token).await {
+        Ok(db) => db,
+        Err(_) => return Redirect::to("/auth?tab=login").into_response(),
+    };
+
+    #[derive(serde::Deserialize)]
+    struct EmailRow {
+        email: String,
+    }
+    let current_email: String = user_db
+        .query("SELECT email FROM $auth")
+        .await
+        .ok()
+        .and_then(|mut r| r.take::<Option<EmailRow>>(0).ok())
+        .flatten()
+        .map(|r| r.email)
+        .unwrap_or_default();
+
+    // Convert avatar storage path to public URL
+    let avatar_url: Option<String> = session
+        .avatar
+        .as_ref()
+        .map(|path| state.storage.public_url(path));
+
+    html_with_csrf(
+        api::templates::auth::account_settings_page(auth, &session, &current_email, avatar_url),
+        &csrf,
+    )
+}
+
 /// GET /games/{id}/tributes/{tribute_id} — tribute detail page.
 pub async fn game_tribute_detail_handler(
     State(state): State<AppState>,

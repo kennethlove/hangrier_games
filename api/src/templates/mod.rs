@@ -116,6 +116,7 @@ fn auth_links(auth: &AuthState) -> Markup {
             @match auth {
                 AuthState::Authenticated { username, csrf_token, .. } => {
                     a href="/account" { (username) }
+                    a href="/account/settings" class="settings-link" { "Settings" }
                     form class="logout-form" method="POST" action="/auth/logout" {
                         input type="hidden" name="csrf_token" value=(csrf_token) {}
                         button type="submit" class="logout-btn" { "Logout" }

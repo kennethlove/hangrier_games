@@ -407,6 +407,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .route("/", axum::routing::get(home_handler))
         .route("/account", axum::routing::get(account_handler))
+        .route(
+            "/account/settings",
+            axum::routing::get(account_settings_handler),
+        )
         .route("/auth", axum::routing::get(auth_handler))
         .route("/auth/login", axum::routing::post(login_post_handler))
         .route("/auth/logout", axum::routing::post(logout_handler))

@@ -480,6 +480,167 @@ pub fn email_verified_page(auth: AuthState) -> maud::Markup {
     )
 }
 
+/// Account settings page with Profile, Avatar, and Password sections.
+pub fn account_settings_page(
+    auth: AuthState,
+    session: &UserSession,
+    current_email: &str,
+    avatar_url: Option<String>,
+) -> maud::Markup {
+    base_layout(
+        &format!("Account Settings — {}", session.username),
+        auth,
+        html! {
+            div {
+                h1 class="text-xl font-bold text-amber-400" { (icon("user")) " Account Settings" }
+
+                // ── Profile ──
+                section class="mb-8 p-4 bg-gray-900 border border-gray-800 rounded-lg" {
+                    h2 class="text-lg font-semibold text-amber-400 mb-4" { "Profile" }
+                    p class="text-sm text-gray-400 mb-4" { "Update your email and display name." }
+                    form
+                        hx-patch="/api/users/me"
+                        hx-target="#profile-feedback"
+                        hx-swap="innerHTML"
+                        hx-vals=(maud::PreEscaped(
+                            r#"js:{email: document.getElementById('settings-email').value, username: document.getElementById('settings-username').value}"#.to_string(),
+                        ))
+                    {
+                        div class="mb-3" {
+                            label for="settings-email" class="block text-sm font-medium text-gray-300 mb-1" { "Email" }
+                            input
+                                id="settings-email"
+                                type="email"
+                                name="email"
+                                value=(current_email)
+                                class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white";
+                        }
+                        div class="mb-4" {
+                            label for="settings-username" class="block text-sm font-medium text-gray-300 mb-1" { "Username" }
+                            input
+                                id="settings-username"
+                                type="text"
+                                name="username"
+                                value=(session.username)
+                                class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white";
+                        }
+                        div class="flex items-center gap-3" {
+                            button
+                                type="submit"
+                                class="bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded"
+                            {
+                                "Save Changes"
+                            }
+                            span class="htmx-indicator" id="profile-indicator" {
+                                (spinner_icon())
+                            }
+                        }
+                        div id="profile-feedback" class="mt-2 text-sm" {}
+                    }
+                }
+
+                // ── Avatar ──
+                section class="mb-8 p-4 bg-gray-900 border border-gray-800 rounded-lg" {
+                    h2 class="text-lg font-semibold text-amber-400 mb-4" { "Avatar" }
+                    div class="flex items-center gap-4 mb-4" {
+                        @if let Some(ref url) = avatar_url {
+                            img src=(url) alt="Your avatar"
+                                class="w-16 h-16 rounded-full object-cover border-2 border-gray-700";
+                        } @else {
+                            div class="w-16 h-16 rounded-full bg-gray-800 border-2 border-gray-700 flex items-center justify-center text-gray-500 text-2xl" {
+                                "?"
+                            }
+                        }
+                    }
+                    form
+                        hx-post="/api/users/me/avatar"
+                        hx-target="#avatar-feedback"
+                        hx-swap="innerHTML"
+                        hx-encoding="multipart/form-data"
+                        enctype="multipart/form-data"
+                        class="mb-3"
+                    {
+                        div class="mb-3" {
+                            input
+                                type="file"
+                                name="avatar"
+                                accept="image/png,image/jpeg,image/webp"
+                                class="text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-amber-600 file:text-white hover:file:bg-amber-700";
+                        }
+                        div class="flex items-center gap-3" {
+                            button
+                                type="submit"
+                                class="bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded"
+                            {
+                                "Upload"
+                            }
+                            span class="htmx-indicator" id="avatar-indicator" {
+                                (spinner_icon())
+                            }
+                        }
+                    }
+                    div class="flex items-center gap-2" {
+                        button
+                            hx-delete="/api/users/me/avatar"
+                            hx-target="#avatar-feedback"
+                            hx-swap="innerHTML"
+                            class="text-red-400 hover:text-red-300 text-sm"
+                        {
+                            "Remove Avatar"
+                        }
+                    }
+                    div id="avatar-feedback" class="mt-2 text-sm" {}
+                }
+
+                // ── Password ──
+                section class="mb-8 p-4 bg-gray-900 border border-gray-800 rounded-lg" {
+                    h2 class="text-lg font-semibold text-amber-400 mb-4" { "Password" }
+                    form
+                        hx-post="/api/users/me/password"
+                        hx-target="#password-feedback"
+                        hx-swap="innerHTML"
+                        hx-vals=(maud::PreEscaped(
+                            r#"js:{current_password: document.getElementById('pw-current').value, new_password: document.getElementById('pw-new').value}"#.to_string(),
+                        ))
+                    {
+                        div class="mb-3" {
+                            label for="pw-current" class="block text-sm font-medium text-gray-300 mb-1" { "Current Password" }
+                            input
+                                id="pw-current"
+                                type="password"
+                                name="current_password"
+                                required
+                                class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white";
+                        }
+                        div class="mb-4" {
+                            label for="pw-new" class="block text-sm font-medium text-gray-300 mb-1" { "New Password" }
+                            input
+                                id="pw-new"
+                                type="password"
+                                name="new_password"
+                                required
+                                minlength="8"
+                                class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white";
+                        }
+                        div class="flex items-center gap-3" {
+                            button
+                                type="submit"
+                                class="bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded"
+                            {
+                                "Change Password"
+                            }
+                            span class="htmx-indicator" id="password-indicator" {
+                                (spinner_icon())
+                            }
+                        }
+                        div id="password-feedback" class="mt-2 text-sm" {}
+                    }
+                }
+            }
+        },
+    )
+}
+
 /// Password reset form shown when user clicks link from email.
 pub fn reset_form_page(auth: AuthState, token: &str, csrf: &str) -> maud::Markup {
     base_layout(

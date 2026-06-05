@@ -31,3 +31,6 @@
 history.txt
 .codegraph/
 .reasonix/
+
+# Cate IDE
+.cate/

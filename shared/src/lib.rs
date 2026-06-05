@@ -260,6 +260,13 @@ pub struct UserSession {
     pub username: String,
     #[serde(default)]
     pub avatar: Option<String>,
+    /// Account status: `"active"` by default.
+    #[serde(default = "default_account_status")]
+    pub account_status: String,
+}
+
+fn default_account_status() -> String {
+    "active".to_string()
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]

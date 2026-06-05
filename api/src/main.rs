@@ -778,7 +778,7 @@ async fn require_auth(
     // Prefer "sub" (own-issued tokens). SurrealDB-issued JWTs don't carry
     // "sub" or the actual username — only "ID":"user:<record-id>".
     if let Some(username) = payload.get("sub").and_then(|v| v.as_str()) {
-        // Own-issued token has username inline — no DB query needed.
+        // Own-issued token has username inline. Query $auth for account_status.
         let id = payload
             .get("id")
             .and_then(|v| v.as_str())
@@ -788,10 +788,42 @@ async fn require_auth(
             .get("avatar")
             .and_then(|v| v.as_str())
             .map(String::from);
+        let user_db = (*state.db).clone();
+        if user_db
+            .use_ns(&state.namespace)
+            .use_db(&state.database)
+            .await
+            .is_err()
+        {
+            return Err(());
+        }
+        if user_db
+            .authenticate(surrealdb::opt::auth::Jwt::from(token.as_str()))
+            .await
+            .is_err()
+        {
+            return Err(());
+        }
+        let mut response = match user_db.query("SELECT account_status FROM $auth").await {
+            Ok(r) => r,
+            Err(_) => return Err(()),
+        };
+        let account_status: Option<String> = match response.take(0) {
+            Ok(r) => r,
+            Err(_) => return Err(()),
+        };
+        let account_status = match account_status {
+            Some(s) => s,
+            None => return Err(()),
+        };
+        if account_status == "banned" {
+            return Err(());
+        }
         return Ok(UserSession {
             id,
             username: username.to_owned(),
             avatar,
+            account_status,
         });
     }
 
@@ -819,10 +851,11 @@ async fn require_auth(
         id: surrealdb::sql::Thing,
         username: String,
         avatar: Option<String>,
+        account_status: String,
     }
 
     let mut response = match user_db
-        .query("SELECT id, username, avatar FROM $auth")
+        .query("SELECT id, username, avatar, account_status FROM $auth")
         .await
     {
         Ok(r) => r,
@@ -836,11 +869,15 @@ async fn require_auth(
         Some(r) => r,
         None => return Err(()),
     };
+    if row.account_status == "banned" {
+        return Err(());
+    }
 
     Ok(UserSession {
         id: row.id.to_string(),
         username: row.username,
         avatar: row.avatar,
+        account_status: row.account_status,
     })
 }
 

@@ -21,8 +21,8 @@ askama_escape = "0.13"
 maud = { version = "0.27", features = ["axum"] }
 shared = { path = "../shared" }
 strum = { version = "0.28", features = ["derive"] }
-surrealdb = "2.3.2"
-surrealdb-migrations = "2.2.2"
+surrealdb = "3.1.2"
+surrealdb-types = "3.1.2"
 thiserror = "2.0.18"
 tokio = { version = "1.52.1", features = ["full"] }
 tokio-cron-scheduler = "0.15"
@@ -43,10 +43,10 @@ cloudflare = ["announcers/cloudflare"]
 [dev-dependencies]
 axum-test = "20.0.0"
 tokio-tungstenite = "0.29"
-surrealdb = { version = "2.3.2", features = ["kv-mem"] }
+surrealdb = { version = "3.1.2", features = ["kv-mem"] }
 
 [target.'cfg(windows)'.dependencies]
-surrealdb = { version = "2.3.2", features = ["kv-mem"] }
+surrealdb = { version = "3.1.2", features = ["kv-mem"] }
 
 [target.'cfg(unix)'.dependencies]
-surrealdb = { version = "2.3.2", features = ["kv-surrealkv"] }
+surrealdb = { version = "3.1.2", features = ["kv-surrealkv"] }

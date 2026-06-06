@@ -1,12 +1,12 @@
 use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
-use surrealdb::RecordId;
 use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
+use surrealdb_types::{RecordId, RecordIdKey, SerdeWrapper};
 use thiserror::Error;
 use tracing::error;
 
@@ -102,10 +102,31 @@ impl IntoResponse for AppError {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct VerifyRow {
     #[allow(dead_code)]
     id: RecordId,
+}
+
+/// Format a RecordId as a human-readable string (`table:key`).
+/// surrealdb_types::RecordId does not implement Display.
+pub fn rid_to_string(rid: &RecordId) -> String {
+    match &rid.key {
+        RecordIdKey::String(s) => format!("{}:{}", rid.table, s),
+        RecordIdKey::Number(n) => format!("{}:{n}", rid.table),
+        RecordIdKey::Uuid(u) => format!("{}:{u}", rid.table),
+        k => format!("{}:{k:?}", rid.table),
+    }
+}
+
+/// Extract the key part of a RecordId as a string.
+pub fn rid_key_to_string(rid: &RecordId) -> String {
+    match &rid.key {
+        RecordIdKey::String(s) => s.clone(),
+        RecordIdKey::Number(n) => n.to_string(),
+        RecordIdKey::Uuid(u) => u.to_string(),
+        k => format!("{k:?}"),
+    }
 }
 
 /// Verify that a record exists at the given `RecordId` after a write that
@@ -127,19 +148,24 @@ pub async fn verify_record_persisted(
         .map_err(|e| {
             AppError::InternalServerError(format!(
                 "{}: persistence verify query failed for {}: {}",
-                site, rid, e
+                site,
+                crate::rid_to_string(rid),
+                e
             ))
         })?;
-    let rows: Vec<VerifyRow> = resp.take(0).map_err(|e| {
+    let rows: Vec<SerdeWrapper<VerifyRow>> = resp.take(0).map_err(|e| {
         AppError::InternalServerError(format!(
             "{}: persistence verify decode failed for {}: {}",
-            site, rid, e
+            site,
+            crate::rid_to_string(rid),
+            e
         ))
     })?;
     if rows.is_empty() {
         return Err(AppError::InternalServerError(format!(
             "{}: persistence verification failed for {}",
-            site, rid
+            site,
+            crate::rid_to_string(rid)
         )));
     }
     Ok(())

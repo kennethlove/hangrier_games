@@ -12,8 +12,7 @@ services:
     # by `just dev` / `just db`. It listens on localhost:8000.
     ports:
       - "3000:3000"  # API
-      - "8000:8000"  # SurrealDB
-      - "8025:8025"  # Mailpit UI
+      - "8025:8025"  # Mailpit UI (runs as binary inside dev container, started by just dev)
 
 volumes:
   cargo-cache:

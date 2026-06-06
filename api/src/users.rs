@@ -1,4 +1,4 @@
-use crate::auth::{RefreshToken, TokenResponse, store_refresh_token};
+use crate::auth::{RefreshToken, TokenResponse, generate_access_token, store_refresh_token};
 use crate::cookies::{set_refresh_cookie, set_session_cookie};
 use crate::{AppError, AppState, AuthDb};
 use axum::extract::{Extension, Multipart, State};
@@ -6,11 +6,11 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, patch, post};
 use axum::{Json, Router};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use shared::{EmailRegistrationUser, UserSession};
 use std::sync::LazyLock;
 use surrealdb::opt::auth::Record;
-use surrealdb::sql::Thing;
+use surrealdb_types::{RecordId, SerdeWrapper};
 use validator::Validate;
 
 use crate::storage::{UploadConstraints, validate_upload};
@@ -43,7 +43,7 @@ pub static USERS_PROTECTED_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(||
 async fn create_token_pair(
     db: &surrealdb::Surreal<surrealdb::engine::any::Any>,
     jwt: String,
-    user_id: Thing,
+    user_id: RecordId,
     username: String,
 ) -> Result<TokenResponse, AppError> {
     // Create and store refresh token
@@ -63,9 +63,9 @@ async fn create_token_pair(
 /// to their `user:` record. Raw `$session` is not exposed; we project to
 /// the small `UserSession` shape the frontend actually needs.
 async fn session(Extension(AuthDb(db)): Extension<AuthDb>) -> Result<Json<UserSession>, AppError> {
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Serialize)]
     struct AuthRow {
-        id: Thing,
+        id: RecordId,
         username: String,
         avatar: Option<String>,
         account_status: String,
@@ -75,12 +75,14 @@ async fn session(Extension(AuthDb(db)): Extension<AuthDb>) -> Result<Json<UserSe
         .query("SELECT id, username, avatar, account_status FROM $auth")
         .await
         .map_err(|e| AppError::DbError(format!("Failed to query session: {e}")))?;
-    let row: Option<AuthRow> = response
+    let row: Option<SerdeWrapper<AuthRow>> = response
         .take(0)
         .map_err(|e| AppError::DbError(format!("Failed to read session result: {e}")))?;
-    let row = row.ok_or_else(|| AppError::Unauthorized("No authenticated session".into()))?;
+    let row = row
+        .map(|w| w.0)
+        .ok_or_else(|| AppError::Unauthorized("No authenticated session".into()))?;
     Ok(Json(UserSession {
-        id: row.id.to_string(),
+        id: crate::rid_to_string(&row.id),
         username: row.username,
         avatar: row.avatar,
         account_status: row.account_status,
@@ -103,10 +105,10 @@ async fn user_create(
         .map_err(|e| AppError::DbError(format!("Failed to scope signup session: {e}")))?;
     let result = user_db
         .signup(Record {
-            access: "user",
-            namespace: &state.namespace,
-            database: &state.database,
-            params: &payload,
+            access: "user".to_string(),
+            namespace: state.namespace.clone(),
+            database: state.database.clone(),
+            params: SerdeWrapper(payload),
         })
         .await;
     match result {
@@ -151,9 +153,9 @@ async fn user_authenticate(
         .map_err(|e| AppError::DbError(format!("Failed to scope signin session: {e}")))?;
     let result = user_db
         .signin(Record {
-            access: "user",
-            namespace: &state.namespace,
-            database: &state.database,
+            access: "user".to_string(),
+            namespace: state.namespace.clone(),
+            database: state.database.clone(),
             params: serde_json::json!({
                 "email": email,
                 "password": password,
@@ -166,20 +168,22 @@ async fn user_authenticate(
                 .query("SELECT id, username, email_verified FROM $auth")
                 .await
                 .map_err(|e| AppError::DbError(format!("Failed to query auth: {e}")))?;
-            #[derive(Deserialize)]
+            #[derive(Deserialize, Serialize)]
             struct AuthRow {
-                id: Thing,
+                id: RecordId,
                 username: String,
                 email_verified: Option<bool>,
             }
-            let row: Option<AuthRow> = resp
+            let row: Option<SerdeWrapper<AuthRow>> = resp
                 .take(0)
                 .map_err(|e| AppError::DbError(format!("Failed to read auth result: {e}")))?;
             let AuthRow {
                 id: user_id,
                 username: display_name,
                 email_verified,
-            } = row.ok_or_else(|| AppError::Unauthorized("Authentication error".to_string()))?;
+            } = row
+                .map(|w| w.0)
+                .ok_or_else(|| AppError::Unauthorized("Authentication error".to_string()))?;
 
             if !email_verified.unwrap_or(false) {
                 return Err(AppError::Unauthorized(
@@ -187,7 +191,8 @@ async fn user_authenticate(
                 ));
             }
 
-            let jwt = _auth_result.into_insecure_token();
+            let jwt =
+                generate_access_token(&user_id, &display_name, &state.namespace, &state.database)?;
             let token_pair = create_token_pair(&user_db, jwt, user_id, display_name).await?;
             Ok(token_response(token_pair))
         }
@@ -242,7 +247,7 @@ async fn update_account_settings(
             .bind(("email", new_email.clone()))
             .await
             .map_err(|e| AppError::DbError(format!("Failed to check email: {e}")))?;
-        let existing: Option<Thing> = resp
+        let existing: Option<RecordId> = resp
             .take(0)
             .map_err(|e| AppError::DbError(format!("Failed to read email check: {e}")))?;
         if existing.is_some() {
@@ -293,13 +298,14 @@ async fn upload_avatar(
         .query("SELECT id FROM $auth")
         .await
         .map_err(|e| AppError::DbError(format!("Failed to query auth: {e}")))?;
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Serialize)]
     struct AuthId {
-        id: Thing,
+        id: RecordId,
     }
     let AuthId { id: user_id } = auth_resp
-        .take::<Option<AuthId>>(0)
+        .take::<Option<SerdeWrapper<AuthId>>>(0)
         .map_err(|e| AppError::DbError(format!("Failed to read auth id: {e}")))?
+        .map(|w| w.0)
         .ok_or_else(|| AppError::Unauthorized("No authenticated session".into()))?;
 
     let mut file_data: Option<Vec<u8>> = None;
@@ -335,8 +341,8 @@ async fn upload_avatar(
         .and_then(|e| e.to_str())
         .ok_or_else(|| AppError::ValidationError("Invalid filename".into()))?;
 
-    // SurrealDB Thing key is opaque; use the full string with colon replaced
-    let user_key = user_id.to_string().replace(':', "_");
+    // RecordId key is opaque; use the full string with colon replaced
+    let user_key = crate::rid_to_string(&user_id).replace(':', "_");
     let storage_path = format!("avatars/user/{}.{}", user_key, extension);
 
     let saved_path = state.storage.save(&storage_path, &file_data).await?;
@@ -362,13 +368,14 @@ async fn delete_avatar(
         .query("SELECT avatar FROM $auth")
         .await
         .map_err(|e| AppError::DbError(format!("Failed to query avatar: {e}")))?;
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Serialize)]
     struct AvatarRow {
         avatar: Option<String>,
     }
-    let row: Option<AvatarRow> = resp
+    let row: Option<SerdeWrapper<AvatarRow>> = resp
         .take(0)
         .map_err(|e| AppError::DbError(format!("Failed to read avatar: {e}")))?;
+    let row = row.map(|w| w.0);
 
     if let Some(AvatarRow { avatar: Some(path) }) = row {
         state.storage.delete(&path).await?;
@@ -410,13 +417,14 @@ async fn change_password(
         .query("SELECT email FROM $auth")
         .await
         .map_err(|e| AppError::DbError(format!("Failed to query email: {e}")))?;
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Serialize)]
     struct EmailRow {
         email: String,
     }
     let EmailRow { email } = resp
-        .take::<Option<EmailRow>>(0)
+        .take::<Option<SerdeWrapper<EmailRow>>>(0)
         .map_err(|e| AppError::DbError(format!("Failed to read email: {e}")))?
+        .map(|w| w.0)
         .ok_or_else(|| AppError::Unauthorized("No authenticated session".into()))?;
 
     // Verify current password by attempting signin
@@ -428,9 +436,9 @@ async fn change_password(
         .map_err(|e| AppError::DbError(format!("Failed to scope session: {e}")))?;
     user_db
         .signin(Record {
-            access: "user",
-            namespace: &state.namespace,
-            database: &state.database,
+            access: "user".to_string(),
+            namespace: state.namespace.clone(),
+            database: state.database.clone(),
             params: serde_json::json!({
                 "email": email,
                 "password": payload.current_password,

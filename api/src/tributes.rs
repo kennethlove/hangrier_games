@@ -11,9 +11,9 @@ use game::tributes::Tribute;
 use serde::{Deserialize, Serialize};
 use shared::EditTribute;
 use std::sync::LazyLock;
-use surrealdb::RecordId;
 use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
+use surrealdb_types::{RecordId, SerdeWrapper};
 use uuid::Uuid;
 
 pub static TRIBUTES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
@@ -43,7 +43,7 @@ pub async fn create_tribute(
     db: &Surreal<Any>,
     district: u32,
 ) -> Result<Tribute, AppError> {
-    let game_id = RecordId::from(("game", game_identifier.to_owned()));
+    let game_id = RecordId::new("game", game_identifier.to_owned());
     let mut tribute_count_resp = db
         .query("RETURN count(SELECT id FROM playing_in WHERE out.identifier=$game)")
         .bind(("game", game_identifier.to_owned()))
@@ -60,7 +60,7 @@ pub async fn create_tribute(
     tribute.district = district + 1;
     tribute.statistics.game = game_identifier.to_owned();
 
-    let id = RecordId::from(("tribute", &tribute.identifier));
+    let id = RecordId::new("tribute", tribute.identifier.as_str());
 
     // Bind via serde_json::Value to bypass the SurrealDB SDK's bespoke type
     // serializer, which collapses externally-tagged enums and Option fields.
@@ -85,7 +85,7 @@ pub async fn create_tribute(
         })?;
 
     let new_object: Item = Item::new_random(None);
-    let new_object_id: RecordId = RecordId::from(("item", &new_object.identifier));
+    let new_object_id: RecordId = RecordId::new("item", new_object.identifier.as_str());
     let item_body = serde_json::to_value(&new_object)
         .map_err(|e| AppError::InternalServerError(format!("Failed to encode item: {}", e)))?;
     db.query("UPSERT $rid CONTENT $body")
@@ -115,8 +115,8 @@ pub async fn tribute_delete(
     Path((_, tribute_identifier)): Path<(String, String)>,
     Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<StatusCode, AppError> {
-    let tribute: Option<Tribute> = db
-        .delete(("tribute", &tribute_identifier))
+    let tribute: Option<SerdeWrapper<Tribute>> = db
+        .delete(("tribute", tribute_identifier.as_str()))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to delete tribute: {}", e)))?;
     match tribute {
@@ -145,8 +145,8 @@ pub async fn tribute_update(
         .await;
 
     match response {
-        Ok(mut response) => match response.take::<Option<Tribute>>(0).unwrap() {
-            Some(_tribute) => Ok(StatusCode::OK),
+        Ok(mut response) => match response.take::<Option<SerdeWrapper<Tribute>>>(0).unwrap() {
+            Some(_wrapper) => Ok(StatusCode::OK),
             None => Err(AppError::InternalServerError(
                 "Failed to update tribute".into(),
             )),
@@ -168,12 +168,12 @@ pub async fn tribute_detail(
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to fetch tribute: {}", e)))?;
 
-    let tribute: Option<Tribute> = result
+    let tribute: Option<SerdeWrapper<Tribute>> = result
         .take(0)
         .map_err(|e| AppError::InternalServerError(format!("Failed to take tribute: {}", e)))?;
 
-    if let Some(tribute) = tribute {
-        Ok(Json(tribute.clone()))
+    if let Some(tribute) = tribute.map(|w| w.0) {
+        Ok(Json(tribute))
     } else {
         Err(AppError::NotFound("Tribute not found".to_string()))
     }
@@ -190,9 +190,10 @@ pub async fn tribute_log(
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to fetch logs: {}", e)))?;
 
-    let rows: Vec<crate::games::GameLog> = result
+    let rows: Vec<SerdeWrapper<crate::games::GameLog>> = result
         .take(0)
         .map_err(|e| AppError::InternalServerError(format!("Failed to take logs: {}", e)))?;
+    let rows: Vec<crate::games::GameLog> = rows.into_iter().map(|w| w.0).collect();
     let logs: Vec<GameMessage> = rows.into_iter().map(GameMessage::from).collect();
     Ok(Json(logs))
 }
@@ -262,8 +263,8 @@ pub async fn upload_avatar(
         .await;
 
     match response {
-        Ok(mut response) => match response.take::<Option<Tribute>>(0).unwrap() {
-            Some(_) => Ok(Json(serde_json::json!({
+        Ok(mut response) => match response.take::<Option<SerdeWrapper<Tribute>>>(0).unwrap() {
+            Some(_wrapper) => Ok(Json(serde_json::json!({
                 "url": public_url,
                 "path": saved_path
             }))),

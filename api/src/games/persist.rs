@@ -1,9 +1,9 @@
 use axum::Json;
 use game::games::Game;
 use game::messages::GameMessage;
-use surrealdb::RecordId;
 use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
+use surrealdb_types::{RecordId, SerdeWrapper};
 
 use super::items::{save_area_items, save_tribute_items};
 use super::{GameLog, MAX_MESSAGES};
@@ -15,7 +15,7 @@ pub(crate) async fn save_game(
     db: &Surreal<Any>,
     broadcaster: &GameBroadcaster,
 ) -> Result<Json<Game>, AppError> {
-    let game_identifier = RecordId::from(("game", game.identifier.clone()));
+    let game_identifier = RecordId::new("game", game.identifier.clone());
 
     // Start transaction
     db.query("BEGIN TRANSACTION").await.map_err(|e| {
@@ -36,7 +36,7 @@ pub(crate) async fn save_game(
         let game_logs: Vec<GameLog> = logs
             .into_iter()
             .map(|log| GameLog {
-                id: RecordId::from(("message", &log.identifier)),
+                id: RecordId::new("message", log.identifier.as_str()),
                 identifier: log.identifier,
                 source: log.source,
                 game_day,
@@ -111,7 +111,13 @@ pub(crate) async fn save_game(
         // serializer's habit of collapsing externally-tagged enums and
         // `serde_json::Value::Object` payloads to `{}` when bound into
         // an `object` column. mqi.3.
-        if let Err(e) = db.insert::<Vec<GameLog>>(()).content(game_logs).await {
+        let wrapped_logs: Vec<SerdeWrapper<GameLog>> =
+            game_logs.into_iter().map(SerdeWrapper).collect();
+        if let Err(e) = db
+            .insert::<Vec<SerdeWrapper<GameLog>>>("message")
+            .content(wrapped_logs)
+            .await
+        {
             let _ = db.query("ROLLBACK").await;
             return Err(AppError::InternalServerError(format!(
                 "Failed to save game logs: {}",
@@ -121,7 +127,7 @@ pub(crate) async fn save_game(
     }
 
     let area_results = futures::future::join_all(game.areas.iter().map(|area| async {
-        let id = RecordId::from(("area", area.identifier.clone()));
+        let id = RecordId::new("area", area.identifier.clone());
         save_area_items(&area.items, id.clone(), db).await?;
 
         let mut area_without_items = area.clone();
@@ -150,7 +156,7 @@ pub(crate) async fn save_game(
     }
 
     let tribute_results = futures::future::join_all(game.tributes.iter().map(|tribute| async {
-        let id = RecordId::from(("tribute", tribute.identifier.clone()));
+        let id = RecordId::new("tribute", tribute.identifier.clone());
         if tribute.is_alive() {
             save_tribute_items(&tribute.items, id.clone(), db).await?;
         }

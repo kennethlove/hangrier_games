@@ -31,8 +31,8 @@ use std::sync::LazyLock;
 use std::sync::Mutex;
 use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
-use surrealdb::opt::auth::{Jwt, Root};
-use surrealdb_migrations::MigrationRunner;
+use surrealdb::opt::auth::{Root, Token};
+use surrealdb_types::SerdeWrapper;
 use time::OffsetDateTime;
 use tower::ServiceBuilder;
 use tower_governor::GovernorLayer;
@@ -101,8 +101,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         env::var("SURREAL_PASS").map_err(|_| "SURREAL_PASS environment variable not set")?;
 
     db.signin(Root {
-        username: &surreal_user,
-        password: &surreal_pass,
+        username: surreal_user.clone(),
+        password: surreal_pass.clone(),
     })
     .await
     .map_err(|e| format!("Failed to authenticate to database: {}", e))?;
@@ -122,93 +122,67 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         surreal_database
     );
 
-    // Try migration runner first. If migration state is corrupted, drop
-    // the tracking table and re-run from scratch.
-    let mut migration_ok = MigrationRunner::new(&db).up().await.is_ok();
-    if !migration_ok {
-        tracing::warn!("Migration runner failed; resetting state and retrying...");
-        // Migration state corrupted; drop the tracking table and retry.
-        if let Err(e) = db
-            .query("REMOVE TABLE IF EXISTS _surrealdb_migrations;")
+    // ── Schema & migration helper ──────────────────────────────────────
+    async fn apply_files(
+        db: &Surreal<Any>,
+        dir_rel: &str,
+        kind: &str,
+        critical: &[&str],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let dir_abs = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(dir_rel);
+        let mut entries = match tokio::fs::read_dir(&dir_abs).await {
+            Ok(e) => e,
+            Err(e) => {
+                tracing::warn!("Cannot read {dir_rel} directory: {e}");
+                return Ok(());
+            }
+        };
+        let mut files = Vec::new();
+        while let Some(entry) = entries
+            .next_entry()
             .await
+            .map_err(|e| format!("Failed to read entry in {dir_rel}: {e}"))?
         {
-            tracing::error!("Failed to remove migration tracking table: {e}");
-            return Err("Migration state corrupted and cannot be reset; aborting startup".into());
-        }
-        migration_ok = MigrationRunner::new(&db).up().await.is_ok();
-        if migration_ok {
-            tracing::info!("Migration runner succeeded after resetting state");
-        }
-    }
-
-    if !migration_ok {
-        // Last resort: apply critical schemas directly so auth still works.
-        tracing::warn!("Migration still failing; applying critical schemas directly");
-        let schema_paths = ["../schemas/users.surql", "../schemas/refresh_tokens.surql"];
-        if let Err(e) = db
-            .use_ns(&surreal_namespace)
-            .use_db(&surreal_database)
-            .await
-        {
-            return Err(format!(
-                "Failed to select namespace/db for direct schema application: {e}"
-            )
-            .into());
-        }
-        let mut all_critical_ok = true;
-        for rel_path in &schema_paths {
-            let abs_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(rel_path);
-            match tokio::fs::read_to_string(&abs_path).await {
-                Ok(sql) => {
-                    if let Err(sqlerr) = db.query(sql).await {
-                        tracing::error!("Direct-schema apply failed for {}: {sqlerr}", rel_path);
-                        all_critical_ok = false;
-                    } else {
-                        tracing::info!("Applied schema: {rel_path}");
-                    }
-                }
-                Err(read_err) => {
-                    tracing::error!("Cannot read schema {rel_path}: {read_err}");
-                    all_critical_ok = false;
-                }
+            if entry
+                .file_type()
+                .await
+                .map(|t| t.is_file())
+                .unwrap_or(false)
+                && let Some(name) = entry.file_name().to_str()
+                && name.ends_with(".surql")
+            {
+                files.push(name.to_string());
             }
         }
-        if !all_critical_ok {
-            return Err(
-                "Failed to apply critical schemas — cannot boot with half-applied schema. \
-                 Check database state and retry."
-                    .into(),
-            );
+        files.sort();
+        for fname in &files {
+            let path = dir_abs.join(fname);
+            let sql = tokio::fs::read_to_string(&path)
+                .await
+                .map_err(|e| format!("Failed to read {dir_rel}/{fname}: {e}"))?;
+            if let Err(e) = db.query(&sql).await {
+                tracing::error!("Failed to apply {kind} {fname}: {e}");
+                if critical.contains(&fname.as_str()) {
+                    return Err(format!("Critical {kind} {fname} failed: {e}").into());
+                }
+            } else {
+                tracing::info!("Applied {kind}: {fname}");
+            }
         }
-        tracing::info!("Critical schemas applied directly (migration runner unavailable)");
+        Ok(())
     }
 
-    // Apply commentary and tribute histories schemas (non-critical — failures
-    // are logged but don't block startup).
-    let extras_paths = [
-        "../schemas/commentary.surql",
-        "../schemas/tribute_histories.surql",
-    ];
-    if let Err(e) = db
-        .use_ns(&surreal_namespace)
-        .use_db(&surreal_database)
-        .await
-    {
-        tracing::warn!("Failed to re-select namespace/db for extras schemas: {e}");
-    }
-    for rel_path in &extras_paths {
-        let abs_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(rel_path);
-        match tokio::fs::read_to_string(&abs_path).await {
-            Ok(sql) => {
-                if let Err(sqlerr) = db.query(sql).await {
-                    tracing::warn!("Schema apply failed for {}: {sqlerr}", rel_path);
-                } else {
-                    tracing::info!("Applied schema: {rel_path}");
-                }
-            }
-            Err(read_err) => tracing::warn!("Cannot read schema {rel_path}: {read_err}"),
-        }
-    }
+    tracing::info!("Applying schema definitions...");
+    apply_files(
+        &db,
+        "../schemas",
+        "schema",
+        &["users.surql", "refresh_tokens.surql"],
+    )
+    .await?;
+
+    tracing::info!("Applying migrations...");
+    apply_files(&db, "../migrations", "migration", &[]).await?;
 
     // CORS Configuration
     let env_mode = env::var("ENV").unwrap_or_else(|_| "production".to_string());
@@ -530,7 +504,7 @@ async fn surreal_jwt(State(state): State<AppState>, request: Request, next: Next
         return StatusCode::UNAUTHORIZED.into_response();
     }
 
-    let jwt = Jwt::from(token.as_str());
+    let jwt = Token::from(token.as_str());
     // Per-request session: clone the shared connection (independent
     // session state, same underlying socket per SurrealDB Rust SDK 2.x
     // multi-tenancy) and authenticate the clone. The original
@@ -733,7 +707,7 @@ fn extract_auth_state(headers: &axum::http::HeaderMap, csrf: &str) -> AuthState 
         return AuthState::guest(csrf);
     }
 
-    let id = payload.get("ID").and_then(|v| v.as_str()).map(String::from);
+    let id = payload.get("id").and_then(|v| v.as_str()).map(String::from);
     let username = payload
         .get("sub")
         .and_then(|v| v.as_str())
@@ -743,11 +717,12 @@ fn extract_auth_state(headers: &axum::http::HeaderMap, csrf: &str) -> AuthState 
         (Some(id), Some(name)) if !name.is_empty() => AuthState::authenticated(id, name, csrf),
         _ => {
             // No `sub` claim — this is a raw SurrealDB-issued JWT (only
-            // carries `ID: user:<record-id>`). We refuse to surface the
-            // record id as a display name. The cookie will be replaced
-            // with a `sub`-bearing token on the next login or refresh.
+            // carries `ID: user:<record-id>` but encoded as lowercase `id`
+            // in our tokens). We refuse to surface the record id as a
+            // display name. The cookie will be replaced with a
+            // `sub`-bearing token on the next login or refresh.
             tracing::warn!(
-                "session JWT missing `sub` or `ID` claim; treating as guest for display"
+                "session JWT missing `sub` or `id` claim; treating as guest for display"
             );
             AuthState::guest(csrf)
         }
@@ -802,7 +777,7 @@ async fn require_auth(
             return Err(());
         }
         if user_db
-            .authenticate(surrealdb::opt::auth::Jwt::from(token.as_str()))
+            .authenticate(surrealdb::opt::auth::Token::from(token.as_str()))
             .await
             .is_err()
         {
@@ -843,16 +818,16 @@ async fn require_auth(
         return Err(());
     }
     if user_db
-        .authenticate(surrealdb::opt::auth::Jwt::from(token.as_str()))
+        .authenticate(surrealdb::opt::auth::Token::from(token.as_str()))
         .await
         .is_err()
     {
         return Err(());
     }
 
-    #[derive(serde::Deserialize)]
+    #[derive(serde::Deserialize, serde::Serialize)]
     struct AuthRow {
-        id: surrealdb::sql::Thing,
+        id: surrealdb_types::RecordId,
         username: String,
         avatar: Option<String>,
         account_status: String,
@@ -865,12 +840,12 @@ async fn require_auth(
         Ok(r) => r,
         Err(_) => return Err(()),
     };
-    let row: Option<AuthRow> = match response.take(0) {
+    let row: Option<SerdeWrapper<AuthRow>> = match response.take(0) {
         Ok(r) => r,
         Err(_) => return Err(()),
     };
     let row = match row {
-        Some(r) => r,
+        Some(r) => r.0,
         None => return Err(()),
     };
     if row.account_status == "banned" {
@@ -878,7 +853,7 @@ async fn require_auth(
     }
 
     Ok(UserSession {
-        id: row.id.to_string(),
+        id: api::rid_to_string(&row.id),
         username: row.username,
         avatar: row.avatar,
         account_status: row.account_status,
@@ -899,7 +874,7 @@ async fn authenticate_db(
     {
         return Err(Redirect::to("/auth"));
     }
-    if user_db.authenticate(Jwt::from(token)).await.is_err() {
+    if user_db.authenticate(Token::from(token)).await.is_err() {
         return Err(Redirect::to("/auth"));
     }
     Ok(user_db)

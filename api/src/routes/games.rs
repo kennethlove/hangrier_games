@@ -8,6 +8,7 @@ use axum::extract::{Query, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use serde::Deserialize;
 use shared::ListDisplayGame;
+use surrealdb_types::SerdeWrapper;
 
 // ── Game list types ─────────────────────────────────────────────────
 
@@ -61,7 +62,12 @@ pub async fn games_list_handler(
         .await;
 
     let all_games: Vec<ListDisplayGame> = match result {
-        Ok(mut result) => result.take(0).unwrap_or_default(),
+        Ok(mut result) => result
+            .take::<Vec<SerdeWrapper<ListDisplayGame>>>(0)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|w| w.0)
+            .collect(),
         Err(_) => vec![],
     };
 
@@ -121,8 +127,9 @@ pub async fn game_detail_handler(
 
     let game = match result {
         Ok(mut result) => {
-            let game: Option<shared::DisplayGame> = result.take(0).unwrap_or_default();
-            game
+            let game: Option<SerdeWrapper<shared::DisplayGame>> =
+                result.take(0).unwrap_or_default();
+            game.map(|w| w.0)
         }
         Err(_) => None,
     };
@@ -152,9 +159,13 @@ pub async fn game_tributes_handler(
 
     let tributes = match result {
         Ok(mut result) => {
-            let tributes: Vec<Vec<game::tributes::Tribute>> =
+            let tributes: Vec<Vec<SerdeWrapper<game::tributes::Tribute>>> =
                 result.take("tributes").unwrap_or_default();
-            tributes.into_iter().next().unwrap_or_default()
+            tributes
+                .into_iter()
+                .next()
+                .map(|inner| inner.into_iter().map(|w| w.0).collect())
+                .unwrap_or_default()
         }
         Err(_) => vec![],
     };
@@ -188,9 +199,13 @@ SELECT (
 
     let areas = match result {
         Ok(mut result) => {
-            let areas: Vec<Vec<game::areas::AreaDetails>> =
+            let areas: Vec<Vec<SerdeWrapper<game::areas::AreaDetails>>> =
                 result.take("areas").unwrap_or_default();
-            areas.into_iter().next().unwrap_or_default()
+            areas
+                .into_iter()
+                .next()
+                .map(|inner| inner.into_iter().map(|w| w.0).collect())
+                .unwrap_or_default()
         }
         Err(_) => vec![],
     };
@@ -218,9 +233,9 @@ pub async fn game_log_handler(
 
     let messages = match result {
         Ok(mut logs) => {
-            let rows: Vec<api::games::GameLog> = logs.take(0).unwrap_or_default();
+            let rows: Vec<SerdeWrapper<api::games::GameLog>> = logs.take(0).unwrap_or_default();
             rows.into_iter()
-                .map(shared::messages::GameMessage::from)
+                .map(|w| shared::messages::GameMessage::from(w.0))
                 .collect()
         }
         Err(_) => vec![],
@@ -238,8 +253,11 @@ pub async fn game_log_handler(
 
     let segments = match commentary_result {
         Ok(mut result) => result
-            .take::<Vec<announcers::CommentarySegment>>(0)
-            .unwrap_or_default(),
+            .take::<Vec<SerdeWrapper<announcers::CommentarySegment>>>(0)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|w| w.0)
+            .collect(),
         Err(_) => vec![],
     };
 
@@ -274,8 +292,11 @@ pub async fn account_handler(
         .query("SELECT * FROM fn::get_list_games(100, 0)")
         .await
         .ok()
-        .and_then(|mut r| r.take(0).ok())
-        .unwrap_or_default();
+        .and_then(|mut r| r.take::<Vec<SerdeWrapper<ListDisplayGame>>>(0).ok())
+        .unwrap_or_default()
+        .into_iter()
+        .map(|w| w.0)
+        .collect();
 
     html_with_csrf(
         api::templates::auth::account_page(auth, &session, &games),
@@ -304,7 +325,7 @@ pub async fn account_settings_handler(
         Err(_) => return Redirect::to("/auth?tab=login").into_response(),
     };
 
-    #[derive(serde::Deserialize)]
+    #[derive(serde::Deserialize, serde::Serialize)]
     struct EmailRow {
         email: String,
     }
@@ -312,9 +333,9 @@ pub async fn account_settings_handler(
         .query("SELECT email FROM $auth")
         .await
         .ok()
-        .and_then(|mut r| r.take::<Option<EmailRow>>(0).ok())
+        .and_then(|mut r| r.take::<Option<SerdeWrapper<EmailRow>>>(0).ok())
         .flatten()
-        .map(|r| r.email)
+        .map(|w| w.0.email)
         .unwrap_or_default();
 
     // Convert avatar storage path to public URL
@@ -350,8 +371,9 @@ pub async fn game_tribute_detail_handler(
 
     let tribute = match result {
         Ok(mut result) => result
-            .take::<Option<game::tributes::Tribute>>(0)
-            .unwrap_or_default(),
+            .take::<Option<SerdeWrapper<game::tributes::Tribute>>>(0)
+            .unwrap_or_default()
+            .map(|w| w.0),
         Err(_) => None,
     };
 
@@ -418,9 +440,9 @@ pub async fn create_game_post_handler(
         ..Default::default()
     };
 
-    use surrealdb::RecordId;
+    use surrealdb_types::RecordId;
 
-    let game_rid = RecordId::from(("game", game_identifier.as_str()));
+    let game_rid = RecordId::new("game", game_identifier.as_str());
     let body = match serde_json::to_value(&new_game) {
         Ok(b) => b,
         Err(_) => return Redirect::to("/games/new").into_response(),

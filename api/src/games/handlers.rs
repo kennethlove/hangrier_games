@@ -14,8 +14,7 @@ use shared::{
 };
 use std::collections::HashMap;
 use strum::IntoEnumIterator;
-use surrealdb::RecordId;
-use surrealdb::sql::Thing;
+use surrealdb_types::{RecordId, SerdeWrapper};
 use uuid::Uuid;
 use validator::Validate;
 
@@ -55,7 +54,7 @@ pub async fn create_game(
     // Use serde_json::Value + bound CONTENT to bypass the SurrealDB SDK's
     // bespoke serializer (which collapses externally-tagged enums and drops
     // Option fields like `day`). Same pattern as save_game.
-    let game_rid = RecordId::from(("game", game_identifier.as_str()));
+    let game_rid = RecordId::new("game", game_identifier.as_str());
     let body = serde_json::to_value(&game)
         .map_err(|e| AppError::InternalServerError(format!("Failed to encode game: {}", e)))?;
     db.query("UPSERT $rid CONTENT $body")
@@ -130,10 +129,10 @@ pub async fn game_delete(
             AppError::InternalServerError(format!("Failed to fetch game pieces: {}", e))
         })?;
 
-    let game_pieces: Option<HashMap<String, Vec<Thing>>> = result
+    let game_pieces: Option<HashMap<String, Vec<RecordId>>> = result
         .take(0)
         .map_err(|e| AppError::InternalServerError(format!("Failed to take game pieces: {}", e)))?;
-    let area_pieces: Option<HashMap<String, Vec<Thing>>> = result
+    let area_pieces: Option<HashMap<String, Vec<RecordId>>> = result
         .take(1)
         .map_err(|e| AppError::InternalServerError(format!("Failed to take area pieces: {}", e)))?;
     if let Some(pieces) = game_pieces {
@@ -143,8 +142,8 @@ pub async fn game_delete(
         super::delete_pieces(pieces, &db).await?
     };
 
-    let game: Option<Game> = db
-        .delete(("game", &game_identifier))
+    let game: Option<SerdeWrapper<Game>> = db
+        .delete(("game", game_identifier.as_str()))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to delete game: {}", e)))?;
     match game {
@@ -173,7 +172,7 @@ pub async fn game_list(
 
     match result {
         Ok(mut result) => {
-            let games: Vec<ListDisplayGame> = match result.take(0) {
+            let games: Vec<SerdeWrapper<ListDisplayGame>> = match result.take(0) {
                 Ok(games) => games,
                 Err(e) => {
                     return Err(AppError::InternalServerError(format!(
@@ -182,6 +181,7 @@ pub async fn game_list(
                     )));
                 }
             };
+            let games: Vec<ListDisplayGame> = games.into_iter().map(|w| w.0).collect();
 
             let total = games.len() as u32;
             let has_more = (params.offset + params.limit) < total;
@@ -214,11 +214,11 @@ pub async fn game_detail(
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to fetch game: {}", e)))?;
 
-    let game: Option<DisplayGame> = result
+    let game: Option<SerdeWrapper<DisplayGame>> = result
         .take(0)
         .map_err(|e| AppError::InternalServerError(format!("Failed to take game: {}", e)))?;
 
-    if let Some(game) = game {
+    if let Some(game) = game.map(|w| w.0) {
         Ok(Json(game))
     } else {
         Err(AppError::NotFound("Failed to find game".into()))
@@ -251,15 +251,12 @@ pub async fn game_update(
 
     match response {
         Ok(mut response) => {
-            let game: Option<Game> = response.take(0).map_err(|e| {
+            let game: Option<SerdeWrapper<Game>> = response.take(0).map_err(|e| {
                 AppError::InternalServerError(format!("Failed to take game: {}", e))
             })?;
-            if let Some(game) = game {
-                Ok(Json::<Game>(game))
-            } else if game.is_none() {
-                Err(AppError::NotFound("Failed to find game".into()))
-            } else {
-                unreachable!()
+            match game {
+                Some(w) => Ok(Json::<Game>(w.0)),
+                None => Err(AppError::NotFound("Failed to find game".into())),
             }
         }
         Err(_) => Err(AppError::InternalServerError(
@@ -287,9 +284,14 @@ SELECT (
 
     match response {
         Ok(mut response) => {
-            let areas: Vec<Vec<AreaDetails>> = response.take("areas").map_err(|e| {
-                AppError::InternalServerError(format!("Failed to take areas: {}", e))
-            })?;
+            let areas: Vec<Vec<SerdeWrapper<AreaDetails>>> =
+                response.take("areas").map_err(|e| {
+                    AppError::InternalServerError(format!("Failed to take areas: {}", e))
+                })?;
+            let areas: Vec<Vec<AreaDetails>> = areas
+                .into_iter()
+                .map(|inner| inner.into_iter().map(|w| w.0).collect())
+                .collect();
             Ok(Json::<Vec<AreaDetails>>(areas[0].clone()))
         }
         Err(e) => Err(AppError::InternalServerError(format!(
@@ -320,9 +322,13 @@ SELECT (
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to fetch area: {}", e)))?;
 
-    let areas: Vec<Vec<AreaDetails>> = response
+    let areas: Vec<Vec<SerdeWrapper<AreaDetails>>> = response
         .take("areas")
         .map_err(|e| AppError::InternalServerError(format!("Failed to take area: {}", e)))?;
+    let areas: Vec<Vec<AreaDetails>> = areas
+        .into_iter()
+        .map(|inner| inner.into_iter().map(|w| w.0).collect())
+        .collect();
     match areas
         .into_iter()
         .next()
@@ -358,10 +364,10 @@ SELECT * FROM $candidates WHERE identifier = $item_identifier LIMIT 1;
 
     // The four LET statements occupy result indexes 0..=3; the SELECT lives at
     // index 4.
-    let items: Vec<Item> = response
+    let items: Vec<SerdeWrapper<Item>> = response
         .take(4)
         .map_err(|e| AppError::InternalServerError(format!("Failed to take item: {}", e)))?;
-    match items.into_iter().next() {
+    match items.into_iter().next().map(|w| w.0) {
         Some(item) => Ok(Json(item)),
         None => Err(AppError::NotFound("Item not found".to_string())),
     }
@@ -397,10 +403,15 @@ pub async fn game_tributes(
 
     match response {
         Ok(mut response) => {
-            let tributes: Vec<Vec<Tribute>> = response.take("tributes").map_err(|e| {
-                AppError::InternalServerError(format!("Failed to take tributes: {}", e))
-            })?;
-            let all_tributes = tributes[0].clone();
+            let tributes: Vec<Vec<SerdeWrapper<Tribute>>> =
+                response.take("tributes").map_err(|e| {
+                    AppError::InternalServerError(format!("Failed to take tributes: {}", e))
+                })?;
+            let all_tributes: Vec<Tribute> = tributes
+                .into_iter()
+                .next()
+                .map(|inner| inner.into_iter().map(|w| w.0).collect())
+                .unwrap_or_default();
 
             // Apply pagination to the results
             let paginated_tributes: Vec<Tribute> = all_tributes
@@ -437,7 +448,7 @@ pub async fn next_step(
 ) -> Result<Json<Option<Game>>, AppError> {
     let id = identifier.to_string();
     let id_str = id.as_str();
-    let record_id = RecordId::from(("game", id_str));
+    let record_id = RecordId::new("game", id_str);
     let game_status = super::get_game_status(&db, id_str).await?;
 
     match game_status {
@@ -505,10 +516,11 @@ pub(crate) async fn game_day_logs(
         .await
     {
         Ok(mut logs) => {
-            let rows: Vec<GameLog> = logs.take(0).unwrap_or_else(|err| {
+            let rows: Vec<SerdeWrapper<GameLog>> = logs.take(0).unwrap_or_else(|err| {
                 eprintln!("Error taking logs: {err:?}");
                 vec![]
             });
+            let rows: Vec<GameLog> = rows.into_iter().map(|w| w.0).collect();
             let logs: Vec<GameMessage> = rows.into_iter().map(GameMessage::from).collect();
             Ok(Json(logs))
         }
@@ -532,10 +544,11 @@ pub(crate) async fn game_logs(
         .await
     {
         Ok(mut logs) => {
-            let rows: Vec<GameLog> = logs.take(0).unwrap_or_else(|err| {
+            let rows: Vec<SerdeWrapper<GameLog>> = logs.take(0).unwrap_or_else(|err| {
                 eprintln!("Error taking logs: {err:?}");
                 vec![]
             });
+            let rows: Vec<GameLog> = rows.into_iter().map(|w| w.0).collect();
             let logs: Vec<GameMessage> = rows.into_iter().map(GameMessage::from).collect();
             Ok(Json(logs))
         }
@@ -566,9 +579,10 @@ pub(crate) async fn tribute_logs(
         .await
     {
         Ok(mut logs) => {
-            let rows: Vec<GameLog> = logs.take(0).map_err(|e| {
+            let rows: Vec<SerdeWrapper<GameLog>> = logs.take(0).map_err(|e| {
                 AppError::InternalServerError(format!("Failed to take logs: {}", e))
             })?;
+            let rows: Vec<GameLog> = rows.into_iter().map(|w| w.0).collect();
             let logs: Vec<GameMessage> = rows.into_iter().map(GameMessage::from).collect();
             Ok(Json(logs))
         }
@@ -587,7 +601,7 @@ pub(crate) async fn timeline_summary(
     // the newest `(game_day, phase, tick, emit_index)` tuple matches the
     // engine's per-cycle emission order and stays correct across the
     // Day -> Night transition without needing a schema migration.
-    #[derive(serde::Deserialize)]
+    #[derive(serde::Serialize, serde::Deserialize)]
     struct GameDay {
         day: Option<u32>,
     }
@@ -600,7 +614,8 @@ pub(crate) async fn timeline_summary(
         .await
         .map_err(|err| AppError::NotFound(format!("Failed to query game: {err:?}")))?;
 
-    let game_rows: Vec<GameDay> = game_resp.take(0).unwrap_or_default();
+    let game_rows: Vec<SerdeWrapper<GameDay>> = game_resp.take(0).unwrap_or_default();
+    let game_rows: Vec<GameDay> = game_rows.into_iter().map(|w| w.0).collect();
     let game_row = game_rows
         .into_iter()
         .next()
@@ -618,10 +633,11 @@ pub(crate) async fn timeline_summary(
         .await
         .map_err(|err| AppError::NotFound(format!("Failed to query timeline messages: {err:?}")))?;
 
-    let rows: Vec<GameLog> = msg_resp.take(0).unwrap_or_else(|err| {
+    let rows: Vec<SerdeWrapper<GameLog>> = msg_resp.take(0).unwrap_or_else(|err| {
         eprintln!("Error taking timeline logs: {err:?}");
         vec![]
     });
+    let rows: Vec<GameLog> = rows.into_iter().map(|w| w.0).collect();
     let messages: Vec<GameMessage> = rows.into_iter().map(GameMessage::from).collect();
 
     // Derive current phase from the latest message in the current day.
@@ -690,11 +706,11 @@ pub async fn game_display(
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to fetch game: {}", e)))?;
 
-    let game: Option<DisplayGame> = result
+    let game: Option<SerdeWrapper<DisplayGame>> = result
         .take(0)
         .map_err(|e| AppError::InternalServerError(format!("Failed to take game: {}", e)))?;
 
-    if let Some(game) = game {
+    if let Some(game) = game.map(|w| w.0) {
         Ok(Json(game))
     } else {
         Err(AppError::NotFound(format!(

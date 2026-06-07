@@ -532,6 +532,7 @@ impl TributeHistories {
                 | MessagePayload::TrapSet { .. }
                 | MessagePayload::TrapTriggered { .. }
                 | MessagePayload::RescueAttempted { .. }
+                | MessagePayload::SleepIncident { .. }
                 | MessagePayload::PartialRescueProgress { .. } => {}
             }
         }

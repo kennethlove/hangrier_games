@@ -179,6 +179,8 @@ pub enum MessageKind {
     /// Trapped affliction events: tribute trapped, struggling, escaped, or died.
     Trapped,
     Affliction,
+    /// Sleep incident (nightmare, night terror, animal encounter, etc.).
+    Sleep,
 }
 
 /// Visible fatigue band derived from a tribute's stamina/max_stamina ratio.
@@ -508,6 +510,16 @@ pub enum MessagePayload {
         tribute: TributeRef,
         phase: Phase,
         reason: WakeReason,
+    },
+    /// Sleep incident event (flavor-only or wake-causing). Emitted alongside
+    /// or instead of `TributeWoke` when a sleeping tribute experiences an
+    /// incident (nightmare, night terror, theft, animal encounter, etc.).
+    /// The `kind` field discriminates the incident type; `description` holds
+    /// the narrative text.
+    SleepIncident {
+        tribute: TributeRef,
+        kind: SleepIncidentKind,
+        description: String,
     },
     /// Emitted when the game ends. `winner` is `Some` for the lone-survivor
     /// case and `None` for "no survivors".

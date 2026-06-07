@@ -1,5 +1,5 @@
 use maud::html;
-use shared::messages::{GameMessage, MessagePayload};
+use shared::messages::{GameMessage, MessagePayload, SleepIncidentKind};
 
 use super::super::icon;
 
@@ -996,6 +996,43 @@ pub fn trapped_card(msg: &GameMessage) -> maud::Markup {
                 span { "Day " (msg.game_day) " " (msg.phase) }
             }
             p class="text-sm text-gray-200" { (content) }
+        }
+    }
+}
+
+/// Sleep incident event card.
+pub fn sleep_card(msg: &GameMessage) -> maud::Markup {
+    let (kind_label, description) = match &msg.payload {
+        MessagePayload::SleepIncident {
+            tribute: _,
+            kind,
+            description,
+        } => {
+            let label = match kind {
+                SleepIncidentKind::Annoying => "Restless",
+                SleepIncidentKind::Theft => "Theft",
+                SleepIncidentKind::Relocation => "Sleepwalk",
+                SleepIncidentKind::AnimalEncounter { .. } => "Animal",
+                SleepIncidentKind::Hallucination => "Hallucination",
+                SleepIncidentKind::Nightmare => "Nightmare",
+                SleepIncidentKind::NightTerror => "Night Terror",
+                SleepIncidentKind::AllyAbandonment => "Abandoned",
+                SleepIncidentKind::LimbInjury => "Limb Injury",
+            };
+            (label, description.as_str())
+        }
+        _ => return fallback_card(msg),
+    };
+
+    html! {
+        div class="bg-gray-900 border border-indigo-900/50 rounded-lg p-3" {
+            div class="flex items-center gap-2 text-xs text-gray-500 mb-1" {
+                (super::super::icon("moon"))
+                span class="text-indigo-400 font-medium" { (kind_label) }
+                span { "\u{b7}" }
+                span { "Day " (msg.game_day) " " (msg.phase) }
+            }
+            p class="text-sm text-gray-200" { (description) }
         }
     }
 }

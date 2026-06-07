@@ -13,6 +13,7 @@ use api::templates::auth::{self, AuthTab};
 use axum::extract::{Form, Query, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use serde::Deserialize;
+use surrealdb_types::SerdeWrapper;
 use validator::Validate;
 
 // ── Auth form types ─────────────────────────────────────────────────
@@ -135,9 +136,9 @@ pub async fn handle_login_post(
 
     let result = user_db
         .signin(surrealdb::opt::auth::Record {
-            access: "user",
-            namespace: &state.namespace,
-            database: &state.database,
+            access: "user".to_string(),
+            namespace: state.namespace.clone(),
+            database: state.database.clone(),
             params: serde_json::json!({
                 "email": login.clone(),
                 "password": password,
@@ -148,10 +149,11 @@ pub async fn handle_login_post(
     match result {
         Ok(_auth_result) => {
             use serde::Deserialize as SerdeDeserialize;
+            use serde::Serialize as SerdeSerialize;
 
-            #[derive(SerdeDeserialize)]
+            #[derive(SerdeDeserialize, SerdeSerialize)]
             struct AuthRow {
-                id: surrealdb::sql::Thing,
+                id: surrealdb_types::RecordId,
                 username: String,
                 email_verified: Option<bool>,
             }
@@ -163,7 +165,7 @@ pub async fn handle_login_post(
                 Ok(r) => r,
                 Err(_) => return redirect_with_error("/auth", "login", "Authentication error"),
             };
-            let row: Option<AuthRow> = match resp.take(0) {
+            let row: Option<SerdeWrapper<AuthRow>> = match resp.take(0) {
                 Ok(r) => r,
                 Err(_) => return redirect_with_error("/auth", "login", "Authentication error"),
             };
@@ -171,7 +173,7 @@ pub async fn handle_login_post(
                 id: user_id,
                 username: display_name,
                 email_verified,
-            } = match row {
+            } = match row.map(|w| w.0) {
                 Some(r) => r,
                 None => return redirect_with_error("/auth", "login", "Authentication error"),
             };
@@ -252,10 +254,10 @@ pub async fn handle_register_post(
 
     let result = user_db
         .signup(surrealdb::opt::auth::Record {
-            access: "user",
-            namespace: &state.namespace,
-            database: &state.database,
-            params: reg_user,
+            access: "user".to_string(),
+            namespace: state.namespace.clone(),
+            database: state.database.clone(),
+            params: SerdeWrapper(reg_user),
         })
         .await;
 
@@ -397,11 +399,12 @@ pub async fn resend_verification_handler(
 
     match result {
         Ok(mut resp) => {
-            #[derive(serde::Deserialize)]
+            #[derive(serde::Deserialize, serde::Serialize)]
             struct EmailRow {
                 email_verified: Option<bool>,
             }
-            let row: Option<EmailRow> = resp.take(0).unwrap_or(None);
+            let row: Option<SerdeWrapper<EmailRow>> = resp.take(0).unwrap_or(None);
+            let row: Option<EmailRow> = row.map(|w| w.0);
             match row {
                 Some(r) if r.email_verified.unwrap_or(false) => {
                     Redirect::to("/auth?tab=login&error=Email+already+verified").into_response()

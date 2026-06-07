@@ -204,7 +204,7 @@ pub fn broadcast_commentary(
     game_id: &str,
     segment: &announcers::CommentarySegment,
 ) {
-    let data = serde_json::to_value(segment).unwrap_or_else(|_| serde_json::Value::Null);
+    let data = serde_json::to_value(segment).unwrap_or(serde_json::Value::Null);
     broadcaster.broadcast(WebSocketMessage::Commentary {
         game_id: game_id.to_string(),
         data,

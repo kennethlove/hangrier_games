@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use crate::AppError;
 use game::items::Item;
-use surrealdb::RecordId;
 use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
+use surrealdb_types::{RecordId, SerdeWrapper};
 
 pub(crate) async fn save_area_items(
     items: &Vec<Item>,
@@ -12,7 +12,7 @@ pub(crate) async fn save_area_items(
     db: &Surreal<Any>,
 ) -> Result<(), AppError> {
     // Get existing items
-    let existing_items: Vec<Item> = db
+    let existing_items: Vec<SerdeWrapper<Item>> = db
         .query("SELECT * FROM items WHERE in = $owner")
         .bind(("owner", owner.clone()))
         .await
@@ -22,7 +22,7 @@ pub(crate) async fn save_area_items(
 
     // Create lookups for efficient comparison
     let mut existing_map = HashMap::new();
-    for item in existing_items {
+    for item in existing_items.into_iter().map(|w| w.0) {
         existing_map.insert(item.identifier.clone(), item.clone());
     }
 
@@ -84,7 +84,7 @@ pub(crate) async fn save_area_items(
         // (the previous hand-rolled CONTENT block silently dropped `rarity`,
         // and string-interpolating fields is fragile around quoting).
         for item in &items_to_update {
-            let rid = RecordId::from(("item", item.identifier.to_string().as_str()));
+            let rid = RecordId::new("item", item.identifier.to_string().as_str());
             let body = serde_json::to_value(item).map_err(|e| {
                 AppError::InternalServerError(format!("Failed to encode item: {}", e))
             })?;
@@ -103,7 +103,8 @@ pub(crate) async fn save_area_items(
         for item in &items_to_update {
             relation_parts.push(format!(
                 "RELATE {}->items->item:⟨{}⟩",
-                owner, item.identifier
+                crate::rid_to_string(&owner),
+                item.identifier
             ));
         }
 
@@ -122,7 +123,7 @@ pub(crate) async fn save_tribute_items(
     db: &Surreal<Any>,
 ) -> Result<(), AppError> {
     // Get existing items
-    let existing_items: Vec<Item> = db
+    let existing_items: Vec<SerdeWrapper<Item>> = db
         .query("SELECT * from owns->items WHERE in = $owner")
         .bind(("owner", owner.clone()))
         .await
@@ -132,7 +133,7 @@ pub(crate) async fn save_tribute_items(
 
     // Create lookups for efficient comparison
     let mut existing_map = HashMap::new();
-    for item in existing_items {
+    for item in existing_items.into_iter().map(|w| w.0) {
         existing_map.insert(item.identifier.clone(), item);
     }
 
@@ -194,7 +195,7 @@ pub(crate) async fn save_tribute_items(
         // (the previous hand-rolled CONTENT block silently dropped `rarity`,
         // and string-interpolating fields is fragile around quoting).
         for item in &items_to_update {
-            let rid = RecordId::from(("item", item.identifier.to_string().as_str()));
+            let rid = RecordId::new("item", item.identifier.to_string().as_str());
             let body = serde_json::to_value(item).map_err(|e| {
                 AppError::InternalServerError(format!("Failed to encode item: {}", e))
             })?;
@@ -213,7 +214,8 @@ pub(crate) async fn save_tribute_items(
         for item in &items_to_update {
             relation_parts.push(format!(
                 "RELATE {}->owns->item:⟨{}⟩",
-                owner, item.identifier
+                crate::rid_to_string(&owner),
+                item.identifier
             ));
         }
 

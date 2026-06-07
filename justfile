@@ -35,9 +35,9 @@ dev:
     MAILPIT_PID=$!
 
     echo "==> Building Tailwind CSS..."
-    cd api/assets && npm install --silent && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css
+    (cd api/assets && npm install && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css)
     echo "==> Starting Tailwind watcher..."
-    cd api/assets && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css --watch &
+    (cd api/assets && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css --watch) &
     CSS_PID=$!
 
     echo "==> Starting API server..."

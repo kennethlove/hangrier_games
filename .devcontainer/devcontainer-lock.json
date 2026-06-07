@@ -1,5 +1,10 @@
 {
   "features": {
+    "ghcr.io/devcontainers-community/features/surrealdb": {
+      "version": "1.0.0",
+      "resolved": "ghcr.io/devcontainers-community/features/surrealdb@sha256:873e9b333bf323f8bb890f9c3f476cda945c7090070864901ae49844cbac8601",
+      "integrity": "sha256:873e9b333bf323f8bb890f9c3f476cda945c7090070864901ae49844cbac8601"
+    },
     "ghcr.io/devcontainers/features/github-cli:1": {
       "version": "1.1.0",
       "resolved": "ghcr.io/devcontainers/features/github-cli@sha256:d22f50b70ed75339b4eed1ba9ecde3a1791f90e88d37936517e3bace0bbad671",

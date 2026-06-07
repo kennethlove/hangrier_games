@@ -17,7 +17,7 @@ use chrono::Utc;
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
-use surrealdb::sql::{Datetime, Thing};
+use surrealdb_types::{Datetime, RecordId, SerdeWrapper};
 use time::OffsetDateTime;
 use uuid::Uuid;
 use validator::Validate;
@@ -63,7 +63,7 @@ struct ResetTokenQuery {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RefreshToken {
     pub token: String,
-    pub user_id: Thing,
+    pub user_id: RecordId,
     pub username: String,
     pub expires_at: Datetime,
     pub revoked: bool,
@@ -87,7 +87,7 @@ pub struct TokenResponse {
 
 impl RefreshToken {
     /// Generate a new refresh token for a user
-    pub fn new(user_id: Thing, username: String) -> Self {
+    pub fn new(user_id: RecordId, username: String) -> Self {
         let token = Uuid::new_v4().to_string();
         let now = Utc::now();
         let expires_at = now + chrono::Duration::days(7);
@@ -108,7 +108,7 @@ impl RefreshToken {
             return false;
         }
 
-        self.expires_at.0 > Utc::now()
+        *self.expires_at > Utc::now()
     }
 }
 
@@ -120,17 +120,13 @@ pub async fn store_refresh_token(
     db: &surrealdb::Surreal<surrealdb::engine::any::Any>,
     refresh_token: &RefreshToken,
 ) -> Result<(), AppError> {
-    // Build the row inline so SurrealDB parses the `record<user>` /
-    // `datetime` literals natively, sidestepping the SDK serializer
-    // (which collapses `Thing` and `Datetime` to opaque enum payloads
-    // and triggers `FieldCheck` errors that the old `.await?` chain
-    // silently swallowed). See bd hangrier_games-lkxg.
-    let user_id_str = refresh_token.user_id.to_string();
+    // Bind the RecordId natively — surrealdb v3 SDK accepts it directly
+    // without needing `type::thing()` string conversion.
     let mut response = db
         .query(
             "CREATE refresh_token CONTENT {
                 token: $tk,
-                user_id: type::thing($user_id),
+                user_id: $user_id,
                 username: $username,
                 expires_at: type::datetime($expires_at),
                 revoked: $revoked,
@@ -138,14 +134,14 @@ pub async fn store_refresh_token(
             }",
         )
         .bind(("tk", refresh_token.token.clone()))
-        .bind(("user_id", user_id_str))
+        .bind(("user_id", refresh_token.user_id.clone()))
         .bind(("username", refresh_token.username.clone()))
-        .bind(("expires_at", refresh_token.expires_at.to_raw()))
+        .bind(("expires_at", refresh_token.expires_at))
         .bind(("revoked", refresh_token.revoked))
-        .bind(("created_at", refresh_token.created_at.to_raw()))
+        .bind(("created_at", refresh_token.created_at))
         .await
         .map_err(|e| AppError::DbError(format!("Failed to store refresh token: {}", e)))?;
-    let _: Vec<RefreshToken> = response
+    let _: Vec<SerdeWrapper<RefreshToken>> = response
         .take(0)
         .map_err(|e| AppError::DbError(format!("Failed to store refresh token: {}", e)))?;
     Ok(())
@@ -163,13 +159,14 @@ pub async fn get_refresh_token(
         .await
         .map_err(|e| AppError::DbError(format!("Failed to query refresh token: {}", e)))?;
 
-    let tokens: Vec<RefreshToken> = result
+    let tokens: Vec<SerdeWrapper<RefreshToken>> = result
         .take(0)
         .map_err(|e| AppError::DbError(format!("Failed to parse refresh token: {}", e)))?;
 
     tokens
         .into_iter()
         .next()
+        .map(|w| w.0)
         .ok_or_else(|| AppError::Unauthorized("Invalid refresh token".to_string()))
 }
 
@@ -179,7 +176,7 @@ pub async fn revoke_refresh_token(
     token: &str,
 ) -> Result<(), AppError> {
     let token_owned = token.to_string();
-    let _: Option<RefreshToken> = db
+    let _: Option<SerdeWrapper<RefreshToken>> = db
         .query("UPDATE refresh_token SET revoked = true WHERE token = $tk")
         .bind(("tk", token_owned))
         .await
@@ -197,7 +194,7 @@ pub async fn revoke_refresh_token(
 /// carrying the username so display paths (`extract_auth_state`) can read
 /// it without a DB round-trip.
 pub fn generate_access_token(
-    user_id: &Thing,
+    user_id: &RecordId,
     username: &str,
     namespace: &str,
     database: &str,
@@ -214,7 +211,7 @@ pub fn generate_access_token(
         "ns": namespace,
         "db": database,
         "ac": "user",
-        "id": user_id.to_string(),
+        "id": crate::rid_to_string(user_id),
         "sub": username,
     });
 
@@ -493,7 +490,7 @@ mod tests {
 
     #[test]
     fn test_refresh_token_generation() {
-        let user_id = Thing::from(("user".to_string(), "test123".to_string()));
+        let user_id = RecordId::new("user", "test123");
         let username = "testuser".to_string();
 
         let token = RefreshToken::new(user_id.clone(), username.clone());
@@ -502,12 +499,12 @@ mod tests {
         assert_eq!(token.username, username);
         assert_eq!(token.token.len(), 36); // UUID v4 length
         assert!(!token.revoked);
-        assert!(token.expires_at.0 > Utc::now());
+        assert!(*token.expires_at > Utc::now());
     }
 
     #[test]
     fn test_expired_token_invalid() {
-        let user_id = Thing::from(("user".to_string(), "test123".to_string()));
+        let user_id = RecordId::new("user", "test123");
         let username = "testuser".to_string();
         let token_str = Uuid::new_v4().to_string();
 
@@ -529,7 +526,7 @@ mod tests {
 
     #[test]
     fn test_revoked_token_invalid() {
-        let user_id = Thing::from(("user".to_string(), "test123".to_string()));
+        let user_id = RecordId::new("user", "test123");
         let username = "testuser".to_string();
         let token_str = Uuid::new_v4().to_string();
 

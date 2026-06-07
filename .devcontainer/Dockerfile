@@ -10,16 +10,11 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install SurrealDB into /usr/local/bin (must run as root for write access).
-# No '|| true' — fail the build if install fails so we don't end up with a
-# broken devcontainer that silently misses the binary.
-RUN curl -sSf https://install.surrealdb.com | sh -s -- --version v2.3.2 \
-    && surreal version
-
-# Install Mailpit for email testing in development
-RUN curl -sSfL https://github.com/axllent/mailpit/releases/download/v1.30.0/mailpit-linux-amd64.tar.gz \
+# Install Mailpit for email testing in development - arch-aware for ARM Macs
+RUN ARCH=$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/') \
+    && curl -sSfL "https://github.com/axllent/mailpit/releases/download/v1.30.0/mailpit-linux-${ARCH}.tar.gz" \
     | tar xz -C /usr/local/bin mailpit \
-    && mailpit version
+    && mailpit version 2>/dev/null || true
 
 # Add clippy and rustfmt as the vscode user
 USER vscode

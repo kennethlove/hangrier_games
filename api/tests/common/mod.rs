@@ -7,7 +7,32 @@ use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
 use surrealdb::opt::Config;
 use surrealdb::opt::auth::Root;
-use surrealdb_migrations::MigrationRunner;
+/// Apply .surql files from a directory tree against the database.
+/// Mirrors `main.rs::apply_files` so tests don't depend on the
+/// `surrealdb_migrations` crate.
+async fn apply_surql_dir(
+    db: &surrealdb::Surreal<surrealdb::engine::any::Any>,
+    dir: &std::path::Path,
+) {
+    let entries: std::fs::ReadDir = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    let mut files: Vec<std::path::PathBuf> = entries
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|ext| ext == "surql"))
+        .collect();
+    files.sort();
+    for path in &files {
+        let sql = tokio::fs::read_to_string(path)
+            .await
+            .unwrap_or_else(|e| panic!("Failed to read {:?}: {e}", path));
+        db.query(&sql)
+            .await
+            .unwrap_or_else(|e| panic!("Failed to apply {:?}: {e}", path));
+    }
+}
 
 /// Test configuration for SurrealDB
 pub struct TestDb {
@@ -24,8 +49,8 @@ impl TestDb {
         // (and downstream JWT-based authenticate calls) succeed against a
         // fresh `mem://` instance.
         let config = Config::new().user(Root {
-            username: "root",
-            password: "root",
+            username: "root".into(),
+            password: "root".into(),
         });
         let db = Arc::new(
             surrealdb::engine::any::connect(("mem://", config))
@@ -35,8 +60,8 @@ impl TestDb {
 
         // Sign in as root
         db.signin(Root {
-            username: "root",
-            password: "root",
+            username: "root".into(),
+            password: "root".into(),
         })
         .await
         .expect("Failed to authenticate to test database");
@@ -82,12 +107,10 @@ impl TestDb {
         // copy from, since `read_dir` over a directory being written by
         // the migration tool can also EOF.
         let config_path = build_isolated_migration_root();
+        let mig_root = config_path.parent().expect("config file has parent");
         let _guard = MIGRATION_LOCK.lock().await;
-        MigrationRunner::new(&db)
-            .use_config_file(&config_path)
-            .up()
-            .await
-            .expect("Failed to apply migrations");
+        apply_surql_dir(&db, &mig_root.join("schemas")).await;
+        apply_surql_dir(&db, &mig_root.join("migrations")).await;
         drop(_guard);
 
         TestDb {
@@ -277,7 +300,7 @@ async fn surreal_jwt(
     use axum::http::header::AUTHORIZATION;
     use axum::response::IntoResponse;
     use base64_url::decode;
-    use surrealdb::opt::auth::Jwt;
+    use surrealdb::opt::auth::Token;
     use time::OffsetDateTime;
 
     let token = match request
@@ -306,7 +329,7 @@ async fn surreal_jwt(
         return StatusCode::UNAUTHORIZED.into_response();
     }
 
-    let jwt = Jwt::from(token);
+    let token_auth = Token::from(token);
     let user_db = (*state.db).clone();
     if user_db
         .use_ns(&state.namespace)
@@ -316,7 +339,7 @@ async fn surreal_jwt(
     {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
-    if user_db.authenticate(jwt).await.is_err() {
+    if user_db.authenticate(token_auth).await.is_err() {
         return StatusCode::UNAUTHORIZED.into_response();
     }
     let mut request = request;

@@ -21,9 +21,10 @@ use shared::{GameArea, GameStatus, PaginationMetadata};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, LazyLock};
+use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
-use surrealdb::sql::Thing;
-use surrealdb::{RecordId, Surreal};
+use surrealdb_types::RecordId;
+use surrealdb_types::SerdeWrapper;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -95,7 +96,7 @@ pub struct GameAreaEdge {
 
 async fn create_game_area(area: Area, db: &Surreal<Any>) -> Result<GameArea, AppError> {
     let identifier = Uuid::new_v4().to_string();
-    let area_id: RecordId = RecordId::from(("area", identifier.to_string()));
+    let area_id: RecordId = RecordId::new("area", identifier.to_string());
 
     // create the `area` record. Bind via serde_json::Value + a raw
     // UPDATE...CONTENT query so the SDK's bespoke serializer can't drop
@@ -123,7 +124,7 @@ async fn create_game_area_edge(
     db: &Surreal<Any>,
 ) -> Result<GameAreaEdge, AppError> {
     let game_identifier_str = game_identifier.to_string();
-    let game_id = RecordId::from(("game", &game_identifier_str));
+    let game_id = RecordId::new("game", game_identifier_str.as_str());
 
     // Does the `area` exist for the game?
     let mut resp = db
@@ -134,15 +135,15 @@ async fn create_game_area_edge(
         WHERE original_name = '$name'
         AND <-areas<-game.identifier = '$game_id'"#,
         )
-        .bind(("name", area))
+        .bind(("name", area.to_string()))
         .bind(("game_id", game_identifier_str.clone()))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to find area: {}", e)))?;
-    let existing_area: Option<Area> = resp
+    let existing_area: Option<SerdeWrapper<Area>> = resp
         .take(0)
         .map_err(|e| AppError::InternalServerError(format!("Failed to find area: {}", e)))?;
 
-    let area_uuid = if let Some(identifier) = existing_area {
+    let area_uuid = if let Some(identifier) = existing_area.map(|w| w.0) {
         Uuid::from_str(&identifier.to_string())
             .map_err(|e| AppError::BadRequest(format!("Invalid area UUID: {}", e)))?
     } else {
@@ -159,7 +160,7 @@ async fn create_game_area_edge(
 
     let edge = GameAreaEdge {
         game: game_id.clone(),
-        area: RecordId::from(("area", &area_uuid.to_string())),
+        area: RecordId::new("area", area_uuid.to_string().as_str()),
     };
 
     // RELATE always returns an array; the SDK's typed Option<T> path fails to
@@ -223,7 +224,7 @@ async fn add_item_to_area(
         Some(t) => Item::new_random_with_terrain(t, None),
         None => Item::new_random(None),
     };
-    let new_item_id: RecordId = RecordId::from(("item", &new_item.identifier));
+    let new_item_id: RecordId = RecordId::new("item", new_item.identifier.as_str());
     let body = serde_json::to_value(&new_item)
         .map_err(|e| AppError::InternalServerError(format!("Failed to encode item: {}", e)))?;
     if let Err(e) = db
@@ -258,7 +259,7 @@ async fn add_item_to_area(
 }
 
 async fn delete_pieces(
-    pieces: HashMap<String, Vec<Thing>>,
+    pieces: HashMap<String, Vec<RecordId>>,
     db: &Surreal<Any>,
 ) -> Result<(), AppError> {
     for (table, ids) in pieces {
@@ -268,7 +269,7 @@ async fn delete_pieces(
             .bind((
                 "ids",
                 ids.iter()
-                    .map(|i| format!(r#"{table}:{}"#, i.id))
+                    .map(|i| format!(r#"{table}:{}"#, crate::rid_key_to_string(i)))
                     .collect::<Vec<String>>()
                     .join(","),
             ))
@@ -590,8 +591,9 @@ async fn get_full_game(identifier: Uuid, db: &Surreal<Any>) -> Result<Json<Game>
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to fetch game: {}", e)))?;
     if let Some(game) = result
-        .take(0)
+        .take::<Option<SerdeWrapper<Game>>>(0)
         .map_err(|e| AppError::InternalServerError(format!("Failed to take game: {}", e)))?
+        .map(|w| w.0)
     {
         Ok(Json::<Game>(game))
     } else {

@@ -194,7 +194,7 @@ pub(crate) async fn save_game(
     if let Err(e) = db
         .query("UPDATE $record_id SET day = $day, status = $status")
         .bind(("record_id", game_identifier.clone()))
-        .bind(("day", game.day))
+        .bind(("day", game.day.unwrap_or(0) as i64))
         .bind(("status", game.status.to_string()))
         .await
     {

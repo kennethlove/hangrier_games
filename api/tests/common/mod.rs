@@ -225,8 +225,6 @@ fn source_migration_root() -> std::path::PathBuf {
         .clone()
 }
 
-
-
 fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
     std::fs::create_dir_all(dst)?;
     for entry in std::fs::read_dir(src)? {

@@ -102,16 +102,10 @@ impl TestDb {
         // tempdir (cheap — these are small files), point a `.surrealdb`
         // ini at that copy, and run migrations from there. Each test
         // owns its own tree so concurrent rewrites are impossible.
-        // Belt-and-suspenders: a global mutex serializes the actual
-        // `up()` invocation against the shared template directory we
-        // copy from, since `read_dir` over a directory being written by
-        // the migration tool can also EOF.
         let config_path = build_isolated_migration_root();
         let mig_root = config_path.parent().expect("config file has parent");
-        let _guard = MIGRATION_LOCK.lock().await;
         apply_surql_dir(&db, &mig_root.join("schemas")).await;
         apply_surql_dir(&db, &mig_root.join("migrations")).await;
-        drop(_guard);
 
         TestDb {
             db,
@@ -230,15 +224,6 @@ fn source_migration_root() -> std::path::PathBuf {
         })
         .clone()
 }
-
-/// Serializes `MigrationRunner::up()` calls. Belt-and-suspenders on top
-/// of per-test tempdirs: while each test's *destination* tree is
-/// private, libtest's many threads can still all enter `up()` at the
-/// same time, and the runner has historically been fragile under heavy
-/// concurrent invocation. The lock is cheap (held only for the
-/// migration call) and removes the last source of intermittent EOF
-/// panics in CI.
-static MIGRATION_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
     std::fs::create_dir_all(dst)?;

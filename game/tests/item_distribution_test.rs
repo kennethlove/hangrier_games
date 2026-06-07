@@ -262,7 +262,7 @@ fn test_named_items_respect_terrain_weights() {
 
     // Generate multiple and verify distribution still works
     let mut consumable_count = 0;
-    for _ in 0..50 {
+    for _ in 0..200 {
         let item = Item::new_random_with_terrain(terrain, Some("Test Item"));
         if !item.is_weapon() && !item.is_defensive() {
             consumable_count += 1;
@@ -271,7 +271,7 @@ fn test_named_items_respect_terrain_weights() {
 
     // Should still favor consumables
     assert!(
-        consumable_count > 20,
+        consumable_count > 80,
         "Named items in Desert should still favor consumables: got {}",
         consumable_count
     );

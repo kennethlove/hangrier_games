@@ -3,7 +3,7 @@ use crate::areas::{Area, AreaDetails};
 use crate::items::{Item, OwnsItems};
 use crate::messages::{AreaRef, ItemRef, MessagePayload, TributeRef};
 use crate::tributes::events::TributeEvent;
-use crate::tributes::incidents::{SleepIncident, apply_sleep_incident};
+use crate::tributes::incidents::{SleepIncident, SleepShelter, apply_sleep_incident};
 use crate::tributes::statuses::TributeStatus;
 use crate::tributes::{
     ActionSuggestion, EncounterContext, EnvironmentContext, Tribute, calculate_stamina_cost,
@@ -446,6 +446,7 @@ impl Game {
                                 None,
                             ));
                         }
+                        tribute.sleep_shelter = None;
                         continue;
                     }
                 }
@@ -456,7 +457,26 @@ impl Game {
                 // incidents (theft, relocation, animal, ally abandonment,
                 // limb injury) interrupt sleep immediately. Flavor-only
                 // incidents (annoying) are remembered for the natural wake.
-                if let Some(incident) = SleepIncident::roll(rng) {
+                let biome = area_details_map
+                    .get(&tribute.area)
+                    .and_then(|&idx| self.areas.get(idx))
+                    .map(|a| a.terrain.base)
+                    .unwrap_or(crate::terrain::types::BaseTerrain::Clearing);
+                let phase_index: u32 = self.day.unwrap_or(1) * 4 + phase.ord() as u32;
+                let is_sheltered = tribute
+                    .sheltered_until
+                    .is_some_and(|until| until > phase_index);
+                if let Some(incident) = SleepIncident::roll(
+                    rng,
+                    phase,
+                    biome,
+                    is_sheltered,
+                    tribute
+                        .sleep_shelter
+                        .as_ref()
+                        .unwrap_or(&SleepShelter::None),
+                    current_day,
+                ) {
                     let description = apply_sleep_incident(tribute, &incident, rng);
                     let incident_kind: shared::messages::SleepIncidentKind = (&incident).into();
 
@@ -503,6 +523,7 @@ impl Game {
                         tribute.sleep_remaining = 0;
                         tribute.cycles_awake = 0;
                         tribute.pending_sleep_incident = None;
+                        tribute.sleep_shelter = None;
                         continue;
                     } else {
                         // Flavor-only incident: emit flavor, remember it,
@@ -557,6 +578,7 @@ impl Game {
                 if tribute.sleep_remaining == 0 {
                     tribute.sleeping = false;
                     tribute.cycles_awake = 0;
+                    tribute.sleep_shelter = None;
                     let tref = TributeRef {
                         identifier: tribute.identifier.clone(),
                         name: tribute.name.clone(),

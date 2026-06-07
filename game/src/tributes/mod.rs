@@ -289,6 +289,10 @@ pub struct Tribute {
     /// reflects the experience. Reset to `None` on sleep end.
     #[serde(default, skip)]
     pub pending_sleep_incident: Option<SleepIncidentKind>,
+    /// Sleep shelter rolled at start of sleep session (transient).
+    /// Cleared on wake or phase change. Not persisted.
+    #[serde(skip)]
+    pub sleep_shelter: Option<crate::tributes::incidents::SleepShelter>,
     /// Active afflictions keyed by (kind, body_part). Empty by default;
     /// serde skips serialization when empty to keep payloads lean.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -383,6 +387,7 @@ impl Tribute {
             sleeping: false,
             sleep_remaining: 0,
             pending_sleep_incident: None,
+            sleep_shelter: None,
             afflictions: BTreeMap::new(),
             game_day: None,
             addiction_use_count: BTreeMap::new(),
@@ -449,6 +454,7 @@ impl Tribute {
             sleeping: false,
             sleep_remaining: 0,
             pending_sleep_incident: None,
+            sleep_shelter: None,
             afflictions: BTreeMap::new(),
             game_day: None,
             addiction_use_count: BTreeMap::new(),
@@ -652,6 +658,14 @@ impl Tribute {
             | Action::Eat(_)
             | Action::DrinkItem(_) => {}
             Action::Sleep { duration_phases } => {
+                // PR1 Task 9a: roll shelter quality at sleep start (we6l)
+                let terrain = area_details.terrain.base;
+                self.sleep_shelter = Some(crate::tributes::incidents::find_shelter(
+                    self.attributes.intelligence,
+                    self.attributes.strength,
+                    terrain,
+                    rng,
+                ));
                 self.act_sleep(duration_phases, environment_details.phase, events);
             }
             Action::Frozen | Action::Flashback { .. } | Action::Avoidance => {}

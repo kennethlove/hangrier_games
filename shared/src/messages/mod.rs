@@ -305,6 +305,10 @@ pub enum SleepIncidentKind {
     AnimalEncounter { animal: String },
     /// Hallucination or bad dream — sanity damage.
     Hallucination,
+    /// Nightmare (bad dream) — sanity damage, does not wake the sleeper.
+    Nightmare,
+    /// Night terror — sanity damage, wakes the sleeper.
+    NightTerror,
     /// An ally abandoned the sleeper during the night.
     AllyAbandonment,
     /// Comedic limb issue (leg fell asleep, etc.) — temporary affliction.

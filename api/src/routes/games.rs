@@ -428,27 +428,16 @@ pub async fn create_game_post_handler(
     let game_name = form.name.filter(|n| !n.is_empty()).unwrap_or(game.name);
     let is_private = form.private.is_some_and(|v| v == "true");
 
-    let new_game = Game {
-        identifier: game_identifier.clone(),
-        name: game_name,
-        status: shared::GameStatus::NotStarted,
-        day: None,
-        tributes: vec![],
-        areas: vec![],
-        private: is_private,
-        config: Default::default(),
-        messages: vec![],
-        alliance_events: vec![],
-        ..Default::default()
-    };
-
     use surrealdb_types::RecordId;
 
     let game_rid = RecordId::new("game", game_identifier.as_str());
-    let body = match serde_json::to_value(&new_game) {
-        Ok(b) => b,
-        Err(_) => return Redirect::to("/games/new").into_response(),
-    };
+    let body = serde_json::json!({
+        "identifier": &game_identifier,
+        "name": &game_name,
+        "status": "NotStarted",
+        "day": null,
+        "private": is_private,
+    });
 
     if user_db
         .query("UPSERT $rid CONTENT $body")

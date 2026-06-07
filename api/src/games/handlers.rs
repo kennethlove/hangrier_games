@@ -36,6 +36,23 @@ pub async fn create_game(
     let game_identifier = Uuid::new_v4().to_string();
     let game_name = payload.name.unwrap_or(default_game.name);
 
+    // Build the UPSERT body BEFORE constructing the Game struct so we can
+    // use game_name before it moves into `Game { name }`.
+    //
+    // IMPORTANT: Only include fields defined in the `game` table schema
+    // (`schemas/game.surql` is SCHEMAFULL). The full Game struct carries
+    // extra fields (`config`, `combat_tuning`, `sponsors`, `areas`,
+    // `tributes`) that SurrealDB v3 strictly rejects on SCHEMAFULL tables.
+    // See also save_game which uses explicit UPDATE SET for the same reason.
+    let game_rid = RecordId::new("game", game_identifier.as_str());
+    let body = serde_json::json!({
+        "identifier": &game_identifier,
+        "name": &game_name,
+        "status": "NotStarted",
+        "day": null,
+        "private": true,
+    });
+
     // Construct Game with server-controlled fields
     let game = Game {
         identifier: game_identifier.clone(),
@@ -51,17 +68,12 @@ pub async fn create_game(
         ..Default::default()
     };
 
-    // Use serde_json::Value + bound CONTENT to bypass the SurrealDB SDK's
-    // bespoke serializer (which collapses externally-tagged enums and drops
-    // Option fields like `day`). Same pattern as save_game.
-    let game_rid = RecordId::new("game", game_identifier.as_str());
-    let body = serde_json::to_value(&game)
-        .map_err(|e| AppError::InternalServerError(format!("Failed to encode game: {}", e)))?;
     db.query("UPSERT $rid CONTENT $body")
         .bind(("rid", game_rid.clone()))
         .bind(("body", body))
         .await
-        .map_err(|e| AppError::InternalServerError(format!("Failed to create game: {}", e)))?;
+        .map_err(|e| AppError::InternalServerError(format!("Failed to create game: {e}")))?;
+
     crate::verify_record_persisted(&db, &game_rid, "create_game").await?;
 
     let created_game = game;
@@ -73,8 +85,7 @@ pub async fn create_game(
 
     if let Some(err) = tribute_results.into_iter().find_map(Result::err) {
         return Err(AppError::InternalServerError(format!(
-            "Failed to create tributes: {}",
-            err
+            "Failed to create tributes: {err}"
         )));
     }
 
@@ -142,16 +153,15 @@ pub async fn game_delete(
         super::delete_pieces(pieces, &db).await?
     };
 
-    let game: Option<SerdeWrapper<Game>> = db
-        .delete(("game", game_identifier.as_str()))
+    // Execute DELETE ignoring the return value. SurrealDB v3 DELETE returns
+    // the deleted record which may contain null `day`, tripping the SDK
+    // deserializer — we just care that the query succeeds.
+    db.query("DELETE game WHERE identifier = $identifier")
+        .bind(("identifier", game_identifier.to_string()))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to delete game: {}", e)))?;
-    match game {
-        Some(_) => Ok(StatusCode::NO_CONTENT),
-        None => Err(AppError::InternalServerError(
-            "Failed to delete game".into(),
-        )),
-    }
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// List games with pagination.
@@ -207,7 +217,6 @@ pub async fn game_detail(
     Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<Json<DisplayGame>, AppError> {
     let identifier = game_identifier.to_string();
-
     let mut result = db
         .query("SELECT * FROM fn::get_detail_game($identifier)")
         .bind(("identifier", identifier.clone()))
@@ -241,7 +250,8 @@ pub async fn game_update(
             r#"
         UPDATE game
         SET name = $name, private = $private
-        WHERE identifier = $identifier;
+        WHERE identifier = $identifier
+        RETURN identifier, name, status, (day ?? 0) AS day, private, created_by;
         "#,
         )
         .bind(("identifier", game_identifier.to_string()))
@@ -403,15 +413,24 @@ pub async fn game_tributes(
 
     match response {
         Ok(mut response) => {
-            let tributes: Vec<Vec<SerdeWrapper<Tribute>>> =
-                response.take("tributes").map_err(|e| {
-                    AppError::InternalServerError(format!("Failed to take tributes: {}", e))
-                })?;
-            let all_tributes: Vec<Tribute> = tributes
+            // Bypass SurrealDB SDK custom deserializer (which chokes on null
+            // fields inside structs like `day_killed: Option<u32>`) by taking
+            // as raw JSON then deserializing via serde_json.
+            let raw_rows: Vec<serde_json::Value> = match response.take(0) {
+                Ok(rows) => rows,
+                Err(e) => {
+                    return Err(AppError::InternalServerError(format!(
+                        "Failed to take raw tributes: {}",
+                        e
+                    )));
+                }
+            };
+            let all_tributes: Vec<Tribute> = raw_rows
                 .into_iter()
-                .next()
-                .map(|inner| inner.into_iter().map(|w| w.0).collect())
-                .unwrap_or_default();
+                .filter_map(|row| row["tributes"].as_array().cloned())
+                .flatten()
+                .filter_map(|t| serde_json::from_value(t).ok())
+                .collect();
 
             // Apply pagination to the results
             let paginated_tributes: Vec<Tribute> = all_tributes
@@ -603,13 +622,14 @@ pub(crate) async fn timeline_summary(
     // Day -> Night transition without needing a schema migration.
     #[derive(serde::Serialize, serde::Deserialize)]
     struct GameDay {
-        day: Option<u32>,
+        #[serde(default)]
+        day: u32,
     }
 
     let game_identifier_str = game_identifier.to_string();
 
     let mut game_resp = db
-        .query("SELECT day FROM game WHERE identifier = $identifier;")
+        .query("SELECT (day ?? 0) AS day FROM game WHERE identifier = $identifier;")
         .bind(("identifier", game_identifier_str.clone()))
         .await
         .map_err(|err| AppError::NotFound(format!("Failed to query game: {err:?}")))?;
@@ -621,7 +641,7 @@ pub(crate) async fn timeline_summary(
         .next()
         .ok_or_else(|| AppError::NotFound(format!("Game {game_identifier} not found")))?;
 
-    let current_day = game_row.day.unwrap_or(0);
+    let current_day = game_row.day;
 
     let mut msg_resp = db
         .query(
@@ -700,6 +720,7 @@ pub async fn game_display(
     Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<Json<DisplayGame>, AppError> {
     let identifier = game_identifier.to_string();
+    // Debug: check fn::get_display_game output
     let mut result = db
         .query("SELECT * FROM fn::get_display_game($identifier);")
         .bind(("identifier", identifier.clone()))

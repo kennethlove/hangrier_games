@@ -258,7 +258,9 @@ pub struct Tribute {
     pub thirst: u8,
     /// Phase index until which the tribute is considered sheltered.
     /// `None` = exposed.
-    #[serde(default)]
+    /// `skip_serializing_if` avoids SurrealDB v3's rejection of JSON `null`
+    /// for `TYPE option<int>` (which expects `NONE`, not `NULL`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sheltered_until: Option<u32>,
     /// Escalating step counter for HP drain while Starving.
     #[serde(default)]

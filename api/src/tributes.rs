@@ -112,19 +112,26 @@ pub async fn create_tribute(
 }
 
 pub async fn tribute_delete(
-    Path((_, tribute_identifier)): Path<(String, String)>,
+    Path((game_identifier, tribute_identifier)): Path<(String, String)>,
     Extension(AuthDb(db)): Extension<AuthDb>,
 ) -> Result<StatusCode, AppError> {
-    let tribute: Option<SerdeWrapper<Tribute>> = db
-        .delete(("tribute", tribute_identifier.as_str()))
+    // The tribute was created with RecordId::new("tribute", identifier),
+    // so its record ID is `tribute:<identifier>`. Delete by RecordId.
+    let tribute_rid = surrealdb_types::RecordId::new("tribute", tribute_identifier.as_str());
+
+    // Delete the playing_in edge (tribute->playing_in->game)
+    let _ = db
+        .query("DELETE playing_in WHERE in.identifier = $game_id AND out.identifier = $tribute_id")
+        .bind(("game_id", game_identifier.to_string()))
+        .bind(("tribute_id", tribute_identifier.to_string()))
+        .await;
+
+    let _: Option<serde_json::Value> = db
+        .delete(tribute_rid)
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to delete tribute: {}", e)))?;
-    match tribute {
-        Some(_) => Ok(StatusCode::NO_CONTENT),
-        None => Err(AppError::InternalServerError(
-            "Could not delete tribute".into(),
-        )),
-    }
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn tribute_update(
@@ -137,23 +144,25 @@ pub async fn tribute_update(
         return Err(AppError::ValidationError(format!("{}", e)));
     }
 
-    let response = db
-        .query("UPDATE tribute SET name = $name, avatar = $avatar WHERE identifier = $identifier;")
+    // Use raw JSON to bypass SDK deserializer
+    let mut response = db
+        .query("UPDATE tribute SET name = $name, avatar = $avatar WHERE identifier = $identifier")
         .bind(("identifier", payload.identifier.clone()))
         .bind(("name", payload.name.clone()))
         .bind(("avatar", Some(payload.avatar.clone())))
-        .await;
+        .await
+        .map_err(|e| AppError::InternalServerError(format!("Failed to update tribute: {}", e)))?;
 
-    match response {
-        Ok(mut response) => match response.take::<Option<SerdeWrapper<Tribute>>>(0).unwrap() {
-            Some(_wrapper) => Ok(StatusCode::OK),
-            None => Err(AppError::InternalServerError(
-                "Failed to update tribute".into(),
-            )),
-        },
-        Err(_) => Err(AppError::InternalServerError(
+    let updated: Vec<serde_json::Value> = response
+        .take(0)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to check update: {}", e)))?;
+
+    if updated.is_empty() {
+        Err(AppError::InternalServerError(
             "Failed to update tribute".into(),
-        )),
+        ))
+    } else {
+        Ok(StatusCode::OK)
     }
 }
 
@@ -168,14 +177,20 @@ pub async fn tribute_detail(
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to fetch tribute: {}", e)))?;
 
-    let tribute: Option<SerdeWrapper<Tribute>> = result
+    // Take as raw JSON to bypass SurrealDB SDK custom deserializer (chokes
+    // on null fields like `game_day: null` inside Option<T>).
+    let raw: Vec<serde_json::Value> = result
         .take(0)
         .map_err(|e| AppError::InternalServerError(format!("Failed to take tribute: {}", e)))?;
 
-    if let Some(tribute) = tribute.map(|w| w.0) {
-        Ok(Json(tribute))
-    } else {
-        Err(AppError::NotFound("Tribute not found".to_string()))
+    let tribute: Option<Tribute> = raw
+        .into_iter()
+        .next()
+        .and_then(|v| serde_json::from_value(v).ok());
+
+    match tribute {
+        Some(tribute) => Ok(Json(tribute)),
+        None => Err(AppError::NotFound("Tribute not found".to_string())),
     }
 }
 
@@ -256,25 +271,25 @@ pub async fn upload_avatar(
     let public_url = state.storage.public_url(&saved_path);
 
     // Update tribute avatar field in database
-    let response = db
+    let mut response = db
         .query("UPDATE tribute SET avatar = $avatar WHERE identifier = $identifier;")
         .bind(("identifier", tribute_identifier.clone()))
         .bind(("avatar", Some(saved_path.clone())))
-        .await;
+        .await
+        .map_err(|e| AppError::InternalServerError(format!("Failed to update tribute: {}", e)))?;
 
-    match response {
-        Ok(mut response) => match response.take::<Option<SerdeWrapper<Tribute>>>(0).unwrap() {
-            Some(_wrapper) => Ok(Json(serde_json::json!({
-                "url": public_url,
-                "path": saved_path
-            }))),
-            None => Err(AppError::InternalServerError(
-                "Failed to update tribute avatar".into(),
-            )),
-        },
-        Err(e) => Err(AppError::InternalServerError(format!(
-            "Failed to update tribute: {}",
-            e
-        ))),
+    let updated: Vec<serde_json::Value> = response
+        .take(0)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to check update: {}", e)))?;
+
+    if updated.is_empty() {
+        Err(AppError::InternalServerError(
+            "Failed to update tribute avatar".into(),
+        ))
+    } else {
+        Ok(Json(serde_json::json!({
+            "url": public_url,
+            "path": saved_path
+        })))
     }
 }

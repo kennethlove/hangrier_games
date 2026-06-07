@@ -22,21 +22,27 @@ PERMISSIONS FOR
 DEFINE INDEX OVERWRITE game_areas ON areas FIELDS game, area;
 
 DEFINE FUNCTION OVERWRITE fn::get_full_game($game_id: string) {
-    RETURN SELECT *, (
-        SELECT *, ->owns->item[*] AS items
-        FROM <-playing_in<-tribute[*]
-        ORDER district
-    )
-    AS tributes, (
-        SELECT *, ->items->item[*] AS items
-        FROM ->areas->area
-    ) AS areas, (
-        RETURN count(SELECT id FROM <-playing_in<-tribute)
-    ) AS tribute_count,
-    count(<-playing_in<-tribute.id) == 24
-    AND
-    count(array::distinct(<-playing_in<-tribute.district)) == 12
-    AS ready
+    RETURN SELECT
+        identifier,
+        name,
+        status,
+        (day ?? 0) AS day,
+        private,
+        created_by,
+        (
+            SELECT *, ->owns->item[*] AS items
+            FROM <-playing_in<-tribute[*]
+            ORDER district
+        )
+        AS tributes, (
+            SELECT *, ->items->item[*] AS items
+            FROM ->areas->area
+        ) AS areas,
+        count(SELECT id FROM <-playing_in<-tribute) AS tribute_count,
+        count(<-playing_in<-tribute.id) == 24
+        AND
+        count(array::distinct(<-playing_in<-tribute.district)) == 12
+        AS ready
     FROM game
     WHERE identifier = $game_id;
 };
@@ -55,19 +61,17 @@ DEFINE FUNCTION OVERWRITE fn::get_display_game($game_id: string) {
         SELECT * FROM $tributes.in WHERE attributes.health > 0
     );
 
-    LET $winner = (
-        IF count($living_tributes) == 1 THEN
-            RETURN { identifier: $living_tributes[0].identifier, name: $living_tributes[0].name }
-        ELSE
-            RETURN NONE
-        END
-    );
+    LET $winner = IF count($living_tributes) == 1 THEN
+        { identifier: $living_tributes[0].identifier, name: $living_tributes[0].name }
+    ELSE
+        NONE
+    END;
 
     RETURN SELECT
         identifier,
         name,
         status,
-        day,
+        (day ?? 0) AS day,
         private,
         created_by.username,
         created_by.id == $auth.id AS is_mine,
@@ -80,23 +84,14 @@ DEFINE FUNCTION OVERWRITE fn::get_display_game($game_id: string) {
     FROM game
     WHERE identifier = $game_id
     LIMIT 1
-    FETCH tribute
 };
 
 DEFINE FUNCTION OVERWRITE fn::get_list_games($limit: int, $offset: int) {
-    RETURN SELECT name, identifier, status, day, private,
+    RETURN SELECT name, identifier, status, (day ?? 0) AS day, private,
     created_by.id == $auth.id AS is_mine,
     created_by.username,
-    (
-        RETURN count(
-            SELECT id FROM <-playing_in<-tribute
-        )
-    ) AS tribute_count,
-    (
-        RETURN count(
-            SELECT id FROM <-playing_in<-tribute WHERE attributes.health > 0
-        )
-    ) AS living_count,
+    count(SELECT id FROM <-playing_in<-tribute) AS tribute_count,
+    count(SELECT id FROM <-playing_in<-tribute WHERE attributes.health > 0) AS living_count,
     count(<-playing_in<-tribute.id) == 24
     AND
     count(array::distinct(<-playing_in<-tribute.district)) == 12
@@ -106,28 +101,25 @@ DEFINE FUNCTION OVERWRITE fn::get_list_games($limit: int, $offset: int) {
 };
 
 DEFINE FUNCTION OVERWRITE fn::get_detail_game($game_id: string) {
-    LET $day = SELECT day FROM game WHERE identifier = $game_id LIMIT 1;
-
-    RETURN SELECT *, (
-        SELECT *,
-        ->owns->item[*] AS items, (
-            SELECT *
-            FROM tribute_log
-            WHERE tribute_identifier = $parent.identifier
-            AND day = $day
-            ORDER BY instant
-        ) AS log
-        FROM <-playing_in<-tribute[*]
-        ORDER district
-    ) AS tributes, (
-        SELECT *, ->items->item[*] AS items
-        FROM ->areas->area
-    ) AS areas, (
-        RETURN count(SELECT id FROM <-playing_in<-tribute)
-    ) AS tribute_count,
-    count(<-playing_in<-tribute.id) == 24 AND count(array::distinct(<-playing_in<-tribute.district)) == 12 AS ready,
-    created_by.id == $auth.id AS is_mine,
-    created_by.username
+    RETURN SELECT
+        identifier,
+        name,
+        status,
+        (day ?? 0) AS day,
+        private,
+        (
+            SELECT *,
+            ->owns->item[*] AS items
+            FROM <-playing_in<-tribute[*]
+            ORDER district
+        ) AS tributes, (
+            SELECT *, ->items->item[*] AS items
+            FROM ->areas->area
+        ) AS areas,
+        count(SELECT id FROM <-playing_in<-tribute) AS tribute_count,
+        count(<-playing_in<-tribute.id) == 24 AND count(array::distinct(<-playing_in<-tribute.district)) == 12 AS ready,
+        created_by.id == $auth.id AS is_mine,
+        created_by.username
     FROM game
     WHERE identifier = $game_id
 };

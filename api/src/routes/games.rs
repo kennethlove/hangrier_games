@@ -159,13 +159,13 @@ pub async fn game_tributes_handler(
 
     let tributes = match result {
         Ok(mut result) => {
-            let tributes: Vec<Vec<SerdeWrapper<game::tributes::Tribute>>> =
-                result.take("tributes").unwrap_or_default();
-            tributes
+            let raw_rows: Vec<serde_json::Value> = result.take(0).unwrap_or_default();
+            raw_rows
                 .into_iter()
-                .next()
-                .map(|inner| inner.into_iter().map(|w| w.0).collect())
-                .unwrap_or_default()
+                .filter_map(|row| row["tributes"].as_array().cloned())
+                .flatten()
+                .filter_map(|t| serde_json::from_value(t).ok())
+                .collect()
         }
         Err(_) => vec![],
     };
@@ -371,9 +371,11 @@ pub async fn game_tribute_detail_handler(
 
     let tribute = match result {
         Ok(mut result) => result
-            .take::<Option<SerdeWrapper<game::tributes::Tribute>>>(0)
+            .take::<Vec<serde_json::Value>>(0)
             .unwrap_or_default()
-            .map(|w| w.0),
+            .into_iter()
+            .next()
+            .and_then(|v| serde_json::from_value(v).ok()),
         Err(_) => None,
     };
 

@@ -79,6 +79,7 @@ impl MessagePayload {
             | PartialRescueProgress { .. } => MessageKind::Trapped,
             MessagePayload::TrapSet { .. } => MessageKind::Combat,
             MessagePayload::TrapTriggered { .. } => MessageKind::Combat,
+            SleepIncident { .. } => MessageKind::Sleep,
             Generic => MessageKind::State,
         }
     }
@@ -120,7 +121,8 @@ impl MessagePayload {
             | Drank { tribute, .. }
             | Ate { tribute, .. }
             | TributeSlept { tribute, .. }
-            | TributeWoke { tribute, .. } => r(tribute),
+            | TributeWoke { tribute, .. }
+            | SleepIncident { tribute, .. } => r(tribute),
             AfflictionAcquired { tribute_id, .. }
             | AfflictionProgressed { tribute_id, .. }
             | AfflictionHealed { tribute_id, .. }

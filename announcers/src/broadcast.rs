@@ -391,6 +391,7 @@ impl BroadcastPackageBuilder {
             | MessagePayload::TrapSet { .. }
             | MessagePayload::TrapTriggered { .. }
             | MessagePayload::RescueAttempted { .. }
+            | MessagePayload::SleepIncident { .. }
             | MessagePayload::PartialRescueProgress { .. } => Some(EventLine {
                 kind: EventKind::State,
                 prose,

@@ -492,7 +492,14 @@ impl Game {
                             tribute.identifier.clone(),
                             tribute.name.clone(),
                             flavor_line,
-                            None,
+                            Some(MessagePayload::SleepIncident {
+                                tribute: TributeRef {
+                                    identifier: tribute.identifier.clone(),
+                                    name: tribute.name.clone(),
+                                },
+                                kind: incident_kind.clone(),
+                                description: description.clone(),
+                            }),
                             None,
                         ));
 
@@ -537,7 +544,14 @@ impl Game {
                             tribute.identifier.clone(),
                             tribute.name.clone(),
                             flavor_line,
-                            None,
+                            Some(MessagePayload::SleepIncident {
+                                tribute: TributeRef {
+                                    identifier: tribute.identifier.clone(),
+                                    name: tribute.name.clone(),
+                                },
+                                kind: incident_kind.clone(),
+                                description: description.clone(),
+                            }),
                             None,
                         ));
                         tribute.pending_sleep_incident = Some(incident_kind);

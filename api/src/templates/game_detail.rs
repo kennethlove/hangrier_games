@@ -555,6 +555,7 @@ fn message_kind_label(payload: &shared::messages::MessagePayload) -> &'static st
         MessageKind::Phobia => "Fear",
         MessageKind::Fixation => "Fixation",
         MessageKind::Trapped => "Trapped",
+        MessageKind::Sleep => "Sleep",
     }
 }
 
@@ -588,6 +589,7 @@ fn message_kind_icon(payload: &shared::messages::MessagePayload) -> maud::Markup
         MessagePayload::PhaseStarted { .. } | MessagePayload::PhaseEnded { .. } => "clock",
         MessagePayload::TributeSlept { .. } => "moon",
         MessagePayload::TributeWoke { .. } => "sun",
+        MessagePayload::SleepIncident { .. } => "moon",
         MessagePayload::GameEnded { .. } => "trophy",
         MessagePayload::CombatSwing(_) => "sword",
         MessagePayload::TrustShockBreak { .. } => "heart-crack",
@@ -655,6 +657,7 @@ fn kind_color(payload: &shared::messages::MessagePayload) -> &'static str {
         MessageKind::Phobia => "kind-phobia",
         MessageKind::Fixation => "kind-fixation",
         MessageKind::Trapped => "kind-trapped",
+        MessageKind::Sleep => "kind-sleep",
     }
 }
 

@@ -1,0 +1,734 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hangrier Games — Games Portal</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   TOKENS — same light mode as the broadcast page
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --bg:              #eef1f5;
+  --surface:         #ffffff;
+  --surface-alt:     #f4f6fa;
+  --surface-hover:   #e8ecf2;
+  --fg:              #111318;
+  --fg-muted:        #6b7280;
+  --border:          #d1d5db;
+  --border-strong:   #9ca3af;
+  --accent:          #0891b2;
+  --accent-glow:     rgba(8,145,178,0.1);
+  --gold:            #d97706;
+  --gold-glow:       rgba(217,119,6,0.08);
+  --danger:          #dc2626;
+  --danger-glow:     rgba(220,38,38,0.08);
+  --success:         #16a34a;
+  --warning:         #ea580c;
+  --info:            #2563eb;
+  --purple:          #7c3aed;
+
+  --font-display:  'Tahoma', 'Arial Narrow', 'Impact', -apple-system, system-ui, sans-serif;
+  --font-body:     -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono:     'Courier New', ui-monospace, monospace;
+  --font-condensed: 'Arial Narrow', 'Impact', -apple-system, system-ui, sans-serif;
+
+  --fs-hero:  clamp(28px, 3.2vw, 42px);
+  --fs-h2:    clamp(18px, 2vw, 26px);
+  --fs-h3:    clamp(14px, 1.4vw, 18px);
+  --fs-body:  14px;
+  --fs-sm:    12px;
+  --fs-xs:    10px;
+  --fs-xxs:   9px;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--fg);
+  font-family:var(--font-body);
+  font-size:var(--fs-body);
+  line-height:1.5;
+  min-height:100vh;
+}
+#app{
+  max-width:1400px;
+  margin:0 auto;
+  display:flex;
+  flex-direction:column;
+  gap:0;
+  min-height:100vh;
+  padding:8px;
+}
+
+/* ─── TOP NAV ───────────────────────────────────────────── */
+.top-nav{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:8px 16px;
+  background:linear-gradient(90deg, #e2e6ed, var(--surface));
+  border:2px solid var(--border-strong);
+  border-bottom:none;
+  font-size:var(--fs-xs);
+  font-family:var(--font-condensed);
+  letter-spacing:1px;
+}
+.top-nav .nav-left{display:flex;align-items:center;gap:18px;}
+.top-nav .site-brand{
+  font-weight:700;
+  font-size:var(--fs-h2);
+  letter-spacing:4px;
+  text-transform:uppercase;
+  color:var(--fg);
+  font-family:var(--font-display);
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.top-nav .site-brand .emblem{
+  width:28px;height:28px;
+  background:var(--accent);
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  display:grid;place-items:center;
+  flex-shrink:0;
+}
+.top-nav .site-brand .emblem::after{
+  content:'';display:block;
+  width:12px;height:12px;
+  background:var(--bg);
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+}
+.top-nav .site-brand .brand-accent{color:var(--accent);}
+.top-nav .nav-link{
+  color:var(--fg-muted);
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  text-decoration:none;
+  padding:4px 10px;
+  border:1px solid transparent;
+  transition:all 0.12s;
+  cursor:pointer;
+  font-size:var(--fs-xs);
+  background:none;
+  font-family:var(--font-condensed);
+}
+.top-nav .nav-link:hover{color:var(--fg);border-color:var(--border);}
+.top-nav .nav-link.back-link{display:flex;align-items:center;gap:4px;}
+.top-nav .nav-link.back-link::before{content:'\2190';font-size:12px;}
+.top-nav .nav-right{display:flex;align-items:center;gap:8px;}
+.top-nav .nav-right .auth-btn{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-xs);
+  letter-spacing:2px;
+  text-transform:uppercase;
+  padding:5px 14px;
+  border:1px solid var(--border-strong);
+  background:transparent;
+  color:var(--fg-muted);
+  cursor:pointer;
+  transition:all 0.12s;
+}
+.top-nav .nav-right .auth-btn:hover{border-color:var(--accent);color:var(--accent);}
+.top-nav .nav-right .auth-btn.logged-in{border-color:var(--danger);color:var(--danger);}
+.top-nav .nav-right .auth-btn.logged-in:hover{background:var(--danger);color:#fff;}
+.top-nav .nav-right .user-badge{
+  display:flex;align-items:center;gap:6px;
+  padding:3px 10px;
+  border:1px solid var(--border);
+  font-size:var(--fs-xxs);
+  color:var(--fg-muted);
+  letter-spacing:0.5px;
+}
+.top-nav .nav-right .user-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--success);}
+
+/* ─── PAGE HEADER ────────────────────────────────────────── */
+.page-header{
+  background:linear-gradient(135deg,var(--surface),var(--surface-alt));
+  border:2px solid var(--border-strong);
+  padding:14px 20px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.page-header h1{
+  font-family:var(--font-display);
+  font-size:var(--fs-hero);
+  font-weight:700;
+  line-height:1;
+  letter-spacing:3px;
+  text-transform:uppercase;
+}
+.page-header .hl{color:var(--accent);}
+.page-header .sub{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-h3);
+  color:var(--fg-muted);
+  text-transform:uppercase;
+  letter-spacing:2px;
+}
+.page-header .user-stats{display:flex;align-items:center;gap:10px;}
+.page-header .user-stats .stat{
+  display:flex;align-items:center;gap:4px;
+  padding:3px 10px;
+  border:1px solid var(--border);
+  background:rgba(0,0,0,0.02);
+  font-size:var(--fs-sm);
+}
+.page-header .user-stats .stat .num{font-weight:700;color:var(--fg);}
+.page-header .user-stats .stat-label{
+  font-size:var(--fs-xs);
+  color:var(--fg-muted);
+  text-transform:uppercase;
+  letter-spacing:1px;
+}
+
+/* ─── CREATE GAME ─────────────────────────────────────────── */
+.create-game{
+  border:2px solid var(--border-strong);
+  border-top:none;
+  background:var(--surface);
+}
+.create-game .section-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 20px 8px;
+  border-bottom:1px solid var(--border);
+}
+.create-game .section-header h2{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-h3);
+  text-transform:uppercase;
+  letter-spacing:3px;
+  font-weight:700;
+}
+.create-game .section-header .tag{
+  font-size:var(--fs-xxs);
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  color:var(--fg-muted);
+  padding:2px 8px;
+  border:1px solid var(--border);
+}
+.create-game .form-body{padding:16px 20px 20px;display:flex;flex-direction:column;gap:14px;}
+.create-game .form-row{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;}
+.create-game .field-group{display:flex;flex-direction:column;gap:4px;flex:1;min-width:200px;}
+.create-game .field-group label{
+  font-size:var(--fs-xs);
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  color:var(--fg-muted);
+  font-weight:600;
+}
+.create-game .field-group label .required{color:var(--danger);margin-left:2px;}
+.create-game .field-group input[type="text"]{
+  font-family:var(--font-body);
+  font-size:var(--fs-body);
+  padding:8px 12px;
+  border:2px solid var(--border);
+  background:var(--bg);
+  color:var(--fg);
+  outline:none;
+  transition:border-color 0.12s;
+}
+.create-game .field-group input[type="text"]:focus{border-color:var(--accent);}
+.create-game .field-group input[type="text"]::placeholder{color:var(--fg-muted);opacity:0.6;}
+.create-game .btn-group{display:flex;gap:8px;align-items:flex-end;flex-shrink:0;}
+.create-game .btn{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-sm);
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:2px;
+  padding:8px 18px;
+  border:2px solid var(--border-strong);
+  cursor:pointer;
+  transition:all 0.12s;
+  background:var(--surface);
+  color:var(--fg);
+  white-space:nowrap;
+  line-height:1;
+}
+.create-game .btn:hover{background:var(--surface-hover);border-color:var(--fg-muted);}
+.create-game .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.create-game .btn-primary:hover{background:color-mix(in oklab,var(--accent),black 10%);border-color:color-mix(in oklab,var(--accent),black 10%);}
+.create-game .btn-quickstart{background:var(--gold);border-color:var(--gold);color:#fff;}
+.create-game .btn-quickstart:hover{background:color-mix(in oklab,var(--gold),black 10%);border-color:color-mix(in oklab,var(--gold),black 10%);}
+
+/* ─── ADVANCED PANEL ─────────────────────────────────────── */
+.advanced-toggle{
+  display:flex;align-items:center;gap:6px;
+  font-family:var(--font-condensed);
+  font-size:var(--fs-xs);
+  text-transform:uppercase;
+  letter-spacing:2px;
+  color:var(--fg-muted);
+  cursor:pointer;
+  padding:2px 0;
+  border:none;
+  background:none;
+  transition:color 0.12s;
+}
+.advanced-toggle:hover{color:var(--fg);}
+.advanced-toggle .arrow{display:inline-block;transition:transform 0.2s;font-size:10px;}
+.advanced-toggle.open .arrow{transform:rotate(90deg);}
+.advanced-panel{display:none;flex-direction:column;gap:14px;padding-top:8px;border-top:1px dashed var(--border);}
+.advanced-panel.open{display:flex;}
+.advanced-panel .dial-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
+.advanced-panel .dial-group{display:flex;flex-direction:column;gap:4px;}
+.advanced-panel .dial-group .dial-header{display:flex;justify-content:space-between;align-items:center;}
+.advanced-panel .dial-group label{
+  font-size:var(--fs-xs);
+  text-transform:uppercase;
+  letter-spacing:1px;
+  color:var(--fg-muted);
+  font-weight:600;
+}
+.advanced-panel .dial-group .dial-value{font-family:var(--font-mono);font-size:var(--fs-sm);color:var(--fg);font-weight:700;}
+.advanced-panel .dial-group input[type="range"]{
+  -webkit-appearance:none;appearance:none;width:100%;height:6px;
+  background:var(--border);border-radius:3px;outline:none;
+}
+.advanced-panel .dial-group input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;width:18px;height:18px;
+  background:var(--accent);border:2px solid #fff;border-radius:50%;
+  cursor:pointer;box-shadow:0 0 0 1px var(--border-strong);
+}
+.advanced-panel .dial-group input[type="range"]::-moz-range-thumb{
+  width:18px;height:18px;background:var(--accent);border:2px solid #fff;
+  border-radius:50%;cursor:pointer;box-shadow:0 0 0 1px var(--border-strong);
+}
+.advanced-panel .dial-group select{
+  font-family:var(--font-body);font-size:var(--fs-sm);
+  padding:6px 10px;border:2px solid var(--border);
+  background:var(--bg);color:var(--fg);outline:none;cursor:pointer;
+}
+.advanced-panel .dial-group select:focus{border-color:var(--accent);}
+.advanced-panel .dial-group .toggle-row{display:flex;align-items:center;gap:8px;}
+.advanced-panel .dial-group .toggle-switch{
+  position:relative;width:36px;height:20px;background:var(--border);
+  border-radius:10px;cursor:pointer;transition:background 0.15s;
+  border:1px solid var(--border-strong);flex-shrink:0;
+}
+.advanced-panel .dial-group .toggle-switch.active{background:var(--accent);}
+.advanced-panel .dial-group .toggle-switch::after{
+  content:'';position:absolute;top:2px;left:2px;
+  width:14px;height:14px;background:#fff;border-radius:50%;transition:transform 0.15s;
+}
+.advanced-panel .dial-group .toggle-switch.active::after{transform:translateX(16px);}
+.advanced-panel .dial-group .toggle-label{font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:1px;color:var(--fg-muted);}
+
+/* ─── GAMES LIST ──────────────────────────────────────────── */
+.games-list{
+  border:2px solid var(--border-strong);
+  border-top:none;
+  background:var(--surface);
+}
+.games-list .section-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 20px 8px;
+  border-bottom:1px solid var(--border);
+}
+.games-list .section-header h2{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-h3);
+  text-transform:uppercase;
+  letter-spacing:3px;
+  font-weight:700;
+}
+.games-list .section-header .filter-bar{display:flex;gap:4px;}
+.games-list .section-header .filter-btn{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-xs);
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  padding:3px 10px;
+  border:1px solid var(--border);
+  background:transparent;
+  color:var(--fg-muted);
+  cursor:pointer;
+  transition:all 0.12s;
+}
+.games-list .section-header .filter-btn:hover{border-color:var(--border-strong);color:var(--fg);}
+.games-list .section-header .filter-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.games-list .list-body{padding:8px 12px 12px;display:flex;flex-direction:column;gap:6px;}
+.games-list .empty-state{
+  padding:40px 20px;text-align:center;color:var(--fg-muted);
+  font-size:var(--fs-h3);font-family:var(--font-condensed);
+  text-transform:uppercase;letter-spacing:2px;
+  border:1px dashed var(--border);margin:4px;
+}
+
+/* ─── GAME CARD ───────────────────────────────────────────── */
+.game-card{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 14px;
+  border:1px solid var(--border);
+  background:var(--bg);
+  transition:background 0.12s,border-color 0.12s;
+  cursor:pointer;
+}
+.game-card:hover{background:var(--surface-hover);border-color:var(--border-strong);}
+.game-card .game-visual{
+  width:44px;height:44px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  flex-shrink:0;
+  display:grid;place-items:center;
+}
+.game-card .game-visual .hex-icon{
+  width:28px;height:28px;
+  background:var(--accent);opacity:0.6;
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+}
+.game-card .game-info{flex:1;min-width:0;}
+.game-card .game-info .game-name{
+  font-family:var(--font-display);
+  font-size:var(--fs-h3);
+  font-weight:700;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  line-height:1.2;
+}
+.game-card .game-info .game-meta{display:flex;align-items:center;gap:8px;margin-top:2px;flex-wrap:wrap;}
+.game-card .game-info .game-meta .meta-item{
+  font-size:var(--fs-xs);
+  color:var(--fg-muted);
+  text-transform:uppercase;
+  letter-spacing:1px;
+  display:flex;align-items:center;gap:4px;
+}
+.game-card .game-info .game-meta .meta-item .dot{width:5px;height:5px;border-radius:50%;display:inline-block;}
+.game-card .game-info .game-meta .meta-item .dot.alive{background:var(--success);}
+.game-card .game-info .game-meta .meta-item .dot.fallen{background:var(--danger);}
+.game-card .game-tags{display:flex;gap:4px;flex-shrink:0;}
+.game-card .game-tags .tag{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-xxs);
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  padding:2px 8px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  color:var(--fg-muted);
+}
+.game-card .game-tags .tag.public{border-color:var(--success);color:var(--success);}
+.game-card .game-tags .tag.private{border-color:var(--danger);color:var(--danger);}
+.game-card .game-tags .tag.active{border-color:var(--accent);color:var(--accent);}
+.game-card .game-tags .tag.completed{border-color:var(--fg-muted);color:var(--fg-muted);}
+.game-card .game-action{flex-shrink:0;}
+.game-card .game-action .enter-btn{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-xs);
+  text-transform:uppercase;
+  letter-spacing:2px;
+  padding:5px 14px;
+  border:1px solid var(--border-strong);
+  background:var(--surface);
+  color:var(--fg);
+  cursor:pointer;
+  transition:all 0.12s;
+}
+.game-card .game-action .enter-btn:hover{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+/* ─── TOAST ───────────────────────────────────────────────── */
+.toast-container{
+  position:fixed;bottom:20px;right:20px;
+  display:flex;flex-direction:column;gap:8px;z-index:1000;
+}
+.toast{
+  font-family:var(--font-condensed);font-size:var(--fs-sm);
+  padding:10px 18px;
+  border:2px solid var(--border-strong);
+  background:var(--surface);color:var(--fg);
+  text-transform:uppercase;letter-spacing:1.5px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.12);
+  animation:toast-in 0.25s ease-out;
+  max-width:360px;
+}
+.toast.success{border-color:var(--success);}
+.toast.error{border-color:var(--danger);}
+.toast.info{border-color:var(--accent);}
+@keyframes toast-in{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+
+/* ─── RESPONSIVE ──────────────────────────────────────────── */
+@media(max-width:800px){
+  #app{padding:6px;}
+  .top-nav{padding:6px 12px;flex-wrap:wrap;gap:6px;}
+  .top-nav .nav-left{gap:10px;flex-wrap:wrap;}
+  .top-nav .site-brand{font-size:var(--fs-h3);}
+  .create-game .form-row{flex-direction:column;}
+  .create-game .field-group{min-width:100%;}
+  .create-game .btn-group{width:100%;}
+  .create-game .btn-group .btn{flex:1;text-align:center;}
+  .advanced-panel .dial-grid{grid-template-columns:1fr 1fr;}
+  .game-card{flex-wrap:wrap;}
+  .game-card .game-action{width:100%;}
+  .game-card .game-action .enter-btn{width:100%;text-align:center;}
+  .page-header .user-stats{width:100%;}
+}
+@media(max-width:500px){
+  .advanced-panel .dial-grid{grid-template-columns:1fr;}
+  .games-list .section-header{flex-direction:column;align-items:flex-start;gap:6px;}
+  .game-card .game-tags{flex-wrap:wrap;}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- TOP NAV -->
+  <nav class="top-nav">
+    <div class="nav-left">
+      <span class="site-brand">
+        <span class="emblem"></span>
+        HANGRIER <span class="brand-accent">GAMES</span>
+      </span>
+      <a href="#" class="nav-link back-link" data-action="back">ALL GAMES</a>
+    </div>
+    <div class="nav-right">
+      <span class="user-badge" id="userBadge">
+        <span class="dot"></span>
+        CAPITOL_SPONSOR
+      </span>
+      <button class="auth-btn logged-in" id="authBtn" data-logged-in="true">LOGOUT</button>
+    </div>
+  </nav>
+
+  <!-- PAGE HEADER -->
+  <header class="page-header">
+    <div>
+      <h1>GAMES <span class="hl">PORTAL</span></h1>
+      <div class="sub">Manage your arenas &mdash; create, spectate, conquer</div>
+    </div>
+    <div class="user-stats">
+      <span class="stat"><span class="num" id="totalGames">7</span> <span class="stat-label">GAMES</span></span>
+      <span class="stat"><span class="num" id="activeGames">3</span> <span class="stat-label">ACTIVE</span></span>
+      <span class="stat"><span class="num" id="completedGames">4</span> <span class="stat-label">COMPLETED</span></span>
+    </div>
+  </header>
+
+  <!-- CREATE GAME -->
+  <section class="create-game" id="createGame">
+    <div class="section-header">
+      <h2>CREATE <span class="hl">NEW GAME</span></h2>
+      <span class="tag">AUTHORIZED COMMISSIONER</span>
+    </div>
+    <div class="form-body">
+      <div class="form-row">
+        <div class="field-group">
+          <label for="gameName">Game Name <span class="required">*</span></label>
+          <input type="text" id="gameName" placeholder="e.g. The 25th Quarter Quell" maxlength="60" autocomplete="off">
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary" id="createBtn">CREATE GAME</button>
+          <button class="btn btn-quickstart" id="quickstartBtn">QUICKSTART</button>
+        </div>
+      </div>
+
+      <button class="advanced-toggle" id="advancedToggle">
+        <span class="arrow">&#9654;</span> ADVANCED OPTIONS
+      </button>
+
+      <div class="advanced-panel" id="advancedPanel">
+        <div class="dial-grid">
+          <div class="dial-group">
+            <div class="dial-header">
+              <label for="dialTributes">Tributes</label>
+              <span class="dial-value" id="tributeVal">24</span>
+            </div>
+            <input type="range" id="dialTributes" min="12" max="36" step="2" value="24">
+          </div>
+          <div class="dial-group">
+            <div class="dial-header">
+              <label for="dialDifficulty">Difficulty</label>
+              <span class="dial-value" id="difficultyVal">NORMAL</span>
+            </div>
+            <input type="range" id="dialDifficulty" min="1" max="5" step="1" value="3">
+          </div>
+          <div class="dial-group">
+            <div class="dial-header">
+              <label for="dialEvents">Event Frequency</label>
+              <span class="dial-value" id="eventsVal">MEDIUM</span>
+            </div>
+            <input type="range" id="dialEvents" min="1" max="5" step="1" value="3">
+          </div>
+          <div class="dial-group">
+            <div class="dial-header">
+              <label for="dialDuration">Est. Duration</label>
+              <span class="dial-value" id="durationVal">10 DAYS</span>
+            </div>
+            <input type="range" id="dialDuration" min="5" max="20" step="1" value="10">
+          </div>
+        </div>
+        <div class="dial-grid">
+          <div class="dial-group">
+            <label for="dialArena">Arena Type</label>
+            <select id="dialArena">
+              <option value="the_gorge">The Gorge</option>
+              <option value="the_ruins">Ancient Ruins</option>
+              <option value="the_crags">The Crags</option>
+              <option value="the_mire">The Mire</option>
+              <option value="the_arena">Grand Arena</option>
+              <option value="random">Random</option>
+            </select>
+          </div>
+          <div class="dial-group">
+            <label for="dialPhase">Starting Phase</label>
+            <select id="dialPhase">
+              <option value="dawn">Dawn</option>
+              <option value="day" selected>Day</option>
+              <option value="dusk">Dusk</option>
+              <option value="night">Night</option>
+            </select>
+          </div>
+          <div class="dial-group">
+            <label for="dialMap">Map Seed</label>
+            <select id="dialMap">
+              <option value="random">Random</option>
+              <option value="symmetrical">Symmetrical</option>
+              <option value="asymmetrical">Asymmetrical</option>
+              <option value="ring">Ring Layout</option>
+            </select>
+          </div>
+          <div class="dial-group">
+            <label>Visibility</label>
+            <div class="toggle-row">
+              <span class="toggle-switch active" id="visToggle"></span>
+              <span class="toggle-label" id="visLabel">PUBLIC</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GAMES LIST -->
+  <section class="games-list">
+    <div class="section-header">
+      <h2>ALL <span class="hl">GAMES</span></h2>
+      <div class="filter-bar">
+        <button class="filter-btn active" data-filter="all">ALL</button>
+        <button class="filter-btn" data-filter="active">ACTIVE</button>
+        <button class="filter-btn" data-filter="completed">COMPLETED</button>
+        <button class="filter-btn" data-filter="mine">MY GAMES</button>
+      </div>
+    </div>
+    <div class="list-body" id="gamesContainer"></div>
+  </section>
+
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+/* ─── SAMPLE GAMES ─────────────────────────────────────────── */
+const GAMES = [
+  { id:'g001', name:'The 25th Quarter Quell', arena:'The Gorge', status:'active', day:7, phase:'dusk', alive:11, fallen:13, total:24, visibility:'public', owner:true, createdAt:'2025-02-14' },
+  { id:'g002', name:'Blood Moon Rumble', arena:'Ancient Ruins', status:'active', day:3, phase:'night', alive:18, fallen:6, total:24, visibility:'public', owner:false, createdAt:'2025-02-16' },
+  { id:'g003', name:'Iron Harvest', arena:'The Crags', status:'active', day:9, phase:'dawn', alive:5, fallen:19, total:24, visibility:'private', owner:true, createdAt:'2025-02-10' },
+  { id:'g004', name:'The First Bloodbath', arena:'Grand Arena', status:'completed', day:14, phase:'dusk', alive:1, fallen:23, total:24, visibility:'public', owner:false, createdAt:'2025-01-28' },
+  { id:'g005', name:'Twilight Carnage', arena:'The Mire', status:'completed', day:11, phase:'night', alive:0, fallen:24, total:24, visibility:'public', owner:false, createdAt:'2025-01-15' },
+  { id:'g006', name:'Arena of Shadows', arena:'The Ruins', status:'completed', day:8, phase:'dawn', alive:1, fallen:23, total:24, visibility:'private', owner:true, createdAt:'2025-01-05' },
+  { id:'g007', name:'Crimson Tide', arena:'The Gorge', status:'completed', day:12, phase:'day', alive:0, fallen:24, total:24, visibility:'public', owner:false, createdAt:'2024-12-20' }
+];
+
+/* ─── RENDER ───────────────────────────────────────────────── */
+function renderGames(filter) {
+  const container = document.getElementById('gamesContainer');
+  const filtered = filter==='all'?GAMES:filter==='active'?GAMES.filter(g=>g.status==='active'):filter==='completed'?GAMES.filter(g=>g.status==='completed'):filter==='mine'?GAMES.filter(g=>g.owner):GAMES;
+  if(!filtered.length){container.innerHTML='<div class="empty-state">No games found — create one above</div>';return;}
+  container.innerHTML=filtered.map(g=>{
+    const pd={dawn:'<span class="dot alive"></span>',day:'<span class="dot" style="background:var(--gold)"></span>',dusk:'<span class="dot" style="background:var(--warning)"></span>',night:'<span class="dot" style="background:var(--info)"></span>'};
+    const st=g.status==='active'?'<span class="tag active">LIVE</span>':'<span class="tag completed">FINISHED</span>';
+    const vt=g.visibility==='public'?'<span class="tag public">PUBLIC</span>':'<span class="tag private">PRIVATE</span>';
+    const ot=g.owner?'<span class="tag">HOST</span>':'';
+    return '<div class="game-card" data-id="'+g.id+'"><div class="game-visual"><span class="hex-icon"></span></div><div class="game-info"><div class="game-name">'+g.name+'</div><div class="game-meta"><span class="meta-item">'+g.arena+'</span><span class="meta-item">DAY '+g.day+'</span><span class="meta-item">'+pd[g.phase]+' '+g.phase.toUpperCase()+'</span><span class="meta-item"><span class="dot alive"></span> '+g.alive+' / <span class="dot fallen"></span> '+g.fallen+'</span></div></div><div class="game-tags">'+st+vt+ot+'</div><div class="game-action"><button class="enter-btn" data-id="'+g.id+'">'+(g.status==='active'?'SPECTATE':'REPLAY')+'</button></div></div>';
+  }).join('');
+  document.querySelectorAll('.enter-btn').forEach(b=>b.addEventListener('click',function(e){
+    e.stopPropagation();
+    const g=GAMES.find(x=>x.id===this.dataset.id);
+    if(!g)return;
+    showToast('Entering "'+g.name+'"...','info');
+    setTimeout(()=>showToast('Joined broadcast: '+g.name+' (Day '+g.day+', '+g.phase.toUpperCase()+')','success'),400);
+  }));
+  document.querySelectorAll('.game-card').forEach(c=>c.addEventListener('click',function(){const b=this.querySelector('.enter-btn');if(b)b.click();}));
+}
+
+document.querySelectorAll('.filter-btn').forEach(b=>b.addEventListener('click',function(){document.querySelectorAll('.filter-btn').forEach(x=>x.classList.remove('active'));this.classList.add('active');renderGames(this.dataset.filter);}));
+
+/* ─── CREATE GAME ──────────────────────────────────────────── */
+function getAdvancedSettings(){
+  return{
+    tributes:parseInt(document.getElementById('dialTributes').value),
+    difficulty:parseInt(document.getElementById('dialDifficulty').value),
+    events:parseInt(document.getElementById('dialEvents').value),
+    duration:parseInt(document.getElementById('dialDuration').value),
+    arena:document.getElementById('dialArena').value,
+    phase:document.getElementById('dialPhase').value,
+    mapSeed:document.getElementById('dialMap').value,
+    visibility:document.getElementById('visToggle').classList.contains('active')?'public':'private'
+  };
+}
+function createGame(name,isQuickstart){
+  if(!name||!name.trim()){showToast('Game name is required','error');document.getElementById('gameName').focus();return;}
+  const adv=isQuickstart?{tributes:24,difficulty:3,events:3,duration:10,arena:'random',phase:'day',mapSeed:'random',visibility:'public'}:getAdvancedSettings();
+  const arenas=['The Gorge','Ancient Ruins','The Crags','The Mire','Grand Arena','The Ruins'];
+  const arenaName=adv.arena==='random'?arenas[Math.floor(Math.random()*arenas.length)]:arenas.find(a=>a.toLowerCase().replace(/\s+/g,'_')===adv.arena)||'The Arena';
+  GAMES.unshift({id:'g'+String(Date.now()).slice(-6),name:name.trim(),arena:arenaName,status:'active',day:1,phase:adv.phase,alive:adv.tributes,fallen:0,total:adv.tributes,visibility:adv.visibility,owner:true,createdAt:new Date().toISOString().slice(0,10)});
+  updateCounts();renderGames('all');document.getElementById('gameName').value='';
+  showToast('"'+name.trim()+'" created'+(isQuickstart?' [QUICKSTART]':'')+' — Day 1, '+adv.phase.toUpperCase(),'success');
+}
+document.getElementById('createBtn').addEventListener('click',()=>createGame(document.getElementById('gameName').value,false));
+document.getElementById('gameName').addEventListener('keydown',e=>{if(e.key==='Enter')createGame(document.getElementById('gameName').value,false);});
+document.getElementById('quickstartBtn').addEventListener('click',()=>{const n=['Thunder Dome Royale','The Victor\'s Gambit','Fury of the Fallen','Crimson Harvest','Iron Will','The Reaping Redux','Bone Shaker','The Fray','Last Stand at Dusk'][Math.floor(Math.random()*9)];createGame(n,true);});
+
+/* ─── ADVANCED TOGGLE ──────────────────────────────────────── */
+document.getElementById('advancedToggle').addEventListener('click',function(){
+  const p=document.getElementById('advancedPanel');const o=p.classList.toggle('open');this.classList.toggle('open');
+  this.innerHTML=o?'<span class="arrow">&#9660;</span> HIDE ADVANCED':'<span class="arrow">&#9654;</span> ADVANCED OPTIONS';
+});
+document.getElementById('dialTributes').addEventListener('input',function(){document.getElementById('tributeVal').textContent=this.value;});
+document.getElementById('dialDifficulty').addEventListener('input',function(){const l=['EASY','EASY','NORMAL','HARD','HARD','BRUTAL'];document.getElementById('difficultyVal').textContent=l[parseInt(this.value)];});
+document.getElementById('dialEvents').addEventListener('input',function(){const l=['RARE','RARE','MEDIUM','FREQUENT','FREQUENT','CONSTANT'];document.getElementById('eventsVal').textContent=l[parseInt(this.value)];});
+document.getElementById('dialDuration').addEventListener('input',function(){document.getElementById('durationVal').textContent=this.value+' DAYS';});
+document.getElementById('visToggle').addEventListener('click',function(){this.classList.toggle('active');document.getElementById('visLabel').textContent=this.classList.contains('active')?'PUBLIC':'PRIVATE';});
+
+/* ─── AUTH ────────────────────────────────────────────────── */
+document.getElementById('authBtn').addEventListener('click',function(){
+  if(this.dataset.loggedIn==='true'){
+    this.textContent='LOGIN / SIGN UP';this.dataset.loggedIn='false';this.classList.remove('logged-in');
+    document.getElementById('userBadge').style.display='none';
+    showToast('Logged out','info');
+  }else{
+    this.textContent='LOGOUT';this.dataset.loggedIn='true';this.classList.add('logged-in');
+    document.getElementById('userBadge').style.display='flex';
+    showToast('Welcome back, Commissioner','success');
+  }
+});
+
+/* ─── TOAST ────────────────────────────────────────────────── */
+function showToast(msg,type){
+  const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;
+  document.getElementById('toastContainer').appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity 0.3s';setTimeout(()=>t.remove(),300);},3000);
+}
+function updateCounts(){
+  document.getElementById('totalGames').textContent=GAMES.length;
+  document.getElementById('activeGames').textContent=GAMES.filter(g=>g.status==='active').length;
+  document.getElementById('completedGames').textContent=GAMES.filter(g=>g.status==='completed').length;
+}
+
+renderGames('all');updateCounts();
+setTimeout(()=>showToast('Welcome back, Commissioner — 3 broadcasts active','info'),400);
+</script>
+</body>
+</html>

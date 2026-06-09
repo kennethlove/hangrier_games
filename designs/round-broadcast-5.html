@@ -1,0 +1,2147 @@
+<!doctype html>
+<!--
+  round-broadcast-5.html — Capital broadcast interface v5
+  Top nav, day navigation, moved ticker, tribute tooltips.
+  Tech/sports broadcast tone + refined neobrutalism.
+  50/50 layout: left = hex arena (7-hex honeycomb) + tribute roster, right = event feed.
+  4 dramatically different event card types.
+  Proper 7-hex honeycomb: flat-top hexagons, correct axial-to-pixel.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hangrier Games — ROUND 7 · THE GORGE</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   TOKENS — tech/sports broadcast dark mode
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --bg:              #0b0e14;    /* control room dark */
+  --surface:         #141a26;    /* card surface */
+  --surface-alt:     #1c2438;    /* alt surface */
+  --surface-hover:   #222c44;    /* hover state */
+  --fg:              #e8ecf4;    /* primary text */
+  --fg-muted:        #7982a0;    /* muted text */
+  --border:          #283044;    /* default border */
+  --border-strong:   #3d4866;    /* strong border */
+  --accent:          #00b8d9;    /* cyan — primary data */
+  --accent-glow:     rgba(0,184,217,0.15);
+  --gold:            #f0b429;    /* amber — commentary, highlights */
+  --gold-glow:       rgba(240,180,41,0.12);
+  --danger:          #ef4455;    /* red — deaths */
+  --danger-glow:     rgba(239,68,85,0.12);
+  --success:         #22c55e;    /* green — alive */
+  --warning:         #f97316;    /* orange — injured */
+  --info:            #3b82f6;    /* blue — action cards */
+  --purple:          #8b5cf6;    /* purple — special events */
+
+  /* Phase colors */
+  --phase-dawn:     #f5b342;
+  --phase-day:      #f5d742;
+  --phase-dusk:     #c97b3a;
+  --phase-night:    #4a6fa5;
+
+  /* Terrain colors — 7 hexes */
+  --terrain-arena:    #5a4a3a;    /* packed earth */
+  --terrain-ruins:    #8b7d6b;
+  --terrain-forest:   #2d6a4f;
+  --terrain-mountain: #6b7280;
+  --terrain-swamp:    #5b4b6b;
+  --terrain-plains:   #7c9a5e;
+  --terrain-lake:     #3b82c4;
+
+  /* Faction colors for player dots */
+  --faction-0: #00b8d9;
+  --faction-1: #f0b429;
+  --faction-2: #ef4455;
+  --faction-3: #22c55e;
+  --faction-4: #8b5cf6;
+  --faction-5: #f97316;
+  --faction-6: #ec4899;
+  --faction-7: #06b6d4;
+
+  /* Typography */
+  --font-display:  'Tahoma', 'Arial Narrow', 'Impact', -apple-system, system-ui, sans-serif;
+  --font-body:     -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono:     'Courier New', ui-monospace, monospace;
+  --font-condensed: 'Arial Narrow', 'Impact', -apple-system, system-ui, sans-serif;
+
+  --fs-hero:  clamp(28px, 3.2vw, 42px);
+  --fs-h2:    clamp(18px, 2vw, 26px);
+  --fs-h3:    clamp(14px, 1.4vw, 18px);
+  --fs-body:  13px;
+  --fs-sm:    12px;
+  --fs-xs:    10px;
+  --fs-xxs:   9px;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px}
+body{
+  background:var(--bg);
+  color:var(--fg);
+  font-family:var(--font-body);
+  font-size:var(--fs-body);
+  line-height:1.5;
+  min-height:100vh;
+  padding:0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   APP LAYOUT
+   ═══════════════════════════════════════════════════════════════════════════ */
+#app{
+  max-width:1600px;
+  margin:0 auto;
+  display:flex;
+  flex-direction:column;
+  gap:0;
+  min-height:100vh;
+  padding:8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TOP NAV
+   ═══════════════════════════════════════════════════════════════════════════ */
+.top-nav{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:8px 16px;
+  background:linear-gradient(90deg, #0f1522, var(--surface));
+  border:2px solid var(--border-strong);
+  border-bottom:none;
+  font-size:var(--fs-xs);
+  font-family:var(--font-condensed);
+  letter-spacing:1px;
+}
+.top-nav .nav-left{
+  display:flex;
+  align-items:center;
+  gap:18px;
+}
+.top-nav .site-brand{
+  font-weight:700;
+  font-size:var(--fs-h2);
+  letter-spacing:4px;
+  text-transform:uppercase;
+  color:var(--fg);
+  font-family:var(--font-display);
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.top-nav .site-brand .emblem{
+  width:28px;height:28px;
+  background:var(--accent);
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  display:grid;place-items:center;
+  flex-shrink:0;
+}
+.top-nav .site-brand .emblem::after{
+  content:'';display:block;
+  width:12px;height:12px;
+  background:var(--bg);
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+}
+.top-nav .site-brand .brand-accent{
+  color:var(--accent);
+}
+.top-nav .nav-link{
+  color:var(--fg-muted);
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  text-decoration:none;
+  padding:4px 10px;
+  border:1px solid transparent;
+  transition:all 0.12s;
+  cursor:pointer;
+  font-size:var(--fs-xs);
+  background:none;
+  font-family:var(--font-condensed);
+}
+.top-nav .nav-link:hover{
+  color:var(--fg);
+  border-color:var(--border);
+}
+.top-nav .nav-link.back-link{
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+.top-nav .nav-link.back-link::before{
+  content:'\2190';
+  font-size:12px;
+}
+.top-nav .nav-right{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.top-nav .nav-right .auth-btn{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-xs);
+  letter-spacing:2px;
+  text-transform:uppercase;
+  padding:5px 14px;
+  border:1px solid var(--border-strong);
+  background:transparent;
+  color:var(--fg-muted);
+  cursor:pointer;
+  transition:all 0.12s;
+}
+.top-nav .nav-right .auth-btn:hover{
+  border-color:var(--accent);
+  color:var(--accent);
+}
+.top-nav .nav-right .auth-btn.logged-in{
+  border-color:var(--danger);
+  color:var(--danger);
+}
+.top-nav .nav-right .auth-btn.logged-in:hover{
+  background:var(--danger);
+  color:var(--bg);
+}
+.top-nav .nav-right .user-badge{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:3px 10px;
+  border:1px solid var(--border);
+  font-size:var(--fs-xxs);
+  color:var(--fg-muted);
+  letter-spacing:0.5px;
+}
+.top-nav .nav-right .user-badge .dot{
+  width:6px;height:6px;
+  border-radius:50%;
+  background:var(--success);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BROADCAST HEADER
+   ═══════════════════════════════════════════════════════════════════════════ */
+.broadcast-header{
+  background:linear-gradient(135deg,var(--surface),var(--surface-alt));
+  border:2px solid var(--border-strong);
+  box-shadow:0 2px 12px rgba(0,0,0,0.4);
+  padding:10px 18px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.broadcast-header .brand{
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+.broadcast-header .brand .capitol-emblem{
+  width:32px;height:32px;
+  background:var(--accent);
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  display:grid;place-items:center;
+}
+.broadcast-header .brand .capitol-emblem::after{
+  content:'';display:block;
+  width:14px;height:14px;
+  background:var(--bg);
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+}
+.broadcast-header .round-id{
+  font-family:var(--font-display);
+  font-size:var(--fs-hero);
+  font-weight:700;
+  line-height:1;
+  letter-spacing:3px;
+  text-transform:uppercase;
+}
+.broadcast-header .round-id .hl{color:var(--accent);}
+.broadcast-header .location{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-h3);
+  font-weight:400;
+  color:var(--fg-muted);
+  text-transform:uppercase;
+  letter-spacing:2px;
+  padding:0 12px;
+  border-left:1px solid var(--border);
+}
+.broadcast-header .phase-indicator{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-family:var(--font-condensed);
+  font-size:var(--fs-h3);
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:3px;
+  padding:4px 14px;
+  border:2px solid;
+}
+.phase-indicator.phase-dawn{border-color:var(--phase-dawn);color:var(--phase-dawn);}
+.phase-indicator.phase-day{border-color:var(--phase-day);color:var(--phase-day);}
+.phase-indicator.phase-dusk{border-color:var(--phase-dusk);color:var(--phase-dusk);}
+.phase-indicator.phase-night{border-color:var(--phase-night);color:var(--phase-night);}
+.phase-indicator .phase-dot{
+  width:10px;height:10px;
+  border-radius:50%;
+  background:currentColor;
+}
+.broadcast-meta{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:var(--fs-sm);
+}
+.broadcast-meta .stat{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  padding:3px 10px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,0.03);
+}
+.broadcast-meta .stat .num{font-weight:700;color:var(--fg);}
+.broadcast-meta .stat .alive{color:var(--success);}
+.broadcast-meta .stat .fallen{color:var(--danger);}
+.broadcast-meta .stat-label{font-size:var(--fs-xs);color:var(--fg-muted);text-transform:uppercase;letter-spacing:1px;}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DAY NAV
+   ═══════════════════════════════════════════════════════════════════════════ */
+.day-nav{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:6px 14px;
+  background:var(--surface-alt);
+  border:2px solid var(--border-strong);
+  border-top:none;
+  font-size:var(--fs-xs);
+  font-family:var(--font-mono);
+  flex-shrink:0;
+}
+.day-nav .day-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.day-nav .day-label{
+  font-family:var(--font-condensed);
+  font-weight:700;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  color:var(--fg);
+  font-size:var(--fs-sm);
+}
+.day-nav .day-label .hl{
+  color:var(--accent);
+}
+.day-nav .day-arrows{
+  display:flex;
+  gap:2px;
+}
+.day-nav .day-arrow{
+  width:24px;height:24px;
+  display:grid;place-items:center;
+  border:1px solid var(--border);
+  background:transparent;
+  color:var(--fg-muted);
+  cursor:pointer;
+  font-family:var(--font-mono);
+  font-size:12px;
+  font-weight:700;
+  transition:all 0.1s;
+}
+.day-nav .day-arrow:hover{
+  border-color:var(--accent);
+  color:var(--accent);
+  background:rgba(0,184,217,0.08);
+}
+.day-nav .day-arrow:active{
+  background:var(--accent);
+  color:var(--bg);
+}
+.day-nav .day-select{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  padding:2px 6px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  color:var(--fg);
+  cursor:pointer;
+  outline:none;
+}
+.day-nav .day-select option{background:var(--surface);color:var(--fg);}
+.day-nav .day-right{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.day-nav .phase-btn{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-xxs);
+  letter-spacing:2px;
+  text-transform:uppercase;
+  padding:3px 10px;
+  border:1px solid var(--border);
+  background:transparent;
+  color:var(--fg-muted);
+  cursor:pointer;
+  transition:all 0.1s;
+  font-weight:700;
+}
+.day-nav .phase-btn:hover{
+  border-color:var(--gold);
+  color:var(--gold);
+}
+.day-nav .phase-btn:active{
+  background:var(--gold);
+  color:var(--bg);
+}
+.day-nav .day-info{
+  font-size:var(--fs-xxs);
+  color:var(--fg-muted);
+  letter-spacing:0.5px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TICKER BAR (moved from bottom to top)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.ticker-bar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:5px 14px;
+  background:var(--surface);
+  border:2px solid var(--border-strong);
+  border-top:none;
+  font-size:var(--fs-xs);
+  font-family:var(--font-mono);
+  flex-shrink:0;
+}
+.ticker-bar .ticker-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.ticker-bar .live-dot{
+  width:7px;height:7px;
+  border-radius:50%;
+  background:var(--danger);
+  animation:pulse 1.2s infinite;
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.ticker-bar .live-label{
+  font-weight:700;
+  letter-spacing:2px;
+  color:var(--danger);
+  font-size:var(--fs-xxs);
+}
+.ticker-bar .ticker-divider{
+  width:1px;
+  height:16px;
+  background:var(--border);
+}
+.ticker-bar .ticker-text{
+  color:var(--fg-muted);
+  font-size:var(--fs-xxs);
+  letter-spacing:0.3px;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  max-width:400px;
+}
+.ticker-bar .ticker-text .hl{color:var(--accent);}
+.ticker-bar .ticker-text .danger{color:var(--danger);}
+.ticker-bar .ticker-text .gold{color:var(--gold);}
+.ticker-bar .ticker-right{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.ticker-bar .ticker-stat{
+  font-size:var(--fs-xxs);
+  color:var(--fg-muted);
+  letter-spacing:0.5px;
+}
+.ticker-bar .ticker-stat .num{font-weight:700;color:var(--fg);}
+.ticker-bar .clock{
+  font-size:var(--fs-sm);
+  font-weight:700;
+  color:var(--accent);
+  font-variant-numeric:tabular-nums;
+  min-width:50px;
+  text-align:right;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAIN GRID — 50/50
+   ═══════════════════════════════════════════════════════════════════════════ */
+.main-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  flex:1;
+  min-height:0;
+  margin-top:10px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LEFT PANEL
+   ═══════════════════════════════════════════════════════════════════════════ */
+.left-panel{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  min-height:0;
+}
+
+/* ─── Arena Map ─── */
+.map-section{
+  height:320px;
+  flex-shrink:0;
+  background:var(--surface);
+  border:2px solid var(--border-strong);
+  display:flex;
+  flex-direction:column;
+}
+.map-section .section-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:8px 12px;
+  border-bottom:1px solid var(--border);
+  font-size:var(--fs-xs);
+  text-transform:uppercase;
+  letter-spacing:1px;
+  color:var(--fg-muted);
+  flex-shrink:0;
+}
+.map-section .section-header .title{font-weight:600;color:var(--fg);font-family:var(--font-condensed);letter-spacing:2px;font-size:var(--fs-sm);}
+.map-section .section-header .controls{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.map-section .filter-btn{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  padding:2px 8px;
+  border:1px solid var(--border);
+  background:transparent;
+  color:var(--fg-muted);
+  cursor:pointer;
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+  transition:all 0.12s;
+}
+.map-section .filter-btn:hover{border-color:var(--accent);color:var(--accent);}
+.map-section .filter-btn.active{background:var(--accent);color:var(--bg);border-color:var(--accent);}
+
+.map-container{
+  position:relative;
+  flex:1;
+  overflow:hidden;
+  cursor:grab;
+  min-height:120px;
+}
+.map-container:active{cursor:grabbing;}
+.map-viewport{
+  transform-origin:0 0;
+}
+.map-viewport.zooming{
+  transition:transform 0.2s ease;
+}
+
+.map-zoom-controls{
+  position:absolute;
+  bottom:10px;
+  left:10px;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  z-index:10;
+}
+.map-zoom-controls button{
+  width:28px;height:28px;
+  background:var(--surface);
+  border:1px solid var(--border-strong);
+  color:var(--fg);
+  font-size:14px;
+  font-weight:700;
+  cursor:pointer;
+  display:grid;place-items:center;
+  font-family:var(--font-mono);
+  transition:background 0.1s;
+}
+.map-zoom-controls button:hover{background:var(--surface-hover);}
+.map-zoom-controls button:active{background:var(--accent);color:var(--bg);}
+
+.map-legend{
+  position:absolute;
+  bottom:10px;
+  right:10px;
+  z-index:10;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  background:rgba(11,14,20,0.85);
+  border:1px solid var(--border);
+  padding:6px 10px;
+  font-size:var(--fs-xxs);
+  color:var(--fg-muted);
+}
+.map-legend .legend-row{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.map-legend .legend-dot{
+  width:8px;height:8px;
+  border-radius:50%;
+  border:1px solid rgba(255,255,255,0.3);
+}
+
+/* ─── Tribute Roster ─── */
+.roster-section{
+  flex:1;
+  min-height:120px;
+  background:var(--surface);
+  border:2px solid var(--border-strong);
+  display:flex;
+  flex-direction:column;
+}
+.roster-section .section-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:6px 12px;
+  border-bottom:1px solid var(--border);
+  font-size:var(--fs-xs);
+  text-transform:uppercase;
+  letter-spacing:1px;
+  color:var(--fg-muted);
+  flex-shrink:0;
+}
+.roster-section .section-header .title{font-weight:600;color:var(--fg);font-family:var(--font-condensed);letter-spacing:2px;font-size:var(--fs-sm);}
+.roster-section .section-header .count{font-family:var(--font-mono);color:var(--accent);}
+
+.roster-scroll{
+  flex:1;
+  overflow-y:auto;
+  padding:8px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.roster-scroll::-webkit-scrollbar{width:4px;}
+.roster-scroll::-webkit-scrollbar-track{background:transparent;}
+.roster-scroll::-webkit-scrollbar-thumb{background:var(--border);}
+
+.pair-card{
+  border:1px solid var(--border);
+  background:var(--surface-alt);
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  gap:0;
+  transition:border-color 0.12s;
+  position:relative;
+}
+.pair-card:hover{border-color:var(--border-strong);}
+.pair-card .pair-divider{
+  width:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+}
+.pair-card .pair-divider::before{
+  content:'';
+  width:1px;
+  height:60%;
+  background:var(--border);
+}
+.pair-card .pair-link-icon{
+  position:absolute;
+  font-size:8px;
+  color:var(--fg-muted);
+  line-height:1;
+}
+.tribute-card{
+  padding:6px 10px;
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  gap:8px;
+  align-items:center;
+  position:relative;
+  cursor:default;
+}
+.tribute-card.dead{opacity:0.5;}
+.tribute-card.dead::after{
+  content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(239,68,85,0.08) 6px,rgba(239,68,85,0.08) 8px);
+  pointer-events:none;
+}
+.tribute-avatar{
+  width:26px;height:26px;
+  border-radius:50%;
+  border:2px solid;
+  display:grid;place-items:center;
+  font-family:var(--font-condensed);
+  font-size:var(--fs-xs);
+  font-weight:700;
+  flex-shrink:0;
+}
+.tribute-info{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  min-width:0;
+}
+.tribute-name{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-sm);
+  font-weight:700;
+  letter-spacing:0.5px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.tribute-meta{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.tribute-alliance{
+  font-size:var(--fs-xxs);
+  font-family:var(--font-mono);
+  font-weight:700;
+  letter-spacing:0.5px;
+  padding:0 4px;
+  border:1px solid;
+  white-space:nowrap;
+}
+.health-bar{
+  width:40px;height:5px;
+  background:var(--border);
+  overflow:hidden;
+  flex-shrink:0;
+}
+.health-fill{height:100%;transition:width 0.3s;}
+.health-fill.high{background:var(--success);}
+.health-fill.mid{background:var(--warning);}
+.health-fill.low{background:var(--danger);}
+.health-fill.empty{background:transparent;}
+.tribute-stats{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:1px;
+  flex-shrink:0;
+}
+.tribute-stats .kills{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xxs);
+  color:var(--fg-muted);
+}
+.tribute-stats .kills .num{color:var(--accent);font-weight:700;}
+.tribute-status{
+  font-family:var(--font-condensed);
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:1px;
+  padding:1px 5px;
+}
+.tribute-status.alive{color:var(--success);border:1px solid var(--success);}
+.tribute-status.injured{color:var(--warning);border:1px solid var(--warning);}
+.tribute-status.dead{color:var(--danger);border:1px solid var(--danger);}
+
+/* ─── Tribute Tooltip ─── */
+.tribute-card{
+  position:relative;
+}
+.tribute-tooltip{
+  position:absolute;
+  bottom:calc(100% + 8px);
+  left:50%;
+  transform:translateX(-50%);
+  background:var(--surface-alt);
+  border:2px solid var(--border-strong);
+  padding:10px 14px;
+  z-index:100;
+  min-width:180px;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity 0.15s, transform 0.15s;
+  box-shadow:0 4px 20px rgba(0,0,0,0.5);
+}
+.tribute-card:hover .tribute-tooltip{
+  opacity:1;
+}
+.tribute-tooltip .tt-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:8px;
+}
+.tribute-tooltip .tt-avatar{
+  width:36px;height:36px;
+  border-radius:50%;
+  border:2px solid;
+  display:grid;place-items:center;
+  font-family:var(--font-condensed);
+  font-size:16px;
+  font-weight:700;
+  flex-shrink:0;
+}
+.tribute-tooltip .tt-name{
+  font-family:var(--font-condensed);
+  font-weight:700;
+  font-size:var(--fs-sm);
+  letter-spacing:1px;
+}
+.tribute-tooltip .tt-alliance{
+  font-size:9px;
+  font-family:var(--font-mono);
+  letter-spacing:1px;
+  padding:0 4px;
+  border:1px solid;
+  display:inline-block;
+  margin-top:2px;
+}
+.tribute-tooltip .tt-stats{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:4px 10px;
+  font-size:var(--fs-xs);
+}
+.tribute-tooltip .tt-stat{
+  display:flex;
+  flex-direction:column;
+}
+.tribute-tooltip .tt-stat .tt-label{
+  font-size:7px;
+  font-family:var(--font-mono);
+  color:var(--fg-muted);
+  letter-spacing:1px;
+  text-transform:uppercase;
+}
+.tribute-tooltip .tt-stat .tt-value{
+  font-family:var(--font-condensed);
+  font-weight:700;
+  font-size:var(--fs-sm);
+}
+.tribute-tooltip .tt-stat .tt-value.health-high{color:var(--success);}
+.tribute-tooltip .tt-stat .tt-value.health-mid{color:var(--warning);}
+.tribute-tooltip .tt-stat .tt-value.health-low{color:var(--danger);}
+.tribute-tooltip .tt-divider{
+  height:1px;
+  background:var(--border);
+  margin:6px 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RIGHT PANEL — EVENT FEED
+   ═══════════════════════════════════════════════════════════════════════════ */
+.feed-section{
+  background:var(--surface);
+  border:2px solid var(--border-strong);
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+}
+.feed-section .section-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:8px 12px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+  flex-wrap:wrap;
+  gap:6px;
+}
+.feed-section .section-header .title{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-sm);
+  font-weight:600;
+  letter-spacing:2px;
+  text-transform:uppercase;
+}
+.feed-section .section-header .title .hl{color:var(--accent);}
+.feed-tabs{
+  display:flex;
+  gap:3px;
+}
+.feed-tab{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  padding:3px 10px;
+  border:1px solid var(--border);
+  background:transparent;
+  color:var(--fg-muted);
+  cursor:pointer;
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+  transition:all 0.12s;
+}
+.feed-tab:hover{border-color:var(--accent);color:var(--accent);}
+.feed-tab.active{background:var(--accent);color:var(--bg);border-color:var(--accent);}
+
+.feed-scroll{
+  flex:1;
+  overflow-y:auto;
+  padding:8px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.feed-scroll::-webkit-scrollbar{width:5px;}
+.feed-scroll::-webkit-scrollbar-track{background:transparent;}
+.feed-scroll::-webkit-scrollbar-thumb{background:var(--border);}
+
+/* ─── Event Card Base ─── */
+.event-card{
+  border:1px solid var(--border);
+  position:relative;
+  transition:border-color 0.12s;
+}
+.event-card:hover{border-color:var(--border-strong);}
+.event-card .card-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:5px 10px;
+  font-size:var(--fs-xs);
+  gap:8px;
+}
+.event-card .card-badge{
+  font-family:var(--font-condensed);
+  font-weight:700;
+  font-size:var(--fs-xxs);
+  letter-spacing:2px;
+  padding:1px 6px;
+}
+.event-card .card-timestamp{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xxs);
+  color:var(--fg-muted);
+}
+
+/* ─── COMBAT card (blue accent) ─── */
+.event-card.action{
+  border-left:3px solid var(--info);
+  background:rgba(59,130,246,0.04);
+}
+.event-card.action .card-badge{background:var(--info);color:var(--bg);}
+.event-card.action .card-body{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:5px 10px 8px;
+  flex-wrap:wrap;
+}
+.event-card.action .actor-avatar{
+  width:20px;height:20px;
+  border-radius:50%;
+  border:2px solid;
+  display:grid;place-items:center;
+  font-family:var(--font-condensed);
+  font-size:9px;
+  font-weight:700;
+  flex-shrink:0;
+}
+.event-card.action .action-verb{
+  font-weight:700;
+  font-size:var(--fs-sm);
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+}
+.event-card.action .action-target{
+  font-weight:600;
+  color:var(--fg);
+}
+.event-card.action .action-detail{
+  font-size:var(--fs-xs);
+  color:var(--fg-muted);
+  font-family:var(--font-mono);
+}
+.event-card.action .action-detail .hl{color:var(--danger);}
+
+/* ─── ELIMINATED card (red/bold) ─── */
+.event-card.death{
+  border:2px solid var(--danger);
+  background:rgba(239,68,85,0.04);
+  position:relative;
+  overflow:hidden;
+}
+.event-card.death .card-badge{background:var(--danger);color:var(--bg);}
+.event-card.death .card-body{
+  padding:6px 10px 8px;
+}
+.event-card.death .death-quote{
+  font-family:Georgia, serif;
+  font-size:var(--fs-sm);
+  font-style:italic;
+  color:var(--fg);
+  line-height:1.4;
+}
+.event-card.death .death-meta{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:4px 10px 6px;
+  border-top:1px solid rgba(239,68,85,0.2);
+  font-size:var(--fs-xs);
+}
+.event-card.death .death-meta .weapon{
+  font-family:var(--font-mono);
+  color:var(--fg-muted);
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+}
+.event-card.death .death-meta .kill-count{
+  font-family:var(--font-condensed);
+  font-weight:700;
+}
+.event-card.death .death-meta .kill-count .hl{color:var(--danger);}
+
+/* ─── ARENA EVENT card (purple) ─── */
+.event-card.event{
+  border-top:3px solid var(--purple);
+  background:rgba(139,92,246,0.04);
+}
+.event-card.event .card-badge{background:var(--purple);color:var(--bg);}
+.event-card.event .card-body{
+  padding:5px 10px 8px;
+}
+.event-card.event .event-title{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-h3);
+  font-weight:700;
+  letter-spacing:1px;
+  text-transform:uppercase;
+}
+.event-card.event .event-desc{
+  font-size:var(--fs-xs);
+  color:var(--fg-muted);
+  margin-top:2px;
+  line-height:1.4;
+}
+.event-card.event .event-affected{
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px;
+  margin-top:6px;
+}
+.event-card.event .affected-pill{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xxs);
+  padding:1px 6px;
+  border:1px solid var(--border);
+  color:var(--fg-muted);
+}
+
+/* ─── ANALYSIS card (gold) ─── */
+.event-card.commentary{
+  border-left:3px solid var(--gold);
+  background:rgba(240,180,41,0.03);
+}
+.event-card.commentary .card-badge{background:var(--gold);color:var(--bg);}
+.event-card.commentary .card-body{
+  padding:5px 10px 8px;
+}
+.event-card.commentary .comment-text{
+  font-family:Georgia, serif;
+  font-size:var(--fs-sm);
+  font-style:italic;
+  color:var(--fg);
+  line-height:1.4;
+  padding:2px 0 2px 10px;
+  border-left:2px solid var(--gold);
+}
+.event-card.commentary .comment-speaker{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:6px;
+}
+.event-card.commentary .speaker-avatar{
+  width:20px;height:20px;
+  border-radius:50%;
+  background:var(--surface-alt);
+  border:1px solid var(--border);
+  display:grid;place-items:center;
+  font-family:var(--font-condensed);
+  font-size:8px;
+  font-weight:700;
+  color:var(--gold);
+}
+.event-card.commentary .speaker-info{
+  display:flex;
+  flex-direction:column;
+}
+.event-card.commentary .speaker-name{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-xs);
+  font-weight:700;
+}
+.event-card.commentary .speaker-role{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xxs);
+  color:var(--fg-muted);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media(max-width:1100px){
+  .main-grid{grid-template-columns:1fr;}
+  .left-panel{order:0;}
+  .feed-section{order:1;min-height:400px;}
+  .map-section{height:260px;}
+  .top-nav .nav-link.back-link span{display:none;}
+  .ticker-bar .ticker-text{max-width:200px;}
+}
+@media(max-width:720px){
+  .broadcast-header{flex-direction:column;align-items:flex-start;gap:6px;}
+  .map-section{height:220px;}
+  .top-nav{flex-wrap:wrap;gap:8px;}
+  .top-nav .site-brand{font-size:var(--fs-h3);}
+  .day-nav{flex-wrap:wrap;gap:6px;}
+  .ticker-bar .ticker-text{max-width:120px;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       TOP NAV
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="top-nav">
+    <div class="nav-left">
+      <div class="site-brand">
+        <div class="emblem"></div>
+        <span>HANGRIER <span class="brand-accent">GAMES</span></span>
+      </div>
+      <button class="nav-link back-link" onclick="navigateBack()"><span>ALL GAMES</span></button>
+    </div>
+    <div class="nav-right" id="navAuth">
+      <div class="user-badge" id="userBadge" style="display:none">
+        <span class="dot"></span>
+        <span id="userName">SPONSOR</span>
+      </div>
+      <button class="auth-btn" id="authBtn" onclick="toggleAuth()">LOGIN / SIGN UP</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       BROADCAST HEADER
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="broadcast-header">
+    <div class="brand">
+      <div class="capitol-emblem"></div>
+      <span class="round-id">ROUND <span class="hl">7</span></span>
+      <span class="location">THE GORGE</span>
+    </div>
+    <div class="phase-indicator phase-dawn" id="phaseIndicator">
+      <span class="phase-dot"></span>
+      <span id="phaseLabel">DAWN</span>
+    </div>
+    <div class="broadcast-meta">
+      <div class="stat"><span class="num alive" id="aliveCount">18</span> <span class="stat-label">ALIVE</span></div>
+      <div class="stat"><span class="num fallen" id="fallenCount">6</span> <span class="stat-label">FALLEN</span></div>
+      <div class="stat"><span class="num" id="totalCount">24</span> <span class="stat-label">TOTAL</span></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       DAY NAV
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="day-nav">
+    <div class="day-left">
+      <span class="day-label">DAY <span class="hl" id="dayLabel">7</span></span>
+      <div class="day-arrows">
+        <button class="day-arrow" onclick="prevDay()" title="Previous day">&lt;</button>
+        <button class="day-arrow" onclick="nextDay()" title="Next day">&gt;</button>
+      </div>
+      <select class="day-select" id="daySelect" onchange="jumpToDay(this)">
+        <option value="1">Day 1 — OPENING</option>
+        <option value="2">Day 2</option>
+        <option value="3">Day 3</option>
+        <option value="4">Day 4</option>
+        <option value="5">Day 5</option>
+        <option value="6">Day 6</option>
+        <option value="7" selected>Day 7 — THE GORGE</option>
+        <option value="8">Day 8</option>
+        <option value="9">Day 9</option>
+        <option value="10">Day 10 — FINALE</option>
+      </select>
+    </div>
+    <div class="day-right">
+      <span class="day-info">PHASE</span>
+      <button class="phase-btn" onclick="advancePhase()" id="advancePhaseBtn">ADVANCE +</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       TICKER BAR (live ticker — moved above main grid)
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="ticker-bar">
+    <div class="ticker-left">
+      <span class="live-dot"></span>
+      <span class="live-label">LIVE</span>
+      <span class="ticker-divider"></span>
+      <span class="ticker-text" id="tickerText">ARENA SURVEILLANCE ACTIVE — <span class="hl">24 TRIBUTES</span> IN PLAY. FIRST ENGAGEMENTS REPORTED IN THE <span class="gold">ANCIENT RUINS</span>.</span>
+    </div>
+    <div class="ticker-right">
+      <span class="ticker-stat">EVENTS: <span class="num" id="feedCount">0</span></span>
+      <span class="ticker-divider"></span>
+      <span class="clock" id="countdownClock">--:--</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       MAIN GRID — 50/50
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="main-grid">
+
+    <!-- ── LEFT PANEL: MAP + ROSTER ── -->
+    <div class="left-panel">
+
+      <!-- Hex Arena Map -->
+      <div class="map-section">
+        <div class="section-header">
+          <span class="title">ARENA SURVEILLANCE</span>
+          <div class="controls">
+            <button class="filter-btn active" onclick="filterMap('players',this)">PLAYERS</button>
+            <button class="filter-btn active" onclick="filterMap('resources',this)">RESOURCES</button>
+            <button class="filter-btn" onclick="filterMap('terrain',this)">TERRAIN</button>
+          </div>
+        </div>
+        <div class="map-container" id="mapContainer">
+          <div class="map-viewport" id="mapViewport">
+            <svg id="hexSvg" width="0" height="0"></svg>
+          </div>
+          <div class="map-zoom-controls">
+            <button onclick="zoomMap(1.4)">+</button>
+            <button onclick="zoomMap(0.72)">-</button>
+            <button onclick="resetMap()" style="font-size:10px;letter-spacing:1px">R</button>
+          </div>
+          <div class="map-legend" id="mapLegend">
+            <div class="legend-row"><span class="legend-dot" style="background:var(--accent)"></span> Player</div>
+            <div class="legend-row"><span class="legend-dot" style="background:var(--gold)"></span> Resource</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tribute Roster -->
+      <div class="roster-section">
+        <div class="section-header">
+          <span class="title">TRIBUTE ROSTER</span>
+          <span class="count" id="rosterCount">12 ALLIANCES / 24 TRIBUTES</span>
+        </div>
+        <div class="roster-scroll" id="rosterScroll"></div>
+      </div>
+    </div>
+
+    <!-- ── RIGHT PANEL: EVENT FEED ── -->
+    <div class="feed-section">
+      <div class="section-header">
+        <span class="title">EVENT <span class="hl">FEED</span></span>
+        <div class="feed-tabs" id="feedTabs">
+          <button class="feed-tab active" data-tab="all" onclick="filterFeed('all',this)">ALL</button>
+          <button class="feed-tab" data-tab="action" onclick="filterFeed('action',this)">ACTION</button>
+          <button class="feed-tab" data-tab="death" onclick="filterFeed('death',this)">DEATHS</button>
+          <button class="feed-tab" data-tab="event" onclick="filterFeed('event',this)">EVENTS</button>
+          <button class="feed-tab" data-tab="commentary" onclick="filterFeed('commentary',this)">COMMS</button>
+        </div>
+      </div>
+      <div class="feed-scroll" id="feedScroll"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   DATA
+   ═══════════════════════════════════════════════════════════════════════════ */
+var TERRAIN_TYPES = ['arena','ruins','forest','plains','mountain','lake','swamp'];
+
+var ZONE_NAMES = {
+  'arena':   'THE ARENA',
+  'ruins':   'ANCIENT RUINS',
+  'forest':  'DARK FOREST',
+  'plains':  'OPEN PLAINS',
+  'mountain':'CRAG MOUNTAIN',
+  'lake':    'MIRROR LAKE',
+  'swamp':   'FEN SWAMP'
+};
+
+var ZONE_DESCS = {
+  'arena':   'The central combat zone — open ground with scattered debris.',
+  'ruins':   'Crumbled stone structures offer cover and ambush points.',
+  'forest':  'Dense canopy blocks the sky. Visibility is limited.',
+  'plains':  'Flat, exposed grassland with no natural cover.',
+  'mountain':'Rocky outcroppings and steep drops. High ground advantage.',
+  'lake':    'Dark, still water. Slow movement, no cover.',
+  'swamp':   'Foul bog with sinkholes. Every step could be your last.'
+};
+
+var TERRAIN_COLORS = {
+  arena:    '#5a4a3a',
+  ruins:    'var(--terrain-ruins)',
+  forest:   'var(--terrain-forest)',
+  plains:   'var(--terrain-plains)',
+  mountain: 'var(--terrain-mountain)',
+  lake:     'var(--terrain-lake)',
+  swamp:    'var(--terrain-swamp)'
+};
+
+var FACTION_COLORS = [
+  'var(--faction-0)','var(--faction-1)','var(--faction-2)','var(--faction-3)',
+  'var(--faction-4)','var(--faction-5)','var(--faction-6)','var(--faction-7)'
+];
+
+var TRIBUTE_NAMES = [
+  'Valerius', 'Cassia', 'Toran', 'Lyra', 'Hector', 'Vega',
+  'Marius', 'Sable', 'Corvus', 'Iris', 'Damon', 'Nova',
+  'Ronan', 'Phaea', 'Silas', 'Vale', 'Artemis', 'Caelus',
+  'Titus', 'Riven', 'Flavia', 'Oren', 'Decima', 'Zephyr'
+];
+
+var ALLIANCE_NAMES = [
+  'Wolf Pack', 'Iron Vow', 'Shadow Pact', 'Blood Oath',
+  'Frost Kin', 'Ember Clan', 'Storm Eye', 'Stone Guard',
+  'Night Watch', 'Dawn Bringers', 'Ash Walkers', 'Thunder Run'
+];
+
+var ALLIANCE_SHORT = [
+  'WOLF', 'VOW', 'SHADOW', 'OATH',
+  'FROST', 'EMBER', 'STORM', 'GUARD',
+  'WATCH', 'DAWN', 'ASH', 'THUNDER'
+];
+
+var FACTION_ASSIGN = [0,1,2,3,4,5,6,7,0,1,2,3,4,5,6,7,0,1,2,3,4,5,6,7];
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GENERATE TRIBUTE DATA
+   ═══════════════════════════════════════════════════════════════════════════ */
+function generateTribes() {
+  var tributes = [];
+  var id = 0;
+  for (var a = 0; a < 12; a++) {
+    var h1 = Math.floor(Math.random() * 40) + 50;
+    var h2 = Math.max(5, h1 - 5 + Math.floor(Math.random() * 20));
+    var s1 = h1 > 20 ? (Math.random() > 0.3 ? 'alive' : 'injured') : 'dead';
+    var s2 = h2 > 20 ? (Math.random() > 0.25 ? 'alive' : 'injured') : 'dead';
+    var k1 = Math.floor(Math.random() * 5);
+    var k2 = Math.floor(Math.random() * 5);
+
+    tributes.push({
+      id: id++, name: TRIBUTE_NAMES[a*2],
+      alliance: ALLIANCE_NAMES[a], allianceShort: ALLIANCE_SHORT[a],
+      faction: FACTION_ASSIGN[a], health: h1,
+      status: s1, kills: k1, avatar: TRIBUTE_NAMES[a*2][0]
+    });
+    tributes.push({
+      id: id++, name: TRIBUTE_NAMES[a*2+1],
+      alliance: ALLIANCE_NAMES[a], allianceShort: ALLIANCE_SHORT[a],
+      faction: FACTION_ASSIGN[a], health: h2,
+      status: s2, kills: k2, avatar: TRIBUTE_NAMES[a*2+1][0]
+    });
+  }
+  return tributes;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GENERATE EVENT DATA
+   ═══════════════════════════════════════════════════════════════════════════ */
+var LOCATIONS = ['THE ARENA','ANCIENT RUINS','DARK FOREST','OPEN PLAINS','CRAG MOUNTAIN','MIRROR LAKE','FEN SWAMP'];
+var WEAPONS = ['LONGBOW','THROWING KNIFE','SPEAR','NET','SWORD','HATCHET','CROSSBOW','BLOWGUN','MACE','SICKLE','STAFF','SLING'];
+var COMMENTATORS = [
+  {name:'JULIUS CAIN',role:'LEAD ANALYST',initial:'JC'},
+  {name:'LYDIA VOSS',role:'TACTICAL COMMENTATOR',initial:'LV'},
+  {name:'MARCUS DRAAK',role:'FIELD REPORTER',initial:'MD'}
+];
+
+var verbs = ['strikes','ambushes','pins','flanks','wounds','clubs','slashes','spears','mauls','harries'];
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function generateEvents(tributes) {
+  var events = [];
+  var alive = tributes.filter(function(t) { return t.status !== 'dead'; });
+  var timestamp = function() {
+    var m = Math.floor(Math.random() * 60);
+    return '+' + String(Math.floor(Math.random()*30)).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+  };
+
+  // Combat actions
+  for (var i = 0; i < 8; i++) {
+    var a = pick(alive);
+    var b = pick(tributes.filter(function(t) { return t.id !== a.id; }));
+    events.push({
+      type: 'action', timestamp: timestamp(),
+      actorInitial: a.avatar, actorFaction: a.faction,
+      verb: pick(verbs), target: b.name,
+      weapon: pick(WEAPONS), damage: Math.floor(Math.random() * 20) + 5,
+      location: pick(LOCATIONS)
+    });
+  }
+
+  // Deaths
+  var dead = tributes.filter(function(t) { return t.status === 'dead'; });
+  for (var i2 = 0; i2 < 6 && i2 < dead.length; i2++) {
+    var d = dead[i2];
+    var killer = pick(alive);
+    events.push({
+      type: 'death', timestamp: timestamp(), location: pick(LOCATIONS),
+      quote: d.name + ' eliminated by ' + killer.name + ' after a brutal engagement.',
+      victim: d.name, slayer: killer.name, weapon: pick(WEAPONS),
+      killerKills: killer.kills + Math.floor(Math.random() * 3)
+    });
+  }
+
+  // Arena events
+  var arenaEvents = [
+    {title:'FIRE SWEEP', desc:'A wildfire sweeps across the eastern ridge, forcing tributes toward the gorge.'},
+    {title:'AVALANCHE', desc:'A thunderous cascade of rock and ice thunders down CRAG MOUNTAIN, reshaping the terrain.'},
+    {title:'SUPPLY DROP', desc:'A hovercraft releases supply crates over the arena. Expect heavy contestation.'},
+    {title:'FOG BANK', desc:'Dense fog rolls through the lowlands, reducing visibility to near zero.'},
+    {title:'CORN HARVEST', desc:'The arena announces a Cornucopia bloodbath feast — supplies are here.'}
+  ];
+  for (var i3 = 0; i3 < 4; i3++) {
+    var ae = pick(arenaEvents);
+    var affected = [];
+    var numAffected = Math.floor(Math.random() * 4) + 2;
+    for (var j = 0; j < numAffected; j++) {
+      affected.push(pick(alive).name);
+    }
+    events.push({
+      type: 'event', timestamp: timestamp(),
+      title: ae.title, desc: ae.desc,
+      affected: [...new Set(affected)]
+    });
+  }
+
+  // Commentary
+  for (var i4 = 0; i4 < 6; i4++) {
+    var comm = pick(COMMENTATORS);
+    var quotes = [
+      'The pacing this round is exceptional — we are seeing real tactical evolution from the field.',
+      'That positioning from WOLF PACK is textbook. They control the high ground entirely.',
+      'You can see the fatigue setting in. Mistakes are becoming costly.',
+      'The alliance dynamics have shifted dramatically since the last supply drop.',
+      'If STORM EYE consolidates the western hex, they will be nearly impossible to dislodge.',
+      'The arena itself is the deadliest opponent today. That fire sweep changed everything.',
+      'Watch for IRON VOW — they have been conserving resources while others bleed each other dry.',
+      'FEN SWAMP has claimed three tributes this round alone. The terrain is unforgiving.',
+      'DAWN BRINGERS are making an aggressive push toward the center. Bold move.',
+      'The kill count is climbing faster than projected. This may be a short round.'
+    ];
+    events.push({
+      type: 'commentary', timestamp: timestamp(),
+      speaker: comm.name, speakerRole: comm.role, speakerInitial: comm.initial,
+      text: pick(quotes)
+    });
+  }
+
+  // Shuffle
+  events.sort(function() { return Math.random() - 0.5; });
+  return events;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RENDER TRIBUTE ROSTER (with hover tooltips)
+   ═══════════════════════════════════════════════════════════════════════════ */
+function renderRoster(tributes) {
+  var container = document.getElementById('rosterScroll');
+  container.innerHTML = '';
+
+  var pairMap = {};
+  tributes.forEach(function(t) {
+    if (!pairMap[t.alliance]) pairMap[t.alliance] = [];
+    pairMap[t.alliance].push(t);
+  });
+  var pairs = Object.values(pairMap);
+
+  pairs.forEach(function(pair) {
+    var card = document.createElement('div');
+    card.className = 'pair-card';
+
+    pair.forEach(function(t, idx) {
+      var barClass = t.health > 60 ? 'high' : t.health > 20 ? 'mid' : t.health > 0 ? 'low' : 'empty';
+      var tc = document.createElement('div');
+      tc.className = 'tribute-card' + (t.status === 'dead' ? ' dead' : '');
+
+      // Build tooltip
+      var tooltip = '<div class="tribute-tooltip">' +
+        '<div class="tt-row">' +
+          '<div class="tt-avatar" style="border-color:var(--faction-' + t.faction + ');color:var(--faction-' + t.faction + ')">' + t.avatar + '</div>' +
+          '<div>' +
+            '<div class="tt-name">' + t.name + '</div>' +
+            '<div class="tt-alliance" style="border-color:var(--faction-' + t.faction + ');color:var(--faction-' + t.faction + ')">' + t.allianceShort + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="tt-divider"></div>' +
+        '<div class="tt-stats">' +
+          '<div class="tt-stat"><span class="tt-label">Health</span><span class="tt-value health-' + barClass + '">' + t.health + '%</span></div>' +
+          '<div class="tt-stat"><span class="tt-label">Status</span><span class="tt-value">' + t.status.toUpperCase() + '</span></div>' +
+          '<div class="tt-stat"><span class="tt-label">Kills</span><span class="tt-value" style="color:var(--accent)">' + t.kills + '</span></div>' +
+          '<div class="tt-stat"><span class="tt-label">ID</span><span class="tt-value" style="color:var(--fg-muted)">#' + String(t.id+1).padStart(2,'0') + '</span></div>' +
+          '<div class="tt-stat" style="grid-column:1/-1"><span class="tt-label">Alliance</span><span class="tt-value">' + t.alliance + '</span></div>' +
+        '</div>' +
+      '</div>';
+
+      tc.innerHTML =
+        tooltip +
+        '<div class="tribute-avatar" style="border-color:var(--faction-' + t.faction + ');color:var(--faction-' + t.faction + ')">' + t.avatar + '</div>' +
+        '<div class="tribute-info">' +
+          '<div class="tribute-name">' + t.name + '</div>' +
+          '<div class="tribute-meta">' +
+            '<span class="tribute-alliance" style="border-color:var(--faction-' + t.faction + ');color:var(--faction-' + t.faction + ')">' + t.allianceShort + '</span>' +
+            '<div class="health-bar"><div class="health-fill ' + barClass + '" style="width:' + t.health + '%"></div></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="tribute-stats">' +
+          '<span class="kills"><span class="num">' + t.kills + '</span> K</span>' +
+          '<span class="tribute-status ' + t.status + '">' + t.status.toUpperCase() + '</span>' +
+        '</div>';
+      card.appendChild(tc);
+
+      if (idx === 0) {
+        var div = document.createElement('div');
+        div.className = 'pair-divider';
+        card.appendChild(div);
+      }
+    });
+
+    container.appendChild(card);
+  });
+
+  var evCount = document.querySelectorAll('.event-card').length;
+  document.getElementById('feedCount').textContent = evCount;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RENDER EVENT FEED
+   ═══════════════════════════════════════════════════════════════════════════ */
+function renderFeed(events) {
+  var container = document.getElementById('feedScroll');
+  container.innerHTML = '';
+
+  events.forEach(function(e) {
+    var card = document.createElement('div');
+    card.className = 'event-card ' + e.type;
+    card.dataset.type = e.type;
+
+    switch (e.type) {
+      case 'action':
+        card.innerHTML =
+          '<div class="card-head">' +
+            '<span class="card-badge">COMBAT</span>' +
+            '<span class="card-timestamp">' + e.timestamp + '</span>' +
+          '</div>' +
+          '<div class="card-body">' +
+            '<div class="actor-avatar" style="border-color:var(--faction-' + e.actorFaction + ');color:var(--faction-' + e.actorFaction + ')">' + e.actorInitial + '</div>' +
+            '<span class="action-verb">' + e.verb + '</span>' +
+            '<span class="action-target">' + e.target + '</span>' +
+            '<span class="action-detail">' + e.weapon + ' / <span class="hl">-' + e.damage + '</span> / ' + e.location + '</span>' +
+          '</div>';
+        break;
+
+      case 'death':
+        card.innerHTML =
+          '<div class="card-head">' +
+            '<span class="card-badge">ELIMINATED</span>' +
+            '<span class="card-timestamp">' + e.timestamp + ' / ' + e.location + '</span>' +
+          '</div>' +
+          '<div class="card-body">' +
+            '<div class="death-quote">' + e.quote + '</div>' +
+          '</div>' +
+          '<div class="death-meta">' +
+            '<span class="weapon">' + e.weapon + '</span>' +
+            '<span class="kill-count">' + e.slayer + ' <span class="hl">| ' + e.killerKills + ' KILLS</span></span>' +
+          '</div>';
+        break;
+
+      case 'event':
+        card.innerHTML =
+          '<div class="card-head">' +
+            '<span class="card-badge">ARENA EVENT</span>' +
+            '<span class="card-timestamp">' + e.timestamp + '</span>' +
+          '</div>' +
+          '<div class="card-body">' +
+            '<div class="event-title">' + e.title + '</div>' +
+            '<div class="event-desc">' + e.desc + '</div>' +
+            '<div class="event-affected">' +
+              e.affected.map(function(n) { return '<span class="affected-pill">' + n + '</span>'; }).join('') +
+            '</div>' +
+          '</div>';
+        break;
+
+      case 'commentary':
+        card.innerHTML =
+          '<div class="card-head">' +
+            '<span class="card-badge">ANALYSIS</span>' +
+            '<span class="card-timestamp">' + e.timestamp + '</span>' +
+          '</div>' +
+          '<div class="card-body">' +
+            '<div class="comment-text">' + e.text + '</div>' +
+            '<div class="comment-speaker">' +
+              '<div class="speaker-avatar">' + e.speakerInitial + '</div>' +
+              '<div class="speaker-info">' +
+                '<span class="speaker-name">' + e.speaker + '</span>' +
+                '<span class="speaker-role">' + e.speakerRole + '</span>' +
+              '</div>' +
+            '</div>' +
+          '</div>';
+        break;
+    }
+
+    container.appendChild(card);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FEED FILTER
+   ═══════════════════════════════════════════════════════════════════════════ */
+function filterFeed(type, btn) {
+  document.querySelectorAll('.feed-tab').forEach(function(t) { t.classList.remove('active'); });
+  btn.classList.add('active');
+  document.querySelectorAll('.event-card').forEach(function(c) {
+    c.style.display = (type === 'all' || c.dataset.type === type) ? '' : 'none';
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NAVIGATION & AUTH
+   ═══════════════════════════════════════════════════════════════════════════ */
+var isLoggedIn = false;
+
+function toggleAuth() {
+  isLoggedIn = !isLoggedIn;
+  var btn = document.getElementById('authBtn');
+  var badge = document.getElementById('userBadge');
+  if (isLoggedIn) {
+    btn.textContent = 'LOGOUT';
+    btn.className = 'auth-btn logged-in';
+    badge.style.display = 'flex';
+    document.getElementById('userName').textContent = 'SPONSOR CAELUS';
+  } else {
+    btn.textContent = 'LOGIN / SIGN UP';
+    btn.className = 'auth-btn';
+    badge.style.display = 'none';
+  }
+}
+
+function navigateBack() {
+  // Simulate navigation to games list
+  var ticker = document.getElementById('tickerText');
+  ticker.innerHTML = 'NAVIGATING TO GAMES LIST... <span class="hl">STAND BY</span>';
+  setTimeout(function() {
+    ticker.innerHTML = 'RETURNED TO BROADCAST — <span class="hl">ROUND 7</span> RESUMED.';
+  }, 1500);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DAY NAVIGATION
+   ═══════════════════════════════════════════════════════════════════════════ */
+var currentDay = 7;
+var PHASES = ['DAWN', 'DAY', 'DUSK', 'NIGHT'];
+var currentPhase = 0; // index into PHASES
+
+function updateDayDisplay() {
+  document.getElementById('dayLabel').textContent = currentDay;
+  document.getElementById('daySelect').value = currentDay;
+  var ticker = document.getElementById('tickerText');
+  ticker.innerHTML = 'DAY ' + currentDay + ' — ' + document.querySelector('.location').textContent + '. ' +
+    '<span class="hl">' + PHASES[currentPhase] + '</span> PHASE. SURVEILLANCE ACTIVE.';
+}
+
+function prevDay() {
+  if (currentDay <= 1) return;
+  currentDay--;
+  updateDayDisplay();
+  var ticker = document.getElementById('tickerText');
+  ticker.innerHTML = 'NAVIGATING TO DAY <span class="hl">' + currentDay + '</span> — LOADING ARCHIVE...';
+  setTimeout(function() {
+    ticker.innerHTML = 'DAY ' + currentDay + ' ARCHIVE LOADED — ' +
+      '<span class="hl">' + PHASES[currentPhase] + '</span> PHASE.';
+  }, 800);
+}
+
+function nextDay() {
+  if (currentDay >= 10) return;
+  currentDay++;
+  updateDayDisplay();
+  var ticker = document.getElementById('tickerText');
+  ticker.innerHTML = 'ADVANCING TO DAY <span class="hl">' + currentDay + '</span> — UPDATING FEED...';
+  setTimeout(function() {
+    ticker.innerHTML = 'DAY ' + currentDay + ' — ' + document.querySelector('.location').textContent + '. ' +
+      '<span class="hl">' + PHASES[currentPhase] + '</span> PHASE.';
+  }, 800);
+}
+
+function jumpToDay(sel) {
+  var day = parseInt(sel.value);
+  if (day === currentDay) return;
+  currentDay = day;
+  updateDayDisplay();
+  var ticker = document.getElementById('tickerText');
+  ticker.innerHTML = 'LOADING DAY <span class="hl">' + currentDay + '</span> BROADCAST...';
+  setTimeout(function() {
+    ticker.innerHTML = 'DAY ' + currentDay + ' — ' + document.querySelector('.location').textContent + '. ' +
+      '<span class="hl">' + PHASES[currentPhase] + '</span> PHASE. SURVEILLANCE ACTIVE.';
+  }, 800);
+}
+
+function advancePhase() {
+  currentPhase = (currentPhase + 1) % PHASES.length;
+  var phaseName = PHASES[currentPhase];
+  var indicator = document.getElementById('phaseIndicator');
+  var label = document.getElementById('phaseLabel');
+
+  indicator.className = 'phase-indicator phase-' + phaseName.toLowerCase();
+  label.textContent = phaseName;
+
+  var ticker = document.getElementById('tickerText');
+  ticker.innerHTML = 'PHASE ADVANCE — <span class="gold">' + phaseName + '</span>. CONDITIONS SHIFTING IN THE ARENA.';
+
+  var btn = document.getElementById('advancePhaseBtn');
+  btn.textContent = 'ADVANCE + (' + phaseName[0] + ')';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HEX MAP — CORRECT FLAT-TOP honeycomb
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+var HEX_SIZE = 44;
+var HEX_DX = HEX_SIZE * 1.5;
+var HEX_DY = Math.sqrt(3) * HEX_SIZE;
+
+var mapScale = 1;
+var mapOffsetX = 0;
+var mapOffsetY = 0;
+var isDragging = false;
+var dragStartX, dragStartY;
+var lastTouchDist = 0;
+
+function getHexCoords() {
+  var coords = [];
+  for (var q = -1; q <= 1; q++) {
+    for (var r = -1; r <= 1; r++) {
+      if (Math.abs(q + r) <= 1) {
+        coords.push({ q: q, r: r });
+      }
+    }
+  }
+  return coords;
+}
+
+function axialToPixel(q, r) {
+  return {
+    x: HEX_DX * q,
+    y: HEX_DY * (r + q / 2)
+  };
+}
+
+function hexCorners(cx, cy, size) {
+  var pts = [];
+  for (var i = 0; i < 6; i++) {
+    var angle = (Math.PI / 3) * i;
+    pts.push((cx + size * Math.cos(angle)) + ',' + (cy + size * Math.sin(angle)));
+  }
+  return pts.join(' ');
+}
+
+var TERRAIN_GRID = {
+  '0,0': 'arena',
+  '1,0': 'ruins',
+  '1,-1': 'swamp',
+  '0,-1': 'lake',
+  '-1,0': 'mountain',
+  '-1,1': 'plains',
+  '0,1': 'forest'
+};
+
+function buildMap(tributes) {
+  var svg = document.getElementById('hexSvg');
+  var hexes = getHexCoords();
+
+  var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  hexes.forEach(function(h) {
+    var p = axialToPixel(h.q, h.r);
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  });
+
+  var pad = HEX_SIZE * 2.5;
+  var svgW = (maxX - minX) + pad * 2;
+  var svgH = (maxY - minY) + pad * 2;
+  var ox = pad - minX;
+  var oy = pad - minY;
+
+  svg.setAttribute('width', svgW);
+  svg.setAttribute('height', svgH);
+  svg.setAttribute('viewBox', '0 0 ' + svgW + ' ' + svgH);
+
+  var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.id = 'hexGroup';
+
+  hexes.forEach(function(h) {
+    var key = h.q + ',' + h.r;
+    var terrain = TERRAIN_GRID[key] || 'arena';
+    var p = axialToPixel(h.q, h.r);
+    var cx = p.x + ox;
+    var cy = p.y + oy;
+    var pts = hexCorners(cx, cy, HEX_SIZE);
+
+    var polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    polygon.setAttribute('points', pts);
+    polygon.setAttribute('fill', TERRAIN_COLORS[terrain] || '#555');
+    polygon.setAttribute('stroke', 'var(--border-strong)');
+    polygon.setAttribute('stroke-width', '1.5');
+    polygon.dataset.q = h.q;
+    polygon.dataset.r = h.r;
+    polygon.dataset.terrain = terrain;
+    polygon.style.cursor = 'pointer';
+    polygon.style.transition = 'fill 0.15s';
+    polygon.addEventListener('mouseenter', function() {
+      polygon.setAttribute('stroke', 'var(--fg)');
+      polygon.setAttribute('stroke-width', '2.5');
+    });
+    polygon.addEventListener('mouseleave', function() {
+      polygon.setAttribute('stroke', 'var(--border-strong)');
+      polygon.setAttribute('stroke-width', '1.5');
+    });
+    polygon.addEventListener('click', function() {
+      document.querySelectorAll('#hexGroup polygon').forEach(function(p) {
+        p.setAttribute('stroke', 'var(--border-strong)');
+        p.setAttribute('stroke-width', '1.5');
+      });
+      polygon.setAttribute('stroke', 'var(--accent)');
+      polygon.setAttribute('stroke-width', '3');
+    });
+    g.appendChild(polygon);
+
+    var zoneName = ZONE_NAMES[terrain] || terrain.toUpperCase();
+    var words = zoneName.split(' ');
+    var line1 = words.slice(0, Math.ceil(words.length / 2)).join(' ');
+    var line2 = words.slice(Math.ceil(words.length / 2)).join(' ');
+
+    var t1 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    t1.setAttribute('x', cx);
+    t1.setAttribute('y', cy - 8);
+    t1.setAttribute('text-anchor', 'middle');
+    t1.setAttribute('font-size', '11');
+    t1.setAttribute('fill', 'rgba(255,255,255,0.85)');
+    t1.setAttribute('font-family', 'var(--font-condensed)');
+    t1.setAttribute('font-weight', '700');
+    t1.setAttribute('letter-spacing', '2');
+    t1.dataset.type = 'terrain-label';
+    t1.textContent = line1;
+    g.appendChild(t1);
+
+    if (line2) {
+      var t2 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      t2.setAttribute('x', cx);
+      t2.setAttribute('y', cy + 8);
+      t2.setAttribute('text-anchor', 'middle');
+      t2.setAttribute('font-size', '11');
+      t2.setAttribute('fill', 'rgba(255,255,255,0.85)');
+      t2.setAttribute('font-family', 'var(--font-condensed)');
+      t2.setAttribute('font-weight', '700');
+      t2.setAttribute('letter-spacing', '2');
+      t2.dataset.type = 'terrain-label';
+      t2.textContent = line2;
+      g.appendChild(t2);
+    }
+  });
+
+  // Place tributes on hexes
+  var sortedHexes = [...hexes].sort(function(a, b) {
+    if (a.q === 0 && a.r === 0) return 1;
+    if (b.q === 0 && b.r === 0) return -1;
+    return 0;
+  });
+
+  var pairMap2 = {};
+  tributes.forEach(function(t) {
+    if (!pairMap2[t.alliance]) pairMap2[t.alliance] = [];
+    pairMap2[t.alliance].push(t);
+  });
+  var pairs2 = Object.values(pairMap2);
+
+  pairs2.forEach(function(pair, pIdx) {
+    var h = sortedHexes[pIdx % sortedHexes.length];
+    var p = axialToPixel(h.q, h.r);
+    var cx = p.x + ox;
+    var cy = p.y + oy;
+
+    pair.forEach(function(t, memberIdx) {
+      var dotR = t.status === 'dead' ? 4 : 6;
+      var angle = memberIdx * Math.PI + Math.PI / 4;
+      var dist = HEX_SIZE * 0.25;
+      var px = cx + Math.cos(angle) * dist;
+      var py = cy + Math.sin(angle) * dist;
+
+      var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      dot.setAttribute('cx', px);
+      dot.setAttribute('cy', py);
+      dot.setAttribute('r', dotR);
+      dot.setAttribute('fill', 'var(--faction-' + t.faction + ')');
+      dot.setAttribute('stroke', t.status === 'dead' ? 'var(--danger)' : 'var(--bg)');
+      dot.setAttribute('stroke-width', '2');
+      dot.dataset.type = 'player';
+      dot.dataset.playerId = t.id;
+      dot.dataset.alive = t.status !== 'dead';
+      dot.style.opacity = t.status === 'dead' ? '0.4' : '1';
+      dot.style.cursor = 'pointer';
+      dot.style.transition = 'opacity 0.15s';
+      dot.addEventListener('mouseenter', function() {
+        this.setAttribute('r', dotR + 3);
+        var label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', px);
+        label.setAttribute('y', py - HEX_SIZE * 0.35);
+        label.setAttribute('text-anchor', 'middle');
+        label.setAttribute('font-size', '8');
+        label.setAttribute('fill', 'var(--fg)');
+        label.setAttribute('font-family', 'var(--font-mono)');
+        label.setAttribute('font-weight', '700');
+        label.dataset.type = 'player-label';
+        label.textContent = t.name + ' [' + t.kills + 'K]';
+        g.appendChild(label);
+      });
+      dot.addEventListener('mouseleave', function() {
+        this.setAttribute('r', dotR);
+        g.querySelectorAll('[data-type="player-label"]').forEach(function(l) { l.remove(); });
+      });
+      g.appendChild(dot);
+    });
+  });
+
+  // Resource markers on 3 specific hexes
+  ['1,0', '0,-1', '-1,1'].forEach(function(key) {
+    var h = hexes.find(function(x) { return x.q + ',' + x.r === key; });
+    if (!h) return;
+    var p = axialToPixel(h.q, h.r);
+    var cx = p.x + ox;
+    var cy = p.y + oy;
+    var rx = cx + HEX_SIZE * 0.35;
+    var ry = cy + HEX_SIZE * 0.3;
+    var rd = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    rd.setAttribute('cx', rx);
+    rd.setAttribute('cy', ry);
+    rd.setAttribute('r', 4);
+    rd.setAttribute('fill', 'var(--gold)');
+    rd.setAttribute('stroke', 'var(--bg)');
+    rd.setAttribute('stroke-width', '1.5');
+    rd.dataset.type = 'resource';
+    g.appendChild(rd);
+  });
+
+  svg.appendChild(g);
+
+  var container = document.getElementById('mapContainer');
+  var cw = container.clientWidth;
+  var ch = container.clientHeight;
+  mapOffsetX = (cw - svgW * mapScale) / 2;
+  mapOffsetY = (ch - svgH * mapScale) / 2;
+  updateMapTransform();
+}
+
+function updateMapTransform() {
+  var vp = document.getElementById('mapViewport');
+  vp.style.transform = 'translate(' + mapOffsetX + 'px, ' + mapOffsetY + 'px) scale(' + mapScale + ')';
+}
+
+function zoomMap(factor) {
+  var container = document.getElementById('mapContainer');
+  var newScale = Math.max(0.3, Math.min(5, mapScale * factor));
+  var cw = container.clientWidth;
+  var ch = container.clientHeight;
+  var cx = cw / 2;
+  var cy = ch / 2;
+  var scaleRatio = newScale / mapScale;
+  mapOffsetX = cx - (cx - mapOffsetX) * scaleRatio;
+  mapOffsetY = cy - (cy - mapOffsetY) * scaleRatio;
+  mapScale = newScale;
+  document.getElementById('mapViewport').classList.add('zooming');
+  updateMapTransform();
+  setTimeout(function() { document.getElementById('mapViewport').classList.remove('zooming'); }, 200);
+}
+
+function resetMap() {
+  var container = document.getElementById('mapContainer');
+  var svg = document.getElementById('hexSvg');
+  var cw = container.clientWidth;
+  var ch = container.clientHeight;
+  var svgW = parseFloat(svg.getAttribute('width'));
+  var svgH = parseFloat(svg.getAttribute('height'));
+  mapScale = 1;
+  mapOffsetX = (cw - svgW) / 2;
+  mapOffsetY = (ch - svgH) / 2;
+  document.getElementById('mapViewport').classList.add('zooming');
+  updateMapTransform();
+  setTimeout(function() { document.getElementById('mapViewport').classList.remove('zooming'); }, 200);
+}
+
+/* ─── Map Interaction: Pan & Zoom ─── */
+function setupMapInteraction() {
+  var container = document.getElementById('mapContainer');
+
+  container.addEventListener('mousedown', function(e) {
+    if (e.target.tagName === 'polygon' || e.target.tagName === 'circle') return;
+    isDragging = true;
+    dragStartX = e.clientX - mapOffsetX;
+    dragStartY = e.clientY - mapOffsetY;
+    container.style.cursor = 'grabbing';
+  });
+
+  window.addEventListener('mousemove', function(e) {
+    if (!isDragging) return;
+    mapOffsetX = e.clientX - dragStartX;
+    mapOffsetY = e.clientY - dragStartY;
+    updateMapTransform();
+  });
+
+  window.addEventListener('mouseup', function() {
+    isDragging = false;
+    container.style.cursor = 'grab';
+  });
+
+  container.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    var factor = e.deltaY < 0 ? 1.1 : 0.9;
+    var rect = container.getBoundingClientRect();
+    var mx = e.clientX - rect.left;
+    var my = e.clientY - rect.top;
+    var newScale = Math.max(0.3, Math.min(5, mapScale * factor));
+    var scaleRatio = newScale / mapScale;
+    mapOffsetX = mx - (mx - mapOffsetX) * scaleRatio;
+    mapOffsetY = my - (my - mapOffsetY) * scaleRatio;
+    mapScale = newScale;
+    document.getElementById('mapViewport').classList.add('zooming');
+    updateMapTransform();
+    setTimeout(function() { document.getElementById('mapViewport').classList.remove('zooming'); }, 200);
+  }, { passive: false });
+
+  var lastTouchX, lastTouchY;
+  container.addEventListener('touchstart', function(e) {
+    if (e.touches.length === 1) {
+      lastTouchX = e.touches[0].clientX - mapOffsetX;
+      lastTouchY = e.touches[0].clientY - mapOffsetY;
+    } else if (e.touches.length === 2) {
+      var dx = e.touches[0].clientX - e.touches[1].clientX;
+      var dy = e.touches[0].clientY - e.touches[1].clientY;
+      lastTouchDist = Math.sqrt(dx*dx + dy*dy);
+    }
+  }, { passive: true });
+
+  container.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    if (e.touches.length === 1 && !lastTouchDist) {
+      mapOffsetX = e.touches[0].clientX - lastTouchX;
+      mapOffsetY = e.touches[0].clientY - lastTouchY;
+      updateMapTransform();
+    } else if (e.touches.length === 2) {
+      var dx = e.touches[0].clientX - e.touches[1].clientX;
+      var dy = e.touches[0].clientY - e.touches[1].clientY;
+      var dist = Math.sqrt(dx*dx + dy*dy);
+      if (lastTouchDist) {
+        var factor = dist / lastTouchDist;
+        var rect = container.getBoundingClientRect();
+        var mx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+        var my = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+        var newScale = Math.max(0.3, Math.min(5, mapScale * factor));
+        var scaleRatio = newScale / mapScale;
+        mapOffsetX = mx - (mx - mapOffsetX) * scaleRatio;
+        mapOffsetY = my - (my - mapOffsetY) * scaleRatio;
+        mapScale = newScale;
+        updateMapTransform();
+      }
+      lastTouchDist = dist;
+    }
+  }, { passive: false });
+
+  container.addEventListener('touchend', function() {
+    lastTouchDist = 0;
+  }, { passive: true });
+}
+
+/* ─── Map Filters ─── */
+function filterMap(type, btn) {
+  var isActive = btn.classList.toggle('active');
+  var svg = document.getElementById('hexSvg');
+
+  switch (type) {
+    case 'players':
+      svg.querySelectorAll('[data-type="player"]').forEach(function(el) {
+        el.style.display = isActive ? '' : 'none';
+      });
+      break;
+    case 'resources':
+      svg.querySelectorAll('[data-type="resource"]').forEach(function(el) {
+        el.style.display = isActive ? '' : 'none';
+      });
+      break;
+    case 'terrain':
+      svg.querySelectorAll('#hexGroup polygon').forEach(function(el) {
+        el.style.opacity = isActive ? '1' : '0.25';
+      });
+      svg.querySelectorAll('[data-type="terrain-label"]').forEach(function(el) {
+        el.style.opacity = isActive ? '1' : '0';
+      });
+      break;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COUNTDOWN CLOCK
+   ═══════════════════════════════════════════════════════════════════════════ */
+function startClock() {
+  var seconds = Math.floor(Math.random() * 120) + 60;
+  var clock = document.getElementById('countdownClock');
+  setInterval(function() {
+    seconds--;
+    if (seconds <= 0) {
+      seconds = Math.floor(Math.random() * 120) + 60;
+    }
+    var m = Math.floor(seconds / 60);
+    var s = seconds % 60;
+    clock.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }, 1000);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════════════════════════════════ */
+var TRIBUTES = generateTribes();
+var EVENTS = generateEvents(TRIBUTES);
+
+renderRoster(TRIBUTES);
+renderFeed(EVENTS);
+buildMap(TRIBUTES);
+setupMapInteraction();
+startClock();
+
+// Restore feed scroll
+try {
+  var saved = localStorage.getItem('feedScroll');
+  if (saved) document.getElementById('feedScroll').scrollTop = parseInt(saved);
+} catch(e) {}
+document.getElementById('feedScroll').addEventListener('scroll', function() {
+  try { localStorage.setItem('feedScroll', document.getElementById('feedScroll').scrollTop); } catch(e) {}
+});
+</script>
+</body>
+</html>

@@ -111,7 +111,7 @@ fn filter_games_by_status(games: &[ListDisplayGame], status: Option<&str>) -> Ve
     }
 }
 
-/// GET /games/{id} — game detail page.
+/// GET /games/{id} — game detail page (broadcast interface).
 pub async fn game_detail_handler(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
@@ -119,6 +119,9 @@ pub async fn game_detail_handler(
 ) -> Response {
     let (auth, csrf) = extract_auth(&headers);
     let identifier = game_identifier.to_string();
+
+    // ── Fetch game ─────────────────────────────────────────────────
+
     let result = state
         .db
         .query("SELECT * FROM fn::get_display_game($identifier);")
@@ -134,8 +137,76 @@ pub async fn game_detail_handler(
         Err(_) => None,
     };
 
+    // ── Fetch tributes ─────────────────────────────────────────────
+
+    let tributes_result = state
+        .db
+        .query("SELECT * FROM fn::get_tributes_by_game($identifier);")
+        .bind(("identifier", identifier.clone()))
+        .await;
+
+    let tributes: Vec<game::tributes::Tribute> = match tributes_result {
+        Ok(mut result) => {
+            let raw_rows: Vec<serde_json::Value> = result.take(0).unwrap_or_default();
+            raw_rows
+                .into_iter()
+                .filter_map(|row| row["tributes"].as_array().cloned())
+                .flatten()
+                .filter_map(|t| serde_json::from_value(t).ok())
+                .collect()
+        }
+        Err(_) => vec![],
+    };
+
+    // ── Fetch messages (events) ────────────────────────────────────
+
+    let messages_result = state
+        .db
+        .query(
+            r#"SELECT * FROM message
+            WHERE string::starts_with(subject, $identifier)
+            ORDER BY game_day, phase, tick, emit_index;"#,
+        )
+        .bind(("identifier", identifier.clone()))
+        .await;
+
+    let messages: Vec<shared::messages::GameMessage> = match messages_result {
+        Ok(mut logs) => {
+            let rows: Vec<SerdeWrapper<api::games::GameLog>> = logs.take(0).unwrap_or_default();
+            rows.into_iter()
+                .map(|w| shared::messages::GameMessage::from(w.0))
+                .collect()
+        }
+        Err(_) => vec![],
+    };
+
+    // ── Fetch commentary segments ──────────────────────────────────
+
+    let commentary_result = state
+        .db
+        .query(
+            r#"SELECT * FROM commentary_segments
+            WHERE game_id = $identifier
+            ORDER BY day, phase;"#,
+        )
+        .bind(("identifier", identifier.clone()))
+        .await;
+
+    let segments: Vec<announcers::CommentarySegment> = match commentary_result {
+        Ok(mut result) => result
+            .take::<Vec<SerdeWrapper<announcers::CommentarySegment>>>(0)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|w| w.0)
+            .collect(),
+        Err(_) => vec![],
+    };
+
     match game {
-        Some(game) => html_with_csrf(game_detail::game_detail_page(auth, &game), &csrf),
+        Some(game) => html_with_csrf(
+            game_detail::game_detail_page(auth, &game, &tributes, &messages, &segments),
+            &csrf,
+        ),
         None => html_with_csrf(
             pages::not_found_page(auth, "The game you're looking for doesn't exist."),
             &csrf,

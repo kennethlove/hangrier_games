@@ -1,0 +1,651 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Hangrier Games — Auth</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   HANGRIER GAMES — AUTH PAGE
+   Light mode · Tech/sports broadcast · Neobrutalism-adjacent
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --bg:      #eef1f5;
+  --surface: #ffffff;
+  --fg:      #111318;
+  --muted:   #5b6370;
+  --border:  #d1d5db;
+  --accent:  #0891b2;
+  --accent-hover: #066f8a;
+  --accent-on: #ffffff;
+  --gold:    #d97706;
+  --red:     #dc2626;
+  --green:   #16a34a;
+  --focus-ring: 0 0 0 3px color-mix(in oklab, #0891b2, transparent 70%);
+
+  --font-display: "Inter", -apple-system, system-ui, sans-serif;
+  --font-body:    "Inter", -apple-system, system-ui, sans-serif;
+  --font-mono:    ui-monospace, "JetBrains Mono", monospace;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --elev-raised: 0 2px 8px rgba(0,0,0,0.10);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── TOP NAV ──────────────────────────────────────────────────────────── */
+.top-nav {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 24px;
+  background: var(--surface);
+  border-bottom: 3px solid var(--fg);
+  box-shadow: 0 3px 0 rgba(0,0,0,0.08);
+  flex-wrap: wrap;
+}
+.nav-brand {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 20px; font-weight: 700; letter-spacing: -0.01em;
+  color: var(--fg); text-decoration: none;
+  font-family: var(--font-display);
+}
+.nav-brand .hex {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  background: var(--accent); color: var(--accent-on);
+  font-size: 13px; font-weight: 800; font-family: var(--font-mono);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+.nav-links { display: flex; align-items: center; gap: 16px; margin-left: auto; }
+.nav-links a {
+  font-size: 13px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.04em; text-decoration: none; color: var(--muted);
+  padding: 6px 10px; border-radius: var(--radius-sm);
+  transition: color 150ms, background 150ms;
+}
+.nav-links a:hover { color: var(--fg); background: color-mix(in oklab, var(--fg), transparent 94%); }
+.auth-btn {
+  border: 2px solid var(--fg); background: var(--fg); color: var(--surface);
+  padding: 6px 16px; font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; border-radius: var(--radius-sm); cursor: pointer;
+  transition: background 150ms, color 150ms;
+}
+.auth-btn:hover { background: var(--accent); border-color: var(--accent); color: var(--accent-on); }
+.auth-btn.logged-in { background: var(--accent); border-color: var(--accent); color: var(--accent-on); }
+.user-badge {
+  display: none; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--gold); padding: 4px 10px;
+  border: 2px solid var(--gold); border-radius: var(--radius-sm);
+}
+
+/* ─── PAGE WRAPPER ───────────────────────────────────────────────────── */
+.page { flex: 1; display: flex; align-items: center; justify-content: center; padding: 48px 24px 64px; }
+
+/* ─── AUTH CARD ───────────────────────────────────────────────────────── */
+.auth-card {
+  width: 100%; max-width: 460px;
+  background: var(--surface);
+  border: 3px solid var(--fg);
+  border-radius: var(--radius-md);
+  box-shadow: 6px 6px 0 var(--fg);
+  overflow: hidden;
+}
+
+/* ─── HEADER WITH TABS ────────────────────────────────────────────────── */
+.auth-header {
+  border-bottom: 2px solid var(--border);
+  padding: 24px 28px 0;
+}
+.auth-header h1 {
+  font-family: var(--font-display);
+  font-size: 24px; font-weight: 700;
+  margin-bottom: 16px;
+}
+.auth-tabs {
+  display: flex; gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin: 0 -28px;
+  padding: 0 28px;
+}
+.auth-tab {
+  flex: 1; text-align: center;
+  padding: 10px 12px 8px;
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: none; border: none; cursor: pointer;
+  color: var(--muted);
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: color 200ms, border-color 200ms;
+}
+.auth-tab:hover { color: var(--fg); }
+.auth-tab.active { color: var(--fg); border-bottom-color: var(--accent); }
+
+/* ─── FORM BODY ───────────────────────────────────────────────────────── */
+.auth-body {
+  padding: 28px;
+}
+.auth-form { display: none; }
+.auth-form.active { display: block; }
+
+.field-group { margin-bottom: 20px; }
+.field-group label {
+  display: block;
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.field-group label .required { color: var(--red); margin-left: 2px; }
+.field-group input {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 15px;
+  font-family: var(--font-body);
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  outline: none;
+  transition: border-color 200ms, box-shadow 200ms;
+}
+.field-group input:focus {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+.field-group input::placeholder { color: var(--border); }
+.field-group .field-hint {
+  font-size: 12px; color: var(--muted);
+  margin-top: 4px;
+}
+
+.form-row { display: flex; gap: 16px; }
+.form-row .field-group { flex: 1; }
+
+/* ─── PASSWORD RULES ──────────────────────────────────────────────────── */
+.password-rules {
+  display: flex; flex-direction: column; gap: 4px;
+  margin: 8px 0 16px;
+  padding: 10px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+.password-rules .rule { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.password-rules .rule .check { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border); display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; flex-shrink: 0; transition: all 200ms; }
+.password-rules .rule.met { color: var(--green); }
+.password-rules .rule.met .check { background: var(--green); border-color: var(--green); color: #fff; }
+
+/* ─── SUBMIT BTN ──────────────────────────────────────────────────────── */
+.submit-btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 14px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-family: var(--font-display);
+  background: var(--fg); color: var(--surface);
+  border: 2px solid var(--fg);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 150ms, box-shadow 150ms;
+}
+.submit-btn:hover {
+  background: var(--accent); border-color: var(--accent);
+  box-shadow: 3px 3px 0 var(--fg);
+}
+.submit-btn:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 var(--fg); }
+
+/* ─── FORGOT PASSWORD ─────────────────────────────────────────────────── */
+.forgot-row {
+  display: flex; justify-content: flex-end;
+  margin-top: -12px; margin-bottom: 18px;
+}
+.forgot-link {
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  background: none; border: none; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px;
+  transition: color 150ms;
+}
+.forgot-link:hover { color: var(--accent); }
+
+/* ─── DIVIDER ──────────────────────────────────────────────────────────── */
+.divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 24px 0;
+  color: var(--muted); font-size: 12px; font-weight: 600;
+}
+.divider::before, .divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
+/* ─── SOCIAL BUTTONS ──────────────────────────────────────────────────── */
+.social-btns {
+  display: flex; flex-direction: column; gap: 10px;
+}
+.social-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px;
+  font-size: 13px; font-weight: 600;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+  color: var(--fg);
+  text-decoration: none;
+}
+.social-btn:hover { border-color: var(--fg); background: var(--surface); }
+.social-btn .icon-svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+/* ─── TOGGLE PASSWORD VISIBILITY ──────────────────────────────────────── */
+.input-wrap { position: relative; }
+.input-wrap input { padding-right: 44px; }
+.toggle-vis {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); padding: 4px;
+  line-height: 1;
+}
+.toggle-vis .eye-icon { width: 20px; height: 20px; display: block; }
+.toggle-vis:hover { color: var(--fg); }
+
+/* ─── TERMS CHECKBOX ──────────────────────────────────────────────────── */
+.terms-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: 16px 0;
+  font-size: 13px; color: var(--muted);
+}
+.terms-row input[type="checkbox"] {
+  width: 18px; height: 18px; flex-shrink: 0; margin-top: 3px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.terms-row a { color: var(--accent); text-decoration: underline; }
+
+/* ─── TOAST ───────────────────────────────────────────────────────────── */
+.toast-container {
+  position: fixed; bottom: 24px; right: 24px;
+  z-index: 999; display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+  padding: 12px 20px;
+  background: var(--fg); color: var(--surface);
+  font-size: 13px; font-weight: 600; border-radius: var(--radius-sm);
+  border: 2px solid var(--fg);
+  box-shadow: 3px 3px 0 rgba(0,0,0,0.2);
+  animation: slideIn 0.3s ease-out;
+}
+.toast.success { background: var(--green); border-color: var(--green); color: #fff; }
+.toast.error { background: var(--red); border-color: var(--red); color: #fff; }
+.toast.info { background: var(--accent); border-color: var(--accent); color: var(--accent-on); }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* ─── RESPONSIVE ──────────────────────────────────────────────────────── */
+@media (max-width: 540px) {
+  .auth-card { border-width: 2px; box-shadow: 4px 4px 0 var(--fg); }
+  .auth-body { padding: 20px; }
+  .auth-header { padding: 20px 20px 0; }
+  .auth-header h1 { font-size: 20px; }
+  .auth-tabs { margin: 0 -20px; padding: 0 20px; }
+  .form-row { flex-direction: column; gap: 0; }
+}
+@media (max-width: 400px) {
+  .page { padding: 24px 12px; }
+  .top-nav { padding: 8px 12px; }
+  .nav-brand { font-size: 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ TOP NAV ══════════════════════════════════════════════════════════ -->
+<nav class="top-nav">
+  <a href="games-portal.html" class="nav-brand">
+    <span class="hex">HG</span>
+    HANGRIER GAMES
+  </a>
+  <div class="nav-links">
+    <a href="games-portal.html">ALL GAMES</a>
+    <span class="user-badge" id="userBadge">
+      <span>⬡</span> CAPITOL_SPONSOR
+    </span>
+    <button class="auth-btn" id="authBtn" data-logged-in="false">LOGIN / SIGN UP</button>
+  </div>
+</nav>
+
+<!-- ═══ AUTH CARD ═══════════════════════════════════════════════════════ -->
+<main class="page">
+<div class="auth-card" id="authCard">
+
+  <!-- HEADER + TABS -->
+  <div class="auth-header">
+    <h1 id="authTitle">Welcome Back</h1>
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="login">Log In</button>
+      <button class="auth-tab" data-tab="signup">Sign Up</button>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div class="auth-body">
+
+    <!-- ─── LOGIN FORM ─────────────────────────────────────────────── -->
+    <form class="auth-form active" id="loginForm" autocomplete="on">
+      <div class="field-group">
+        <label for="loginEmail">Email <span class="required">*</span></label>
+        <input type="email" id="loginEmail" placeholder="citizen@capitol.gov" required autocomplete="email"/>
+      </div>
+      <div class="field-group">
+        <label for="loginPass">Password <span class="required">*</span></label>
+        <div class="input-wrap">
+          <input type="password" id="loginPass" placeholder="············" required autocomplete="current-password"/>
+          <button type="button" class="toggle-vis" data-target="loginPass" aria-label="Toggle visibility">
+            <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="forgot-row">
+        <button type="button" class="forgot-link" id="forgotBtn">Forgot your password?</button>
+      </div>
+      <button type="submit" class="submit-btn">Enter the Arena</button>
+      <div class="divider">or continue with</div>
+      <div class="social-btns">
+        <button type="button" class="social-btn" data-provider="tribune">
+          <svg class="icon-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm3.5 14.5l-3-1.5-3 1.5V7h6v9.5z"/></svg>
+          Continue with Capitol Tribune
+        </button>
+        <button type="button" class="social-btn" data-provider="sponsor">
+          <svg class="icon-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+          Continue with Sponsor ID
+        </button>
+      </div>
+    </form>
+
+    <!-- ─── SIGNUP FORM ────────────────────────────────────────────── -->
+    <form class="auth-form" id="signupForm" autocomplete="on">
+      <div class="field-group">
+        <label for="signupName">Display Name <span class="required">*</span></label>
+        <input type="text" id="signupName" placeholder="e.g. Luxurious_Sponsor_7" required autocomplete="username"/>
+        <div class="field-hint">3–24 characters, letters, numbers and underscores</div>
+      </div>
+      <div class="field-group">
+        <label for="signupEmail">Email <span class="required">*</span></label>
+        <input type="email" id="signupEmail" placeholder="citizen@capitol.gov" required autocomplete="email"/>
+      </div>
+      <div class="form-row">
+        <div class="field-group">
+          <label for="signupPass">Password <span class="required">*</span></label>
+          <div class="input-wrap">
+            <input type="password" id="signupPass" placeholder="············" required autocomplete="new-password" minlength="8"/>
+            <button type="button" class="toggle-vis" data-target="signupPass" aria-label="Toggle visibility">
+              <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="field-group">
+          <label for="signupConfirm">Confirm <span class="required">*</span></label>
+          <div class="input-wrap">
+            <input type="password" id="signupConfirm" placeholder="············" required autocomplete="new-password"/>
+            <button type="button" class="toggle-vis" data-target="signupConfirm" aria-label="Toggle visibility">
+              <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="password-rules" id="passRules">
+        <span class="rule" id="ruleLength"><span class="check">✓</span> At least 8 characters</span>
+        <span class="rule" id="ruleUpper"><span class="check">✓</span> One uppercase letter</span>
+        <span class="rule" id="ruleNumber"><span class="check">✓</span> One number</span>
+        <span class="rule" id="ruleMatch"><span class="check">✓</span> Passwords match</span>
+      </div>
+      <div class="terms-row">
+        <input type="checkbox" id="acceptTerms" required/>
+        <label for="acceptTerms">I accept the <a href="#">Terms of the Games</a> and <a href="#">Privacy Protocol</a> <span class="required">*</span></label>
+      </div>
+      <button type="submit" class="submit-btn">Enter the Arena</button>
+      <div class="divider">or continue with</div>
+      <div class="social-btns">
+        <button type="button" class="social-btn" data-provider="tribune">
+          <svg class="icon-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm3.5 14.5l-3-1.5-3 1.5V7h6v9.5z"/></svg>
+          Continue with Capitol Tribune
+        </button>
+        <button type="button" class="social-btn" data-provider="sponsor">
+          <svg class="icon-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+          Continue with Sponsor ID
+        </button>
+      </div>
+    </form>
+
+    <!-- ─── FORGOT PASSWORD FORM ───────────────────────────────────── -->
+    <form class="auth-form" id="forgotForm">
+      <p style="font-size:14px;color:var(--muted);margin-bottom:20px;line-height:1.5;">
+        Enter your registered email and we'll send a recovery code via Capitol-issue messenger drone.
+      </p>
+      <div class="field-group">
+        <label for="forgotEmail">Registered Email <span class="required">*</span></label>
+        <input type="email" id="forgotEmail" placeholder="citizen@capitol.gov" required autocomplete="email"/>
+      </div>
+      <button type="submit" class="submit-btn">Send Recovery Code</button>
+      <div style="margin-top:16px;text-align:center;">
+        <button type="button" class="forgot-link" id="backToLogin">Back to Log In</button>
+      </div>
+    </form>
+
+  </div>
+</div>
+</main>
+
+<!-- ═══ TOAST CONTAINER ═════════════════════════════════════════════════ -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   HANGRIER GAMES — AUTH JS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+(function() {
+  /* ─── HELPERS ───────────────────────────────────────────────────── */
+  function showToast(msg, type) {
+    const t = document.createElement('div');
+    t.className = 'toast' + (type ? ' ' + type : '');
+    t.textContent = msg;
+    document.getElementById('toastContainer').appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; setTimeout(() => t.remove(), 300); }, 3500);
+  }
+
+  /* ─── TAB SWITCHING ─────────────────────────────────────────────── */
+  const tabs = document.querySelectorAll('.auth-tab');
+  const forms = {
+    login: document.getElementById('loginForm'),
+    signup: document.getElementById('signupForm'),
+    forgot: document.getElementById('forgotForm')
+  };
+  const titleEl = document.getElementById('authTitle');
+  const titles = { login: 'Welcome Back', signup: 'Join the Games', forgot: 'Reset Password' };
+  let currentTab = 'login';
+
+  function switchTab(tab) {
+    Object.values(forms).forEach(f => f.classList.remove('active'));
+    tabs.forEach(t => t.classList.remove('active'));
+
+    if (tab === 'forgot') {
+      forms.forgot.classList.add('active');
+      titleEl.textContent = titles.forgot;
+      return;
+    }
+
+    currentTab = tab;
+    forms[tab].classList.add('active');
+    tabs.forEach(t => { if (t.dataset.tab === tab) t.classList.add('active'); });
+    titleEl.textContent = titles[tab];
+  }
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      if (tab.dataset.tab) switchTab(tab.dataset.tab);
+    });
+  });
+
+  /* ─── FORGOT → BACK TO LOGIN ────────────────────────────────────── */
+  document.getElementById('forgotBtn').addEventListener('click', () => switchTab('forgot'));
+  document.getElementById('backToLogin').addEventListener('click', () => switchTab('login'));
+
+  /* ─── TOGGLE PASSWORD VISIBILITY ────────────────────────────────── */
+  function toggleVis(btn) {
+    const inp = document.getElementById(btn.dataset.target);
+    if (!inp) return;
+    const isPass = inp.type === 'password';
+    inp.type = isPass ? 'text' : 'password';
+    const svg = btn.querySelector('.eye-icon');
+    if (svg) {
+      svg.innerHTML = isPass
+        ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/>'
+        : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    }
+  }
+  document.querySelectorAll('.toggle-vis').forEach(btn => {
+    btn.addEventListener('click', () => toggleVis(btn));
+  });
+
+  /* ─── PASSWORD VALIDATION (signup) ──────────────────────────────── */
+  const passInput = document.getElementById('signupPass');
+  const confirmInput = document.getElementById('signupConfirm');
+
+  function validatePassword() {
+    const p = passInput.value;
+    const c = confirmInput.value;
+    const rules = [
+      { id: 'ruleLength', test: p.length >= 8 },
+      { id: 'ruleUpper', test: /[A-Z]/.test(p) },
+      { id: 'ruleNumber', test: /\d/.test(p) },
+      { id: 'ruleMatch', test: p.length > 0 && p === c }
+    ];
+    rules.forEach(r => {
+      const el = document.getElementById(r.id);
+      if (el) el.classList.toggle('met', r.test);
+    });
+  }
+
+  if (passInput) passInput.addEventListener('input', validatePassword);
+  if (confirmInput) confirmInput.addEventListener('input', validatePassword);
+
+  /* ─── LOGIN SUBMIT ──────────────────────────────────────────────── */
+  forms.login.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const email = document.getElementById('loginEmail').value.trim();
+    const pass = document.getElementById('loginPass').value;
+    if (!email || !pass) {
+      showToast('Please fill in all required fields', 'error');
+      return;
+    }
+    showToast('Welcome, Citizen — entering the Arena...', 'success');
+    setTimeout(() => {
+      const authBtn = document.getElementById('authBtn');
+      authBtn.textContent = 'LOGOUT';
+      authBtn.dataset.loggedIn = 'true';
+      authBtn.classList.add('logged-in');
+      document.getElementById('userBadge').style.display = 'flex';
+    }, 800);
+  });
+
+  /* ─── SIGNUP SUBMIT ─────────────────────────────────────────────── */
+  forms.signup.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('signupName').value.trim();
+    const email = document.getElementById('signupEmail').value.trim();
+    const pass = document.getElementById('signupPass').value;
+    const confirm = document.getElementById('signupConfirm').value;
+    const terms = document.getElementById('acceptTerms').checked;
+
+    if (!name || !email || !pass || !confirm) {
+      showToast('Please fill in all required fields', 'error');
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]{3,24}$/.test(name)) {
+      showToast('Display Name: 3–24 characters, letters, numbers, underscores only', 'error');
+      return;
+    }
+    if (pass.length < 8) {
+      showToast('Password must be at least 8 characters', 'error');
+      return;
+    }
+    if (pass !== confirm) {
+      showToast('Passwords do not match', 'error');
+      return;
+    }
+    if (!terms) {
+      showToast('You must accept the Terms of the Games', 'error');
+      return;
+    }
+
+    showToast('Tribute registered — welcome to the Games, ' + name, 'success');
+    setTimeout(() => {
+      const authBtn = document.getElementById('authBtn');
+      authBtn.textContent = 'LOGOUT';
+      authBtn.dataset.loggedIn = 'true';
+      authBtn.classList.add('logged-in');
+      document.getElementById('userBadge').style.display = 'flex';
+    }, 800);
+  });
+
+  /* ─── FORGOT SUBMIT ──────────────────────────────────────────────── */
+  forms.forgot.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const email = document.getElementById('forgotEmail').value.trim();
+    if (!email) {
+      showToast('Enter your registered email', 'error');
+      return;
+    }
+    showToast('Recovery code dispatched via messenger drone — check your terminal', 'info');
+    setTimeout(() => switchTab('login'), 1500);
+  });
+
+  /* ─── SOCIAL BUTTONS ────────────────────────────────────────────── */
+  document.querySelectorAll('.social-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const provider = btn.dataset.provider;
+      const names = { tribune: 'Capitol Tribune', sponsor: 'Sponsor ID' };
+      showToast('Connecting to ' + (names[provider] || provider) + '...', 'info');
+      setTimeout(() => {
+        showToast('Authenticated via ' + (names[provider] || provider), 'success');
+        const authBtn = document.getElementById('authBtn');
+        authBtn.textContent = 'LOGOUT';
+        authBtn.dataset.loggedIn = 'true';
+        authBtn.classList.add('logged-in');
+        document.getElementById('userBadge').style.display = 'flex';
+      }, 1200);
+    });
+  });
+
+  /* ─── AUTH TOGGLE IN NAV ────────────────────────────────────────── */
+  document.getElementById('authBtn').addEventListener('click', function() {
+    if (this.dataset.loggedIn === 'true') {
+      this.textContent = 'LOGIN / SIGN UP';
+      this.dataset.loggedIn = 'false';
+      this.classList.remove('logged-in');
+      document.getElementById('userBadge').style.display = 'none';
+      showToast('Logged out — arena connection severed', 'info');
+    } else {
+      showToast('Already on the auth terminal — log in below', 'info');
+    }
+  });
+
+})();
+</script>
+</body>
+</html>

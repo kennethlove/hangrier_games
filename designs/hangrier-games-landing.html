@@ -1,0 +1,768 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hangrier Games — The Arena Awaits</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   HANGRIER GAMES — HOME / LANDING PAGE
+   Light mode · Tech/sports broadcast · Condensed display
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --bg:              #eef1f5;
+  --surface:         #ffffff;
+  --surface-alt:     #f4f6fa;
+  --surface-hover:   #e8ecf2;
+  --fg:              #111318;
+  --fg-muted:        #6b7280;
+  --border:          #d1d5db;
+  --border-strong:   #9ca3af;
+  --accent:          #0891b2;
+  --accent-glow:     rgba(8,145,178,0.1);
+  --gold:            #d97706;
+  --gold-glow:       rgba(217,119,6,0.08);
+  --danger:          #dc2626;
+  --danger-glow:     rgba(220,38,38,0.08);
+  --success:         #16a34a;
+  --warning:         #ea580c;
+  --purple:          #7c3aed;
+
+  --font-display:  'Tahoma', 'Arial Narrow', 'Impact', -apple-system, system-ui, sans-serif;
+  --font-body:     -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono:     'Courier New', ui-monospace, monospace;
+  --font-condensed: 'Arial Narrow', 'Impact', -apple-system, system-ui, sans-serif;
+
+  --fs-hero:  clamp(32px, 4.5vw, 60px);
+  --fs-h2:    clamp(20px, 2.6vw, 34px);
+  --fs-h3:    clamp(14px, 1.5vw, 20px);
+  --fs-body:  14px;
+  --fs-sm:    12px;
+  --fs-xs:    10px;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--fg);
+  font-family:var(--font-body);
+  font-size:var(--fs-body);
+  line-height:1.5;
+  min-height:100vh;
+}
+a{color:var(--accent);text-decoration:none;transition:color 0.12s;}
+a:hover{color:var(--gold);}
+
+/* ─── CONTAINER ───────────────────────────────────────────── */
+.page-wrap{
+  max-width:1400px;
+  margin:0 auto;
+  display:flex;
+  flex-direction:column;
+  min-height:100vh;
+  padding:8px;
+  gap:0;
+}
+
+/* ─── TOP NAV ───────────────────────────────────────────── */
+.top-nav{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:8px 16px;
+  background:linear-gradient(90deg, #e2e6ed, var(--surface));
+  border:2px solid var(--border-strong);
+  border-bottom:none;
+  font-size:var(--fs-sm);
+  font-family:var(--font-condensed);
+  letter-spacing:1px;
+}
+.top-nav .nav-left{display:flex;align-items:center;gap:18px;}
+.top-nav .site-brand{
+  font-weight:700;
+  font-size:var(--fs-h2);
+  letter-spacing:4px;
+  text-transform:uppercase;
+  color:var(--fg);
+  font-family:var(--font-display);
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.top-nav .site-brand .emblem{
+  width:28px;height:28px;
+  background:var(--accent);
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  display:grid;place-items:center;
+  flex-shrink:0;
+}
+.top-nav .site-brand .emblem::after{
+  content:'';display:block;
+  width:12px;height:12px;
+  background:var(--bg);
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+}
+.top-nav .site-brand .brand-accent{color:var(--accent);}
+.top-nav .nav-link{
+  color:var(--fg-muted);
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  text-decoration:none;
+  padding:4px 10px;
+  border:1px solid transparent;
+  transition:all 0.12s;
+  cursor:pointer;
+  font-size:var(--fs-xs);
+  background:none;
+  font-family:var(--font-condensed);
+}
+.top-nav .nav-link:hover{color:var(--fg);border-color:var(--border);}
+.top-nav .nav-link.back-link{display:flex;align-items:center;gap:4px;}
+.top-nav .nav-link.back-link::before{content:'\2190';font-size:12px;}
+.top-nav .nav-right{display:flex;align-items:center;gap:8px;}
+.top-nav .nav-right .auth-btn{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-xs);
+  letter-spacing:2px;
+  text-transform:uppercase;
+  padding:5px 14px;
+  border:1px solid var(--border-strong);
+  background:transparent;
+  color:var(--fg-muted);
+  cursor:pointer;
+  transition:all 0.12s;
+}
+.top-nav .nav-right .auth-btn:hover{border-color:var(--accent);color:var(--accent);}
+.top-nav .nav-right .auth-btn.logged-in{border-color:var(--danger);color:var(--danger);}
+.top-nav .nav-right .auth-btn.logged-in:hover{background:var(--danger);color:#fff;}
+.top-nav .nav-right .user-badge{
+  display:none;align-items:center;gap:6px;
+  padding:3px 10px;
+  border:1px solid var(--border);
+  font-size:var(--fs-xs);
+  color:var(--fg-muted);
+  letter-spacing:0.5px;
+}
+.top-nav .nav-right .user-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--success);}
+
+/* ─── HERO ────────────────────────────────────────────────── */
+.hero{
+  position:relative;
+  border:2px solid var(--border-strong);
+  border-bottom:none;
+  padding:clamp(40px,6vw,80px) 32px;
+  background:linear-gradient(135deg, #1a1f2b 0%, #0d1420 100%);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  text-align:center;
+  gap:16px;
+}
+.hero::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 50%, rgba(8,145,178,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 40% at 80% 30%, rgba(217,119,6,0.06) 0%, transparent 50%);
+  pointer-events:none;
+}
+.hero .kicker{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-sm);
+  letter-spacing:4px;
+  text-transform:uppercase;
+  color:var(--gold);
+  position:relative;
+}
+.hero h1{
+  font-family:var(--font-display);
+  font-size:var(--fs-hero);
+  letter-spacing:6px;
+  text-transform:uppercase;
+  color:#fff;
+  line-height:1.1;
+  position:relative;
+}
+.hero h1 .hl{color:var(--accent);}
+.hero .sub{
+  max-width:640px;
+  font-size:var(--fs-h3);
+  color:rgba(255,255,255,0.55);
+  position:relative;
+  line-height:1.5;
+}
+.hero-actions{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  justify-content:center;
+  margin-top:8px;
+  position:relative;
+}
+.btn{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-sm);
+  letter-spacing:2.5px;
+  text-transform:uppercase;
+  padding:10px 24px;
+  border:2px solid var(--border-strong);
+  cursor:pointer;
+  transition:all 0.15s;
+  background:var(--surface);
+  color:var(--fg);
+}
+.btn:hover{transform:translate(-1px,-1px);box-shadow:3px 3px 0 rgba(0,0,0,0.12);}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.btn-primary:hover{background:var(--gold);border-color:var(--gold);box-shadow:3px 3px 0 rgba(0,0,0,0.18);}
+.btn-ghost{background:transparent;border-color:rgba(255,255,255,0.25);color:rgba(255,255,255,0.7);}
+.btn-ghost:hover{border-color:#fff;color:#fff;box-shadow:none;transform:none;}
+
+.hero-strip{
+  position:absolute;
+  bottom:0;left:0;right:0;
+  display:flex;
+  justify-content:center;
+  gap:clamp(16px,4vw,48px);
+  padding:8px 16px;
+  background:rgba(0,0,0,0.4);
+  border-top:1px solid rgba(255,255,255,0.06);
+  flex-wrap:wrap;
+}
+.hero-strip .stat{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  font-family:var(--font-condensed);
+  font-size:var(--fs-xs);
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  color:rgba(255,255,255,0.4);
+}
+.hero-strip .stat .num{
+  font-family:var(--font-display);
+  font-size:var(--fs-h3);
+  color:#fff;
+  letter-spacing:1px;
+}
+
+/* ─── SECTION HEADER ─────────────────────────────────────── */
+.section-header{
+  background:linear-gradient(135deg,var(--surface),var(--surface-alt));
+  border:2px solid var(--border-strong);
+  border-bottom:none;
+  padding:14px 20px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.section-header h2{
+  font-family:var(--font-display);
+  font-size:var(--fs-h2);
+  letter-spacing:3px;
+  text-transform:uppercase;
+  color:var(--fg);
+}
+.section-header .tag{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-xs);
+  letter-spacing:2px;
+  text-transform:uppercase;
+  color:var(--fg-muted);
+  padding:3px 10px;
+  border:1px solid var(--border);
+}
+
+/* ─── FEATURED GRID ───────────────────────────────────────── */
+.featured-wrap{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:0;
+  border:2px solid var(--border-strong);
+  border-bottom:none;
+}
+.featured-card{
+  display:flex;
+  flex-direction:column;
+  padding:20px;
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  border-bottom:1px solid var(--border);
+  transition:background 0.12s;
+  cursor:pointer;
+  position:relative;
+  gap:8px;
+}
+.featured-card:nth-child(2n){border-right:none;}
+.featured-card:hover{background:var(--surface-hover);}
+.featured-card .card-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+.featured-card .game-name{
+  font-family:var(--font-display);
+  font-size:var(--fs-h3);
+  letter-spacing:2px;
+  text-transform:uppercase;
+}
+.featured-card .live-tag{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-xs);
+  letter-spacing:2px;
+  text-transform:uppercase;
+  padding:2px 10px;
+  background:var(--danger);
+  color:#fff;
+}
+.featured-card .live-tag.finished{background:var(--fg-muted);}
+.featured-card .meta{
+  display:flex;
+  gap:12px;
+  font-size:var(--fs-sm);
+  color:var(--fg-muted);
+  font-family:var(--font-condensed);
+  letter-spacing:0.5px;
+}
+.featured-card .meta span{display:flex;align-items:center;gap:4px;}
+.featured-card .desc{
+  font-size:var(--fs-sm);
+  color:var(--fg-muted);
+  line-height:1.5;
+}
+.featured-card .arena-img{
+  width:100%;height:80px;
+  background:var(--surface-alt);
+  border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-condensed);
+  font-size:var(--fs-sm);
+  letter-spacing:1px;
+  text-transform:uppercase;
+  color:var(--fg-muted);
+  margin-top:auto;
+}
+
+/* ─── HOW IT WORKS ────────────────────────────────────────── */
+.how-wrap{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:0;
+  border:2px solid var(--border-strong);
+  border-bottom:none;
+}
+.how-step{
+  padding:24px 20px;
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  border-bottom:1px solid var(--border);
+  text-align:center;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:10px;
+}
+.how-step:last-child{border-right:none;}
+.how-step .step-num{
+  width:40px;height:40px;
+  display:grid;place-items:center;
+  font-family:var(--font-display);
+  font-size:var(--fs-h2);
+  background:var(--bg);
+  border:2px solid var(--border-strong);
+  color:var(--fg-muted);
+}
+.how-step h3{
+  font-family:var(--font-display);
+  font-size:var(--fs-h3);
+  letter-spacing:2px;
+  text-transform:uppercase;
+}
+.how-step p{
+  font-size:var(--fs-sm);
+  color:var(--fg-muted);
+  max-width:280px;
+  line-height:1.6;
+}
+
+/* ─── TESTIMONIAL / QUOTE ─────────────────────────────────── */
+.quote-row{
+  display:flex;
+  gap:0;
+  border:2px solid var(--border-strong);
+  border-bottom:none;
+}
+.quote-card{
+  flex:1;
+  padding:20px;
+  background:var(--surface);
+  border-right:1px solid var(--border);
+}
+.quote-card:last-child{border-right:none;}
+.quote-card blockquote{
+  font-family:var(--font-condensed);
+  font-size:var(--fs-h3);
+  letter-spacing:0.5px;
+  color:var(--fg);
+  font-style:italic;
+  line-height:1.4;
+}
+.quote-card blockquote::before{content:'\201C';color:var(--accent);}
+.quote-card blockquote::after{content:'\201D';color:var(--accent);}
+.quote-card .attribution{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:10px;
+  font-size:var(--fs-xs);
+  font-family:var(--font-condensed);
+  letter-spacing:1px;
+  text-transform:uppercase;
+  color:var(--fg-muted);
+}
+.quote-card .attribution .avatar{
+  width:24px;height:24px;border-radius:50%;
+  background:var(--accent-glow);
+  border:1px solid var(--accent);
+}
+
+/* ─── CTA BANNER ──────────────────────────────────────────── */
+.cta-banner{
+  border:2px solid var(--border-strong);
+  padding:clamp(24px,4vw,48px) 32px;
+  background:linear-gradient(135deg, #1a1f2b 0%, #0d1420 100%);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  text-align:center;
+  gap:12px;
+  position:relative;
+  overflow:hidden;
+}
+.cta-banner::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:radial-gradient(ellipse 50% 50% at 50% 50%, rgba(8,145,178,0.08) 0%, transparent 60%);
+  pointer-events:none;
+}
+.cta-banner h2{
+  font-family:var(--font-display);
+  font-size:var(--fs-h2);
+  letter-spacing:4px;
+  text-transform:uppercase;
+  color:#fff;
+  position:relative;
+}
+.cta-banner p{
+  max-width:500px;
+  color:rgba(255,255,255,0.5);
+  font-size:var(--fs-body);
+  position:relative;
+}
+.cta-banner .btn-ghost{border-color:rgba(255,255,255,0.3);}
+
+/* ─── FOOTER ──────────────────────────────────────────────── */
+.footer{
+  border:2px solid var(--border-strong);
+  border-top:none;
+  padding:12px 20px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  background:var(--surface-alt);
+  font-size:var(--fs-xs);
+  font-family:var(--font-condensed);
+  letter-spacing:1px;
+  text-transform:uppercase;
+  color:var(--fg-muted);
+  flex-wrap:wrap;
+  gap:8px;
+}
+.footer-links{display:flex;gap:16px;}
+.footer-links a{color:var(--fg-muted);}
+.footer-links a:hover{color:var(--accent);}
+
+/* ─── TOAST ────────────────────────────────────────────────── */
+.toast-container{
+  position:fixed;
+  bottom:16px;right:16px;
+  z-index:999;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.toast{
+  padding:10px 18px;
+  font-family:var(--font-condensed);
+  font-size:var(--fs-sm);
+  letter-spacing:1px;
+  text-transform:uppercase;
+  border:2px solid var(--border-strong);
+  background:var(--surface);
+  color:var(--fg);
+  box-shadow:3px 3px 0 rgba(0,0,0,0.1);
+}
+.toast.success{border-color:var(--success);color:var(--success);}
+.toast.info{border-color:var(--accent);color:var(--accent);}
+
+/* ─── RESPONSIVE ──────────────────────────────────────────── */
+@media(max-width:900px){
+  .featured-wrap{grid-template-columns:1fr;}
+  .featured-card:nth-child(2n){border-right:1px solid var(--border);}
+  .how-wrap{grid-template-columns:1fr 1fr;}
+  .how-step:last-child{grid-column:1/-1;border-right:none;}
+  .quote-row{flex-direction:column;}
+  .quote-card{border-right:none;border-bottom:1px solid var(--border);}
+  .quote-card:last-child{border-bottom:none;}
+}
+@media(max-width:600px){
+  .top-nav{flex-wrap:wrap;gap:4px;padding:6px 10px;}
+  .top-nav .nav-left{gap:10px;}
+  .hero{padding:clamp(24px,5vw,40px) 16px;}
+  .hero-actions{flex-direction:column;}
+  .how-wrap{grid-template-columns:1fr;}
+  .how-step{border-right:none;}
+  .footer{flex-direction:column;text-align:center;}
+}
+</style>
+</head>
+<body>
+
+<div class="page-wrap">
+
+  <!-- ════════════════════════════════════════════════════════════════
+       TOP NAV
+       ════════════════════════════════════════════════════════════════ -->
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="#" class="site-brand">
+        <span class="emblem"></span>
+        HANGRIER <span class="brand-accent">GAMES</span>
+      </a>
+      <a href="#" class="nav-link back-link">ALL GAMES</a>
+    </div>
+    <div class="nav-right">
+      <span class="user-badge" id="userBadge"><span class="dot"></span>CAPITOL SPONSOR</span>
+      <button class="auth-btn" id="authBtn" data-logged-in="false">LOGIN / SIGN UP</button>
+    </div>
+  </nav>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       HERO
+       ════════════════════════════════════════════════════════════════ -->
+  <section class="hero" data-od-id="hero">
+    <div class="kicker">— Season 7 —</div>
+    <h1>THE <span class="hl">ARENA</span> AWAITS</h1>
+    <p class="sub">Twenty-four enter. One survives. Every moment broadcast live from the Capital.</p>
+    <div class="hero-actions">
+      <button class="btn btn-primary" id="heroWatchBtn">WATCH NOW</button>
+      <button class="btn btn-ghost" id="heroLearnBtn">LEARN THE GAMES</button>
+    </div>
+    <div class="hero-strip">
+      <div class="stat"><span class="num">142</span> Total Games</div>
+      <div class="stat"><span class="num">3,408</span> Tributes</div>
+      <div class="stat"><span class="num">12.7K</span> Spectators</div>
+      <div class="stat"><span class="num">7</span> Arenas</div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       TODAY'S FEATURED BROADCASTS
+       ════════════════════════════════════════════════════════════════ -->
+  <div class="section-header" data-od-id="featured-header">
+    <h2>Live &amp; Upcoming</h2>
+    <span class="tag">3 broadcasts active</span>
+  </div>
+  <div class="featured-wrap" id="featuredGrid" data-od-id="featured-grid">
+    <!-- card 1 -->
+    <div class="featured-card" data-game="thunder-dome">
+      <div class="card-top">
+        <span class="game-name">Thunder Dome Royale</span>
+        <span class="live-tag">LIVE</span>
+      </div>
+      <div class="meta">
+        <span>DAY 7 · DAWN</span>
+        <span>14 ALIVE</span>
+        <span>RAVEN CRAG</span>
+      </div>
+      <p class="desc">The alliance of three holds the high ground. Bloodbath expected before dusk.</p>
+      <div class="arena-img">raven crag — 7 hexes</div>
+    </div>
+    <!-- card 2 -->
+    <div class="featured-card" data-game="victor-gambit">
+      <div class="card-top">
+        <span class="game-name">The Victor's Gambit</span>
+        <span class="live-tag">LIVE</span>
+      </div>
+      <div class="meta">
+        <span>DAY 3 · DAY</span>
+        <span>20 ALIVE</span>
+        <span>SUNKEN GORGE</span>
+      </div>
+      <p class="desc">A quiet morning shattered by the first supply drop. Tempers are short.</p>
+      <div class="arena-img">sunken gorge — 7 hexes</div>
+    </div>
+    <!-- card 3 -->
+    <div class="featured-card" data-game="crimson-harvest">
+      <div class="card-top">
+        <span class="game-name">Crimson Harvest</span>
+        <span class="live-tag">LIVE</span>
+      </div>
+      <div class="meta">
+        <span>DAY 1 · DUSK</span>
+        <span>24 ALIVE</span>
+        <span>THE MAW</span>
+      </div>
+      <p class="desc">Fresh tributes enter the Maw. First blood is a matter of minutes.</p>
+      <div class="arena-img">the maw — 7 hexes</div>
+    </div>
+    <!-- card 4 -->
+    <div class="featured-card" data-game="iron-will">
+      <div class="card-top">
+        <span class="game-name">Iron Will</span>
+        <span class="live-tag finished">FINISHED</span>
+      </div>
+      <div class="meta">
+        <span>DAY 10 · NIGHT</span>
+        <span>1 SURVIVOR</span>
+        <span>ASHEN FLOOD</span>
+      </div>
+      <p class="desc">Rook Vex, District 7. 14 kills. Endured the flood, outran the fire, won the feast.</p>
+      <div class="arena-img">ashen flood — 7 hexes</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       HOW IT WORKS
+       ════════════════════════════════════════════════════════════════ -->
+  <div class="section-header" data-od-id="how-header">
+    <h2>How It Works</h2>
+    <span class="tag">the games</span>
+  </div>
+  <div class="how-wrap" data-od-id="how-it-works">
+    <div class="how-step">
+      <span class="step-num">01</span>
+      <h3>The Reaping</h3>
+      <p>Twenty-four tributes are selected from the districts. Each brings a name, a face, and a will to survive.</p>
+    </div>
+    <div class="how-step">
+      <span class="step-num">02</span>
+      <h3>The Arena</h3>
+      <p>A seven-hex arena — one center, six surrounding zones. Terrain, resources, and hazards shift each season.</p>
+    </div>
+    <div class="how-step">
+      <span class="step-num">03</span>
+      <h3>The Broadcast</h3>
+      <p>Every move tracked. Every kill logged. Commentary, analysis, and arena events broadcast in real time.</p>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       QUOTES
+       ════════════════════════════════════════════════════════════════ -->
+  <div class="quote-row" data-od-id="quotes">
+    <div class="quote-card">
+      <blockquote>Watching a veteran corner a rookie in the Crag — that's when the Games earn their name.</blockquote>
+      <div class="attribution"><span class="avatar"></span>JUNO VALE, LEAD ANALYST</div>
+    </div>
+    <div class="quote-card">
+      <blockquote>The alliance reshuffled at dawn. If they hold through dusk, the final four are decided.</blockquote>
+      <div class="attribution"><span class="avatar"></span>CASTOR RENN, COLOR COMMENTARY</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       CTA BANNER
+       ════════════════════════════════════════════════════════════════ -->
+  <section class="cta-banner" data-od-id="cta">
+    <h2>YOUR DISTRICT NEEDS YOU</h2>
+    <p>Create a game. Assemble your tributes. Control the arena. Every choice writes the next headline.</p>
+    <button class="btn btn-primary" id="ctaCreateBtn">CREATE A GAME</button>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       FOOTER
+       ════════════════════════════════════════════════════════════════ -->
+  <footer class="footer" data-od-id="footer">
+    <span>&copy; 2025 Hangrier Games — All Broadcasts Reserved</span>
+    <div class="footer-links">
+      <a href="#">Terms of the Games</a>
+      <a href="#">Privacy Policy</a>
+      <a href="#">Contact the Capital</a>
+    </div>
+  </footer>
+
+</div>
+
+<!-- ─── TOAST CONTAINER ─────────────────────────────────────── -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+(function(){
+  function showToast(msg,type){
+    var t=document.createElement('div');
+    t.className='toast'+(type?' '+type:'');
+    t.textContent=msg;
+    document.getElementById('toastContainer').appendChild(t);
+    setTimeout(function(){t.style.opacity='0';t.style.transition='opacity 0.3s';setTimeout(function(){t.remove();},300);},3000);
+  }
+
+  /* ─── AUTH TOGGLE ───────────────────────────────────────── */
+  var authBtn=document.getElementById('authBtn');
+  authBtn.addEventListener('click',function(){
+    if(this.dataset.loggedIn==='true'){
+      this.textContent='LOGIN / SIGN UP';
+      this.dataset.loggedIn='false';
+      this.classList.remove('logged-in');
+      document.getElementById('userBadge').style.display='none';
+      showToast('Logged out — arena connection severed','info');
+    }else{
+      this.textContent='LOGOUT';
+      this.dataset.loggedIn='true';
+      this.classList.add('logged-in');
+      document.getElementById('userBadge').style.display='flex';
+      showToast('Welcome, Citizen — sponsorships active','success');
+    }
+  });
+
+  /* ─── HERO BUTTONS ──────────────────────────────────────── */
+  document.getElementById('heroWatchBtn').addEventListener('click',function(){
+    showToast('Tuning into the nearest live broadcast...','info');
+  });
+  document.getElementById('heroLearnBtn').addEventListener('click',function(){
+    showToast('The Games explained — scroll below','info');
+  });
+
+  /* ─── FEATURED CARD CLICK ────────────────────────────────── */
+  document.querySelectorAll('.featured-card').forEach(function(card){
+    card.addEventListener('click',function(){
+      var name=this.querySelector('.game-name').textContent;
+      showToast('Opening broadcast: '+name,'info');
+    });
+  });
+
+  /* ─── CTA CREATE GAME ────────────────────────────────────── */
+  document.getElementById('ctaCreateBtn').addEventListener('click',function(){
+    showToast('Navigating to game creation...','info');
+  });
+
+  /* ─── ALL GAMES NAV ──────────────────────────────────────── */
+  document.querySelector('.nav-link.back-link').addEventListener('click',function(e){
+    e.preventDefault();
+    showToast('All Games — full schedule','info');
+  });
+})();
+</script>
+</body>
+</html>

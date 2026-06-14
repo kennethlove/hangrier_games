@@ -9,7 +9,8 @@ use api::cookies::{REFRESH_COOKIE, clear_auth_cookies, clear_csrf_cookie, read_c
 use api::email::{
     generate_verification_token, send_verification_email, validate_verification_token,
 };
-use api::templates::auth::{self, AuthTab};
+use api::templates::auth::AuthTab;
+use api::templates::tera_engine;
 use axum::extract::{Form, Query, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use serde::Deserialize;
@@ -76,13 +77,18 @@ pub async fn auth_handler(
     if auth.is_authenticated() {
         return Redirect::to("/games").into_response();
     }
-    let body = auth::auth_page_with_csrf(
-        auth,
-        &csrf,
-        params.error.as_deref(),
-        AuthTab::from_query(params.tab.as_deref()),
-    );
-    html_with_csrf(body, &csrf)
+    let mut ctx = tera_engine::base_context("Sign In", &auth);
+    let tab = AuthTab::from_query(params.tab.as_deref());
+    let tab_str = match tab {
+        AuthTab::Login => "login",
+        AuthTab::Register => "register",
+        AuthTab::Reset => "reset",
+    };
+    ctx.insert("tab", tab_str);
+    if let Some(err) = params.error.as_deref() {
+        ctx.insert("error", err);
+    }
+    html_with_csrf(tera_engine::render("auth.html", &ctx), &csrf)
 }
 
 /// POST /login — authenticate user.
@@ -312,8 +318,11 @@ pub async fn check_email_handler(
     Query(params): Query<CheckEmailQuery>,
 ) -> impl IntoResponse {
     let (auth, csrf) = extract_auth(&headers);
-    let body = auth::check_email_page(auth, params.address.as_deref(), &csrf);
-    html_with_csrf(body, &csrf)
+    let mut ctx = tera_engine::base_context("Check Email", &auth);
+    if let Some(addr) = params.address.as_deref() {
+        ctx.insert("email_address", addr);
+    }
+    html_with_csrf(tera_engine::render("check_email.html", &ctx), &csrf)
 }
 
 /// GET /auth/verify-email?token=... — verify email address.
@@ -458,8 +467,8 @@ pub async fn resend_verification_handler(
 /// GET /auth/email-verified — confirmation page after email verification.
 pub async fn email_verified_handler(headers: axum::http::HeaderMap) -> impl IntoResponse {
     let (auth, csrf) = extract_auth(&headers);
-    let body = auth::email_verified_page(auth);
-    html_with_csrf(body, &csrf)
+    let ctx = tera_engine::base_context("Email Verified", &auth);
+    html_with_csrf(tera_engine::render("email_verified.html", &ctx), &csrf)
 }
 
 /// POST /logout — revoke refresh token, clear cookies, redirect to /auth.

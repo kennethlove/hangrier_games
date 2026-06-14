@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="padding-block:var(--gap-lg);" hx-ext="sse" sse-connect="/api/games/{{ game_id }}/events">
+  <a href="/games/{{ game_id }}" class="back-link">Back to Game</a>
+  <h2 style="font-family:var(--font-display);font-size:var(--fs-h3);font-weight:600;margin:0 0 var(--gap-md);">Game Log</h2>
+
+  <div id="log-entries"
+    class="log-container"
+    hx-trigger="sse:{{ sse_events | default(value='*') }}"
+    hx-get="/games/{{ game_id }}/log"
+    hx-target="#log-entries"
+    hx-swap="innerHTML">
+    {% if event_cards is empty %}
+      <p class="empty-state">No messages yet.</p>
+    {% else %}
+      {{ event_cards | safe }}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

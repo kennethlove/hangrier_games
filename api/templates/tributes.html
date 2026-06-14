@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="padding-block:var(--gap-lg);">
+  <a href="/games/{{ game_id }}" class="back-link">Back to Game</a>
+  <h2 style="font-family:var(--font-display);font-size:var(--fs-h3);font-weight:600;margin:0 0 var(--gap-md);">Tributes</h2>
+  <div class="card-grid">
+    {{ tribute_cards | safe }}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="auth-card">
+  <div class="auth-logo">Hangry <span>Games</span></div>
+  <h2 class="auth-title">Set new password</h2>
+  <p class="auth-subtitle">Enter your new password below.</p>
+
+  <form method="POST" action="/auth/reset-password/complete">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="token" value="{{ token }}">
+
+    <div class="field-group">
+      <label for="reset-password">New Password</label>
+      <input type="password" id="reset-password" name="password" required minlength="8" maxlength="72" placeholder="8-72 characters">
+    </div>
+
+    <div class="field-group">
+      <label for="reset-confirm">Confirm Password</label>
+      <input type="password" id="reset-confirm" name="confirm_password" required minlength="8" maxlength="72" placeholder="Repeat your password">
+    </div>
+
+    <button type="submit" class="btn btn-primary">Reset Password</button>
+  </form>
+
+  <div class="auth-footer">
+    <a href="/auth?tab=login">Back to Sign In</a>
+  </div>
+</div>
+{% endblock %}

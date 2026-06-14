@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} — Hangry Games</title>
+  <link rel="stylesheet" href="/assets/main.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.3"></script>
+</head>
+<body class="{{ body_class | default(value='') }}">
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none"><use href="/icons/sprite-ui.svg"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none"><use href="/icons/sprite-narrative.svg"/></svg>
+
+  <header class="topnav">
+    <div class="topnav-inner">
+      <div class="nav-left">
+        <div class="site-brand">
+          <div class="emblem"></div>
+          <span>HANGRIER <span class="brand-accent">GAMES</span></span>
+        </div>
+        <a href="/games" class="nav-link back-link">ALL GAMES</a>
+      </div>
+      <div class="nav-right">
+        <div class="theme-switcher">
+          <button onclick="setTheme('light')" title="light">☀</button>
+          <button onclick="setTheme('dark')" title="dark">☾</button>
+          <button onclick="setTheme('auto')" title="auto">◉</button>
+        </div>
+        {% if auth_authenticated %}
+          <div class="user-badge">
+            <span class="dot"></span>
+            <span>{{ auth_username | upper }}</span>
+          </div>
+          <a href="/account/settings" class="nav-link">SETTINGS</a>
+          <form class="logout-form" method="POST" action="/auth/logout">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="nav-link">LOGOUT</button>
+          </form>
+        {% else %}
+          <a href="/auth" class="nav-link">LOGIN / SIGN UP</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="pagefoot">
+    <div class="container row-between">
+      <span>© Hangry Games</span>
+      <span class="num">Server v0.1.15</span>
+    </div>
+  </footer>
+
+  <script>
+  (function() {
+    var root = document.documentElement;
+    var saved = localStorage.getItem('theme') || 'dark';
+    function apply(t) {
+      if (t === 'dark') root.setAttribute('data-theme', 'dark');
+      else if (t === 'light') root.removeAttribute('data-theme');
+      else {
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+          root.setAttribute('data-theme', 'dark');
+        else root.removeAttribute('data-theme');
+      }
+      document.querySelectorAll('.theme-switcher button').forEach(function(b) {
+        b.classList.toggle('active', b.title.toLowerCase() === t);
+      });
+    }
+    apply(saved);
+    window.setTheme = function(t) {
+      localStorage.setItem('theme', t);
+      apply(t);
+    };
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+      if ((localStorage.getItem('theme') || 'dark') === 'auto') apply('auto');
+    });
+  })();
+  </script>
+</body>
+</html>

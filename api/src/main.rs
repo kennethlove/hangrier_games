@@ -15,7 +15,6 @@ use axum::http::header::{
     CONTENT_TYPE, EXPIRES, HeaderName,
 };
 use axum::middleware::Next;
-use axum::response::Html;
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::{Json, Router, middleware};
 use base64_url::decode;
@@ -406,6 +405,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/games/{id}", axum::routing::get(game_detail_handler))
         .route("/games/{id}/areas", axum::routing::get(game_areas_handler))
         .route("/games/{id}/log", axum::routing::get(game_log_handler))
+        .route("/games/{id}/timeline", axum::routing::get(timeline_handler))
         .route(
             "/games/{id}/tributes",
             axum::routing::get(game_tributes_handler),
@@ -617,9 +617,9 @@ impl KeyExtractor for CompoundKeyExtractor {
     }
 }
 
-/// Render a Maud markup as an HTML response with the CSRF cookie attached.
-fn html_with_csrf(markup: maud::Markup, csrf: &str) -> Response {
-    let mut response = Html(markup).into_response();
+/// Render an HTML string as a response with the CSRF cookie attached.
+fn html_with_csrf(html: String, csrf: &str) -> Response {
+    let mut response = axum::response::Html(html).into_response();
     api::cookies::set_csrf_cookie(&mut response, csrf);
     response
 }

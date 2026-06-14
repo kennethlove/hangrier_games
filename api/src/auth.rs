@@ -396,9 +396,15 @@ async fn show_reset_form(
             let csrf = read_cookie(&headers, CSRF_COOKIE)
                 .map(|s| s.to_owned())
                 .unwrap_or_else(generate_csrf_token);
-            let mut ctx = crate::templates::tera_engine::base_context("Reset Password", &AuthState::guest(csrf.clone()));
+            let mut ctx = crate::templates::tera_engine::base_context(
+                "Reset Password",
+                &AuthState::guest(csrf.clone()),
+            );
             ctx.insert("token", &query.token);
-            Html(crate::templates::tera_engine::render("reset_form.html", &ctx))
+            Html(crate::templates::tera_engine::render(
+                "reset_form.html",
+                &ctx,
+            ))
             .into_response()
         }
         Err(_) => Redirect::to("/auth?tab=login").into_response(),

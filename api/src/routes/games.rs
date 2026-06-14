@@ -530,10 +530,10 @@ pub async fn timeline_handler(
     let filtered_events: Vec<shared::messages::GameMessage> = messages
         .iter()
         .filter(|m| {
-            if let (Some(day), Some(phase)) = (selected_day, selected_phase) {
-                if m.game_day != day || m.phase != phase {
-                    return false;
-                }
+            if let (Some(day), Some(phase)) = (selected_day, selected_phase)
+                && (m.game_day != day || m.phase != phase)
+            {
+                return false;
             }
             if !filter_str.is_empty() {
                 let kind = m.payload.kind();
@@ -572,7 +572,7 @@ pub async fn timeline_handler(
     // ── Pre-render event cards ─────────────────────────────────────
     let rendered_events: Vec<String> = filtered_events
         .iter()
-        .map(|msg| game_detail::render_event_card(msg))
+        .map(game_detail::render_event_card)
         .collect();
 
     // ── Build template context ─────────────────────────────────────
@@ -727,7 +727,7 @@ pub async fn game_tribute_detail_handler(
             ctx.insert("game_id", &game_id);
             ctx.insert("tribute_detail_html", &tribute_html);
             html_with_csrf(tera_engine::render("tribute_detail.html", &ctx), &csrf)
-        },
+        }
         None => {
             let mut ctx = tera_engine::base_context("Not Found", &auth);
             ctx.insert("message", "The tribute you're looking for doesn't exist.");

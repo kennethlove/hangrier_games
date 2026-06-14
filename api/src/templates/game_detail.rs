@@ -263,7 +263,15 @@ pub fn render_tribute_row(tribute: &game::tributes::Tribute) -> String {
 pub fn render_tribute_card(tribute: &game::tributes::Tribute) -> String {
     let is_alive = tribute.is_alive();
     let health = tribute.attributes.health;
-    let _health_class = if health > 60 { "high" } else if health > 20 { "mid" } else if health > 0 { "low" } else { "empty" };
+    let _health_class = if health > 60 {
+        "high"
+    } else if health > 20 {
+        "mid"
+    } else if health > 0 {
+        "low"
+    } else {
+        "empty"
+    };
     let status_class = if is_alive { "alive" } else { "dead" };
     let status_text = if is_alive { "ALIVE" } else { "DEAD" };
     let hunger = hunger_label(tribute.hunger);
@@ -316,7 +324,11 @@ pub fn render_area_card(area: &game::areas::AreaDetails) -> String {
           </div>
         </div>"#,
         name = html_escape(&area.name),
-        items = if item_count > 0 { format!("{} items", item_count) } else { "No items".to_string() },
+        items = if item_count > 0 {
+            format!("{} items", item_count)
+        } else {
+            "No items".to_string()
+        },
         events = event_count,
     )
 }
@@ -335,14 +347,18 @@ pub fn render_tribute_detail(tribute: &game::tributes::Tribute, _game_id: &str) 
 
     let mut items_html = String::new();
     for item in &tribute.items {
-        items_html.push_str(&format!("<span class=\"item-tag\">{}</span>", html_escape(&item.name)));
+        items_html.push_str(&format!(
+            "<span class=\"item-tag\">{}</span>",
+            html_escape(&item.name)
+        ));
     }
     if items_html.is_empty() {
-        items_html = "<span style=\"color:var(--muted);font-size:var(--fs-xs);\">No items</span>".to_string();
+        items_html = "<span style=\"color:var(--muted);font-size:var(--fs-xs);\">No items</span>"
+            .to_string();
     }
 
     let mut afflictions_html = String::new();
-    for (kind, _) in &tribute.afflictions {
+    for kind in tribute.afflictions.keys() {
         afflictions_html.push_str(&format!(
             "<span class=\"affliction-badge severity-moderate\">{}</span>",
             html_escape(&format!("{:?}", kind))

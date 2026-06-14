@@ -71,7 +71,10 @@ pub fn thirst_color(value: &Value, _: &HashMap<String, Value>) -> Result<Value, 
 pub fn stamina_label(value: &Value, args: &HashMap<String, Value>) -> Result<Value, Error> {
     let stamina = value.as_u64().unwrap_or(0) as u32;
     let max = args.get("max").and_then(|a| a.as_u64()).unwrap_or(100) as u32;
-    let pct = if max > 0 { stamina * 100 / max } else { 0 };
+    let pct = stamina
+        .checked_mul(100)
+        .and_then(|v| v.checked_div(max))
+        .unwrap_or(0);
     let label = match pct {
         0..=25 => "Exhausted",
         26..=50 => "Winded",
@@ -83,7 +86,10 @@ pub fn stamina_label(value: &Value, args: &HashMap<String, Value>) -> Result<Val
 pub fn stamina_color(value: &Value, args: &HashMap<String, Value>) -> Result<Value, Error> {
     let stamina = value.as_u64().unwrap_or(0) as u32;
     let max = args.get("max").and_then(|a| a.as_u64()).unwrap_or(100) as u32;
-    let pct = if max > 0 { stamina * 100 / max } else { 0 };
+    let pct = stamina
+        .checked_mul(100)
+        .and_then(|v| v.checked_div(max))
+        .unwrap_or(0);
     let color = match pct {
         0..=25 => "var(--danger)",
         26..=50 => "var(--waiting)",

@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="padding-block:var(--gap-lg);">
+  <a href="/games/{{ game_id }}" class="back-link">Back to Game</a>
+  {{ tribute_detail_html | safe }}
+</div>
+{% endblock %}

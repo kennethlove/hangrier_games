@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="auth-card">
+  <div class="auth-logo">Hangry <span>Games</span></div>
+  <div class="check-email">
+    <div class="mail-icon">
+      {{ "mail" | icon | safe }}
+    </div>
+    <h2 class="auth-title">Check your email</h2>
+    <p class="auth-subtitle">
+      {% if address %}
+        We sent a verification link to <strong>{{ address }}</strong>.
+      {% else %}
+        We sent you a verification link.
+      {% endif %}
+    </p>
+    <p class="text-sm text-gray-400 mt-4">
+      Click the link in the email to activate your account, then sign in.
+    </p>
+    <div class="mt-6">
+      <a href="/auth?tab=login" class="btn btn-primary">Go to Sign In</a>
+    </div>
+    {% if address %}
+      <div class="mt-4 text-xs text-gray-500">
+        Didn't receive the email? Check your spam folder, or
+        <button
+          hx-post="/auth/resend-verification"
+          hx-vals="{{ '{' }}"email":"{{ address }}","csrf_token":"{{ csrf_token }}"{{ '}' }}"
+          hx-target="find .resend-feedback"
+          hx-swap="innerHTML"
+          class="text-amber-400 hover:underline cursor-pointer bg-transparent border-none p-0 inline"
+        >send another one.</button>
+        <span class="resend-feedback"></span>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

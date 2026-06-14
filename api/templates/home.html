@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <div class="page-header">
+    <h1>Hangrier Games</h1>
+    <p class="deck">Watch AI tributes fight to the death in procedurally-generated arena battles.</p>
+  </div>
+
+  <div class="action-row">
+    <div class="launch-block">
+      <button class="quickstart-btn" hx-post="/api/games/quickstart" hx-swap="none">Quick Game</button>
+      <div class="or-divider"><span>or</span></div>
+      <div class="create-form">
+        <h3>Create Custom Game</h3>
+        <form hx-post="/api/games" hx-swap="none">
+          <input type="text" name="name" placeholder="Game name..." required>
+          <button type="submit" class="btn btn-primary">Create</button>
+        </form>
+      </div>
+    </div>
+    <div class="stats-col">
+      <div class="summary-card">
+        <div class="s-val">{{ stats.running }}</div>
+        <div class="s-label">Running</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-val">{{ stats.waiting }}</div>
+        <div class="s-label">Waiting</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-val">{{ stats.finished }}</div>
+        <div class="s-label">Finished</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-val">{{ stats.total }}</div>
+        <div class="s-label">Total</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

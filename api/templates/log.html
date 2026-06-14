@@ -10,7 +10,7 @@
     hx-get="/games/{{ game_id }}/log"
     hx-target="#log-entries"
     hx-swap="innerHTML">
-    {% if event_cards is empty %}
+    {% if event_cards | length == 0 %}
       <p class="empty-state">No messages yet.</p>
     {% else %}
       {{ event_cards | safe }}

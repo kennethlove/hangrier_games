@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="padding-block: var(--gap-lg);">
+  <a href="/games/{{ game_id }}" class="back-link">
+    {{ "arrow-left" | icon | safe }}
+    Back to Game
+  </a>
+
+  <div style="margin-bottom: var(--gap-md);">
+    <h1 style="font-family: var(--font-display); font-size: var(--fs-h3); font-weight: 600; color: var(--broad-accent);">Timeline</h1>
+    <p style="font-size: var(--fs-xs); color: var(--muted);">Day {{ current_day }} · {{ current_phase | phase_label }}</p>
+  </div>
+
+  {% if periods %}
+  <div style="margin-bottom: var(--gap-md);">
+    <div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px;">
+      {% for period in periods %}
+      {% set is_current = period.is_current %}
+      {% if is_current %}
+      {% set border_css = "border: 1px solid var(--broad-accent); box-shadow: 0 0 0 1px var(--broad-accent-dim);" %}
+      {% set bg_css = "background: var(--broad-surface-hover);" %}
+      {% else %}
+      {% set border_css = "border: 1px solid var(--border);" %}
+      {% set bg_css = "background: var(--broad-surface);" %}
+      {% endif %}
+      {% set period_url = "/games/" ~ game_id ~ "/timeline?day=" ~ period.day ~ "&phase=" ~ period.phase %}
+      {% if filter %}{% set period_url = period_url ~ "&filter=" ~ filter %}{% endif %}
+      {% if tribute_filter %}{% set period_url = period_url ~ "&tribute=" ~ tribute_filter %}{% endif %}
+      <a href="{{ period_url }}"
+         style="flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; font-size: var(--fs-xs); text-decoration: none; color: var(--broad-fg); {{ border_css }} {{ bg_css }}">
+        <span style="font-weight: 500;">D{{ period.day }} {{ period.phase | phase_label }}</span>
+        <span style="color: var(--muted);">{{ period.event_count }}</span>
+        {% if period.deaths > 0 %}
+        <span style="color: var(--danger);">
+          {{ "skull" | icon | safe }}
+          {{ period.deaths }}
+        </span>
+        {% endif %}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--gap-sm);">
+    {% for f in filter_options %}
+    {% set is_active = f.value == filter %}
+    {% if is_active %}
+    {% set chip_style = "background: var(--broad-accent); color: #fff;" %}
+    {% else %}
+    {% set chip_style = "background: var(--broad-surface); color: var(--muted);" %}
+    {% endif %}
+    {% set chip_url = "/games/" ~ game_id ~ "/timeline?filter=" ~ f.value %}
+    {% if selected_day %}{% set chip_url = chip_url ~ "&day=" ~ selected_day %}{% endif %}
+    {% if selected_phase %}{% set chip_url = chip_url ~ "&phase=" ~ selected_phase %}{% endif %}
+    {% if tribute_filter %}{% set chip_url = chip_url ~ "&tribute=" ~ tribute_filter %}{% endif %}
+    <a href="{{ chip_url }}"
+       style="padding: 4px 10px; border-radius: 9999px; font-size: var(--fs-xs); font-weight: 500; text-decoration: none; {{ chip_style }}">
+      {{ f.icon_name | icon | safe }} {{ f.label }}
+    </a>
+    {% endfor %}
+  </div>
+
+  {% if tributes %}
+  <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--gap-md);">
+    {% set is_all = tribute_filter == "" %}
+    {% if is_all %}
+    {% set all_style = "background: var(--info); color: #fff;" %}
+    {% else %}
+    {% set all_style = "background: var(--broad-surface); color: var(--muted);" %}
+    {% endif %}
+    {% set all_url = "/games/" ~ game_id ~ "/timeline" %}
+    {% if filter %}{% set all_url = all_url ~ "?filter=" ~ filter %}{% endif %}
+    {% if selected_day %}{% set all_url = all_url ~ "&day=" ~ selected_day %}{% endif %}
+    {% if selected_phase %}{% set all_url = all_url ~ "&phase=" ~ selected_phase %}{% endif %}
+    <a href="{{ all_url }}"
+       style="padding: 2px 8px; border-radius: 9999px; font-size: var(--fs-xs); text-decoration: none; {{ all_style }}">
+      All
+    </a>
+    {% for tribute in tributes %}
+    {% set is_active = tribute_filter == tribute.name %}
+    {% if is_active %}
+    {% set t_style = "background: var(--info); color: #fff;" %}
+    {% else %}
+    {% set t_style = "background: var(--broad-surface); color: var(--muted);" %}
+    {% endif %}
+    {% set t_url = "/games/" ~ game_id ~ "/timeline?tribute=" ~ tribute.name %}
+    {% if filter %}{% set t_url = t_url ~ "&filter=" ~ filter %}{% endif %}
+    {% if selected_day %}{% set t_url = t_url ~ "&day=" ~ selected_day %}{% endif %}
+    {% if selected_phase %}{% set t_url = t_url ~ "&phase=" ~ selected_phase %}{% endif %}
+    <a href="{{ t_url }}"
+       style="padding: 2px 8px; border-radius: 9999px; font-size: var(--fs-xs); text-decoration: none; {{ t_style }}">
+      {{ tribute.name }}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if selected_day and selected_phase %}
+    {% if rendered_events %}
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      {% for card_html in rendered_events %}
+      {{ card_html | safe }}
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: var(--gap-xl) 0; color: var(--muted);">
+      {{ "ghost" | icon | safe }}
+      <p style="margin-top: 8px;">No events for this period.</p>
+    </div>
+    {% endif %}
+  {% else %}
+    {% if periods %}
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;">
+      {% for period in periods %}
+      {% set is_current = period.is_current %}
+      {% if is_current %}
+      {% set pg_border = "border: 1px solid var(--broad-accent);" %}
+      {% set pg_bg = "background: var(--broad-surface-hover);" %}
+      {% else %}
+      {% set pg_border = "border: 1px solid var(--border);" %}
+      {% set pg_bg = "background: var(--broad-surface);" %}
+      {% endif %}
+      <div style="padding: 12px; border-radius: 6px; {{ pg_border }} {{ pg_bg }}">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+          <span style="font-size: var(--fs-sm); font-weight: 500; color: var(--broad-fg);">Day {{ period.day }} {{ period.phase | phase_label }}</span>
+          {% if is_current %}
+          <span style="font-size: var(--fs-xs); color: var(--broad-accent);">Now</span>
+          {% endif %}
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; font-size: var(--fs-xs); color: var(--muted);">
+          <span>{{ period.event_count }} events</span>
+          {% if period.deaths > 0 %}
+          <span style="color: var(--danger);">
+            {{ "skull" | icon | safe }}
+            {{ period.deaths }}
+          </span>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: var(--gap-xl) 0; color: var(--muted);">
+      {{ "ghost" | icon | safe }}
+      <p style="margin-top: 8px;">No periods yet.</p>
+    </div>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

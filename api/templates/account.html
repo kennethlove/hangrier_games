@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<div>
+  <div class="mb-8 p-4 bg-gray-900 border border-gray-800 rounded-lg">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-bold text-amber-400">{{ "user" | icon | safe }} {{ session.username }}</h1>
+        <p class="text-sm text-gray-400 mt-1">Account Dashboard</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="mb-6">
+    <a href="/games/new" class="inline-block bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded">Create New Game</a>
+  </div>
+
+  <h2 class="text-lg font-semibold text-amber-400 mb-4">Your Games</h2>
+
+  {% if games is empty %}
+    <p class="text-gray-400">You haven't created any games yet.</p>
+  {% else %}
+    <div class="space-y-3">
+      {% for game in games %}
+        <a href="/games/{{ game.identifier }}" class="block bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-lg p-4 transition-colors">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-semibold text-white">{{ game.name }}</h3>
+              <p class="text-sm text-gray-400">
+                Day {{ game.day | default(value=0) }}
+                ·
+                <span style="color: {{ game.status | status_color }}">{{ game.status }}</span>
+                · {{ game.living_count }}/{{ game.tribute_count }} alive
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              {% if game.private %}
+                <span class="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">Private</span>
+              {% endif %}
+              {% if game.ready %}
+                <span class="text-xs text-green-400 bg-green-900/30 px-2 py-1 rounded">Ready</span>
+              {% endif %}
+            </div>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

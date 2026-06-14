@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="auth-card">
+  <div class="auth-logo">Hangry <span>Games</span></div>
+  <div class="check-email">
+    <div class="mail-icon">✓</div>
+    <h2 class="auth-title">Email verified!</h2>
+    <p class="auth-subtitle">
+      Your email has been verified. You can now sign in to your account.
+    </p>
+    <div class="mt-6">
+      <a href="/auth?tab=login" class="btn btn-primary">Sign In</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+  <div class="container">
+    <h1>Games</h1>
+    <p class="deck">All simulations — past, present, and waiting to begin.</p>
+  </div>
+</section>
+
+<div class="container">
+  <div class="action-row">
+    <div class="launch-block">
+      <button class="quickstart-btn" hx-post="/api/games/quickstart" hx-swap="none">⚡ Quickstart — New 24-Tribute Game</button>
+      <div class="or-divider"><span>or</span></div>
+      <div class="create-form">
+        <h3>Create a Game</h3>
+        <form hx-post="/api/games" hx-swap="none">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="text" name="name" placeholder="Game name...">
+          <button class="btn btn-primary btn-sm" type="submit">Create</button>
+        </form>
+      </div>
+    </div>
+    <div class="stats-col">
+      <div class="summary-card running">
+        <div class="s-val num">{{ stats.running }}</div>
+        <div class="s-label">Running</div>
+      </div>
+      <div class="summary-card waiting">
+        <div class="s-val num">{{ stats.waiting }}</div>
+        <div class="s-label">Waiting</div>
+      </div>
+      <div class="summary-card finished">
+        <div class="s-val num">{{ stats.finished }}</div>
+        <div class="s-label">Finished</div>
+      </div>
+      <div class="summary-card">
+        <div class="s-val num">{{ stats.total }}</div>
+        <div class="s-label">Total Games</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section class="game-list">
+  <div class="container">
+    <div class="game-list-header">
+      <h2>All Games</h2>
+      <div class="filter-pills">
+        <a href="/games" class="filter-pill {% if active_filter == '' %}active{% endif %}">All</a>
+        <a href="/games?status=running" class="filter-pill {% if active_filter == 'running' %}active{% endif %}">Running</a>
+        <a href="/games?status=waiting" class="filter-pill {% if active_filter == 'waiting' %}active{% endif %}">Waiting</a>
+        <a href="/games?status=finished" class="filter-pill {% if active_filter == 'finished' %}active{% endif %}">Finished</a>
+      </div>
+    </div>
+
+    <div id="games-list-content">
+      {% if games is empty %}
+        <div class="empty-state">
+          <p>No games yet</p>
+          <p>Create a game to get started</p>
+        </div>
+      {% else %}
+        {# Featured running cards (first 2) #}
+        {% for game in games %}
+          {% if game.status == 'InProgress' %}
+            {% if loop.index <= 2 %}
+              <div class="game-card featured running" data-status="running">
+                <div class="game-info">
+                  <div class="live-pulse">Live</div>
+                  <h3 class="game-name">
+                    <a href="/games/{{ game.identifier }}">{{ game.name }}</a>
+                  </h3>
+                  <div class="game-meta">
+                    <span><span class="num">{{ game.tribute_count }}</span> tributes</span>
+                    <span><span class="num">{{ game.living_count }}</span> alive</span>
+                    {% if game.day is not none %}
+                      <span><span class="num">Day {{ game.day }}</span></span>
+                    {% endif %}
+                  </div>
+                  <div class="progress-bar">
+                    <div class="fill" style="width:{% if game.day | default(value=1) > 10 %}100{% else %}{{ game.day | default(value=1) * 10 }}{% endif %}%"></div>
+                  </div>
+                  <div class="progress-label">
+                    {% if game.day is not none %}
+                      <span class="num">Day {{ game.day }}</span> ·
+                    {% endif %}
+                    <span class="num">{{ game.living_count }}</span> tributes alive
+                  </div>
+                  <div class="reveal-actions">
+                    <a href="/games/{{ game.identifier }}" class="reveal-btn">Broadcast</a>
+                    <a href="/games/{{ game.identifier }}/tributes" class="reveal-btn">Tributes</a>
+                    <a href="/games/{{ game.identifier }}/areas" class="reveal-btn">Arena Map</a>
+                    <a href="/games/{{ game.identifier }}/odds" class="reveal-btn">Odds</a>
+                  </div>
+                </div>
+                <div class="game-status">
+                  <span class="status-pill running">Running</span>
+                </div>
+              </div>
+            {% else %}
+              <div class="game-card running" data-status="running">
+                <div class="game-info">
+                  <h3 class="game-name">
+                    <a href="/games/{{ game.identifier }}">{{ game.name }}</a>
+                  </h3>
+                  <div class="game-meta">
+                    <span><span class="num">{{ game.tribute_count }}</span> tributes</span>
+                    <span><span class="num">{{ game.living_count }}</span> alive</span>
+                    {% if game.day is not none %}
+                      <span><span class="num">Day {{ game.day }}</span></span>
+                    {% endif %}
+                  </div>
+                  <div class="progress-bar">
+                    <div class="fill" style="width:{% if game.day | default(value=1) > 10 %}100{% else %}{{ game.day | default(value=1) * 10 }}{% endif %}%"></div>
+                  </div>
+                  <div class="progress-label">
+                    {% if game.day is not none %}
+                      <span class="num">Day {{ game.day }}</span> ·
+                    {% endif %}
+                    <span class="num">{{ game.living_count }}</span> tributes alive
+                  </div>
+                  <div class="reveal-actions">
+                    <a href="/games/{{ game.identifier }}" class="reveal-btn">Broadcast</a>
+                    <a href="/games/{{ game.identifier }}/tributes" class="reveal-btn">Tributes</a>
+                    <a href="/games/{{ game.identifier }}/areas" class="reveal-btn">Arena Map</a>
+                  </div>
+                </div>
+                <div class="game-status">
+                  <span class="status-pill running">Running</span>
+                </div>
+              </div>
+            {% endif %}
+          {% elif game.status == 'NotStarted' %}
+            <div class="game-card waiting" data-status="waiting">
+              <div class="game-info">
+                <h3 class="game-name">
+                  <a href="/games/{{ game.identifier }}">{{ game.name }}</a>
+                </h3>
+                <div class="game-meta">
+                  <span><span class="num">{{ game.tribute_count }}</span> tributes</span>
+                </div>
+                <div class="reveal-actions">
+                  <a href="/games/{{ game.identifier }}/launch" class="reveal-btn">Launch</a>
+                  <a href="/games/{{ game.identifier }}/configure" class="reveal-btn">Configure</a>
+                  <button class="reveal-btn" type="button">Delete</button>
+                </div>
+              </div>
+              <div class="game-status">
+                <span class="status-pill waiting">Waiting</span>
+              </div>
+            </div>
+          {% endif %}
+        {% endfor %}
+
+        {# Finished heading + grid #}
+        {% set has_finished = false %}
+        {% for game in games %}
+          {% if game.status == 'Finished' %}
+            {% if not has_finished %}
+              {% set has_finished = true %}
+              <h3 style="font-family:var(--font-display);font-size:var(--fs-h3);font-weight:600;margin:var(--gap-lg) 0 var(--gap-md);">Finished</h3>
+              <div class="finished-grid">
+            {% endif %}
+            <div class="game-card finished" data-status="finished">
+              <div class="game-info">
+                <h3 class="game-name">
+                  <a href="/games/{{ game.identifier }}">{{ game.name }}</a>
+                </h3>
+                <div class="game-meta">
+                  <span><span class="num">{{ game.tribute_count }}</span> tributes</span>
+                  {% if game.day is not none %}
+                    <span><span class="num">{{ game.day }}</span> days</span>
+                  {% endif %}
+                </div>
+                <div class="reveal-actions">
+                  <a href="/games/{{ game.identifier }}/recap" class="reveal-btn">Recap</a>
+                  <a href="/games/{{ game.identifier }}/tributes" class="reveal-btn">Tributes</a>
+                  <a href="/games/{{ game.identifier }}/areas" class="reveal-btn">Arena</a>
+                </div>
+              </div>
+              <div class="game-status">
+                <span class="status-pill finished">Finished</span>
+              </div>
+            </div>
+          {% endif %}
+        {% endfor %}
+        {% if has_finished %}
+          </div>
+        {% endif %}
+
+        {# Load more #}
+        {% if pagination.has_more %}
+          <div class="text-center" style="margin-top:var(--gap-lg);">
+            <button class="btn btn-ghost"
+              hx-get="/games?offset={{ pagination.offset + pagination.limit }}&limit={{ pagination.limit }}"
+              hx-target="#games-list-content"
+              hx-swap="innerHTML"
+              hx-disabled-elt="this">
+              Load More
+            </button>
+          </div>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

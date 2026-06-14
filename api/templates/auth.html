@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="auth-card">
+  <div class="auth-logo">Hangry <span>Games</span></div>
+  <div class="tab-bar">
+    {% set active_tab = tab | default(value="login") %}
+    <button class="tab-btn {% if active_tab == 'login' %}active{% endif %}" data-tab="login">Sign In</button>
+    <button class="tab-btn {% if active_tab == 'register' %}active{% endif %}" data-tab="register">Register</button>
+    <button class="tab-btn {% if active_tab == 'reset' %}active{% endif %}" data-tab="reset">Reset Password</button>
+  </div>
+
+  <div class="tab-panel {% if active_tab == 'login' %}active{% endif %}" id="login">
+    <h2 class="auth-title">Welcome back</h2>
+    <p class="auth-subtitle">Sign in to your account to continue.</p>
+
+    {% if active_tab == 'login' %}
+      {% if error %}
+        <div class="error-banner">{{ error }}</div>
+      {% endif %}
+    {% endif %}
+
+    <form method="POST" action="/auth/login">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+      <div class="field-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required placeholder="you@example.com">
+      </div>
+
+      <div class="field-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required minlength="8" maxlength="72" placeholder="Your password">
+      </div>
+
+      <div class="form-row">
+        <label>
+          <input type="checkbox" name="remember" value="true">
+          Remember me
+        </label>
+        <a href="#" onclick="switchTab('reset');return false;">Forgot password?</a>
+      </div>
+
+      <button type="submit" class="btn btn-primary" hx-indicator="#login-spinner">
+        Sign In
+        <span id="login-spinner" class="htmx-indicator">
+          <svg class="inline w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+        </span>
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Don't have an account?
+      <a href="#" onclick="switchTab('register');return false;">Create one</a>
+    </div>
+  </div>
+
+  <div class="tab-panel {% if active_tab == 'register' %}active{% endif %}" id="register">
+    <h2 class="auth-title">Create account</h2>
+    <p class="auth-subtitle">Join the broadcast. No credit card required.</p>
+
+    {% if active_tab == 'register' %}
+      {% if error %}
+        <div class="error-banner">{{ error }}</div>
+      {% endif %}
+    {% endif %}
+
+    <form method="POST" action="/auth/register">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+      <div class="field-group">
+        <label for="reg-display-name">Display Name</label>
+        <input type="text" id="reg-display-name" name="display_name" required minlength="3" maxlength="50" placeholder="3-50 characters">
+      </div>
+
+      <div class="field-group">
+        <label for="reg-email">Email</label>
+        <input type="email" id="reg-email" name="email" required placeholder="you@example.com">
+      </div>
+
+      <div class="field-group">
+        <label for="reg-password">Password</label>
+        <input type="password" id="reg-password" name="password" required minlength="8" maxlength="72" placeholder="8-72 characters">
+      </div>
+
+      <div class="field-group">
+        <label for="reg-confirm">Confirm Password</label>
+        <input type="password" id="reg-confirm" name="confirm_password" required minlength="8" maxlength="72" placeholder="Repeat your password">
+      </div>
+
+      <button type="submit" class="btn btn-primary" hx-indicator="#register-spinner">
+        Create Account
+        <span id="register-spinner" class="htmx-indicator">
+          <svg class="inline w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+        </span>
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Already have an account?
+      <a href="#" onclick="switchTab('login');return false;">Sign in</a>
+    </div>
+  </div>
+
+  <div class="tab-panel {% if active_tab == 'reset' %}active{% endif %}" id="reset">
+    <h2 class="auth-title">Reset password</h2>
+    <p class="auth-subtitle">Enter your email and we'll send you a reset link.</p>
+
+    <form method="POST" action="/auth/reset-password">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+      <div class="field-group">
+        <label for="reset-email">Email</label>
+        <input type="email" id="reset-email" name="email" required placeholder="Enter your email">
+      </div>
+
+      <button type="submit" class="btn btn-primary">Send Reset Link</button>
+    </form>
+
+    <div class="divider">or</div>
+
+    <button type="button" class="btn btn-ghost" onclick="switchTab('login')">
+      Back to Sign In
+    </button>
+  </div>
+</div>
+
+<script>
+  {% raw %}
+  function switchTab(id) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    const btn = document.querySelector('[data-tab="'+id+'"]');
+    if (btn) btn.classList.add('active');
+    const panel = document.getElementById(id);
+    if (panel) panel.classList.add('active');
+  }
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+  {% endraw %}
+</script>
+{% endblock %}

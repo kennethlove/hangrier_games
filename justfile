@@ -56,6 +56,41 @@ dev:
     trap "kill $DB_PID $MAILPIT_PID $API_PID $CSS_PID 2>/dev/null; exit" INT
     wait
 
+# Start full dev environment with auto-rebuild on file changes
+dev-watch:
+    #!/usr/bin/env bash
+    echo "==> Starting SurrealDB..."
+    surreal start --log info --user root --pass root --bind 0.0.0.0:8000 surrealkv://.surrealdb &
+    DB_PID=$!
+    sleep 2
+
+    echo "==> Starting Mailpit (email testing)..."
+    mailpit --smtp 0.0.0.0:1025 --listen 0.0.0.0:8025 &
+    MAILPIT_PID=$!
+
+    echo "==> Building Tailwind CSS..."
+    (cd api/assets && npm install && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css)
+    echo "==> Starting Tailwind watcher..."
+    (cd api/assets && npx @tailwindcss/cli -i ./src/main.css -o ./dist/main.css --watch) &
+    CSS_PID=$!
+
+    echo "==> Starting API with cargo-watch (auto-rebuild on template/code changes)..."
+    cargo watch -w api/src -s "cargo run --package api" &
+    API_PID=$!
+    sleep 3
+
+    echo ""
+    echo "Development environment running (watch mode):"
+    echo "  - Mailpit UI: http://localhost:8025"
+    echo "  - SurrealDB: ws://localhost:8000"
+    echo "  - API + HTMX pages: http://localhost:3000"
+    echo "  - Tailwind: watching api/assets/src/main.css"
+    echo "  - cargo-watch: watching api/src (auto-rebuild)"
+    echo ""
+    echo "Press Ctrl+C to stop all services"
+    trap "kill $DB_PID $MAILPIT_PID $API_PID $CSS_PID 2>/dev/null; exit" INT
+    wait
+
 # Start Mailpit email testing UI
 mailpit:
     mailpit --smtp 0.0.0.0:1025 --listen 0.0.0.0:8025

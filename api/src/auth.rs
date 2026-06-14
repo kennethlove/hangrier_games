@@ -6,7 +6,6 @@ use crate::email::{
     generate_verification_token, send_password_reset_email, validate_verification_token,
 };
 use crate::templates::AuthState;
-use crate::templates::auth::reset_form_page;
 use crate::{AppError, AppState};
 use axum::extract::{Form, Query, State};
 use axum::http::{HeaderMap, StatusCode};
@@ -397,10 +396,14 @@ async fn show_reset_form(
             let csrf = read_cookie(&headers, CSRF_COOKIE)
                 .map(|s| s.to_owned())
                 .unwrap_or_else(generate_csrf_token);
-            Html(reset_form_page(
-                AuthState::guest(csrf.clone()),
-                &query.token,
-                &csrf,
+            let mut ctx = crate::templates::tera_engine::base_context(
+                "Reset Password",
+                &AuthState::guest(csrf.clone()),
+            );
+            ctx.insert("token", &query.token);
+            Html(crate::templates::tera_engine::render(
+                "reset_form.html",
+                &ctx,
             ))
             .into_response()
         }

@@ -514,3 +514,134 @@ pub fn render_alliance_group(
         total = group.tributes.len(),
     )
 }
+
+fn terrain_color(terrain: &game::terrain::BaseTerrain) -> &'static str {
+    use game::terrain::BaseTerrain::*;
+    match terrain {
+        Forest => "#2d5a27",
+        Desert => "#c4a35a",
+        Tundra => "#8fa8b8",
+        Wetlands => "#3a7a6e",
+        Mountains => "#6b7280",
+        UrbanRuins => "#78716c",
+        Jungle => "#1a6b3c",
+        Grasslands => "#6b8e3a",
+        Badlands => "#8b6914",
+        Highlands => "#5b7553",
+        Geothermal => "#b45309",
+        Clearing => "#4a6741",
+    }
+}
+
+const HEX_SIZE: f64 = 52.0;
+const HEX_H: f64 = 104.0;
+const HEX_W: f64 = 90.0;
+const CENTER_X: f64 = 160.0;
+const CENTER_Y: f64 = 150.0;
+
+fn hex_corners(cx: f64, cy: f64) -> [(f64, f64); 6] {
+    let mut corners = [(0.0, 0.0); 6];
+    for (i, corner) in corners.iter_mut().enumerate() {
+        let angle = std::f64::consts::PI / 180.0 * (60.0 * i as f64 - 30.0);
+        *corner = (cx + HEX_SIZE * angle.cos(), cy + HEX_SIZE * angle.sin());
+    }
+    corners
+}
+
+fn hex_center(area_idx: usize) -> (f64, f64) {
+    match area_idx {
+        0 => (CENTER_X, CENTER_Y),
+        1 => (CENTER_X + HEX_W, CENTER_Y),
+        2 => (CENTER_X + HEX_W * 0.5, CENTER_Y - HEX_H * 0.75),
+        3 => (CENTER_X - HEX_W * 0.5, CENTER_Y - HEX_H * 0.75),
+        4 => (CENTER_X - HEX_W, CENTER_Y),
+        5 => (CENTER_X - HEX_W * 0.5, CENTER_Y + HEX_H * 0.75),
+        6 => (CENTER_X + HEX_W * 0.5, CENTER_Y + HEX_H * 0.75),
+        _ => (CENTER_X, CENTER_Y),
+    }
+}
+
+pub fn render_hex_map(
+    areas: &[game::areas::AreaDetails],
+    tributes: &[&game::tributes::Tribute],
+) -> String {
+    let area_order = [
+        game::areas::Area::Cornucopia,
+        game::areas::Area::Sector1,
+        game::areas::Area::Sector2,
+        game::areas::Area::Sector3,
+        game::areas::Area::Sector4,
+        game::areas::Area::Sector5,
+        game::areas::Area::Sector6,
+    ];
+
+    let area_map: std::collections::HashMap<game::areas::Area, &game::areas::AreaDetails> = areas
+        .iter()
+        .filter_map(|a| a.area.map(|area| (area, a)))
+        .collect();
+
+    let mut hexes = String::new();
+
+    for (idx, area_type) in area_order.iter().enumerate() {
+        let (cx, cy) = hex_center(idx);
+        let corners = hex_corners(cx, cy);
+        let points: String = corners
+            .iter()
+            .map(|(x, y)| format!("{x:.1},{y:.1}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let terrain = area_map
+            .get(area_type)
+            .map(|a| a.terrain.base)
+            .unwrap_or(game::terrain::BaseTerrain::Clearing);
+        let fill = terrain_color(&terrain);
+
+        let terrain_label = format!("{:?}", terrain).to_uppercase();
+        let area_name = area_type.to_string();
+
+        let tribute_count = tributes
+            .iter()
+            .filter(|t| t.is_alive() && *area_type == t.area)
+            .count();
+
+        hexes.push_str(&format!(
+            r#"<polygon points="{points}" fill="{fill}" stroke="var(--broad-border-strong)" stroke-width="2" opacity="0.85"/>
+            <text x="{cx}" y="{cy:.1}" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,0.9)" font-size="9" font-family="var(--font-condensed)" font-weight="600" letter-spacing="1">{terrain_label}</text>
+            <text x="{cx}" y="{cy:.1}" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,0.5)" font-size="7" font-family="var(--font-condensed)" dy="12">{area_name}</text>"#,
+        ));
+
+        // Tribute dots in this hex
+        let in_hex: Vec<_> = tributes
+            .iter()
+            .filter(|t| t.is_alive() && *area_type == t.area)
+            .enumerate()
+            .map(|(i, t)| {
+                let angle = std::f64::consts::PI * 2.0 * i as f64 / tribute_count.max(1) as f64;
+                let r = if tribute_count <= 1 { 0.0 } else { 16.0 };
+                (t, cx + r * angle.cos(), cy + r * angle.sin())
+            })
+            .collect();
+
+        for (tribute, dx, dy) in in_hex {
+            let dot_color = if tribute.is_alive() {
+                "var(--broad-accent)"
+            } else {
+                "var(--broad-fg-muted)"
+            };
+            let r = if tribute.is_alive() { 4.0 } else { 2.5 };
+            hexes.push_str(&format!(
+                r#"<circle cx="{dx:.1}" cy="{dy:.1}" r="{r}" fill="{dot_color}" stroke="var(--broad-bg)" stroke-width="1"/>"#,
+            ));
+        }
+    }
+
+    let view_w = CENTER_X * 2.0 + HEX_W + 20.0;
+    let view_h = CENTER_Y * 2.0 + HEX_H + 20.0;
+
+    format!(
+        r#"<svg viewBox="0 0 {view_w:.0} {view_h:.0}" xmlns="http://www.w3.org/2000/svg" class="hex-map">
+          {hexes}
+        </svg>"#,
+    )
+}

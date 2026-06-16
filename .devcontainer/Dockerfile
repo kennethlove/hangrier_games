@@ -1,5 +1,9 @@
 FROM mcr.microsoft.com/devcontainers/rust:1-bookworm
 
+# Update Rust to latest stable (matches host toolchain)
+RUN rustup update stable && rustup default stable \
+    && rustup component add clippy rustfmt rust-src
+
 # System deps for OpenSSL and SurrealDB CLI
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get install -y --no-install-recommends \
@@ -16,8 +20,11 @@ RUN ARCH=$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/') \
     | tar xz -C /usr/local/bin mailpit \
     && mailpit version 2>/dev/null || true
 
-# Add clippy and rustfmt as the vscode user
-USER vscode
-RUN rustup component add clippy rustfmt rust-src
+# Install SurrealDB - arch-aware for ARM Macs
+RUN ARCH=$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/') \
+    && curl -sSfL "https://github.com/surrealdb/surrealdb/releases/download/v3.1.3/surreal-linux-${ARCH}" \
+    -o /usr/local/bin/surreal \
+    && chmod +x /usr/local/bin/surreal \
+    && surreal version 2>/dev/null || true
 
 USER root

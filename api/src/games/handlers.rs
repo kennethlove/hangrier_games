@@ -121,6 +121,74 @@ pub async fn create_game(
     Ok(response)
 }
 
+/// Quickstart: create a game with 24 tributes, start it, run the first
+/// cycle, and redirect to the game detail page.
+pub async fn quickstart(
+    Extension(AuthDb(db)): Extension<AuthDb>,
+    State(state): State<AppState>,
+) -> Result<Response, AppError> {
+    let default_game = Game::default();
+    let game_identifier = Uuid::new_v4().to_string();
+    let game_name = default_game.name;
+
+    let game_rid = RecordId::new("game", game_identifier.as_str());
+    let body = serde_json::json!({
+        "identifier": &game_identifier,
+        "name": &game_name,
+        "status": "NotStarted",
+        "day": null,
+        "private": false,
+    });
+
+    db.query("UPSERT $rid CONTENT $body")
+        .bind(("rid", game_rid.clone()))
+        .bind(("body", body))
+        .await
+        .map_err(|e| AppError::InternalServerError(format!("Failed to create game: {e}")))?;
+
+    crate::verify_record_persisted(&db, &game_rid, "quickstart").await?;
+
+    // Create 24 tributes
+    let tribute_futures =
+        (0..24).map(|idx| crate::tributes::create_tribute(None, &game_identifier, &db, idx % 12));
+    let tribute_results = futures::future::join_all(tribute_futures).await;
+    if let Some(err) = tribute_results.into_iter().find_map(Result::err) {
+        return Err(AppError::InternalServerError(format!(
+            "Failed to create tributes: {err}"
+        )));
+    }
+
+    // Create 7 areas
+    let base_item_count = shared::ItemQuantity::default().base_item_count();
+    let area_futures = Area::iter()
+        .map(|area| super::create_area(game_identifier.as_str(), area, base_item_count, &db));
+    let area_results = futures::future::join_all(area_futures).await;
+    if let Some(err) = area_results.into_iter().find_map(Result::err) {
+        return Err(AppError::InternalServerError(format!(
+            "Failed to create areas: {err}"
+        )));
+    }
+
+    // Start the game and run first cycle
+    super::update_game_status(&db, &game_rid, GameStatus::InProgress).await?;
+    let mut game = super::get_full_game(Uuid::parse_str(&game_identifier).unwrap(), &db)
+        .await
+        .map_err(|e| AppError::InternalServerError(format!("Failed to load game: {e}")))?
+        .0;
+    game.status = GameStatus::InProgress;
+
+    super::run_game_cycles(
+        &mut game,
+        &db,
+        &state.broadcaster,
+        state.commentator.clone(),
+    )
+    .await?;
+
+    // Redirect to game detail page
+    Ok(axum::response::Redirect::to(&format!("/games/{game_identifier}")).into_response())
+}
+
 /// Delete a game and all its associated pieces (tributes, items, areas).
 pub async fn game_delete(
     game_identifier: Path<Uuid>,

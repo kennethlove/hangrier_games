@@ -242,21 +242,21 @@ pub fn render_tribute_row(tribute: &game::tributes::Tribute) -> String {
     let dead_class = if !is_alive { " dead" } else { "" };
 
     format!(
-        r#"<div class="tribute-card{dead_class}">
-          <div class="tribute-avatar" style="border-color:{avatar_color};color:{avatar_color}">{initial}</div>
-          <div class="tribute-info">
-            <div class="tribute-name">{name}</div>
-            <div class="tribute-meta">
-              <div class="health-bar">
-                <div class="health-fill {health_class}" style="width:{health}%;"></div>
-              </div>
+        r#"<div class="roster-row{dead_class}">
+          <div class="roster-avatar" style="border-color:{avatar_color};color:{avatar_color}">{initial}</div>
+          <div class="roster-info">
+            <span class="roster-name">{name}</span>
+            <span class="roster-district">D{district}</span>
+          </div>
+          <div class="roster-health">
+            <div class="roster-health-bar">
+              <div class="roster-health-fill {health_class}" style="width:{health}%;"></div>
             </div>
           </div>
-          <div class="tribute-stats">
-            <span class="tribute-status {status_class}">{status_text}</span>
-          </div>
+          <span class="roster-status {status_class}">{status_text}</span>
         </div>"#,
-        name = html_escape(&tribute.name)
+        name = html_escape(&tribute.name),
+        district = tribute.district,
     )
 }
 
@@ -393,5 +393,124 @@ pub fn render_tribute_detail(tribute: &game::tributes::Tribute, _game_id: &str) 
         intelligence = tribute.attributes.intelligence,
         items = items_html,
         afflictions = afflictions_html,
+    )
+}
+
+const ALLIANCE_COLORS: &[&str] = &[
+    "var(--broad-accent)",
+    "var(--info)",
+    "var(--gold)",
+    "var(--purple)",
+    "var(--waiting)",
+    "var(--running)",
+    "var(--danger)",
+];
+
+pub struct AllianceGroup {
+    pub name: String,
+    pub color: &'static str,
+    pub tributes: Vec<usize>,
+}
+
+pub fn build_alliance_groups(tributes: &[&game::tributes::Tribute]) -> Vec<AllianceGroup> {
+    let n = tributes.len();
+    let mut parent: Vec<usize> = (0..n).collect();
+
+    fn find(parent: &mut [usize], x: usize) -> usize {
+        if parent[x] != x {
+            parent[x] = find(parent, parent[x]);
+        }
+        parent[x]
+    }
+
+    fn union(parent: &mut [usize], a: usize, b: usize) {
+        let ra = find(parent, a);
+        let rb = find(parent, b);
+        if ra != rb {
+            parent[ra] = rb;
+        }
+    }
+
+    let id_to_idx: std::collections::HashMap<String, usize> = tributes
+        .iter()
+        .enumerate()
+        .map(|(i, t)| (t.id.to_string(), i))
+        .collect();
+
+    for (i, tribute) in tributes.iter().enumerate() {
+        for ally_id in &tribute.allies {
+            if let Some(&j) = id_to_idx.get(&ally_id.to_string()) {
+                union(&mut parent, i, j);
+            }
+        }
+    }
+
+    let mut groups: std::collections::HashMap<usize, Vec<usize>> = std::collections::HashMap::new();
+    for i in 0..n {
+        let root = find(&mut parent, i);
+        groups.entry(root).or_default().push(i);
+    }
+
+    let mut alliance_groups: Vec<AllianceGroup> = groups
+        .into_iter()
+        .enumerate()
+        .map(|(color_idx, (_, indices))| {
+            let color = ALLIANCE_COLORS[color_idx % ALLIANCE_COLORS.len()];
+            let name = if indices.len() == 1 {
+                "SOLO".to_string()
+            } else {
+                format!("ALLIANCE {}", color_idx + 1)
+            };
+            AllianceGroup {
+                name,
+                color,
+                tributes: indices,
+            }
+        })
+        .collect();
+
+    alliance_groups.sort_by(|a, b| {
+        let a_alive = a
+            .tributes
+            .iter()
+            .filter(|&&i| tributes[i].is_alive())
+            .count();
+        let b_alive = b
+            .tributes
+            .iter()
+            .filter(|&&i| tributes[i].is_alive())
+            .count();
+        b_alive.cmp(&a_alive)
+    });
+
+    alliance_groups
+}
+
+pub fn render_alliance_group(
+    group: &AllianceGroup,
+    tributes: &[&game::tributes::Tribute],
+) -> String {
+    let alive_count = group
+        .tributes
+        .iter()
+        .filter(|&&i| tributes[i].is_alive())
+        .count();
+
+    let mut rows = String::new();
+    for &idx in &group.tributes {
+        rows.push_str(&render_tribute_row(tributes[idx]));
+    }
+
+    format!(
+        r#"<div class="alliance-group">
+          <div class="alliance-header" style="border-left-color:{color};">
+            <span class="alliance-name">{name}</span>
+            <span class="alliance-count">{alive_count}/{total} alive</span>
+          </div>
+          {rows}
+        </div>"#,
+        color = group.color,
+        name = group.name,
+        total = group.tributes.len(),
     )
 }

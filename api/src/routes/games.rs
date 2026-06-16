@@ -249,10 +249,11 @@ pub async fn game_detail_handler(
         event_cards.push_str(&game_detail::render_commentary_card(seg));
     }
 
-    // Pre-render tribute rows
+    // Pre-render tribute rows — grouped by alliance
+    let alliance_groups = game_detail::build_alliance_groups(&sorted_tributes);
     let mut tribute_rows = String::new();
-    for tribute in &sorted_tributes {
-        tribute_rows.push_str(&game_detail::render_tribute_row(tribute));
+    for group in &alliance_groups {
+        tribute_rows.push_str(&game_detail::render_alliance_group(group, &sorted_tributes));
     }
 
     // SSE events string

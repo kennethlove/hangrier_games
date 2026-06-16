@@ -183,6 +183,32 @@ pub async fn game_detail_handler(
         Err(_) => vec![],
     };
 
+    // Fetch areas with terrain + tribute slot assignments
+    let areas_result = state
+        .db
+        .query(
+            r#"
+SELECT (
+    SELECT *, ->items->item[*] AS items
+    FROM ->areas->area
+) AS areas FROM game WHERE identifier = $identifier;
+"#,
+        )
+        .bind(("identifier", identifier.clone()))
+        .await;
+
+    let areas: Vec<game::areas::AreaDetails> = match areas_result {
+        Ok(mut result) => {
+            let rows: Vec<Vec<SerdeWrapper<game::areas::AreaDetails>>> =
+                result.take("areas").unwrap_or_default();
+            rows.into_iter()
+                .next()
+                .map(|inner| inner.into_iter().map(|w| w.0).collect())
+                .unwrap_or_default()
+        }
+        Err(_) => vec![],
+    };
+
     let messages_result = state
         .db
         .query(
@@ -256,6 +282,9 @@ pub async fn game_detail_handler(
         tribute_rows.push_str(&game_detail::render_alliance_group(group, &sorted_tributes));
     }
 
+    // Build hex arena map SVG
+    let hex_map = game_detail::render_hex_map(&areas, &sorted_tributes);
+
     // SSE events string
     let sse_events = "death,wound,attack,combat,alliance_formed,alliance_proposed,alliance_dissolved,betrayal,trust_shock_break,sponsor_gift,movement,hidden,area_closed,area_event,item_found,item_used,item_dropped,rested,starved,dehydrated,sanity_break,hunger_band_changed,thirst_band_changed,stamina_band_changed,shelter_sought,foraged,drank,ate,cycle_start,cycle_end,phase_started,phase_ended,slept,woke,game_ended,wounded,attacked,affliction_acquired,affliction_progressed,affliction_healed,affliction_cascaded,trauma_acquired,trauma_reinforced,trauma_escalated,trauma_flashback,trauma_avoidance,trauma_observed,trauma_forgotten,trauma_habituated,phobia_acquired,phobia_triggered,phobia_escalated,phobia_habituated,phobia_observed,phobia_forgotten,fixation_acquired,fixation_escalated,fixation_fired,fixation_consummated,fixation_thwarted,fixation_faded,generic,trapped,struggling,trapped_escaped,died_while_trapped,trap_set,trap_triggered,rescue_attempted,sleep_incident,partial_rescue_progress";
 
@@ -270,6 +299,7 @@ pub async fn game_detail_handler(
     ctx.insert("current_day", &current_day);
     ctx.insert("sse_events", sse_events);
     ctx.insert("tribute_rows", &tribute_rows);
+    ctx.insert("hex_map", &hex_map);
     ctx.insert("event_cards", &event_cards);
     ctx.insert("messages", &messages);
     ctx.insert("segments", &segments);

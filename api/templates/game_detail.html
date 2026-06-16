@@ -127,9 +127,7 @@
             <span class="title">ARENA SURVEILLANCE</span>
           </div>
           <div class="map-container">
-            <div style="display:grid;place-items:center;height:100%;color:var(--broad-fg-muted);font-size:var(--fs-xs);font-family:var(--font-condensed);letter-spacing:2px;text-transform:uppercase;">
-              MAP COMING IN PHASE 6
-            </div>
+            {{ hex_map | safe }}
           </div>
         </div>
 

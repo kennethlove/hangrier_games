@@ -2,8 +2,6 @@
 members = [ "game", "shared", "api", "announcers"]
 resolver = "2"
 
-[profile]
-
 [profile.dev]
 opt-level = 1
 

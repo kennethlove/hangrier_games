@@ -2102,6 +2102,18 @@ body.broadcast {
 .map-container:active {
   cursor: grabbing;
 }
+.hex-map {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.hex-map polygon {
+  transition: opacity 0.15s;
+}
+.hex-map polygon:hover {
+  opacity: 1 !important;
+  filter: brightness(1.15);
+}
 @media (max-width: 1100px) {
   .map-section {
     height: 260px;
@@ -2155,6 +2167,120 @@ body.broadcast {
 }
 .roster-scroll::-webkit-scrollbar-thumb {
   background: var(--broad-border);
+}
+.alliance-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.alliance-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-left: 3px solid var(--broad-accent);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--broad-fg-muted);
+  font-family: var(--font-condensed);
+  font-weight: 600;
+}
+.alliance-name {
+  color: var(--broad-fg);
+}
+.alliance-count {
+  font-weight: 400;
+}
+.roster-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 60px 42px;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--broad-bg);
+  border: 1px solid transparent;
+  transition: border-color 0.1s;
+}
+.roster-row:hover {
+  border-color: var(--broad-border);
+}
+.roster-row.dead {
+  opacity: 0.45;
+}
+.roster-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid;
+  display: grid;
+  place-items: center;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  font-family: var(--font-condensed);
+}
+.roster-info {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.roster-name {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--broad-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.roster-district {
+  font-size: 10px;
+  color: var(--broad-fg-muted);
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+.roster-health {
+  display: flex;
+  align-items: center;
+}
+.roster-health-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--broad-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.roster-health-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+.roster-health-fill.high {
+  background: var(--running);
+}
+.roster-health-fill.mid {
+  background: var(--waiting);
+}
+.roster-health-fill.low {
+  background: var(--danger);
+}
+.roster-health-fill.empty {
+  background: var(--broad-fg-muted);
+}
+.roster-status {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: right;
+  font-family: var(--font-condensed);
+}
+.roster-status.alive {
+  color: var(--running);
+}
+.roster-status.dead {
+  color: oklch(48% 0.22 25);
 }
 @keyframes spin {
   to {

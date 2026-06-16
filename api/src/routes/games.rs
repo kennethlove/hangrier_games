@@ -100,8 +100,15 @@ pub async fn games_list_handler(
     ctx.insert("stats", &serde_json::json!({"running": running, "waiting": waiting, "finished": finished, "total": total}));
     ctx.insert("games", &games);
     ctx.insert("active_filter", active_filter);
-    ctx.insert("has_more", &has_more);
-    ctx.insert("next_offset", &(offset + limit));
+    ctx.insert(
+        "pagination",
+        &shared::PaginationMetadata {
+            total,
+            limit,
+            offset: offset + limit,
+            has_more,
+        },
+    );
 
     html_with_csrf(tera_engine::render("games_list.html", &ctx), &csrf)
 }

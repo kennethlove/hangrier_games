@@ -96,7 +96,7 @@
         <span class="live-label">LIVE</span>
         <span class="ticker-divider"></span>
         <span class="ticker-text" id="tickerText">
-          {% if messages is not empty %}
+          {% if messages | length > 0 %}
             LATEST: {{ messages[-1].content }}
           {% else %}
             ARENA SURVEILLANCE ACTIVE — <span class="hl">{{ total }} TRIBUTES</span> IN PLAY
@@ -139,7 +139,7 @@
             <span class="count">{{ total }} TRIBUTES</span>
           </div>
           <div class="roster-scroll">
-            {% if tribute_rows is empty %}
+            {% if tribute_rows | length == 0 %}
               <div class="empty-state" style="padding:var(--gap-sm);">No tributes yet.</div>
             {% else %}
               {{ tribute_rows | safe }}
@@ -167,7 +167,7 @@
           hx-get="/api/games/{{ game.identifier }}/log"
           hx-target="#feedScroll"
           hx-swap="innerHTML">
-          {% if event_cards is empty %}
+          {% if event_cards | length == 0 %}
             <div class="empty-state">No events yet.</div>
           {% else %}
             {{ event_cards | safe }}

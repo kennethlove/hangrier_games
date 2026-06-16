@@ -55,7 +55,7 @@
     </div>
 
     <div id="games-list-content">
-      {% if games is empty %}
+      {% if games | length == 0 %}
         <div class="empty-state">
           <p>No games yet</p>
           <p>Create a game to get started</p>

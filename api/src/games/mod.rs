@@ -7,7 +7,7 @@ use crate::tributes::TRIBUTES_ROUTER;
 use crate::{AppError, AppState};
 use axum::Json;
 use axum::Router;
-use axum::routing::{get, put};
+use axum::routing::{get, post, put};
 use chrono::{DateTime, Utc};
 use game::areas::{Area, AreaDetails};
 use game::games::Game;
@@ -59,6 +59,7 @@ fn default_offset() -> u32 {
 pub static GAMES_ROUTER: LazyLock<Router<AppState>> = LazyLock::new(|| {
     Router::new()
         .route("/", get(game_list).post(create_game))
+        .route("/quickstart", post(quickstart))
         .route(
             "/{game_identifier}",
             get(game_detail).delete(game_delete).put(game_update),

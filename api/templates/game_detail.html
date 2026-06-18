@@ -5,16 +5,16 @@
 
     {# ══ BROADCAST HEADER ══ #}
     <div class="broad-header">
-      <div style="display:flex;align-items:center;gap:14px;">
-        <div style="width:32px;height:32px;background:var(--broad-accent);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);flex-shrink:0;display:grid;place-items:center;">
-          <div style="width:14px;height:14px;background:var(--broad-bg);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);"></div>
+      <div class="broad-header-row">
+        <div class="broad-emblem">
+          <div class="broad-emblem-inner"></div>
         </div>
         <span class="round-id">
           ROUND <span class="hl">{{ game.day | default(value=0) }}</span>
         </span>
         <span class="location">{{ game.name | upper }}</span>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;">
+      <div class="broad-header-meta">
         <div class="phase-badge {{ phase_class }}">
           <span class="dot"></span>
           <span>{{ phase_label }}</span>
@@ -110,8 +110,8 @@
       </div>
     </div>
 
-    {% if game.status == 'Finished' and game.winner is not none %}
-      <div class="winner-banner" style="margin:0 0 10px;border-color:var(--broad-gold);color:var(--broad-gold);background:rgba(240,180,41,0.08);">
+    {% if game.status == 'Finished' and game.winner is defined and game.winner %}
+      <div class="winner-banner winner-banner-gold">
         <span>☠ WINNER: {{ game.winner.name }} ☠</span>
       </div>
     {% endif %}
@@ -134,14 +134,14 @@
         <div class="roster-section">
           <div class="section-header">
             <span class="title">TRIBUTE ROSTER</span>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <button class="roster-sort feed-tab" style="font-size:9px;padding:2px 6px;">ALLIANCE</button>
+            <div class="roster-controls">
+              <button class="roster-sort feed-tab roster-sort-btn">ALLIANCE</button>
               <span class="count">{{ alive }}/{{ total }}</span>
             </div>
           </div>
           <div class="roster-scroll">
             {% if tribute_rows | length == 0 %}
-              <div class="empty-state" style="padding:var(--gap-sm);">No tributes yet.</div>
+              <div class="empty-state roster-empty">No tributes yet.</div>
             {% else %}
               {{ tribute_rows | safe }}
             {% endif %}

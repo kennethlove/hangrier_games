@@ -134,7 +134,10 @@
         <div class="roster-section">
           <div class="section-header">
             <span class="title">TRIBUTE ROSTER</span>
-            <span class="count">{{ alive }}/{{ total }} TRIBUTES</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button class="roster-sort feed-tab" style="font-size:9px;padding:2px 6px;">ALLIANCE</button>
+              <span class="count">{{ alive }}/{{ total }}</span>
+            </div>
           </div>
           <div class="roster-scroll">
             {% if tribute_rows | length == 0 %}
@@ -177,4 +180,5 @@
     <div id="game-status" style="display:none;"></div>
   </div>
 </div>
+<script src="/assets/broadcast.js"></script>
 {% endblock %}

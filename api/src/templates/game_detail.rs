@@ -170,7 +170,7 @@ pub fn render_event_card(msg: &shared::messages::GameMessage) -> String {
     );
 
     format!(
-        r#"<div class="event-card {archetype}" style="border-left-color:{color};">
+        r#"<div class="event-card {archetype}" data-archetype="{archetype}" style="border-left-color:{color};">
           <div class="card-head">
             <span class="card-badge" style="background:{color};">{badge}</span>
             <span class="card-timestamp">{ts}</span>
@@ -197,7 +197,7 @@ pub fn render_commentary_card(seg: &announcers::CommentarySegment) -> String {
         .collect();
 
     format!(
-        r#"<div class="event-card commentary">
+        r#"<div class="event-card commentary" data-archetype="commentary">
           <div class="card-head">
             <span class="card-badge">ANALYSIS</span>
             <span class="card-timestamp">Day {} {}</span>

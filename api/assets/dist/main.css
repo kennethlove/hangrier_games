@@ -1,4 +1,5 @@
 /*! tailwindcss v4.3.0 | MIT License | https://tailwindcss.com */
+@layer properties;
 @layer theme, base, components, utilities;
 @layer theme {
   :root, :host {
@@ -160,7 +161,14 @@
     display: none !important;
   }
 }
-@layer utilities;
+@layer utilities {
+  .transform {
+    transform: var(--tw-rotate-x,) var(--tw-rotate-y,) var(--tw-rotate-z,) var(--tw-skew-x,) var(--tw-skew-y,);
+  }
+  .filter {
+    filter: var(--tw-blur,) var(--tw-brightness,) var(--tw-contrast,) var(--tw-grayscale,) var(--tw-hue-rotate,) var(--tw-invert,) var(--tw-saturate,) var(--tw-sepia,) var(--tw-drop-shadow,);
+  }
+}
 :root {
   --bg: #eef1f5;
   --surface: #ffffff;
@@ -2102,6 +2110,18 @@ body.broadcast {
 .map-container:active {
   cursor: grabbing;
 }
+.hex-map {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.hex-map polygon {
+  transition: opacity 0.15s;
+}
+.hex-map polygon:hover {
+  opacity: 1 !important;
+  filter: brightness(1.15);
+}
 @media (max-width: 1100px) {
   .map-section {
     height: 260px;
@@ -2156,6 +2176,193 @@ body.broadcast {
 .roster-scroll::-webkit-scrollbar-thumb {
   background: var(--broad-border);
 }
+.alliance-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.alliance-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-left: 3px solid var(--broad-accent);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--broad-fg-muted);
+  font-family: var(--font-condensed);
+  font-weight: 600;
+}
+.alliance-name {
+  color: var(--broad-fg);
+}
+.alliance-count {
+  font-weight: 400;
+}
+.roster-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 60px 42px;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--broad-bg);
+  border: 1px solid transparent;
+  transition: border-color 0.1s;
+}
+.roster-row:hover {
+  border-color: var(--broad-border);
+}
+.roster-row.dead {
+  opacity: 0.45;
+}
+.roster-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid;
+  display: grid;
+  place-items: center;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  font-family: var(--font-condensed);
+}
+.roster-info {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.roster-name {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--broad-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.roster-district {
+  font-size: 10px;
+  color: var(--broad-fg-muted);
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+.roster-health {
+  display: flex;
+  align-items: center;
+}
+.roster-health-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--broad-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.roster-health-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+.roster-health-fill.high {
+  background: var(--running);
+}
+.roster-health-fill.mid {
+  background: var(--waiting);
+}
+.roster-health-fill.low {
+  background: var(--danger);
+}
+.roster-health-fill.empty {
+  background: var(--broad-fg-muted);
+}
+.roster-status {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: right;
+  font-family: var(--font-condensed);
+}
+.roster-status.alive {
+  color: var(--running);
+}
+.roster-status.dead {
+  color: oklch(48% 0.22 25);
+}
+@property --tw-rotate-x {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-rotate-y {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-rotate-z {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-skew-x {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-skew-y {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-blur {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-brightness {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-contrast {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-grayscale {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-hue-rotate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-invert {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-opacity {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-saturate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-sepia {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-drop-shadow {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-drop-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-drop-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-drop-shadow-size {
+  syntax: "*";
+  inherits: false;
+}
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -2164,5 +2371,29 @@ body.broadcast {
 @keyframes pulse {
   50% {
     opacity: 0.5;
+  }
+}
+@layer properties {
+  @supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
+    *, ::before, ::after, ::backdrop {
+      --tw-rotate-x: initial;
+      --tw-rotate-y: initial;
+      --tw-rotate-z: initial;
+      --tw-skew-x: initial;
+      --tw-skew-y: initial;
+      --tw-blur: initial;
+      --tw-brightness: initial;
+      --tw-contrast: initial;
+      --tw-grayscale: initial;
+      --tw-hue-rotate: initial;
+      --tw-invert: initial;
+      --tw-opacity: initial;
+      --tw-saturate: initial;
+      --tw-sepia: initial;
+      --tw-drop-shadow: initial;
+      --tw-drop-shadow-color: initial;
+      --tw-drop-shadow-alpha: 100%;
+      --tw-drop-shadow-size: initial;
+    }
   }
 }

@@ -171,6 +171,9 @@ pub async fn quickstart(
 
     // Start the game and run first cycle
     super::update_game_status(&db, &game_rid, GameStatus::InProgress).await?;
+
+    // Start the game and run first cycle
+    super::update_game_status(&db, &game_rid, GameStatus::InProgress).await?;
     let mut game = super::get_full_game(Uuid::parse_str(&game_identifier).unwrap(), &db)
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to load game: {e}")))?

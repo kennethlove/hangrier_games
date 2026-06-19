@@ -10,7 +10,7 @@
 <div class="container">
   <div class="action-row">
     <div class="launch-block">
-      <button class="quickstart-btn" hx-post="/api/games/quickstart" hx-swap="none">⚡ Quickstart — New 24-Tribute Game</button>
+      <button class="quickstart-btn" hx-post="/api/games/quickstart">⚡ Quickstart — New 24-Tribute Game</button>
       <div class="or-divider"><span>or</span></div>
       <div class="create-form">
         <h3>Create a Game</h3>
@@ -74,7 +74,7 @@
                   <div class="game-meta">
                     <span><span class="num">{{ game.tribute_count }}</span> tributes</span>
                     <span><span class="num">{{ game.living_count }}</span> alive</span>
-                    {% if game.day is not none %}
+                    {% if game.day is defined and game.day %}
                       <span><span class="num">Day {{ game.day }}</span></span>
                     {% endif %}
                   </div>
@@ -82,7 +82,7 @@
                     <div class="fill" style="width:{% if game.day | default(value=1) > 10 %}100{% else %}{{ game.day | default(value=1) * 10 }}{% endif %}%"></div>
                   </div>
                   <div class="progress-label">
-                    {% if game.day is not none %}
+                    {% if game.day is defined and game.day %}
                       <span class="num">Day {{ game.day }}</span> ·
                     {% endif %}
                     <span class="num">{{ game.living_count }}</span> tributes alive
@@ -107,7 +107,7 @@
                   <div class="game-meta">
                     <span><span class="num">{{ game.tribute_count }}</span> tributes</span>
                     <span><span class="num">{{ game.living_count }}</span> alive</span>
-                    {% if game.day is not none %}
+                    {% if game.day is defined and game.day %}
                       <span><span class="num">Day {{ game.day }}</span></span>
                     {% endif %}
                   </div>
@@ -115,7 +115,7 @@
                     <div class="fill" style="width:{% if game.day | default(value=1) > 10 %}100{% else %}{{ game.day | default(value=1) * 10 }}{% endif %}%"></div>
                   </div>
                   <div class="progress-label">
-                    {% if game.day is not none %}
+                    {% if game.day is defined and game.day %}
                       <span class="num">Day {{ game.day }}</span> ·
                     {% endif %}
                     <span class="num">{{ game.living_count }}</span> tributes alive
@@ -169,7 +169,7 @@
                 </h3>
                 <div class="game-meta">
                   <span><span class="num">{{ game.tribute_count }}</span> tributes</span>
-                  {% if game.day is not none %}
+                  {% if game.day is defined and game.day %}
                     <span><span class="num">{{ game.day }}</span> days</span>
                   {% endif %}
                 </div>

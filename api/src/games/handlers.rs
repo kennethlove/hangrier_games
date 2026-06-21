@@ -68,13 +68,23 @@ pub async fn create_game(
         ..Default::default()
     };
 
-    db.query("UPSERT $rid CONTENT $body")
+    let mut result = db
+        .query("UPSERT $rid CONTENT $body RETURN AFTER")
         .bind(("rid", game_rid.clone()))
         .bind(("body", body))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create game: {e}")))?;
 
-    crate::verify_record_persisted(&db, &game_rid, "create_game").await?;
+    let persisted_game: Option<Game> = result
+        .take::<Option<SerdeWrapper<Game>>>(0)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take game: {e}")))?
+        .map(|w| w.0);
+
+    if persisted_game.is_none() {
+        return Err(AppError::InternalServerError(
+            "Game persistence verification failed".into(),
+        ));
+    }
 
     let created_game = game;
 
@@ -140,13 +150,23 @@ pub async fn quickstart(
         "private": false,
     });
 
-    db.query("UPSERT $rid CONTENT $body")
+    let mut result = db
+        .query("UPSERT $rid CONTENT $body RETURN AFTER")
         .bind(("rid", game_rid.clone()))
         .bind(("body", body))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create game: {e}")))?;
 
-    crate::verify_record_persisted(&db, &game_rid, "quickstart").await?;
+    let persisted_game: Option<Game> = result
+        .take::<Option<SerdeWrapper<Game>>>(0)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take game: {e}")))?
+        .map(|w| w.0);
+
+    if persisted_game.is_none() {
+        return Err(AppError::InternalServerError(
+            "Game persistence verification failed".into(),
+        ));
+    }
 
     // Create 24 tributes
     let tribute_futures =

@@ -109,12 +109,23 @@ async fn create_game_area(area: Area, db: &Surreal<Any>) -> Result<GameArea, App
     };
     let body = serde_json::to_value(&game_area)
         .map_err(|e| AppError::InternalServerError(format!("Failed to encode area: {}", e)))?;
-    db.query("UPSERT $rid CONTENT $body")
+    let mut result = db
+        .query("UPSERT $rid CONTENT $body RETURN AFTER")
         .bind(("rid", area_id.clone()))
         .bind(("body", body))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create area: {}", e)))?;
-    crate::verify_record_persisted(db, &area_id, "create_game_area").await?;
+
+    let persisted_area: Option<GameArea> = result
+        .take::<Option<SerdeWrapper<GameArea>>>(0)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take area: {}", e)))?
+        .map(|w| w.0);
+
+    if persisted_area.is_none() {
+        return Err(AppError::InternalServerError(
+            "Area persistence verification failed".into(),
+        ));
+    }
 
     Ok(game_area)
 }
@@ -228,18 +239,23 @@ async fn add_item_to_area(
     let new_item_id: RecordId = RecordId::new("item", new_item.identifier.as_str());
     let body = serde_json::to_value(&new_item)
         .map_err(|e| AppError::InternalServerError(format!("Failed to encode item: {}", e)))?;
-    if let Err(e) = db
-        .query("UPSERT $rid CONTENT $body")
+    let mut result = db
+        .query("UPSERT $rid CONTENT $body RETURN AFTER")
         .bind(("rid", new_item_id.clone()))
         .bind(("body", body))
         .await
-    {
-        return Err(AppError::InternalServerError(format!(
-            "Failed to create item: {}",
-            e
-        )));
+        .map_err(|e| AppError::InternalServerError(format!("Failed to create item: {}", e)))?;
+
+    let persisted_item: Option<Item> = result
+        .take::<Option<SerdeWrapper<Item>>>(0)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take item: {}", e)))?
+        .map(|w| w.0);
+
+    if persisted_item.is_none() {
+        return Err(AppError::InternalServerError(
+            "Item persistence verification failed".into(),
+        ));
     }
-    crate::verify_record_persisted(db, &new_item_id, "add_item_to_area").await?;
 
     // Insert an area-item relationship via a raw RELATE query. RELATE always
     // returns an array, so the SDK's typed insert::<Vec<_>>().relation() path

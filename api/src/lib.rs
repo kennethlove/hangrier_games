@@ -1,12 +1,12 @@
 use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use serde::{Deserialize, Serialize};
+
 use serde_json::json;
 use std::sync::Arc;
 use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
-use surrealdb_types::{RecordId, RecordIdKey, SerdeWrapper};
+use surrealdb_types::{RecordId, RecordIdKey};
 use thiserror::Error;
 use tracing::error;
 
@@ -102,12 +102,6 @@ impl IntoResponse for AppError {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-struct VerifyRow {
-    #[allow(dead_code)]
-    id: RecordId,
-}
-
 /// Format a RecordId as a human-readable string (`table:key`).
 /// surrealdb_types::RecordId does not implement Display.
 pub fn rid_to_string(rid: &RecordId) -> String {
@@ -127,46 +121,4 @@ pub fn rid_key_to_string(rid: &RecordId) -> String {
         RecordIdKey::Uuid(u) => u.to_string(),
         k => format!("{k:?}"),
     }
-}
-
-/// Verify that a record exists at the given `RecordId` after a write that
-/// the SDK reports as successful. SurrealDB returns an empty result set
-/// (no `Err`) when a permission or schema check rejects the write, so we
-/// must read back the row to be sure it landed.
-///
-/// Returns `Err(InternalServerError)` with a `site`-tagged message when
-/// the row is missing.
-pub async fn verify_record_persisted(
-    db: &Surreal<Any>,
-    rid: &RecordId,
-    site: &'static str,
-) -> Result<(), AppError> {
-    let mut resp = db
-        .query("SELECT id FROM $rid")
-        .bind(("rid", rid.clone()))
-        .await
-        .map_err(|e| {
-            AppError::InternalServerError(format!(
-                "{}: persistence verify query failed for {}: {}",
-                site,
-                crate::rid_to_string(rid),
-                e
-            ))
-        })?;
-    let rows: Vec<SerdeWrapper<VerifyRow>> = resp.take(0).map_err(|e| {
-        AppError::InternalServerError(format!(
-            "{}: persistence verify decode failed for {}: {}",
-            site,
-            crate::rid_to_string(rid),
-            e
-        ))
-    })?;
-    if rows.is_empty() {
-        return Err(AppError::InternalServerError(format!(
-            "{}: persistence verification failed for {}",
-            site,
-            crate::rid_to_string(rid)
-        )));
-    }
-    Ok(())
 }

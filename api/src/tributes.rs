@@ -68,12 +68,23 @@ pub async fn create_tribute(
     // save_game in api/src/games.rs.
     let body = serde_json::to_value(&tribute)
         .map_err(|e| AppError::InternalServerError(format!("Failed to encode tribute: {}", e)))?;
-    db.query("UPSERT $rid CONTENT $body")
+    let mut result = db
+        .query("UPSERT $rid CONTENT $body RETURN AFTER")
         .bind(("rid", id.clone()))
         .bind(("body", body))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create tribute: {}", e)))?;
-    crate::verify_record_persisted(db, &id, "create_tribute").await?;
+
+    let persisted_tribute: Option<Tribute> = result
+        .take::<Option<SerdeWrapper<Tribute>>>(0)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take tribute: {}", e)))?
+        .map(|w| w.0);
+
+    if persisted_tribute.is_none() {
+        return Err(AppError::InternalServerError(
+            "Tribute persistence verification failed".into(),
+        ));
+    }
     let new_tribute = Some(tribute);
 
     db.query("RELATE $tribute->playing_in->$game")
@@ -88,12 +99,23 @@ pub async fn create_tribute(
     let new_object_id: RecordId = RecordId::new("item", new_object.identifier.as_str());
     let item_body = serde_json::to_value(&new_object)
         .map_err(|e| AppError::InternalServerError(format!("Failed to encode item: {}", e)))?;
-    db.query("UPSERT $rid CONTENT $body")
+    let mut result = db
+        .query("UPSERT $rid CONTENT $body RETURN AFTER")
         .bind(("rid", new_object_id.clone()))
         .bind(("body", item_body))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create item: {}", e)))?;
-    crate::verify_record_persisted(db, &new_object_id, "create_tribute: item").await?;
+
+    let persisted_item: Option<Item> = result
+        .take::<Option<SerdeWrapper<Item>>>(0)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take item: {}", e)))?
+        .map(|w| w.0);
+
+    if persisted_item.is_none() {
+        return Err(AppError::InternalServerError(
+            "Item persistence verification failed".into(),
+        ));
+    }
     db.query("RELATE $tribute->owns->$item")
         .bind(("tribute", id.clone()))
         .bind(("item", new_object_id.clone()))

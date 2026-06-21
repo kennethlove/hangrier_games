@@ -25,20 +25,37 @@ pub fn current_broadcast_phase(
 }
 
 fn message_archetype(payload: &shared::messages::MessagePayload) -> &'static str {
-    use shared::messages::MessageKind;
+    use shared::messages::MessageKind::*;
     match payload.kind() {
-        MessageKind::Death => "death",
-        MessageKind::Combat | MessageKind::CombatSwing => "action",
-        MessageKind::Alliance => "commentary",
-        MessageKind::Movement => "commentary",
-        MessageKind::Item | MessageKind::SponsorGift => "event",
-        MessageKind::State => "commentary",
-        MessageKind::Trauma => "commentary",
-        MessageKind::Affliction => "commentary",
-        MessageKind::Phobia => "commentary",
-        MessageKind::Fixation => "commentary",
-        MessageKind::Trapped => "event",
-        MessageKind::Sleep => "commentary",
+        TributeKilled => "death",
+        Combat | CombatSwing | TributeAttacked | TributeWounded | TrapSet | TrapTriggered => {
+            "action"
+        }
+        AllianceFormed | AllianceProposed | AllianceDissolved | BetrayalTriggered
+        | TrustShockBreak => "commentary",
+        TributeMoved | TributeHidden | AreaClosed | AreaEvent => "commentary",
+        ItemFound | ItemUsed | ItemDropped | SponsorGift => "event",
+        TributeRested | TributeStarved | TributeDehydrated | SanityBreak | HungerBandChanged
+        | ThirstBandChanged | StaminaBandChanged | ShelterSought | Foraged | Drank | Ate
+        | TributeSlept | TributeWoke | CycleStart | CycleEnd | PhaseStarted | PhaseEnded
+        | GameEnded | Generic => "commentary",
+        TraumaAcquired | TraumaReinforced | TraumaEscalated | TraumaFlashback | TraumaAvoidance
+        | TraumaObserved | TraumaForgotten | TraumaHabituated => "commentary",
+        PhobiaAcquired | PhobiaTriggered | PhobiaEscalated | PhobiaHabituated | PhobiaObserved
+        | PhobiaForgotten => "commentary",
+        FixationAcquired | FixationEscalated | FixationFired | FixationConsummated
+        | FixationThwarted | FixationFaded => "commentary",
+        AfflictionAcquired | AfflictionProgressed | AfflictionHealed | AfflictionCascaded
+        | SubstanceUsed | AddictionAcquired | AddictionReinforced | AddictionEscalated
+        | AddictionResisted | AddictionRelapse | AddictionCraving | AddictionObserved
+        | AddictionForgotten | AddictionHabituated => "commentary",
+        TributeTrapped
+        | Struggling
+        | TrappedEscaped
+        | TributeDiedWhileTrapped
+        | RescueAttempted
+        | PartialRescueProgress => "event",
+        SleepIncident => "commentary",
     }
 }
 
@@ -53,40 +70,72 @@ fn archetype_label(archetype: &str) -> &'static str {
 }
 
 fn message_kind_label(payload: &shared::messages::MessagePayload) -> &'static str {
-    use shared::messages::MessageKind;
+    use shared::messages::MessageKind::*;
     match payload.kind() {
-        MessageKind::Death => "Death",
-        MessageKind::Combat => "Combat",
-        MessageKind::CombatSwing => "Combat",
-        MessageKind::Alliance => "Alliance",
-        MessageKind::Movement => "Movement",
-        MessageKind::Item => "Item",
-        MessageKind::SponsorGift => "Sponsor",
-        MessageKind::State => "State",
-        MessageKind::Trauma => "Trauma",
-        MessageKind::Affliction => "Health",
-        MessageKind::Phobia => "Fear",
-        MessageKind::Fixation => "Fixation",
-        MessageKind::Trapped => "Trapped",
-        MessageKind::Sleep => "Sleep",
+        TributeKilled => "Death",
+        Combat | TributeAttacked | TributeWounded | TrapSet | TrapTriggered => "Combat",
+        CombatSwing => "Combat",
+        AllianceFormed | AllianceProposed | AllianceDissolved | BetrayalTriggered
+        | TrustShockBreak => "Alliance",
+        TributeMoved | TributeHidden | AreaClosed | AreaEvent => "Movement",
+        ItemFound | ItemUsed | ItemDropped => "Item",
+        SponsorGift => "Sponsor",
+        TributeRested | TributeStarved | TributeDehydrated | SanityBreak | HungerBandChanged
+        | ThirstBandChanged | StaminaBandChanged | ShelterSought | Foraged | Drank | Ate
+        | TributeSlept | TributeWoke | CycleStart | CycleEnd | PhaseStarted | PhaseEnded
+        | GameEnded | Generic => "State",
+        TraumaAcquired | TraumaReinforced | TraumaEscalated | TraumaFlashback | TraumaAvoidance
+        | TraumaObserved | TraumaForgotten | TraumaHabituated => "Trauma",
+        PhobiaAcquired | PhobiaTriggered | PhobiaEscalated | PhobiaHabituated | PhobiaObserved
+        | PhobiaForgotten => "Fear",
+        FixationAcquired | FixationEscalated | FixationFired | FixationConsummated
+        | FixationThwarted | FixationFaded => "Fixation",
+        AfflictionAcquired | AfflictionProgressed | AfflictionHealed | AfflictionCascaded
+        | SubstanceUsed | AddictionAcquired | AddictionReinforced | AddictionEscalated
+        | AddictionResisted | AddictionRelapse | AddictionCraving | AddictionObserved
+        | AddictionForgotten | AddictionHabituated => "Health",
+        TributeTrapped
+        | Struggling
+        | TrappedEscaped
+        | TributeDiedWhileTrapped
+        | RescueAttempted
+        | PartialRescueProgress => "Trapped",
+        SleepIncident => "Sleep",
     }
 }
 
 fn kind_color(payload: &shared::messages::MessagePayload) -> &'static str {
-    use shared::messages::MessageKind;
+    use shared::messages::MessageKind::*;
     match payload.kind() {
-        MessageKind::Death => "var(--danger)",
-        MessageKind::Combat | MessageKind::CombatSwing => "var(--waiting)",
-        MessageKind::Alliance => "var(--info)",
-        MessageKind::Movement => "var(--accent)",
-        MessageKind::Item | MessageKind::SponsorGift => "var(--gold)",
-        MessageKind::State => "var(--muted)",
-        MessageKind::Trauma => "var(--purple)",
-        MessageKind::Affliction => "var(--warning)",
-        MessageKind::Phobia => "var(--purple)",
-        MessageKind::Fixation => "var(--purple)",
-        MessageKind::Trapped => "var(--warning)",
-        MessageKind::Sleep => "var(--info)",
+        TributeKilled => "var(--danger)",
+        Combat | CombatSwing | TributeAttacked | TributeWounded | TrapSet | TrapTriggered => {
+            "var(--waiting)"
+        }
+        AllianceFormed | AllianceProposed | AllianceDissolved | BetrayalTriggered
+        | TrustShockBreak => "var(--info)",
+        TributeMoved | TributeHidden | AreaClosed | AreaEvent => "var(--accent)",
+        ItemFound | ItemUsed | ItemDropped | SponsorGift => "var(--gold)",
+        TributeRested | TributeStarved | TributeDehydrated | SanityBreak | HungerBandChanged
+        | ThirstBandChanged | StaminaBandChanged | ShelterSought | Foraged | Drank | Ate
+        | TributeSlept | TributeWoke | CycleStart | CycleEnd | PhaseStarted | PhaseEnded
+        | GameEnded | Generic => "var(--muted)",
+        TraumaAcquired | TraumaReinforced | TraumaEscalated | TraumaFlashback | TraumaAvoidance
+        | TraumaObserved | TraumaForgotten | TraumaHabituated => "var(--purple)",
+        PhobiaAcquired | PhobiaTriggered | PhobiaEscalated | PhobiaHabituated | PhobiaObserved
+        | PhobiaForgotten => "var(--purple)",
+        FixationAcquired | FixationEscalated | FixationFired | FixationConsummated
+        | FixationThwarted | FixationFaded => "var(--purple)",
+        AfflictionAcquired | AfflictionProgressed | AfflictionHealed | AfflictionCascaded
+        | SubstanceUsed | AddictionAcquired | AddictionReinforced | AddictionEscalated
+        | AddictionResisted | AddictionRelapse | AddictionCraving | AddictionObserved
+        | AddictionForgotten | AddictionHabituated => "var(--warning)",
+        TributeTrapped
+        | Struggling
+        | TrappedEscaped
+        | TributeDiedWhileTrapped
+        | RescueAttempted
+        | PartialRescueProgress => "var(--warning)",
+        SleepIncident => "var(--info)",
     }
 }
 

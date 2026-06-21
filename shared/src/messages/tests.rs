@@ -50,12 +50,12 @@ fn phase_ord_and_next_canonical_cycle() {
 #[test]
 fn message_kind_serde_roundtrip() {
     for kind in [
-        MessageKind::Death,
+        MessageKind::TributeKilled,
         MessageKind::Combat,
-        MessageKind::Alliance,
-        MessageKind::Movement,
-        MessageKind::Item,
-        MessageKind::State,
+        MessageKind::AllianceFormed,
+        MessageKind::TributeMoved,
+        MessageKind::ItemFound,
+        MessageKind::TributeRested,
         MessageKind::CombatSwing,
     ] {
         let s = serde_json::to_string(&kind).unwrap();
@@ -71,14 +71,14 @@ fn kind_lifecycle_variants_map_correctly() {
         killer: None,
         cause: "fall".into(),
     };
-    assert_eq!(p.kind(), MessageKind::Death);
+    assert_eq!(p.kind(), MessageKind::TributeKilled);
 
     let p = MessagePayload::TributeWounded {
         victim: t("v"),
         attacker: None,
         hp_lost: 5,
     };
-    assert_eq!(p.kind(), MessageKind::State);
+    assert_eq!(p.kind(), MessageKind::TributeWounded);
 }
 
 #[test]
@@ -94,29 +94,45 @@ fn kind_combat_maps_to_combat() {
 
 #[test]
 fn kind_alliance_variants_map_correctly() {
-    for p in [
+    assert_eq!(
         MessagePayload::AllianceFormed {
             members: vec![t("a"), t("b")],
-        },
+        }
+        .kind(),
+        MessageKind::AllianceFormed
+    );
+    assert_eq!(
         MessagePayload::AllianceProposed {
             proposer: t("a"),
             target: t("b"),
-        },
+        }
+        .kind(),
+        MessageKind::AllianceProposed
+    );
+    assert_eq!(
         MessagePayload::AllianceDissolved {
             members: vec![t("a")],
             reason: "x".into(),
-        },
+        }
+        .kind(),
+        MessageKind::AllianceDissolved
+    );
+    assert_eq!(
         MessagePayload::BetrayalTriggered {
             betrayer: t("a"),
             victim: t("b"),
-        },
+        }
+        .kind(),
+        MessageKind::BetrayalTriggered
+    );
+    assert_eq!(
         MessagePayload::TrustShockBreak {
             tribute: t("a"),
             partner: t("b"),
-        },
-    ] {
-        assert_eq!(p.kind(), MessageKind::Alliance);
-    }
+        }
+        .kind(),
+        MessageKind::TrustShockBreak
+    );
 }
 
 #[test]
@@ -125,25 +141,36 @@ fn kind_movement_variants_map_correctly() {
         identifier: "a1".into(),
         name: "A".into(),
     };
-    for p in [
+    assert_eq!(
         MessagePayload::TributeMoved {
             tribute: t("a"),
             from: area.clone(),
             to: area.clone(),
-        },
+        }
+        .kind(),
+        MessageKind::TributeMoved
+    );
+    assert_eq!(
         MessagePayload::TributeHidden {
             tribute: t("a"),
             area: area.clone(),
-        },
-        MessagePayload::AreaClosed { area: area.clone() },
+        }
+        .kind(),
+        MessageKind::TributeHidden
+    );
+    assert_eq!(
+        MessagePayload::AreaClosed { area: area.clone() }.kind(),
+        MessageKind::AreaClosed
+    );
+    assert_eq!(
         MessagePayload::AreaEvent {
             area: area.clone(),
             kind: AreaEventKind::Storm,
             description: "x".into(),
-        },
-    ] {
-        assert_eq!(p.kind(), MessageKind::Movement);
-    }
+        }
+        .kind(),
+        MessageKind::AreaEvent
+    );
 }
 
 #[test]
@@ -156,24 +183,32 @@ fn kind_item_variants_map_correctly() {
         identifier: "i1".into(),
         name: "I".into(),
     };
-    for p in [
+    assert_eq!(
         MessagePayload::ItemFound {
             tribute: t("a"),
             item: item.clone(),
             area: area.clone(),
-        },
+        }
+        .kind(),
+        MessageKind::ItemFound
+    );
+    assert_eq!(
         MessagePayload::ItemUsed {
             tribute: t("a"),
             item: item.clone(),
-        },
+        }
+        .kind(),
+        MessageKind::ItemUsed
+    );
+    assert_eq!(
         MessagePayload::ItemDropped {
             tribute: t("a"),
             item: item.clone(),
             area: area.clone(),
-        },
-    ] {
-        assert_eq!(p.kind(), MessageKind::Item);
-    }
+        }
+        .kind(),
+        MessageKind::ItemDropped
+    );
     let sponsor = MessagePayload::SponsorGift {
         recipient: t("a"),
         item: item.clone(),
@@ -184,23 +219,34 @@ fn kind_item_variants_map_correctly() {
 
 #[test]
 fn kind_state_variants_map_correctly() {
-    for p in [
+    assert_eq!(
         MessagePayload::TributeRested {
             tribute: t("a"),
             hp_restored: 3,
-        },
+        }
+        .kind(),
+        MessageKind::TributeRested
+    );
+    assert_eq!(
         MessagePayload::TributeStarved {
             tribute: t("a"),
             hp_lost: 1,
-        },
+        }
+        .kind(),
+        MessageKind::TributeStarved
+    );
+    assert_eq!(
         MessagePayload::TributeDehydrated {
             tribute: t("a"),
             hp_lost: 2,
-        },
-        MessagePayload::SanityBreak { tribute: t("a") },
-    ] {
-        assert_eq!(p.kind(), MessageKind::State);
-    }
+        }
+        .kind(),
+        MessageKind::TributeDehydrated
+    );
+    assert_eq!(
+        MessagePayload::SanityBreak { tribute: t("a") }.kind(),
+        MessageKind::SanityBreak
+    );
 }
 
 #[test]
@@ -226,7 +272,7 @@ fn game_message_new_populates_required_fields() {
     assert_eq!(msg.phase, Phase::Night);
     assert_eq!(msg.tick, 3);
     assert_eq!(msg.emit_index, 0);
-    assert_eq!(msg.payload.kind(), MessageKind::State);
+    assert_eq!(msg.payload.kind(), MessageKind::SanityBreak);
 }
 
 fn make_msg(day: u32, phase: Phase, payload: MessagePayload) -> GameMessage {

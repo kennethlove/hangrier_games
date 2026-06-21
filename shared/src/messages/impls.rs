@@ -2,108 +2,49 @@ use super::*;
 
 impl MessagePayload {
     pub fn kind(&self) -> MessageKind {
-        use MessagePayload::*;
-        match self {
-            TributeKilled { .. } => MessageKind::Death,
-            Combat(_) => MessageKind::Combat,
-            TributeAttacked { .. } => MessageKind::Combat,
-            CombatSwing(_) => MessageKind::CombatSwing,
-            AllianceFormed { .. }
-            | AllianceProposed { .. }
-            | AllianceDissolved { .. }
-            | BetrayalTriggered { .. }
-            | TrustShockBreak { .. } => MessageKind::Alliance,
-            TributeMoved { .. } | TributeHidden { .. } | AreaClosed { .. } | AreaEvent { .. } => {
-                MessageKind::Movement
-            }
-            ItemFound { .. } | ItemUsed { .. } | ItemDropped { .. } => MessageKind::Item,
-            SponsorGift { .. } => MessageKind::SponsorGift,
-            CycleStart { .. }
-            | CycleEnd { .. }
-            | PhaseStarted { .. }
-            | PhaseEnded { .. }
-            | GameEnded { .. } => MessageKind::State,
-            TributeWounded { .. }
-            | TributeRested { .. }
-            | TributeStarved { .. }
-            | TributeDehydrated { .. }
-            | SanityBreak { .. }
-            | HungerBandChanged { .. }
-            | ThirstBandChanged { .. }
-            | StaminaBandChanged { .. }
-            | ShelterSought { .. }
-            | Foraged { .. }
-            | Drank { .. }
-            | Ate { .. }
-            | TributeSlept { .. }
-            | TributeWoke { .. } => MessageKind::State,
-            TraumaAcquired { .. }
-            | TraumaReinforced { .. }
-            | TraumaEscalated { .. }
-            | TraumaFlashback { .. }
-            | TraumaAvoidance { .. }
-            | TraumaObserved { .. }
-            | TraumaForgotten { .. }
-            | TraumaHabituated { .. } => MessageKind::Trauma,
-            PhobiaAcquired { .. }
-            | PhobiaTriggered { .. }
-            | PhobiaEscalated { .. }
-            | PhobiaHabituated { .. }
-            | PhobiaObserved { .. }
-            | PhobiaForgotten { .. } => MessageKind::Phobia,
-            FixationAcquired { .. }
-            | FixationEscalated { .. }
-            | FixationFired { .. }
-            | FixationConsummated { .. }
-            | FixationThwarted { .. }
-            | FixationFaded { .. } => MessageKind::Fixation,
-            AfflictionAcquired { .. }
-            | AfflictionProgressed { .. }
-            | AfflictionHealed { .. }
-            | AfflictionCascaded { .. }
-            | SubstanceUsed { .. }
-            | AddictionAcquired { .. }
-            | AddictionReinforced { .. }
-            | AddictionEscalated { .. }
-            | AddictionResisted { .. }
-            | AddictionRelapse { .. }
-            | AddictionCraving { .. }
-            | AddictionObserved { .. }
-            | AddictionForgotten { .. }
-            | AddictionHabituated { .. } => MessageKind::Affliction,
-            TributeTrapped { .. }
-            | Struggling { .. }
-            | TrappedEscaped { .. }
-            | TributeDiedWhileTrapped { .. }
-            | RescueAttempted { .. }
-            | PartialRescueProgress { .. } => MessageKind::Trapped,
-            MessagePayload::TrapSet { .. } => MessageKind::Combat,
-            MessagePayload::TrapTriggered { .. } => MessageKind::Combat,
-            SleepIncident { .. } => MessageKind::Sleep,
-            Generic => MessageKind::State,
-        }
+        MessageKind::from(self)
     }
 
-    /// True if the payload references the tribute (by identifier). Used by
-    /// the per-tribute timeline filter so events involving a given tribute
-    /// — as victim, killer, attacker, ally, mover, item handler, etc. —
-    /// are kept while everything else is dropped.
-    pub fn involves(&self, tribute_identifier: &str) -> bool {
+    pub fn tribute_refs(&self) -> Vec<&TributeRef> {
         use MessagePayload::*;
-        let id = tribute_identifier;
-        let r = |t: &TributeRef| t.identifier == id;
+        let mut refs = Vec::new();
         match self {
-            TributeKilled { victim, killer, .. } => r(victim) || killer.as_ref().is_some_and(r),
+            TributeKilled { victim, killer, .. } => {
+                refs.push(victim);
+                if let Some(k) = killer {
+                    refs.push(k);
+                }
+            }
             TributeWounded {
                 victim, attacker, ..
             }
-            | TributeAttacked { victim, attacker } => r(victim) || attacker.as_ref().is_some_and(r),
-            Combat(engagement) => r(&engagement.attacker) || r(&engagement.target),
-            CombatSwing(beat) => r(&beat.attacker) || r(&beat.target),
-            AllianceFormed { members } | AllianceDissolved { members, .. } => members.iter().any(r),
-            AllianceProposed { proposer, target } => r(proposer) || r(target),
-            BetrayalTriggered { betrayer, victim } => r(betrayer) || r(victim),
-            TrustShockBreak { tribute, partner } => r(tribute) || r(partner),
+            | TributeAttacked { victim, attacker } => {
+                refs.push(victim);
+                if let Some(a) = attacker {
+                    refs.push(a);
+                }
+            }
+            Combat(e) => {
+                refs.push(&e.attacker);
+                refs.push(&e.target);
+            }
+            CombatSwing(b) => {
+                refs.push(&b.attacker);
+                refs.push(&b.target);
+            }
+            AllianceFormed { members } | AllianceDissolved { members, .. } => refs.extend(members),
+            AllianceProposed { proposer, target } => {
+                refs.push(proposer);
+                refs.push(target);
+            }
+            BetrayalTriggered { betrayer, victim } => {
+                refs.push(betrayer);
+                refs.push(victim);
+            }
+            TrustShockBreak { tribute, partner } => {
+                refs.push(tribute);
+                refs.push(partner);
+            }
             TributeMoved { tribute, .. }
             | TributeHidden { tribute, .. }
             | ItemFound { tribute, .. }
@@ -122,7 +63,73 @@ impl MessagePayload {
             | Ate { tribute, .. }
             | TributeSlept { tribute, .. }
             | TributeWoke { tribute, .. }
-            | SleepIncident { tribute, .. } => r(tribute),
+            | SleepIncident { tribute, .. }
+            | TrapSet { tribute, .. } => refs.push(tribute),
+            TrapTriggered { victim, .. } => refs.push(victim),
+            SponsorGift { recipient, .. } => refs.push(recipient),
+            GameEnded { winner } => {
+                if let Some(w) = winner {
+                    refs.push(w);
+                }
+            }
+            AfflictionAcquired { .. }
+            | AfflictionProgressed { .. }
+            | AfflictionHealed { .. }
+            | AfflictionCascaded { .. }
+            | TraumaAcquired { .. }
+            | TraumaReinforced { .. }
+            | TraumaEscalated { .. }
+            | TraumaFlashback { .. }
+            | TraumaAvoidance { .. }
+            | TraumaHabituated { .. }
+            | PhobiaAcquired { .. }
+            | PhobiaTriggered { .. }
+            | PhobiaEscalated { .. }
+            | PhobiaHabituated { .. }
+            | FixationAcquired { .. }
+            | FixationEscalated { .. }
+            | FixationFired { .. }
+            | FixationConsummated { .. }
+            | FixationThwarted { .. }
+            | FixationFaded { .. }
+            | SubstanceUsed { .. }
+            | AddictionAcquired { .. }
+            | AddictionReinforced { .. }
+            | AddictionEscalated { .. }
+            | AddictionResisted { .. }
+            | AddictionRelapse { .. }
+            | AddictionCraving { .. }
+            | AddictionHabituated { .. }
+            | TributeTrapped { .. }
+            | Struggling { .. }
+            | TrappedEscaped { .. }
+            | TributeDiedWhileTrapped { .. }
+            | RescueAttempted { .. }
+            | PartialRescueProgress { .. }
+            | PhobiaObserved { .. }
+            | PhobiaForgotten { .. }
+            | TraumaObserved { .. }
+            | TraumaForgotten { .. }
+            | AddictionObserved { .. }
+            | AddictionForgotten { .. }
+            | Generic
+            | AreaClosed { .. }
+            | AreaEvent { .. }
+            | CycleStart { .. }
+            | CycleEnd { .. }
+            | PhaseStarted { .. }
+            | PhaseEnded { .. } => {}
+        }
+        refs
+    }
+
+    pub fn involves(&self, tribute_identifier: &str) -> bool {
+        let id = tribute_identifier;
+        if self.tribute_refs().iter().any(|t| t.identifier == id) {
+            return true;
+        }
+        use MessagePayload::*;
+        match self {
             AfflictionAcquired { tribute_id, .. }
             | AfflictionProgressed { tribute_id, .. }
             | AfflictionHealed { tribute_id, .. }
@@ -172,49 +179,80 @@ impl MessagePayload {
             | FixationFired { tribute_id, .. }
             | FixationConsummated { tribute_id, .. }
             | FixationThwarted { tribute_id, .. }
-            | FixationFaded { tribute_id, .. } => tribute_id == id,
+            | FixationFaded { tribute_id, .. }
+            | SubstanceUsed {
+                tribute: tribute_id,
+                ..
+            }
+            | AddictionAcquired {
+                tribute: tribute_id,
+                ..
+            }
+            | AddictionReinforced {
+                tribute: tribute_id,
+                ..
+            }
+            | AddictionEscalated {
+                tribute: tribute_id,
+                ..
+            }
+            | AddictionResisted {
+                tribute: tribute_id,
+                ..
+            }
+            | AddictionRelapse {
+                tribute: tribute_id,
+                ..
+            }
+            | AddictionCraving {
+                tribute: tribute_id,
+                ..
+            }
+            | AddictionHabituated {
+                tribute: tribute_id,
+                ..
+            }
+            | TributeTrapped {
+                tribute: tribute_id,
+                ..
+            }
+            | Struggling {
+                tribute: tribute_id,
+                ..
+            }
+            | TrappedEscaped {
+                tribute: tribute_id,
+                ..
+            }
+            | TributeDiedWhileTrapped {
+                tribute: tribute_id,
+                ..
+            } => tribute_id == id,
             PhobiaObserved {
                 observer, subject, ..
-            } => observer == id || subject == id,
-            PhobiaForgotten {
+            }
+            | PhobiaForgotten {
+                observer, subject, ..
+            }
+            | TraumaObserved {
+                observer, subject, ..
+            }
+            | TraumaForgotten {
+                observer, subject, ..
+            }
+            | AddictionObserved {
+                observer, subject, ..
+            }
+            | AddictionForgotten {
                 observer, subject, ..
             } => observer == id || subject == id,
-            TraumaObserved {
-                observer, subject, ..
-            } => observer == id || subject == id,
-            TraumaForgotten {
-                observer, subject, ..
-            } => observer == id || subject == id,
-            SubstanceUsed { tribute, .. }
-            | AddictionAcquired { tribute, .. }
-            | AddictionReinforced { tribute, .. }
-            | AddictionEscalated { tribute, .. }
-            | AddictionResisted { tribute, .. }
-            | AddictionRelapse { tribute, .. }
-            | AddictionCraving { tribute, .. } => tribute == id,
-            AddictionObserved {
-                observer, subject, ..
-            } => observer == id || subject == id,
-            AddictionForgotten {
-                observer, subject, ..
-            } => observer == id || subject == id,
-            AddictionHabituated { tribute, .. } => tribute == id,
-            TributeTrapped { tribute, .. }
-            | Struggling { tribute, .. }
-            | TrappedEscaped { tribute, .. }
-            | TributeDiedWhileTrapped { tribute, .. } => tribute == id,
             RescueAttempted {
                 rescuer, target, ..
-            } => rescuer == id || target == id,
-            PartialRescueProgress {
+            }
+            | PartialRescueProgress {
                 rescuer, target, ..
             } => rescuer == id || target == id,
-            MessagePayload::TrapSet { tribute, .. } => r(tribute),
-            MessagePayload::TrapTriggered { victim, .. } => r(victim),
-            SponsorGift { recipient, .. } => r(recipient),
-            Generic | AreaClosed { .. } | AreaEvent { .. } => false,
-            CycleStart { .. } | CycleEnd { .. } | PhaseStarted { .. } | PhaseEnded { .. } => false,
-            GameEnded { winner } => winner.as_ref().is_some_and(r),
+            _ => false,
         }
     }
 }

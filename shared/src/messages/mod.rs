@@ -155,34 +155,6 @@ pub enum DrinkSource {
     Item { item: ItemRef },
 }
 
-/// Coarse-grained category for a `GameMessage`. Derived from `MessagePayload`
-/// via `MessagePayload::kind()`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum MessageKind {
-    Death,
-    Combat,
-    /// One swing of physical combat (see `CombatBeat`).
-    CombatSwing,
-    Alliance,
-    Movement,
-    Item,
-    State,
-    /// Sponsor gift delivery.
-    SponsorGift,
-    /// Trauma acquisition or reinforcement.
-    Trauma,
-    /// Phobia acquired, triggered, observed, escalated, habituated, or forgotten.
-    Phobia,
-    /// Affliction acquired, progressed, healed, or cascaded.
-    /// Fixation acquired, escalated, fired, consummated, thwarted, or faded.
-    Fixation,
-    /// Trapped affliction events: tribute trapped, struggling, escaped, or died.
-    Trapped,
-    Affliction,
-    /// Sleep incident (nightmare, night terror, animal encounter, etc.).
-    Sleep,
-}
-
 /// Visible fatigue band derived from a tribute's stamina/max_stamina ratio.
 /// Lives in `shared/` because it is wire-visible via
 /// `MessagePayload::StaminaBandChanged`.
@@ -329,6 +301,9 @@ pub enum PhobiaEffect {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
+#[derive(strum::EnumDiscriminants)]
+#[strum_discriminants(name(MessageKind))]
+#[strum_discriminants(derive(Serialize, Deserialize))]
 pub enum MessagePayload {
     /// Generic narrative event — prose-only, no structured payload consumers.
     Generic,

@@ -405,6 +405,138 @@ pub fn attack_contest(
     }
 }
 
+// ---------------------------------------------------------------------------
+// resolve — pure combat resolution
+// ---------------------------------------------------------------------------
+
+/// Pure combat resolution. Calls `attack_contest()` and builds the
+/// `CombatBeat` from the result. Does NOT apply damage, stress, events,
+/// or afflictions — the caller handles those side effects.
+///
+/// Returns the contest outcome (result, wear, inflicts) and the fully
+/// constructed beat (including swing outcome and stress report).
+pub fn resolve(
+    attacker: &mut Tribute,
+    defender: &mut Tribute,
+    rng: &mut impl Rng,
+    sub_events: &mut Vec<TaggedEvent>,
+    tuning: &crate::tributes::combat_tuning::CombatTuning,
+) -> (AttackContestOutcome, CombatBeat) {
+    // Snapshot equipment before attack_contest mutates durability / removes items.
+    let weapon = attacker
+        .items
+        .iter()
+        .rfind(|i| i.is_weapon() && i.current_durability > 0)
+        .map(iref);
+    let shield = defender
+        .items
+        .iter()
+        .rfind(|i| i.is_defensive() && i.current_durability > 0)
+        .map(iref);
+
+    // Run the attack contest (dice rolling, equipment wear, inflict lookup).
+    let contest = attack_contest(attacker, defender, rng, sub_events, tuning);
+    let result = &contest.result;
+
+    // Compute damage based on result.
+    let damage: u32 = match result {
+        AttackResult::CriticalHit => attacker.attributes.strength * 3,
+        AttackResult::AttackerWins => attacker.attributes.strength,
+        AttackResult::AttackerWinsDecisively => attacker.attributes.strength * 2,
+        AttackResult::PerfectBlock => defender.attributes.strength * 2,
+        AttackResult::DefenderWins => defender.attributes.strength,
+        AttackResult::DefenderWinsDecisively => defender.attributes.strength * 2,
+        AttackResult::CriticalFumble | AttackResult::Miss => 0,
+    };
+
+    // Determine SwingOutcome from result and pre-damage health.
+    let swing_outcome = match result {
+        AttackResult::Miss => SwingOutcome::Miss,
+        AttackResult::CriticalFumble => {
+            if attacker.attributes.health <= 5 {
+                SwingOutcome::FumbleDeath { self_damage: 5 }
+            } else {
+                SwingOutcome::FumbleSurvive { self_damage: 5 }
+            }
+        }
+        _ => {
+            let is_counter = matches!(
+                result,
+                AttackResult::PerfectBlock
+                    | AttackResult::DefenderWins
+                    | AttackResult::DefenderWinsDecisively
+            );
+            let victim_health = if is_counter {
+                attacker.attributes.health
+            } else {
+                defender.attributes.health
+            };
+
+            if victim_health <= damage {
+                if is_counter {
+                    SwingOutcome::AttackerDied { damage }
+                } else {
+                    SwingOutcome::Kill { damage }
+                }
+            } else {
+                match result {
+                    AttackResult::CriticalHit => SwingOutcome::CriticalHitWound { damage },
+                    AttackResult::PerfectBlock => SwingOutcome::BlockWound { damage },
+                    _ => SwingOutcome::Wound { damage },
+                }
+            }
+        }
+    };
+
+    // Compute stress damage (pure calculation matching apply_violence_stress).
+    let stress_damage = if matches!(result, AttackResult::Miss | AttackResult::CriticalFumble) {
+        0
+    } else {
+        let (winner_kills, winner_wins, winner_sanity) = match result {
+            AttackResult::CriticalHit
+            | AttackResult::AttackerWins
+            | AttackResult::AttackerWinsDecisively => (
+                attacker.statistics.kills,
+                attacker.statistics.wins + 1,
+                attacker.attributes.sanity,
+            ),
+            _ => (
+                defender.statistics.kills,
+                defender.statistics.wins + 1,
+                defender.attributes.sanity,
+            ),
+        };
+        calculate_violence_stress(winner_kills, winner_wins, winner_sanity, tuning)
+    };
+    let stressed = if stress_damage > 0 {
+        Some(match result {
+            AttackResult::CriticalHit
+            | AttackResult::AttackerWins
+            | AttackResult::AttackerWinsDecisively => tref(attacker),
+            _ => tref(defender),
+        })
+    } else {
+        None
+    };
+
+    let beat = CombatBeat {
+        attacker: tref(attacker),
+        target: tref(defender),
+        weapon,
+        shield,
+        wear: contest.wear.clone(),
+        outcome: swing_outcome,
+        stress: StressReport {
+            stress_damage,
+            stressed,
+        },
+        attacker_stamina_cost: tuning.stamina_cost_attacker,
+        target_stamina_cost: tuning.stamina_cost_target,
+    };
+
+    (contest, beat)
+}
+
 /// Map an AttackResult to the inflict table's severity band.
 fn result_to_hit_severity(result: &AttackResult) -> HitSeverity {
     match result {

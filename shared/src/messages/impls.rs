@@ -90,8 +90,9 @@ impl MessagePayload {
     /// are kept while everything else is dropped.
     pub fn involves(&self, tribute_identifier: &str) -> bool {
         use MessagePayload::*;
+        let tid = tribute_identifier.parse::<crate::ids::TributeId>().ok();
+        let r = |t: &TributeRef| tid.as_ref().is_some_and(|id| t.identifier == *id);
         let id = tribute_identifier;
-        let r = |t: &TributeRef| t.identifier == id;
         match self {
             TributeKilled { victim, killer, .. } => r(victim) || killer.as_ref().is_some_and(r),
             TributeWounded {

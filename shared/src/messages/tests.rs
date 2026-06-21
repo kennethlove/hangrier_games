@@ -1,7 +1,9 @@
 use super::*;
+use uuid::Uuid;
+
 fn t(name: &str) -> TributeRef {
     TributeRef {
-        identifier: format!("id-{name}"),
+        identifier: TributeId(Uuid::new_v4()),
         name: name.into(),
     }
 }
@@ -122,7 +124,7 @@ fn kind_alliance_variants_map_correctly() {
 #[test]
 fn kind_movement_variants_map_correctly() {
     let area = AreaRef {
-        identifier: "a1".into(),
+        identifier: AreaId(Uuid::new_v4()),
         name: "A".into(),
     };
     for p in [
@@ -149,11 +151,11 @@ fn kind_movement_variants_map_correctly() {
 #[test]
 fn kind_item_variants_map_correctly() {
     let area = AreaRef {
-        identifier: "a1".into(),
+        identifier: AreaId(Uuid::new_v4()),
         name: "A".into(),
     };
     let item = ItemRef {
-        identifier: "i1".into(),
+        identifier: ItemId(Uuid::new_v4()),
         name: "I".into(),
     };
     for p in [
@@ -260,7 +262,7 @@ fn summarize_empty_input_with_current_day_zero() {
 #[test]
 fn summarize_groups_by_day_and_phase() {
     let tref = TributeRef {
-        identifier: "t".into(),
+        identifier: TributeId(Uuid::new_v4()),
         name: "T".into(),
     };
     let killed = MessagePayload::TributeKilled {
@@ -271,7 +273,7 @@ fn summarize_groups_by_day_and_phase() {
     let moved = MessagePayload::TributeHidden {
         tribute: tref.clone(),
         area: AreaRef {
-            identifier: "a".into(),
+            identifier: AreaId(Uuid::new_v4()),
             name: "A".into(),
         },
     };
@@ -380,7 +382,7 @@ fn summarize_counts_combat_kills_as_deaths() {
 #[test]
 fn summarize_is_current_flag_set_correctly() {
     let tref = TributeRef {
-        identifier: "t".into(),
+        identifier: TributeId(Uuid::new_v4()),
         name: "T".into(),
     };
     let p = MessagePayload::TributeRested {

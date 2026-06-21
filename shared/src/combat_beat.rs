@@ -98,11 +98,13 @@ pub struct CombatBeat {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ids::{ItemId, TributeId};
     use crate::messages::ItemRef;
+    use uuid::Uuid;
 
     fn t(name: &str) -> TributeRef {
         TributeRef {
-            identifier: "id".into(),
+            identifier: TributeId(Uuid::new_v4()),
             name: name.into(),
         }
     }
@@ -112,7 +114,7 @@ mod tests {
         let report = WearReport {
             owner: t("A"),
             item: ItemRef {
-                identifier: "sword-1".into(),
+                identifier: ItemId(Uuid::new_v4()),
                 name: "Iron Sword".into(),
             },
             outcome: WearOutcomeReport::Broken,

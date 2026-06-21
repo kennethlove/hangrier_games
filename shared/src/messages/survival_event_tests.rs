@@ -1,19 +1,25 @@
 use super::*;
+use uuid::Uuid;
+
+const TEST_TRIBUTE_ID: Uuid = uuid::uuid!("67e55044-10b1-426f-9247-bb680e5fe0c8");
+const TEST_AREA_ID: Uuid = uuid::uuid!("67e55044-10b1-426f-9247-bb680e5fe0c9");
+const TEST_ITEM_ID: Uuid = uuid::uuid!("67e55044-10b1-426f-9247-bb680e5fe0ca");
+
 fn tref() -> TributeRef {
     TributeRef {
-        identifier: "t1".into(),
+        identifier: TributeId(TEST_TRIBUTE_ID),
         name: "Cato".into(),
     }
 }
 fn aref() -> AreaRef {
     AreaRef {
-        identifier: "a1".into(),
+        identifier: AreaId(TEST_AREA_ID),
         name: "Forest".into(),
     }
 }
 fn iref() -> ItemRef {
     ItemRef {
-        identifier: "i1".into(),
+        identifier: ItemId(TEST_ITEM_ID),
         name: "Berries".into(),
     }
 }
@@ -61,7 +67,7 @@ fn stamina_band_change_round_trips_and_routes_to_state() {
     let back: MessagePayload = serde_json::from_str(&json).unwrap();
     assert_eq!(format!("{:?}", p), format!("{:?}", back));
     assert_eq!(p.kind(), MessageKind::State);
-    assert!(p.involves(&tref().identifier));
+    assert!(p.involves(&tref().identifier.to_string()));
 }
 
 #[test]
@@ -121,7 +127,8 @@ fn survival_payloads_involve_tribute() {
         item: iref(),
         debt_recovered: 1,
     };
-    assert!(p.involves("t1"));
+    let id_str = TEST_TRIBUTE_ID.to_string();
+    assert!(p.involves(&id_str));
     assert!(!p.involves("other"));
 }
 
@@ -139,7 +146,7 @@ fn wake_reason_serde_roundtrip_interrupted_variants() {
         WakeReason::Interrupted {
             event: InterruptionKind::Ambush {
                 attacker: TributeRef {
-                    identifier: "a".into(),
+                    identifier: TributeId(Uuid::new_v4()),
                     name: "A".into(),
                 },
             },
@@ -152,7 +159,7 @@ fn wake_reason_serde_roundtrip_interrupted_variants() {
         WakeReason::Interrupted {
             event: InterruptionKind::AllianceSummons {
                 ally: TributeRef {
-                    identifier: "b".into(),
+                    identifier: TributeId(Uuid::new_v4()),
                     name: "B".into(),
                 },
             },
@@ -195,9 +202,10 @@ fn tribute_slept_woke_involves_tribute() {
         phase: Phase::Dawn,
         reason: WakeReason::Rested,
     };
-    assert!(slept.involves("t1"));
+    let id_str = TEST_TRIBUTE_ID.to_string();
+    assert!(slept.involves(&id_str));
     assert!(!slept.involves("other"));
-    assert!(woke.involves("t1"));
+    assert!(woke.involves(&id_str));
     assert!(!woke.involves("other"));
 }
 

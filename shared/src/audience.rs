@@ -149,10 +149,12 @@ impl AudienceEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ids::TributeId;
+    use uuid::Uuid;
 
     fn t(name: &str) -> TributeRef {
         TributeRef {
-            identifier: name.into(),
+            identifier: TributeId(Uuid::new_v4()),
             name: name.into(),
         }
     }

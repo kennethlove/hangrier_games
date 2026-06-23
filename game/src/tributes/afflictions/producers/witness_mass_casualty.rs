@@ -54,7 +54,7 @@ pub(super) fn produce_witness_mass_casualty(game: &mut Game, phase: Phase) {
                         deaths_this_cycle: *death_count,
                     },
                     severity,
-                    cause_hint: String::new(),
+                    cause_hint: shared::afflictions::DeathCause::Unknown,
                 });
             }
         }

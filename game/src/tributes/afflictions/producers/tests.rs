@@ -29,7 +29,7 @@ fn make_killed_msg(victim_id: &str, victim_name: &str, phase: Phase) -> GameMess
                 name: victim_name.into(),
             },
             killer: None,
-            cause: "combat".into(),
+            cause: shared::afflictions::DeathCause::Combat,
         },
     )
 }
@@ -380,26 +380,26 @@ fn map_cause_to_death_cause_killer_takes_priority() {
         identifier: "tributes:killer".into(),
         name: "Killer".into(),
     };
-    let cause = map_cause_to_death_cause(Some(&killer), "fire");
+    let cause = map_cause_to_death_cause(Some(&killer), &DeathCause::Fire);
     assert!(matches!(cause, DeathCause::Tribute(id) if id == "tributes:killer"));
 }
 
 #[test]
-fn map_cause_to_death_cause_string_fallback() {
+fn map_cause_to_death_cause_passthrough() {
     assert!(matches!(
-        map_cause_to_death_cause(None, "fire"),
+        map_cause_to_death_cause(None, &DeathCause::Fire),
         DeathCause::Fire
     ));
     assert!(matches!(
-        map_cause_to_death_cause(None, "drowning"),
+        map_cause_to_death_cause(None, &DeathCause::Drowning),
         DeathCause::Drowning
     ));
     assert!(matches!(
-        map_cause_to_death_cause(None, "starvation"),
+        map_cause_to_death_cause(None, &DeathCause::Starvation),
         DeathCause::Starvation
     ));
     assert!(matches!(
-        map_cause_to_death_cause(None, "unknown_cause"),
+        map_cause_to_death_cause(None, &DeathCause::Unknown),
         DeathCause::Unknown
     ));
 }

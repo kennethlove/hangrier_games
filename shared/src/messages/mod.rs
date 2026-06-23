@@ -3,10 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
-/// Cause string used in `MessagePayload::TributeKilled` for starvation deaths.
-pub const CAUSE_STARVATION: &str = "starvation";
-/// Cause string used in `MessagePayload::TributeKilled` for dehydration deaths.
-pub const CAUSE_DEHYDRATION: &str = "dehydration";
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", content = "value")]
@@ -335,7 +332,7 @@ pub enum MessagePayload {
     TributeKilled {
         victim: TributeRef,
         killer: Option<TributeRef>,
-        cause: String,
+        cause: crate::afflictions::DeathCause,
     },
     TributeWounded {
         victim: TributeRef,

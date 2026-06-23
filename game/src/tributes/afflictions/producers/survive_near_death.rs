@@ -45,7 +45,7 @@ pub(super) fn produce_survive_near_death(game: &mut Game, phase: Phase) {
                 tribute_name: tribute.name.clone(),
                 source: TraumaSource::NearDeath { cause: death_cause },
                 severity: Severity::Moderate,
-                cause_hint: String::new(),
+                cause_hint: shared::afflictions::DeathCause::Unknown,
             });
         }
     }

@@ -157,7 +157,7 @@ impl Game {
                     apply_dehydration_drain, apply_starvation_drain, hunger_band, thirst_band,
                     tick_survival,
                 };
-                use shared::messages::{CAUSE_DEHYDRATION, CAUSE_STARVATION};
+                use shared::afflictions::DeathCause;
 
                 let weather = current_weather();
                 let phase_index: u32 = self.day.unwrap_or(1) * 2 + u32::from(!day);
@@ -271,7 +271,7 @@ impl Game {
                                         Some(MessagePayload::TributeKilled {
                                             victim: tref.clone(),
                                             killer: None,
-                                            cause: kind.to_string(),
+                                            cause: shared::afflictions::DeathCause::Affliction(kind.clone()),
                                         }),
                                         None,
                                     ));
@@ -386,9 +386,9 @@ impl Game {
                 // tick.
                 if tribute.attributes.health == 0 && (hp_lost_starv > 0 || hp_lost_dehy > 0) {
                     let cause = if hp_lost_dehy > 0 {
-                        CAUSE_DEHYDRATION
+                        DeathCause::Dehydration
                     } else {
-                        CAUSE_STARVATION
+                        DeathCause::Starvation
                     };
                     let line = format!("{} succumbs to {}.", tribute.name, cause);
                     collected_events.push((
@@ -398,7 +398,7 @@ impl Game {
                         Some(MessagePayload::TributeKilled {
                             victim: tref,
                             killer: None,
-                            cause: cause.to_string(),
+                            cause,
                         }),
                         None,
                     ));

@@ -69,7 +69,7 @@ fn kind_lifecycle_variants_map_correctly() {
     let p = MessagePayload::TributeKilled {
         victim: t("v"),
         killer: None,
-        cause: "fall".into(),
+        cause: crate::afflictions::DeathCause::Hazard(crate::afflictions::HazardKind::FallingDebris),
     };
     assert_eq!(p.kind(), MessageKind::Death);
 
@@ -266,7 +266,7 @@ fn summarize_groups_by_day_and_phase() {
     let killed = MessagePayload::TributeKilled {
         victim: tref.clone(),
         killer: None,
-        cause: "x".into(),
+        cause: crate::afflictions::DeathCause::Unknown,
     };
     let moved = MessagePayload::TributeHidden {
         tribute: tref.clone(),

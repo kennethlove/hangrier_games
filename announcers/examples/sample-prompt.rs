@@ -78,7 +78,7 @@ async fn main() {
                     identifier: "id-Cato".into(),
                     name: "Cato".into(),
                 }),
-                cause: "combat".into(),
+                cause: shared::afflictions::DeathCause::Combat,
             },
         },
         shared::messages::GameMessage {

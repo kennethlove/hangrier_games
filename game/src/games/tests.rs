@@ -1365,7 +1365,7 @@ fn survival_tick_increments_hunger_and_thirst_per_phase() {
 #[test]
 fn survival_tick_routes_dehydration_death_through_tribute_killed() {
     use crate::messages::MessagePayload;
-    use shared::messages::CAUSE_DEHYDRATION;
+    use shared::afflictions::DeathCause;
     let mut a = Tribute::new("Doomed".to_string(), Some(1), None);
     // Already at the dehydrated band with 1 HP and a high
     // dehydration drain step so the next tick definitely lands fatal
@@ -1378,7 +1378,7 @@ fn survival_tick_routes_dehydration_death_through_tribute_killed() {
     let _ = game.run_phase(crate::messages::Phase::Day);
     let killed = game.messages.iter().any(|m| {
         matches!(&m.payload,
-            MessagePayload::TributeKilled { cause, .. } if cause == CAUSE_DEHYDRATION)
+            MessagePayload::TributeKilled { cause, .. } if *cause == DeathCause::Dehydration)
     });
     assert!(killed, "expected a TributeKilled with cause=dehydration");
 }

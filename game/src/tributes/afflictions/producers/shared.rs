@@ -18,8 +18,8 @@ pub(super) struct TraumaEvent {
     pub(super) tribute_name: String,
     pub(super) source: TraumaSource,
     pub(super) severity: Severity,
-    /// Raw cause string for phobia co-acquire stub.
-    pub(super) cause_hint: String,
+    /// Death cause for phobia co-acquire stub.
+    pub(super) cause_hint: DeathCause,
 }
 
 /// Message data collected during trauma application, pushed afterwards.
@@ -121,18 +121,16 @@ fn format_trauma_content(name: &str, acquisition: &TraumaAcquisition) -> String 
     }
 }
 
-/// Map a killer reference and cause string to a `DeathCause`.
-pub(super) fn map_cause_to_death_cause(killer: Option<&TributeRef>, cause: &str) -> DeathCause {
+/// Map a killer reference and cause to a `DeathCause`. If a killer is present,
+/// their tribute identity takes priority; otherwise the original cause is returned.
+pub(super) fn map_cause_to_death_cause(
+    killer: Option<&TributeRef>,
+    cause: &DeathCause,
+) -> DeathCause {
     if let Some(k) = killer {
         return DeathCause::Tribute(k.identifier.clone());
     }
-    match cause.to_lowercase().as_str() {
-        "fire" | "wildfire" => DeathCause::Fire,
-        "drowning" | "flood" => DeathCause::Drowning,
-        "starvation" => DeathCause::Starvation,
-        "dehydration" => DeathCause::Dehydration,
-        _ => DeathCause::Unknown,
-    }
+    cause.clone()
 }
 
 /// Stub for phobia co-acquisition. No-op until phobia PR lands.
@@ -140,6 +138,6 @@ pub(super) fn map_cause_to_death_cause(killer: Option<&TributeRef>, cause: &str)
 /// TODO(phobia-pr1): wire to `try_acquire_phobia` when the phobia affliction
 /// system is implemented.
 #[allow(dead_code)]
-fn try_co_acquire_phobia(_tribute: &mut Tribute, _cause: &str) {
+fn try_co_acquire_phobia(_tribute: &mut Tribute, _cause: &DeathCause) {
     // No-op stub. Will trigger phobia acquisition once the phobia system exists.
 }

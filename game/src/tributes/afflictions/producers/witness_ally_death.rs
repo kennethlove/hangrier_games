@@ -9,7 +9,7 @@ use super::shared::{TraumaEvent, apply_trauma_events, map_cause_to_death_cause};
 
 pub(super) fn produce_witness_ally_death(game: &mut Game, phase: Phase) {
     // Phase 1: collect killed tributes with area info
-    let killed: Vec<(String, Area, uuid::Uuid, Option<TributeRef>, String)> = game
+    let killed: Vec<(String, Area, uuid::Uuid, Option<TributeRef>, shared::afflictions::DeathCause)> = game
         .messages
         .iter()
         .filter(|m| m.phase == phase)

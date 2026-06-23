@@ -187,7 +187,7 @@ impl Tribute {
                         MessagePayload::TributeKilled {
                             victim: tref(self),
                             killer: None,
-                            cause: "critical_fumble".into(),
+                            cause: shared::afflictions::DeathCause::CriticalFumble,
                         },
                     ));
                     let beat = mk_beat(SwingOutcome::FumbleDeath { self_damage: 5 }, 0, None);

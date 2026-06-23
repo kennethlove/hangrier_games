@@ -139,7 +139,7 @@ async fn full_pipeline_from_roster_to_package() {
         make_msg(MessagePayload::TributeKilled {
             victim: tr("Peeta"),
             killer: Some(tr("Cato")),
-            cause: "combat".into(),
+            cause: shared::afflictions::DeathCause::Combat,
         }),
         make_msg(MessagePayload::TributeMoved {
             tribute: tr("Katniss"),
@@ -206,7 +206,7 @@ async fn histories_accumulate_across_phases() {
     let phase1 = vec![make_msg(MessagePayload::TributeKilled {
         victim: tr("Peeta"),
         killer: Some(tr("Cato")),
-        cause: "combat".into(),
+        cause: shared::afflictions::DeathCause::Combat,
     })];
     histories.update(&phase1);
 
@@ -264,17 +264,17 @@ async fn package_includes_kill_leaders() {
         make_msg(MessagePayload::TributeKilled {
             victim: tr("Peeta"),
             killer: Some(tr("Cato")),
-            cause: "combat".into(),
+            cause: shared::afflictions::DeathCause::Combat,
         }),
         make_msg(MessagePayload::TributeKilled {
             victim: tr("Rue"),
             killer: Some(tr("Cato")),
-            cause: "combat".into(),
+            cause: shared::afflictions::DeathCause::Combat,
         }),
         make_msg(MessagePayload::TributeKilled {
             victim: tr("Clove"),
             killer: Some(tr("Katniss")),
-            cause: "combat".into(),
+            cause: shared::afflictions::DeathCause::Combat,
         }),
     ];
 
@@ -326,7 +326,7 @@ async fn generate_commentary_integration() {
     histories.update(&[make_msg(MessagePayload::TributeKilled {
         victim: tr("Peeta"),
         killer: Some(tr("Katniss")),
-        cause: "combat".into(),
+        cause: shared::afflictions::DeathCause::Combat,
     })]);
 
     let header = GameStateSnapshot {
@@ -375,7 +375,7 @@ async fn killing_spree_streak_rules() {
     histories.update(&[make_msg(MessagePayload::TributeKilled {
         victim: tr("Peeta"),
         killer: Some(tr("Cato")),
-        cause: "combat".into(),
+        cause: shared::afflictions::DeathCause::Combat,
     })]);
     let d = histories.digests();
     assert_eq!(d.iter().find(|d| d.name == "Cato").unwrap().kill_streak, 1);
@@ -393,7 +393,7 @@ async fn killing_spree_streak_rules() {
     histories.update(&[make_msg(MessagePayload::TributeKilled {
         victim: tr("Rue"),
         killer: Some(tr("Cato")),
-        cause: "combat".into(),
+        cause: shared::afflictions::DeathCause::Combat,
     })]);
     let d = histories.digests();
     assert_eq!(d.iter().find(|d| d.name == "Cato").unwrap().kill_streak, 2);
@@ -416,7 +416,7 @@ async fn killing_spree_streak_rules() {
     histories.update(&[make_msg(MessagePayload::TributeKilled {
         victim: tr("Marvel"),
         killer: Some(tr("Katniss")),
-        cause: "combat".into(),
+        cause: shared::afflictions::DeathCause::Combat,
     })]);
     let d = histories.digests();
     assert_eq!(
@@ -436,7 +436,7 @@ async fn spree_milestone_and_break_events() {
     histories.update(&[make_msg(MessagePayload::TributeKilled {
         victim: tr("Peeta"),
         killer: Some(tr("Cato")),
-        cause: "combat".into(),
+        cause: shared::afflictions::DeathCause::Combat,
     })]);
     let d = histories.digests();
     let cato = d.iter().find(|d| d.name == "Cato").unwrap();
@@ -446,7 +446,7 @@ async fn spree_milestone_and_break_events() {
     histories.update(&[make_msg(MessagePayload::TributeKilled {
         victim: tr("Rue"),
         killer: Some(tr("Cato")),
-        cause: "combat".into(),
+        cause: shared::afflictions::DeathCause::Combat,
     })]);
     let d = histories.digests();
     let cato = d.iter().find(|d| d.name == "Cato").unwrap();
@@ -458,12 +458,12 @@ async fn spree_milestone_and_break_events() {
         make_msg(MessagePayload::TributeKilled {
             victim: tr("Clove"),
             killer: Some(tr("Cato")),
-            cause: "combat".into(),
+            cause: shared::afflictions::DeathCause::Combat,
         }),
         make_msg(MessagePayload::TributeKilled {
             victim: tr("Marvel"),
             killer: Some(tr("Cato")),
-            cause: "combat".into(),
+            cause: shared::afflictions::DeathCause::Combat,
         }),
     ]);
     let d = histories.digests();
@@ -535,7 +535,7 @@ async fn permanent_highlights() {
         histories.update(&[make_msg(MessagePayload::TributeKilled {
             victim: tr(&format!("Victim{i}")),
             killer: Some(tr("Cato")),
-            cause: "combat".into(),
+            cause: shared::afflictions::DeathCause::Combat,
         })]);
     }
 

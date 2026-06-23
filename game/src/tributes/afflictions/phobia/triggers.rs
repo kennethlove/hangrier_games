@@ -247,7 +247,7 @@ mod tests {
                     name: "Victim".to_string(),
                 },
                 killer: None,
-                cause: "combat".into(),
+                cause: shared::afflictions::DeathCause::Combat,
             },
         }];
         let ctx = make_context(&area, false, &[], &messages);

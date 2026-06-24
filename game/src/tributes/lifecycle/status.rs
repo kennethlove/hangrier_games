@@ -137,8 +137,12 @@ impl Tribute {
                         | crate::threats::animals::Animal::Hyena => {
                             shared::afflictions::BeastKind::Wolf
                         }
-                        crate::threats::animals::Animal::Bear => shared::afflictions::BeastKind::Bear,
-                        crate::threats::animals::Animal::Snake => shared::afflictions::BeastKind::Snake,
+                        crate::threats::animals::Animal::Bear => {
+                            shared::afflictions::BeastKind::Bear
+                        }
+                        crate::threats::animals::Animal::Snake => {
+                            shared::afflictions::BeastKind::Snake
+                        }
                         _ => shared::afflictions::BeastKind::Other,
                     };
                     shared::afflictions::DeathCause::Beast(beast)

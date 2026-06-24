@@ -70,7 +70,9 @@ fn three_cycle_affinity() {
     let cycle3_payloads = vec![MessagePayload::TributeKilled {
         victim: tref("Tribute4"),
         killer: None,
-        cause: shared::afflictions::DeathCause::Hazard(shared::afflictions::HazardKind::FallingDebris),
+        cause: shared::afflictions::DeathCause::Hazard(
+            shared::afflictions::HazardKind::FallingDebris,
+        ),
     }];
 
     for payloads in [cycle1_payloads, cycle2_payloads, cycle3_payloads] {

@@ -271,7 +271,9 @@ impl Game {
                                         Some(MessagePayload::TributeKilled {
                                             victim: tref.clone(),
                                             killer: None,
-                                            cause: shared::afflictions::DeathCause::Affliction(kind.clone()),
+                                            cause: shared::afflictions::DeathCause::Affliction(
+                                                kind.clone(),
+                                            ),
                                         }),
                                         None,
                                     ));

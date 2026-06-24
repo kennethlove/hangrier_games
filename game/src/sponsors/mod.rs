@@ -490,7 +490,9 @@ mod tests {
         let payload = MessagePayload::TributeKilled {
             victim: tref("v"),
             killer: None,
-            cause: shared::afflictions::DeathCause::Hazard(shared::afflictions::HazardKind::FallingDebris),
+            cause: shared::afflictions::DeathCause::Hazard(
+                shared::afflictions::HazardKind::FallingDebris,
+            ),
         };
         let events = translate(&payload, &ctx);
         assert_eq!(events.len(), 1);

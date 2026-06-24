@@ -69,7 +69,9 @@ fn kind_lifecycle_variants_map_correctly() {
     let p = MessagePayload::TributeKilled {
         victim: t("v"),
         killer: None,
-        cause: crate::afflictions::DeathCause::Hazard(crate::afflictions::HazardKind::FallingDebris),
+        cause: crate::afflictions::DeathCause::Hazard(
+            crate::afflictions::HazardKind::FallingDebris,
+        ),
     };
     assert_eq!(p.kind(), MessageKind::Death);
 

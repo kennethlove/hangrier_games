@@ -29,7 +29,7 @@ fn shelter_sought_round_trip() {
     let json = serde_json::to_string(&p).unwrap();
     let back: MessagePayload = serde_json::from_str(&json).unwrap();
     assert_eq!(format!("{:?}", p), format!("{:?}", back));
-    assert_eq!(p.kind(), MessageKind::State);
+    assert_eq!(p.kind(), MessageKind::ShelterSought);
 }
 
 #[test]
@@ -60,7 +60,7 @@ fn stamina_band_change_round_trips_and_routes_to_state() {
     let json = serde_json::to_string(&p).unwrap();
     let back: MessagePayload = serde_json::from_str(&json).unwrap();
     assert_eq!(format!("{:?}", p), format!("{:?}", back));
-    assert_eq!(p.kind(), MessageKind::State);
+    assert_eq!(p.kind(), MessageKind::StaminaBandChanged);
     assert!(p.involves(&tref().identifier));
 }
 
@@ -100,11 +100,17 @@ fn foraged_drank_ate_round_trip_and_kind() {
         item: iref(),
         debt_recovered: 4,
     };
-    for p in [foraged, drank, drank_item, ate] {
+    let payloads = [
+        (foraged, MessageKind::Foraged),
+        (drank, MessageKind::Drank),
+        (drank_item, MessageKind::Drank),
+        (ate, MessageKind::Ate),
+    ];
+    for (p, expected) in payloads {
         let back: MessagePayload =
             serde_json::from_str(&serde_json::to_string(&p).unwrap()).unwrap();
         assert_eq!(format!("{:?}", p), format!("{:?}", back));
-        assert_eq!(p.kind(), MessageKind::State);
+        assert_eq!(p.kind(), expected);
     }
 }
 
@@ -178,8 +184,8 @@ fn tribute_slept_woke_payload_kind_is_state() {
         phase: Phase::Dawn,
         reason: WakeReason::Rested,
     };
-    assert_eq!(slept.kind(), MessageKind::State);
-    assert_eq!(woke.kind(), MessageKind::State);
+    assert_eq!(slept.kind(), MessageKind::TributeSlept);
+    assert_eq!(woke.kind(), MessageKind::TributeWoke);
 }
 
 #[test]
@@ -212,7 +218,7 @@ fn phobia_acquired_round_trips_and_kind() {
     let json = serde_json::to_string(&p).unwrap();
     let back: MessagePayload = serde_json::from_str(&json).unwrap();
     assert_eq!(format!("{:?}", p), format!("{:?}", back));
-    assert_eq!(p.kind(), MessageKind::Phobia);
+    assert_eq!(p.kind(), MessageKind::PhobiaAcquired);
     assert!(p.involves("t1"));
     assert!(!p.involves("other"));
 }
@@ -228,7 +234,7 @@ fn phobia_triggered_round_trips_and_kind() {
     let json = serde_json::to_string(&p).unwrap();
     let back: MessagePayload = serde_json::from_str(&json).unwrap();
     assert_eq!(format!("{:?}", p), format!("{:?}", back));
-    assert_eq!(p.kind(), MessageKind::Phobia);
+    assert_eq!(p.kind(), MessageKind::PhobiaTriggered);
     assert!(p.involves("t1"));
     assert!(!p.involves("other"));
 }

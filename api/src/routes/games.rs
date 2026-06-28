@@ -576,12 +576,23 @@ pub async fn timeline_handler(
             if !filter_str.is_empty() {
                 let kind = m.payload.kind();
                 let kind_str = match kind {
-                    shared::messages::MessageKind::Death => "death",
+                    shared::messages::MessageKind::TributeKilled => "death",
                     shared::messages::MessageKind::Combat
-                    | shared::messages::MessageKind::CombatSwing => "combat",
-                    shared::messages::MessageKind::Alliance => "alliance",
-                    shared::messages::MessageKind::Movement => "movement",
-                    shared::messages::MessageKind::Item
+                    | shared::messages::MessageKind::CombatSwing
+                    | shared::messages::MessageKind::TributeAttacked
+                    | shared::messages::MessageKind::TributeWounded => "combat",
+                    shared::messages::MessageKind::AllianceFormed
+                    | shared::messages::MessageKind::AllianceProposed
+                    | shared::messages::MessageKind::AllianceDissolved
+                    | shared::messages::MessageKind::BetrayalTriggered
+                    | shared::messages::MessageKind::TrustShockBreak => "alliance",
+                    shared::messages::MessageKind::TributeMoved
+                    | shared::messages::MessageKind::TributeHidden
+                    | shared::messages::MessageKind::AreaClosed
+                    | shared::messages::MessageKind::AreaEvent => "movement",
+                    shared::messages::MessageKind::ItemFound
+                    | shared::messages::MessageKind::ItemUsed
+                    | shared::messages::MessageKind::ItemDropped
                     | shared::messages::MessageKind::SponsorGift => "items",
                     _ => "",
                 };

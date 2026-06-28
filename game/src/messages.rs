@@ -339,7 +339,7 @@ mod tests {
         };
         let ev = TaggedEvent::new("T1 snaps", payload);
         assert_eq!(ev.content, "T1 snaps");
-        assert_eq!(ev.payload.kind(), MessageKind::State);
+        assert_eq!(ev.payload.kind(), MessageKind::SanityBreak);
     }
 
     #[test]

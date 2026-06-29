@@ -86,6 +86,7 @@ pub const HEROISM_BRAVERY_BOOST: u32 = 20;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tributes::Tribute;
 
     #[test]
     fn penalty_increases_with_severity() {
@@ -110,5 +111,104 @@ mod tests {
     #[test]
     fn zero_severity_movement_penalty() {
         assert_eq!(movement_penalty(WoundSeverity::Minor), -1);
+    }
+
+    #[test]
+    fn wound_blood_drain_per_period() {
+        let mut tribute = Tribute::new("Test".to_string(), None, None);
+        tribute.wounds.push(shared::wounds::Wound::new(
+            shared::wounds::WoundType::Stab,
+            WoundSeverity::Moderate,
+            BodyPart::Torso,
+        ));
+
+        let initial_blood = tribute.blood;
+        let lost = tribute.drain_blood_from_wounds();
+
+        assert_eq!(lost, 15);
+        assert_eq!(tribute.blood, initial_blood - 15);
+    }
+
+    #[test]
+    fn multiple_wounds_stack_blood_loss() {
+        let mut tribute = Tribute::new("Test".to_string(), None, None);
+        tribute.wounds.push(shared::wounds::Wound::new(
+            shared::wounds::WoundType::Cut,
+            WoundSeverity::Minor,
+            BodyPart::Torso,
+        ));
+        tribute.wounds.push(shared::wounds::Wound::new(
+            shared::wounds::WoundType::Stab,
+            WoundSeverity::Severe,
+            BodyPart::LeftArm,
+        ));
+
+        let lost = tribute.drain_blood_from_wounds();
+        assert_eq!(lost, 45);
+    }
+
+    #[test]
+    fn stopped_wound_no_blood_loss() {
+        let mut tribute = Tribute::new("Test".to_string(), None, None);
+        let mut wound = shared::wounds::Wound::new(
+            shared::wounds::WoundType::Cut,
+            WoundSeverity::Minor,
+            BodyPart::Torso,
+        );
+        wound.bleeding = false;
+        tribute.wounds.push(wound);
+
+        let lost = tribute.drain_blood_from_wounds();
+        assert_eq!(lost, 0);
+    }
+
+    #[test]
+    fn effective_strength_reduced_by_wounds() {
+        let mut tribute = Tribute::new("Test".to_string(), None, None);
+        tribute.attributes.strength = 30;
+
+        let base = tribute.effective_strength();
+        assert_eq!(base, 30);
+
+        tribute.wounds.push(shared::wounds::Wound::new(
+            shared::wounds::WoundType::Crush,
+            WoundSeverity::Severe,
+            BodyPart::Torso,
+        ));
+
+        let wounded = tribute.effective_strength();
+        assert!(wounded < base, "wounds should reduce effective strength");
+    }
+
+    #[test]
+    fn pain_condition_updates_from_wounds() {
+        let mut tribute = Tribute::new("Test".to_string(), None, None);
+        tribute.wounds.push(shared::wounds::Wound::new(
+            shared::wounds::WoundType::Stab,
+            WoundSeverity::Moderate,
+            BodyPart::Torso,
+        ));
+
+        tribute.update_pain_condition();
+
+        let has_pain = tribute
+            .mental_conditions
+            .iter()
+            .any(|c| matches!(c, shared::conditions::MentalCondition::Pain { .. }));
+        assert!(has_pain, "should have pain condition from wounds");
+    }
+
+    #[test]
+    fn death_from_blood_loss() {
+        let mut tribute = Tribute::new("Test".to_string(), None, None);
+        tribute.blood = 10;
+        tribute.wounds.push(shared::wounds::Wound::new(
+            shared::wounds::WoundType::Stab,
+            WoundSeverity::Critical,
+            BodyPart::Torso,
+        ));
+
+        tribute.drain_blood_from_wounds();
+        assert_eq!(tribute.blood, 0, "blood should be 0 after critical bleed");
     }
 }

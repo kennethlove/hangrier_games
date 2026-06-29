@@ -592,15 +592,94 @@ fn damage_to_severity(damage: u32) -> WoundSeverity {
 }
 
 /// Picks a random body part for a combat wound.
-fn random_body_part(rng: &mut impl Rng) -> BodyPart {
-    match rng.random_range(0..6) {
-        0 => BodyPart::Head,
-        1 => BodyPart::Torso,
-        2 => BodyPart::LeftArm,
-        3 => BodyPart::RightArm,
-        4 => BodyPart::LeftLeg,
-        _ => BodyPart::RightLeg,
+/// Determines body part based on attack context.
+/// Weapons target torso/limbs; unarmed favors head/torso.
+/// Severe attacks are more likely to hit vital areas.
+fn determine_body_part(
+    attacker: &Tribute,
+    severity: WoundSeverity,
+    rng: &mut impl Rng,
+) -> BodyPart {
+    let has_weapon = attacker
+        .items
+        .iter()
+        .any(|i| i.is_weapon() && i.current_durability > 0);
+
+    // Severe+ attacks have elevated head-hit chance
+    let head_chance = if matches!(severity, WoundSeverity::Severe | WoundSeverity::Critical) {
+        0.20
+    } else if has_weapon {
+        0.05
+    } else {
+        0.15
+    };
+
+    let roll: f64 = rng.random();
+    if roll < head_chance {
+        return BodyPart::Head;
     }
+
+    if has_weapon {
+        // Weapons: mostly torso and limbs
+        match rng.random_range(0..4) {
+            0 => BodyPart::Torso,
+            1 => BodyPart::LeftArm,
+            2 => BodyPart::RightArm,
+            _ => {
+                if rng.random_bool(0.5) {
+                    BodyPart::LeftLeg
+                } else {
+                    BodyPart::RightLeg
+                }
+            }
+        }
+    } else {
+        // Unarmed: head/torso biased
+        match rng.random_range(0..3) {
+            0 => BodyPart::Torso,
+            1 => BodyPart::LeftArm,
+            _ => BodyPart::RightArm,
+        }
+    }
+}
+
+/// Checks if the defender's shield can prevent or mitigate a wound.
+/// Returns the adjusted severity. None = wound prevented entirely.
+fn shield_injury_prevention(
+    loser: &mut Tribute,
+    severity: WoundSeverity,
+    rng: &mut impl Rng,
+) -> Option<WoundSeverity> {
+    let shield_idx = match loser
+        .items
+        .iter()
+        .position(|i| i.is_defensive() && i.current_durability > 0)
+    {
+        Some(idx) => idx,
+        None => return Some(severity), // No shield → wound passes through
+    };
+
+    // Shield blocks: 40% chance to prevent wound entirely
+    if rng.random_bool(0.40) {
+        let shield = &mut loser.items[shield_idx];
+        let _outcome = shield.wear(1);
+        return None; // Wound prevented
+    }
+
+    // Shield mitigates: 30% chance to downgrade severity
+    if rng.random_bool(0.30) {
+        let shield = &mut loser.items[shield_idx];
+        let _outcome = shield.wear(1);
+        let mitigated = match severity {
+            WoundSeverity::Critical => WoundSeverity::Severe,
+            WoundSeverity::Severe => WoundSeverity::Moderate,
+            WoundSeverity::Moderate => WoundSeverity::Minor,
+            WoundSeverity::Minor => return None, // Minor → prevented
+        };
+        return Some(mitigated);
+    }
+
+    Some(severity)
 }
 
 /// Picks a wound type based on whether the attacker had a weapon.
@@ -641,13 +720,34 @@ pub(crate) fn apply_combat_results(
     rng: &mut impl Rng,
 ) -> u32 {
     let severity = damage_to_severity(damage_to_loser);
-    let body_part = random_body_part(rng);
+    let body_part = determine_body_part(winner, severity, rng);
     let wound_type = wound_type_for_attack(winner, rng);
 
-    loser.create_wound(wound_type, severity, body_part);
-    // Immediate blood loss on wound creation (first bleed)
+    // Shield may prevent or mitigate the wound
+    let final_severity = match shield_injury_prevention(loser, severity, rng) {
+        None => {
+            // Shield prevented the wound entirely — still reduce health for
+            // backward compat, but no wound is created.
+            loser.takes_physical_damage(damage_to_loser);
+            loser.statistics.defeats += 1;
+            winner.statistics.wins += 1;
+            let stress_damage = winner.apply_violence_stress(events, tuning);
+            let content = log_event.to_string();
+            events.push(TaggedEvent::new(
+                content,
+                MessagePayload::TributeWounded {
+                    victim: tref(loser),
+                    attacker: Some(tref(winner)),
+                    hp_lost: damage_to_loser,
+                },
+            ));
+            return stress_damage;
+        }
+        Some(s) => s,
+    };
+
+    loser.create_wound(wound_type, final_severity, body_part);
     loser.drain_blood_from_wounds();
-    // Also reduce health directly for immediate death checks
     loser.takes_physical_damage(damage_to_loser);
 
     loser.statistics.defeats += 1;

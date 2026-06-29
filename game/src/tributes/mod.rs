@@ -554,11 +554,24 @@ impl Tribute {
         // Process wounds: drain blood from bleeding wounds, then heal naturally.
         if self.is_alive() && !self.wounds.is_empty() {
             self.drain_blood_from_wounds();
-            self.heal_wounds(rng);
+            self.heal_wounds(rng, events);
 
             // Heroism: low blood grants temporary bravery
             if self.should_heroism() {
                 self.increase_bravery(wounds::HEROISM_BRAVERY_BOOST);
+            }
+
+            // Emit TributeBledOut if blood reached zero from wound bleed
+            if self.blood == 0 {
+                events.push(TaggedEvent::new(
+                    format!("{} bled out from their wounds", self.name),
+                    MessagePayload::TributeBledOut {
+                        tribute: TributeRef {
+                            identifier: self.identifier.clone(),
+                            name: self.name.clone(),
+                        },
+                    },
+                ));
             }
         }
 

@@ -54,6 +54,9 @@ impl MessagePayload {
             | TributeStarved { tribute, .. }
             | TributeDehydrated { tribute, .. }
             | SanityBreak { tribute }
+            | TributeBledOut { tribute }
+            | WoundInfected { tribute, .. }
+            | WoundHealed { tribute, .. }
             | HungerBandChanged { tribute, .. }
             | ThirstBandChanged { tribute, .. }
             | StaminaBandChanged { tribute, .. }

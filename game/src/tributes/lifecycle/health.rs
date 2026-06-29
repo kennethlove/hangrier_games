@@ -1,3 +1,4 @@
+use crate::messages::{MessagePayload, TributeRef};
 use crate::tributes::Tribute;
 use crate::tributes::wounds;
 use rand::RngExt;
@@ -139,10 +140,53 @@ impl Tribute {
 
     /// Natural wound healing pass. Each wound attempts to heal; this may stop
     /// bleeding or cause infection for Critical wounds.
-    pub(crate) fn heal_wounds(&mut self, rng: &mut impl rand::Rng) {
+    pub(crate) fn heal_wounds(
+        &mut self,
+        rng: &mut impl rand::Rng,
+        events: &mut Vec<crate::messages::TaggedEvent>,
+    ) {
+        let tribute_name = self.name.clone();
+        let tribute_id = self.identifier.clone();
+
         for wound in &mut self.wounds {
+            let was_infected = wound.infected;
+            let was_bleeding = wound.bleeding;
             let roll: f64 = rng.random();
             wound.heals_naturally(roll);
+
+            // Emit infection event
+            if !was_infected && wound.infected {
+                events.push(crate::messages::TaggedEvent::new(
+                    format!(
+                        "{}'s {} wound became infected",
+                        tribute_name, wound.body_part
+                    ),
+                    MessagePayload::WoundInfected {
+                        tribute: TributeRef {
+                            identifier: tribute_id.clone(),
+                            name: tribute_name.clone(),
+                        },
+                        body_part: wound.body_part.to_string(),
+                    },
+                ));
+            }
+
+            // Emit heal event (stopped bleeding, not infected)
+            if was_bleeding && !wound.bleeding && !wound.infected {
+                events.push(crate::messages::TaggedEvent::new(
+                    format!(
+                        "{}'s {} wound stopped bleeding",
+                        tribute_name, wound.body_part
+                    ),
+                    MessagePayload::WoundHealed {
+                        tribute: TributeRef {
+                            identifier: tribute_id.clone(),
+                            name: tribute_name.clone(),
+                        },
+                        body_part: wound.body_part.to_string(),
+                    },
+                ));
+            }
         }
         // Remove fully healed wounds (no longer bleeding, not infected, Minor only)
         self.wounds

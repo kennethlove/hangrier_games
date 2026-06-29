@@ -398,6 +398,22 @@ pub enum MessagePayload {
         tribute: TributeRef,
     },
 
+    // Wound model events (blood/sanity wound system).
+    /// Emitted when a tribute dies from blood loss (blood reaches 0).
+    TributeBledOut {
+        tribute: TributeRef,
+    },
+    /// Emitted when a wound becomes infected.
+    WoundInfected {
+        tribute: TributeRef,
+        body_part: String,
+    },
+    /// Emitted when a wound heals naturally.
+    WoundHealed {
+        tribute: TributeRef,
+        body_part: String,
+    },
+
     // Survival events (shelter + hunger/thirst spec).
     HungerBandChanged {
         tribute: TributeRef,

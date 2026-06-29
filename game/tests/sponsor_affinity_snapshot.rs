@@ -53,7 +53,7 @@ fn three_cycle_affinity() {
         MessagePayload::TributeKilled {
             victim: tref("Tribute0"),
             killer: Some(tref("Tribute1")),
-            cause: "spear".into(),
+            cause: shared::afflictions::DeathCause::Tribute("spear".into()),
         },
         MessagePayload::AllianceFormed {
             members: vec![tref("Tribute2"), tref("Tribute3")],
@@ -70,7 +70,9 @@ fn three_cycle_affinity() {
     let cycle3_payloads = vec![MessagePayload::TributeKilled {
         victim: tref("Tribute4"),
         killer: None,
-        cause: "fall".into(),
+        cause: shared::afflictions::DeathCause::Hazard(
+            shared::afflictions::HazardKind::FallingDebris,
+        ),
     }];
 
     for payloads in [cycle1_payloads, cycle2_payloads, cycle3_payloads] {

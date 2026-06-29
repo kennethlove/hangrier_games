@@ -539,7 +539,7 @@ impl Tribute {
                         name: self.name.clone(),
                     },
                     killer: None,
-                    cause: "untracked".into(),
+                    cause: shared::afflictions::DeathCause::Unknown,
                 },
             ));
             return;
@@ -790,7 +790,7 @@ impl Tribute {
                                 name: self.name.clone(),
                             },
                             killer: None,
-                            cause: "suicide".into(),
+                            cause: shared::afflictions::DeathCause::Suicide,
                         },
                     ));
                     Some(self.clone())

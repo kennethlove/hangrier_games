@@ -115,12 +115,6 @@ fn foraged_drank_ate_round_trip_and_kind() {
 }
 
 #[test]
-fn cause_constants_exist() {
-    assert_eq!(CAUSE_STARVATION, "starvation");
-    assert_eq!(CAUSE_DEHYDRATION, "dehydration");
-}
-
-#[test]
 fn survival_payloads_involve_tribute() {
     let p = MessagePayload::Ate {
         tribute: tref(),

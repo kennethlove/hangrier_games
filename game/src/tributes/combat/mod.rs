@@ -136,7 +136,7 @@ impl Tribute {
                         MessagePayload::TributeKilled {
                             victim: tref(self),
                             killer: None,
-                            cause: "critical_fumble".into(),
+                            cause: shared::afflictions::DeathCause::CriticalFumble,
                         },
                     ));
                     events.push(TaggedEvent::new(

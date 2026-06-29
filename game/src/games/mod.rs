@@ -699,8 +699,31 @@ impl Game {
                     let name = tribute.name.clone();
                     let id = tribute.identifier.clone();
                     tribute.attributes.health = 0;
-                    let cause = most_severe_event.to_string();
-                    tribute.statistics.killed_by = Some(cause.clone());
+                    let cause = match most_severe_event {
+                        crate::areas::events::AreaEvent::Wildfire => {
+                            shared::afflictions::DeathCause::Fire
+                        }
+                        crate::areas::events::AreaEvent::Flood
+                        | crate::areas::events::AreaEvent::Sinkhole => {
+                            shared::afflictions::DeathCause::Drowning
+                        }
+                        crate::areas::events::AreaEvent::Avalanche
+                        | crate::areas::events::AreaEvent::Rockslide => {
+                            shared::afflictions::DeathCause::Hazard(
+                                shared::afflictions::HazardKind::FallingDebris,
+                            )
+                        }
+                        crate::areas::events::AreaEvent::Earthquake
+                        | crate::areas::events::AreaEvent::Landslide => {
+                            shared::afflictions::DeathCause::Hazard(
+                                shared::afflictions::HazardKind::Other,
+                            )
+                        }
+                        _ => shared::afflictions::DeathCause::Hazard(
+                            shared::afflictions::HazardKind::Other,
+                        ),
+                    };
+                    tribute.statistics.killed_by = Some(cause.to_string());
                     tribute.status = crate::tributes::statuses::TributeStatus::RecentlyDead;
                     (name, id, cause)
                 };
@@ -792,8 +815,30 @@ impl Game {
                 // Apply results
                 if !result.survived {
                     tribute.attributes.health = 0;
-                    let cause = most_severe_event.to_string();
-                    tribute.statistics.killed_by = Some(cause.clone());
+                    let cause = match most_severe_event {
+                        crate::areas::events::AreaEvent::Wildfire => {
+                            shared::afflictions::DeathCause::Fire
+                        }
+                        crate::areas::events::AreaEvent::Flood => {
+                            shared::afflictions::DeathCause::Drowning
+                        }
+                        crate::areas::events::AreaEvent::Avalanche
+                        | crate::areas::events::AreaEvent::Rockslide => {
+                            shared::afflictions::DeathCause::Hazard(
+                                shared::afflictions::HazardKind::FallingDebris,
+                            )
+                        }
+                        crate::areas::events::AreaEvent::Earthquake
+                        | crate::areas::events::AreaEvent::Landslide => {
+                            shared::afflictions::DeathCause::Hazard(
+                                shared::afflictions::HazardKind::Other,
+                            )
+                        }
+                        _ => shared::afflictions::DeathCause::Hazard(
+                            shared::afflictions::HazardKind::Other,
+                        ),
+                    };
+                    tribute.statistics.killed_by = Some(cause.to_string());
                     // Mark as RecentlyDead so the end-of-cycle announcement
                     // and the alliance-cascade pipeline both pick this death
                     // up. Without this, env-killed tributes were silently

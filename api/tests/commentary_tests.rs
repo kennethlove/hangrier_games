@@ -100,7 +100,7 @@ async fn generate_commentary_pipeline() {
     let events = vec![make_msg(MessagePayload::TributeKilled {
         victim: tr("Peeta"),
         killer: Some(tr("Cato")),
-        cause: "combat".into(),
+        cause: shared::afflictions::DeathCause::Combat,
     })];
 
     let histories = vec![
@@ -162,7 +162,7 @@ fn broadcast_package_with_leaders_and_sprees() {
     let events = vec![make_msg(MessagePayload::TributeKilled {
         victim: tr("Marvel"),
         killer: Some(tr("Cato")),
-        cause: "combat".into(),
+        cause: shared::afflictions::DeathCause::Combat,
     })];
 
     let package = announcers::BroadcastPackageBuilder::build(header, &events, vec![]);

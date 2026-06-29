@@ -36,7 +36,7 @@ pub(super) fn produce_survive_betrayal(game: &mut Game, phase: Phase) {
                 by: betrayer.identifier.clone(),
             },
             severity: Severity::Moderate,
-            cause_hint: betrayer.name.clone(),
+            cause_hint: shared::afflictions::DeathCause::Tribute(betrayer.name.clone()),
         });
     }
 

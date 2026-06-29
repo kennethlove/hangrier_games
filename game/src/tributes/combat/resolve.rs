@@ -730,7 +730,7 @@ impl Tribute {
                 MessagePayload::TributeKilled {
                     victim: tref(self),
                     killer: None,
-                    cause: "suicide".into(),
+                    cause: shared::afflictions::DeathCause::Suicide,
                 },
             ));
             let mut beat = new_beat(self, target, SwingOutcome::Suicide { damage }, tuning);

@@ -735,7 +735,7 @@ mod tests {
         h.update(&[make_msg(MessagePayload::TributeKilled {
             victim: tr("Katniss"),
             killer: None,
-            cause: "starvation".into(),
+            cause: shared::afflictions::DeathCause::Starvation,
         })]);
         let d = h.get("id-Katniss").unwrap();
         assert_eq!(d.status, "deceased");

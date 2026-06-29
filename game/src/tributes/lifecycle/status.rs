@@ -130,6 +130,25 @@ impl Tribute {
             let killer = self.status.clone();
             let line = GameOutput::TributeDiesFromStatus(self.name.as_str(), &killer.to_string())
                 .to_string();
+            let cause = match &killer {
+                TributeStatus::Mauled(animal) => {
+                    let beast = match animal {
+                        crate::threats::animals::Animal::Wolf
+                        | crate::threats::animals::Animal::Hyena => {
+                            shared::afflictions::BeastKind::Wolf
+                        }
+                        crate::threats::animals::Animal::Bear => {
+                            shared::afflictions::BeastKind::Bear
+                        }
+                        crate::threats::animals::Animal::Snake => {
+                            shared::afflictions::BeastKind::Snake
+                        }
+                        _ => shared::afflictions::BeastKind::Other,
+                    };
+                    shared::afflictions::DeathCause::Beast(beast)
+                }
+                _ => shared::afflictions::DeathCause::Unknown,
+            };
             events.push(TaggedEvent::new(
                 line,
                 MessagePayload::TributeKilled {
@@ -138,7 +157,7 @@ impl Tribute {
                         name: self.name.clone(),
                     },
                     killer: None,
-                    cause: killer.to_string(),
+                    cause,
                 },
             ));
             self.statistics.killed_by = Some(killer.to_string());

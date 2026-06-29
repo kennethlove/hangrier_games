@@ -85,7 +85,7 @@ impl BroadcastPackageBuilder {
                     "killer": killer.as_ref().map(|k| {
                         serde_json::json!({ "id": k.identifier, "name": k.name })
                     }),
-                    "cause": cause,
+                    "cause": cause.to_string(),
                 });
                 Some(EventLine {
                     kind: EventKind::Death,
@@ -488,7 +488,7 @@ mod tests {
         let msg = make_msg(MessagePayload::TributeKilled {
             victim: tr("Katniss"),
             killer: Some(tr("Cato")),
-            cause: "combat".into(),
+            cause: shared::afflictions::DeathCause::Combat,
         });
         let line = BroadcastPackageBuilder::classify_event(&msg).unwrap();
         assert_eq!(line.kind, EventKind::Death);
@@ -612,7 +612,7 @@ mod tests {
             make_msg(MessagePayload::TributeKilled {
                 victim: tr("Marvel"),
                 killer: Some(tr("Katniss")),
-                cause: "combat".into(),
+                cause: shared::afflictions::DeathCause::Combat,
             }),
             make_msg(MessagePayload::TributeMoved {
                 tribute: tr("Katniss"),
@@ -642,7 +642,7 @@ mod tests {
         let msg = make_msg(MessagePayload::TributeKilled {
             victim: tr("Peeta"),
             killer: None,
-            cause: "starvation".into(),
+            cause: shared::afflictions::DeathCause::Starvation,
         });
         let line = BroadcastPackageBuilder::classify_event(&msg).unwrap();
         assert_eq!(line.kind, EventKind::Death);

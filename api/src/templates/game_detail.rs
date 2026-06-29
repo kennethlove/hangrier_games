@@ -38,7 +38,7 @@ fn message_archetype(payload: &shared::messages::MessagePayload) -> &'static str
         TributeRested | TributeStarved | TributeDehydrated | SanityBreak | HungerBandChanged
         | ThirstBandChanged | StaminaBandChanged | ShelterSought | Foraged | Drank | Ate
         | TributeSlept | TributeWoke | CycleStart | CycleEnd | PhaseStarted | PhaseEnded
-        | GameEnded | Generic => "commentary",
+        | GameEnded | Generic | TributeBledOut | WoundInfected | WoundHealed => "commentary",
         TraumaAcquired | TraumaReinforced | TraumaEscalated | TraumaFlashback | TraumaAvoidance
         | TraumaObserved | TraumaForgotten | TraumaHabituated => "commentary",
         PhobiaAcquired | PhobiaTriggered | PhobiaEscalated | PhobiaHabituated | PhobiaObserved
@@ -83,7 +83,7 @@ fn message_kind_label(payload: &shared::messages::MessagePayload) -> &'static st
         TributeRested | TributeStarved | TributeDehydrated | SanityBreak | HungerBandChanged
         | ThirstBandChanged | StaminaBandChanged | ShelterSought | Foraged | Drank | Ate
         | TributeSlept | TributeWoke | CycleStart | CycleEnd | PhaseStarted | PhaseEnded
-        | GameEnded | Generic => "State",
+        | GameEnded | Generic | TributeBledOut | WoundInfected | WoundHealed => "State",
         TraumaAcquired | TraumaReinforced | TraumaEscalated | TraumaFlashback | TraumaAvoidance
         | TraumaObserved | TraumaForgotten | TraumaHabituated => "Trauma",
         PhobiaAcquired | PhobiaTriggered | PhobiaEscalated | PhobiaHabituated | PhobiaObserved
@@ -118,7 +118,7 @@ fn kind_color(payload: &shared::messages::MessagePayload) -> &'static str {
         TributeRested | TributeStarved | TributeDehydrated | SanityBreak | HungerBandChanged
         | ThirstBandChanged | StaminaBandChanged | ShelterSought | Foraged | Drank | Ate
         | TributeSlept | TributeWoke | CycleStart | CycleEnd | PhaseStarted | PhaseEnded
-        | GameEnded | Generic => "var(--muted)",
+        | GameEnded | Generic | TributeBledOut | WoundInfected | WoundHealed => "var(--muted)",
         TraumaAcquired | TraumaReinforced | TraumaEscalated | TraumaFlashback | TraumaAvoidance
         | TraumaObserved | TraumaForgotten | TraumaHabituated => "var(--purple)",
         PhobiaAcquired | PhobiaTriggered | PhobiaEscalated | PhobiaHabituated | PhobiaObserved

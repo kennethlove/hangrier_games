@@ -268,6 +268,26 @@ impl BroadcastPackageBuilder {
                 structured: None,
             }),
 
+            MessagePayload::TributeBledOut { tribute } => {
+                let structured = serde_json::json!({
+                    "type": "bled_out",
+                    "tribute": { "id": tribute.identifier, "name": tribute.name },
+                });
+                Some(EventLine {
+                    kind: EventKind::Death,
+                    prose,
+                    structured: Some(structured),
+                })
+            }
+
+            MessagePayload::WoundInfected { .. } | MessagePayload::WoundHealed { .. } => {
+                Some(EventLine {
+                    kind: EventKind::State,
+                    prose,
+                    structured: None,
+                })
+            }
+
             // ---- State / survival events: prose-only ----
             MessagePayload::TributeRested { .. }
             | MessagePayload::TributeStarved { .. }

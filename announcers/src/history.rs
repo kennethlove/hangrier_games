@@ -533,7 +533,10 @@ impl TributeHistories {
                 | MessagePayload::TrapTriggered { .. }
                 | MessagePayload::RescueAttempted { .. }
                 | MessagePayload::SleepIncident { .. }
-                | MessagePayload::PartialRescueProgress { .. } => {}
+                | MessagePayload::PartialRescueProgress { .. }
+                | MessagePayload::TributeBledOut { .. }
+                | MessagePayload::WoundInfected { .. }
+                | MessagePayload::WoundHealed { .. } => {}
             }
         }
     }

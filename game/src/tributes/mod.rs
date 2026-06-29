@@ -339,6 +339,10 @@ pub struct Tribute {
     /// `process_turn_phase`. Transient — never persisted.
     #[serde(default, skip)]
     pub pending_theft_target: Option<Uuid>,
+    /// Active mental conditions (pain, horror, panic, etc.).
+    /// Recalculated each period based on wounds and stress.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mental_conditions: Vec<shared::conditions::MentalCondition>,
 }
 
 impl Default for Tribute {
@@ -410,6 +414,7 @@ impl Tribute {
             hangover_cycles_remaining: 0,
             was_ambushed: false,
             pending_theft_target: None,
+            mental_conditions: Vec::new(),
         }
     }
 
@@ -479,6 +484,7 @@ impl Tribute {
             hangover_cycles_remaining: 0,
             was_ambushed: false,
             pending_theft_target: None,
+            mental_conditions: Vec::new(),
         }
     }
 
@@ -554,6 +560,13 @@ impl Tribute {
             if self.should_heroism() {
                 self.increase_bravery(wounds::HEROISM_BRAVERY_BOOST);
             }
+        }
+
+        // Recalculate pain from wounds and tick mental conditions.
+        if self.is_alive() {
+            self.update_pain_condition();
+            // Apply mental condition effects (sanity drain) and tick durations.
+            self.tick_mental_conditions();
         }
 
         // Tribute died to the period's events (status effects or blood loss).

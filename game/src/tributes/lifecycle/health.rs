@@ -227,6 +227,23 @@ impl Tribute {
         }
         (base + penalty).max(0)
     }
+
+    /// Ticks all mental conditions: applies sanity drain, advances durations,
+    /// and removes expired conditions.
+    pub(crate) fn tick_mental_conditions(&mut self) {
+        let total_drain: u32 = self
+            .mental_conditions
+            .iter()
+            .map(|c| c.severity().sanity_drain())
+            .sum();
+        if total_drain > 0 {
+            self.takes_mental_damage(total_drain);
+        }
+        for condition in &mut self.mental_conditions {
+            condition.tick();
+        }
+        self.mental_conditions.retain(|c| !c.is_expired());
+    }
 }
 
 #[cfg(test)]

@@ -18,6 +18,7 @@ use crate::tributes::stamina_band::stamina_band;
 use rand::RngExt;
 use rand::prelude::*;
 use shared::combat_beat::{CombatBeat, StressReport, SwingOutcome, WearOutcomeReport, WearReport};
+use shared::conditions::{ConditionSeverity, MentalCondition};
 use shared::messages::{ItemRef, StaminaBand};
 use shared::wounds::{BodyPart, WoundSeverity, WoundType};
 use std::cmp::Ordering;
@@ -726,6 +727,16 @@ impl Tribute {
         );
 
         if stress_damage > 0 {
+            let severity = if stress_damage >= 10 {
+                ConditionSeverity::Critical
+            } else if stress_damage >= 5 {
+                ConditionSeverity::Severe
+            } else if stress_damage >= 2 {
+                ConditionSeverity::Moderate
+            } else {
+                ConditionSeverity::Mild
+            };
+
             let content =
                 GameOutput::TributeHorrified(self.name.as_str(), stress_damage).to_string();
             events.push(TaggedEvent::new(
@@ -734,7 +745,13 @@ impl Tribute {
                     tribute: tref(self),
                 },
             ));
+            // Apply immediate sanity reduction
             self.takes_mental_damage(stress_damage);
+            // Record as condition for ongoing tracking
+            self.mental_conditions.push(MentalCondition::Horrified {
+                severity,
+                remaining_periods: 3,
+            });
         }
         stress_damage
     }

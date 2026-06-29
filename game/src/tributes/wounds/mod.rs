@@ -1,3 +1,5 @@
+pub mod pain;
+
 use shared::wounds::{BodyPart, WoundSeverity};
 
 /// Maximum blood pool for a tribute.

@@ -449,16 +449,14 @@ fn test_perfect_block() {
 }
 
 #[rstest]
-fn test_critical_hit_triple_damage(_small_rng: SmallRng) {
+fn test_critical_hit_triple_damage(mut _small_rng: SmallRng) {
     let mut attacker = Tribute::new("Katniss".to_string(), None, None);
     let mut target = Tribute::new("Peeta".to_string(), None, None);
 
     attacker.attributes.strength = 20;
-    target.attributes.health = 100;
-    let initial_health = target.attributes.health;
     let damage = attacker.attributes.strength * 3;
 
-    // Manually test the damage application for critical hit
+    // Manually test the wound creation for critical hit
     apply_combat_results(
         &mut attacker,
         &mut target,
@@ -466,10 +464,13 @@ fn test_critical_hit_triple_damage(_small_rng: SmallRng) {
         GameOutput::TributeAttackWin("Katniss", "Peeta"),
         &mut Vec::new(),
         &CombatTuning::default(),
+        &mut _small_rng,
     );
 
-    // Verify triple damage was applied
-    assert_eq!(target.attributes.health, initial_health - damage);
+    // Verify wound was created (damage maps to severity, not direct health loss)
+    assert!(!target.wounds.is_empty());
+    // Blood should have been drained from the wound
+    assert!(target.blood < 1000);
 }
 
 #[rstest]

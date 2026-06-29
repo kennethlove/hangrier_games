@@ -2,11 +2,7 @@
 source: game/src/tributes/afflictions/integration_tests.rs
 expression: affliction_summary
 ---
+- wounded (moderate)
 - wounded (severe)
-- wounded (moderate)
-- wounded (moderate)
-- wounded (moderate)
 - broken_bone (severe)
 - broken_bone (severe)
-- broken_bone (mild)
-- broken_bone (moderate)

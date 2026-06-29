@@ -19,6 +19,7 @@ use rand::RngExt;
 use rand::prelude::*;
 use shared::combat_beat::{CombatBeat, StressReport, SwingOutcome, WearOutcomeReport, WearReport};
 use shared::messages::{ItemRef, StaminaBand};
+use shared::wounds::{BodyPart, WoundSeverity, WoundType};
 use std::cmp::Ordering;
 
 // ---------------------------------------------------------------------------
@@ -576,8 +577,55 @@ fn classify_weapon(item: &Item) -> WeaponKind {
 // apply_combat_results
 // ---------------------------------------------------------------------------
 
+/// Maps raw damage to a wound severity.
+fn damage_to_severity(damage: u32) -> WoundSeverity {
+    if damage <= 10 {
+        WoundSeverity::Minor
+    } else if damage <= 25 {
+        WoundSeverity::Moderate
+    } else if damage <= 50 {
+        WoundSeverity::Severe
+    } else {
+        WoundSeverity::Critical
+    }
+}
+
+/// Picks a random body part for a combat wound.
+fn random_body_part(rng: &mut impl Rng) -> BodyPart {
+    match rng.random_range(0..6) {
+        0 => BodyPart::Head,
+        1 => BodyPart::Torso,
+        2 => BodyPart::LeftArm,
+        3 => BodyPart::RightArm,
+        4 => BodyPart::LeftLeg,
+        _ => BodyPart::RightLeg,
+    }
+}
+
+/// Picks a wound type based on whether the attacker had a weapon.
+fn wound_type_for_attack(attacker: &Tribute, rng: &mut impl Rng) -> WoundType {
+    let has_weapon = attacker
+        .items
+        .iter()
+        .any(|i| i.is_weapon() && i.current_durability > 0);
+    if has_weapon {
+        match rng.random_range(0..4) {
+            0 => WoundType::Cut,
+            1 => WoundType::Stab,
+            2 => WoundType::Pierce,
+            _ => WoundType::Tear,
+        }
+    } else {
+        match rng.random_range(0..3) {
+            0 => WoundType::Crush,
+            1 => WoundType::Tear,
+            _ => WoundType::Cut,
+        }
+    }
+}
+
 /// Apply the results of a combat encounter.
-/// Adjust statistics and log the result.
+/// Creates a wound on the loser based on damage dealt, and updates statistics.
 ///
 /// Returns the stress damage applied to the winner via
 /// `apply_violence_stress` so the caller can populate
@@ -589,8 +637,18 @@ pub(crate) fn apply_combat_results(
     log_event: GameOutput,
     events: &mut Vec<TaggedEvent>,
     tuning: &crate::tributes::combat_tuning::CombatTuning,
+    rng: &mut impl Rng,
 ) -> u32 {
+    let severity = damage_to_severity(damage_to_loser);
+    let body_part = random_body_part(rng);
+    let wound_type = wound_type_for_attack(winner, rng);
+
+    loser.create_wound(wound_type, severity, body_part);
+    // Immediate blood loss on wound creation (first bleed)
+    loser.drain_blood_from_wounds();
+    // Also reduce health directly for immediate death checks
     loser.takes_physical_damage(damage_to_loser);
+
     loser.statistics.defeats += 1;
     winner.statistics.wins += 1;
     let stress_damage = winner.apply_violence_stress(events, tuning);

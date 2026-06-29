@@ -8,6 +8,7 @@ pub mod audience;
 pub mod combat_beat;
 pub mod messages;
 pub mod sponsors;
+pub mod wounds;
 
 use crate::messages::{GameMessage, TributeRef};
 

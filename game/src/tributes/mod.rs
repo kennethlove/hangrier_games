@@ -16,6 +16,7 @@ pub mod statuses;
 pub mod survival;
 pub mod traits;
 pub mod traps;
+pub mod wounds;
 
 // Re-export key items from sub-modules
 pub use combat::inflict_table::{
@@ -46,6 +47,7 @@ use shared::afflictions::{
     Substance, TrappedMetadata, TraumaSource,
 };
 use shared::messages::SleepIncidentKind;
+use shared::wounds::Wound;
 use statuses::TributeStatus;
 use uuid::Uuid;
 
@@ -118,6 +120,10 @@ where
 
 /// Consts
 const SANITY_BREAK_LEVEL: u32 = 9;
+
+fn default_blood() -> u32 {
+    1000
+}
 
 #[derive(Clone, Debug)]
 pub struct ActionSuggestion {
@@ -217,6 +223,13 @@ pub struct Tribute {
     pub stamina: u32,
     /// Maximum stamina capacity
     pub max_stamina: u32,
+    /// Blood reserve (0-1000). Replaces abstract health pool for wound model.
+    /// Tribute dies when blood reaches 0.
+    #[serde(default = "default_blood")]
+    pub blood: u32,
+    /// Active wounds. Each wound bleeds and inflicts stat penalties.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub wounds: Vec<Wound>,
     /// Personality/behavior trait set. Replaces `BrainPersonality`.
     /// A tribute with zero traits behaves as the old `Balanced` baseline.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -372,6 +385,8 @@ impl Tribute {
             terrain_affinity,
             stamina: 100,
             max_stamina: 100,
+            blood: 1000,
+            wounds: Vec::new(),
             traits,
             allies: Vec::new(),
             turns_since_last_betrayal: 0,
@@ -439,6 +454,8 @@ impl Tribute {
             terrain_affinity,
             stamina: 100,
             max_stamina: 100,
+            blood: 1000,
+            wounds: Vec::new(),
             traits,
             allies: Vec::new(),
             turns_since_last_betrayal: 0,
@@ -528,8 +545,22 @@ impl Tribute {
         // Update the tribute based on the period's events.
         self.process_status(area_details, rng, events);
 
-        // Tribute died to the period's events.
-        if self.status == TributeStatus::RecentlyDead || self.attributes.health == 0 {
+        // Process wounds: drain blood from bleeding wounds, then heal naturally.
+        if self.is_alive() && !self.wounds.is_empty() {
+            self.drain_blood_from_wounds();
+            self.heal_wounds(rng);
+
+            // Heroism: low blood grants temporary bravery
+            if self.should_heroism() {
+                self.increase_bravery(wounds::HEROISM_BRAVERY_BOOST);
+            }
+        }
+
+        // Tribute died to the period's events (status effects or blood loss).
+        if self.status == TributeStatus::RecentlyDead
+            || self.attributes.health == 0
+            || self.blood == 0
+        {
             let line = GameOutput::TributeDead(self.name.as_str()).to_string();
             events.push(TaggedEvent::new(
                 line,

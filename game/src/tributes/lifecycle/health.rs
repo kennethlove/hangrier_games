@@ -1,4 +1,7 @@
 use crate::tributes::Tribute;
+use crate::tributes::wounds;
+use rand::RngExt;
+use shared::wounds::{BodyPart, Wound, WoundSeverity, WoundType};
 
 /// Attribute maximums
 const MAX_HEALTH: u32 = 100;
@@ -106,6 +109,123 @@ impl Tribute {
         self.short_rests();
         self.heals(DEFAULT_HEAL);
         self.heals_mental_damage(DEFAULT_MENTAL_HEAL);
+    }
+
+    // --- Wound-based blood system ---
+
+    /// Creates a wound on this tribute. Adds the wound and drains blood
+    /// immediately based on severity.
+    pub(crate) fn create_wound(
+        &mut self,
+        wound_type: WoundType,
+        severity: WoundSeverity,
+        body_part: BodyPart,
+    ) {
+        let mut wound = Wound::new(wound_type, severity, body_part);
+        wound.created_day = self.game_day;
+        self.wounds.push(wound);
+    }
+
+    /// Drains blood from all active bleeding wounds. Returns the total blood
+    /// lost this period. Called once per game cycle.
+    pub(crate) fn drain_blood_from_wounds(&mut self) -> u32 {
+        let mut total_loss = 0u32;
+        for wound in &self.wounds {
+            total_loss += wound.blood_loss_per_period();
+        }
+        self.blood = self.blood.saturating_sub(total_loss);
+        total_loss
+    }
+
+    /// Natural wound healing pass. Each wound attempts to heal; this may stop
+    /// bleeding or cause infection for Critical wounds.
+    pub(crate) fn heal_wounds(&mut self, rng: &mut impl rand::Rng) {
+        for wound in &mut self.wounds {
+            let roll: f64 = rng.random();
+            wound.heals_naturally(roll);
+        }
+        // Remove fully healed wounds (no longer bleeding, not infected, Minor only)
+        self.wounds
+            .retain(|w| w.bleeding || w.infected || w.severity != WoundSeverity::Minor);
+    }
+
+    /// Restores blood from rest/food.
+    #[allow(dead_code)]
+    pub(crate) fn restores_blood(&mut self, amount: u32) {
+        self.blood = self.blood.saturating_add(amount).min(wounds::MAX_BLOOD);
+    }
+
+    // --- Effective stats (base + wound penalties) ---
+
+    /// Effective strength after wound penalties.
+    pub fn effective_strength(&self) -> i32 {
+        let base = self.attributes.strength as i32;
+        let mut penalty = 0i32;
+        for wound in &self.wounds {
+            let mut p = wounds::strength_penalty(wound.severity);
+            p = (p as f64 * wounds::body_part_penalty_multiplier(wound.body_part)) as i32;
+            penalty += p;
+        }
+        (base + penalty).max(0)
+    }
+
+    /// Effective movement after wound penalties.
+    pub fn effective_movement(&self) -> i32 {
+        let base = self.attributes.movement as i32;
+        let mut penalty = 0i32;
+        for wound in &self.wounds {
+            let mut p = wounds::movement_penalty(wound.severity);
+            p = (p as f64 * wounds::body_part_penalty_multiplier(wound.body_part)) as i32;
+            penalty += p;
+        }
+        (base + penalty).max(0)
+    }
+
+    /// Effective defense after wound penalties.
+    pub fn effective_defense(&self) -> i32 {
+        let base = self.attributes.defense as i32;
+        let mut penalty = 0i32;
+        for wound in &self.wounds {
+            let mut p = wounds::defense_penalty(wound.severity);
+            p = (p as f64 * wounds::body_part_penalty_multiplier(wound.body_part)) as i32;
+            penalty += p;
+        }
+        (base + penalty).max(0)
+    }
+
+    /// Effective bravery after wound penalties.
+    pub fn effective_bravery(&self) -> i32 {
+        let base = self.attributes.bravery as i32;
+        let mut penalty = 0i32;
+        for wound in &self.wounds {
+            let mut p = wounds::bravery_penalty(wound.severity);
+            p = (p as f64 * wounds::body_part_penalty_multiplier(wound.body_part)) as i32;
+            penalty += p;
+        }
+        (base + penalty).max(0)
+    }
+
+    /// Whether this tribute should trigger heroism (low blood bravery boost).
+    pub fn should_heroism(&self) -> bool {
+        let blood_ratio = self.blood as f64 / wounds::MAX_BLOOD as f64;
+        blood_ratio <= wounds::HEROISM_BLOOD_THRESHOLD
+    }
+
+    /// Effective sanity after wound-induced mental distress.
+    /// Each wound imposes a sanity penalty based on severity.
+    pub fn effective_sanity(&self) -> i32 {
+        let base = self.attributes.sanity as i32;
+        let mut penalty = 0i32;
+        for wound in &self.wounds {
+            let p = match wound.severity {
+                WoundSeverity::Minor => -1,
+                WoundSeverity::Moderate => -3,
+                WoundSeverity::Severe => -5,
+                WoundSeverity::Critical => -10,
+            };
+            penalty += p;
+        }
+        (base + penalty).max(0)
     }
 }
 

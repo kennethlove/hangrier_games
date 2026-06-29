@@ -112,6 +112,7 @@ impl Tribute {
                     GameOutput::TributeAttackWin(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                     tuning,
+                    rng,
                 );
                 for ev in sub_events.drain(..) {
                     detail_lines.push(ev.content);
@@ -172,6 +173,7 @@ impl Tribute {
                     GameOutput::TributeAttackLose(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                     tuning,
+                    rng,
                 );
                 for ev in sub_events.drain(..) {
                     detail_lines.push(ev.content);
@@ -185,6 +187,7 @@ impl Tribute {
                     GameOutput::TributeAttackWin(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                     tuning,
+                    rng,
                 );
                 for ev in sub_events.drain(..) {
                     detail_lines.push(ev.content);
@@ -198,6 +201,7 @@ impl Tribute {
                     GameOutput::TributeAttackWinExtra(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                     tuning,
+                    rng,
                 );
                 for ev in sub_events.drain(..) {
                     detail_lines.push(ev.content);
@@ -211,6 +215,7 @@ impl Tribute {
                     GameOutput::TributeAttackLose(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                     tuning,
+                    rng,
                 );
                 for ev in sub_events.drain(..) {
                     detail_lines.push(ev.content);
@@ -224,6 +229,7 @@ impl Tribute {
                     GameOutput::TributeAttackLoseExtra(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                     tuning,
+                    rng,
                 );
                 for ev in sub_events.drain(..) {
                     detail_lines.push(ev.content);

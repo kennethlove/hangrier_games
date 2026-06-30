@@ -8,14 +8,12 @@
 
 pub mod inflict_table;
 pub mod resolve;
-pub mod stats;
 
 #[cfg(test)]
 mod tests;
 
 // Re-exports for public API.
 pub use resolve::{AttackContestOutcome, attack_contest, resolve};
-pub use stats::update_stats;
 
 // Re-export for tests (pub(crate) items from resolve).
 pub(crate) use resolve::apply_combat_results;
@@ -92,6 +90,7 @@ impl Tribute {
 
         let (contest, beat) = resolve(self, target, rng, &mut sub_events, tuning);
         let result = contest.result;
+        let damage = contest.damage;
         let target_inflicts = contest.inflicts;
         let attacker_inflicts = contest.attacker_inflicts;
 
@@ -108,7 +107,7 @@ impl Tribute {
                 let _ = apply_combat_results(
                     self,
                     target,
-                    self.attributes.strength * 3,
+                    damage,
                     GameOutput::TributeAttackWin(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                     tuning,
@@ -169,7 +168,7 @@ impl Tribute {
                 let _ = apply_combat_results(
                     target,
                     self,
-                    target.attributes.strength * 2,
+                    damage,
                     GameOutput::TributeAttackLose(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                     tuning,
@@ -183,7 +182,7 @@ impl Tribute {
                 let _ = apply_combat_results(
                     self,
                     target,
-                    self.attributes.strength,
+                    damage,
                     GameOutput::TributeAttackWin(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                     tuning,
@@ -197,7 +196,7 @@ impl Tribute {
                 let _ = apply_combat_results(
                     self,
                     target,
-                    self.attributes.strength * 2,
+                    damage,
                     GameOutput::TributeAttackWinExtra(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                     tuning,
@@ -211,7 +210,7 @@ impl Tribute {
                 let _ = apply_combat_results(
                     target,
                     self,
-                    target.attributes.strength,
+                    damage,
                     GameOutput::TributeAttackLose(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                     tuning,
@@ -225,7 +224,7 @@ impl Tribute {
                 let _ = apply_combat_results(
                     target,
                     self,
-                    target.attributes.strength * 2,
+                    damage,
                     GameOutput::TributeAttackLoseExtra(tribute_name.as_str(), target_name.as_str()),
                     &mut sub_events,
                     tuning,

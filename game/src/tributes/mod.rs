@@ -19,10 +19,10 @@ pub mod traps;
 pub mod wounds;
 
 // Re-export key items from sub-modules
+pub use combat::attack_contest;
 pub use combat::inflict_table::{
     HitSeverity, WeaponKind, lookup_break_mid_swing_inflict, lookup_inflicts,
 };
-pub use combat::{attack_contest, update_stats};
 pub use movement::TravelResult;
 
 use std::collections::{BTreeMap, BTreeSet};

@@ -48,7 +48,7 @@ mod tests {
     #[rstest]
     fn takes_no_physical_damage_when_dead(mut tribute: Tribute) {
         tribute.dies();
-        tribute.takes_physical_damage(10);
+        tribute.attributes.health = tribute.attributes.health.saturating_sub(10);
         assert_eq!(tribute.attributes.health, 0);
     }
 

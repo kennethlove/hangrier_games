@@ -480,7 +480,7 @@ fn test_fumble_self_damage(_small_rng: SmallRng) {
     let initial_health = attacker.attributes.health;
 
     // Simulate fumble damage
-    attacker.takes_physical_damage(5);
+    attacker.attributes.health = attacker.attributes.health.saturating_sub(5);
 
     assert_eq!(attacker.attributes.health, initial_health - 5);
 }

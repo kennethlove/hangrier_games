@@ -178,14 +178,15 @@ impl Tribute {
         for kind in &kinds {
             match kind {
                 AfflictionKind::Wounded => {
-                    self.takes_physical_damage(WOUNDED_DAMAGE);
+                    self.attributes.health = self.attributes.health.saturating_sub(WOUNDED_DAMAGE);
                 }
                 AfflictionKind::Sick => {
                     self.reduce_strength(SICK_STRENGTH_REDUCTION);
                     self.reduce_movement(SICK_MOVEMENT_REDUCTION);
                 }
                 AfflictionKind::Electrocuted => {
-                    self.takes_physical_damage(ELECTROCUTED_DAMAGE);
+                    self.attributes.health =
+                        self.attributes.health.saturating_sub(ELECTROCUTED_DAMAGE);
                 }
                 AfflictionKind::Frozen => {
                     self.reduce_movement(FROZEN_MOVEMENT_REDUCTION);
@@ -200,7 +201,10 @@ impl Tribute {
                     self.reduce_strength(STARVING_STRENGTH_REDUCTION);
                 }
                 AfflictionKind::Poisoned => {
-                    self.takes_mental_damage(POISONED_MENTAL_DAMAGE);
+                    self.attributes.sanity = self
+                        .attributes
+                        .sanity
+                        .saturating_sub(POISONED_MENTAL_DAMAGE);
                 }
                 AfflictionKind::BrokenBone => {
                     let bone = rng.random_range(0..4);
@@ -208,15 +212,23 @@ impl Tribute {
                         0 => self.reduce_movement(BROKEN_BONE_LEG_MOVEMENT_REDUCTION),
                         1 => self.reduce_strength(BROKEN_BONE_ARM_STRENGTH_REDUCTION),
                         2 => self.reduce_intelligence(BROKEN_BONE_SKULL_INTELLIGENCE_REDUCTION),
-                        _ => self.takes_physical_damage(BROKEN_BONE_RIB_DAMAGE),
+                        _ => {
+                            self.attributes.health = self
+                                .attributes
+                                .health
+                                .saturating_sub(BROKEN_BONE_RIB_DAMAGE)
+                        }
                     }
                 }
                 AfflictionKind::Infected => {
-                    self.takes_physical_damage(INFECTED_DAMAGE);
-                    self.takes_mental_damage(INFECTED_MENTAL_DAMAGE);
+                    self.attributes.health = self.attributes.health.saturating_sub(INFECTED_DAMAGE);
+                    self.attributes.sanity = self
+                        .attributes
+                        .sanity
+                        .saturating_sub(INFECTED_MENTAL_DAMAGE);
                 }
                 AfflictionKind::Burned => {
-                    self.takes_physical_damage(BURNED_DAMAGE);
+                    self.attributes.health = self.attributes.health.saturating_sub(BURNED_DAMAGE);
                 }
                 AfflictionKind::Trapped(kind) => {
                     let tuning = trap_tuning_for(*kind);
@@ -245,30 +257,57 @@ impl Tribute {
 
                     match kind {
                         TrapKind::Drowning => {
-                            self.takes_mental_damage(tuning.mental_damage[sev_idx]);
+                            self.attributes.sanity = self
+                                .attributes
+                                .sanity
+                                .saturating_sub(tuning.mental_damage[sev_idx]);
                         }
                         TrapKind::Buried => {
                             let progressive =
                                 tuning.progressive_damage_per_cycle * cycles_trapped as u32;
-                            self.takes_physical_damage(tuning.hp_damage[sev_idx] + progressive);
-                            self.takes_mental_damage(tuning.mental_damage[sev_idx]);
+                            self.attributes.health = self
+                                .attributes
+                                .health
+                                .saturating_sub(tuning.hp_damage[sev_idx] + progressive);
+                            self.attributes.sanity = self
+                                .attributes
+                                .sanity
+                                .saturating_sub(tuning.mental_damage[sev_idx]);
                         }
                         // Pitfall: HP + mental damage per cycle
                         TrapKind::Pitfall => {
-                            self.takes_physical_damage(tuning.hp_damage[sev_idx]);
-                            self.takes_mental_damage(tuning.mental_damage[sev_idx]);
+                            self.attributes.health = self
+                                .attributes
+                                .health
+                                .saturating_sub(tuning.hp_damage[sev_idx]);
+                            self.attributes.sanity = self
+                                .attributes
+                                .sanity
+                                .saturating_sub(tuning.mental_damage[sev_idx]);
                         }
                         // SpikedPitfall: stub — instant death handled upstream
                         TrapKind::SpikedPitfall => { /* no-op */ }
                         // Snared: HP + mental damage per cycle
                         TrapKind::Snared => {
-                            self.takes_physical_damage(tuning.hp_damage[sev_idx]);
-                            self.takes_mental_damage(tuning.mental_damage[sev_idx]);
+                            self.attributes.health = self
+                                .attributes
+                                .health
+                                .saturating_sub(tuning.hp_damage[sev_idx]);
+                            self.attributes.sanity = self
+                                .attributes
+                                .sanity
+                                .saturating_sub(tuning.mental_damage[sev_idx]);
                         }
                         // Pinned: HP + mental damage per cycle
                         TrapKind::Pinned => {
-                            self.takes_physical_damage(tuning.hp_damage[sev_idx]);
-                            self.takes_mental_damage(tuning.mental_damage[sev_idx]);
+                            self.attributes.health = self
+                                .attributes
+                                .health
+                                .saturating_sub(tuning.hp_damage[sev_idx]);
+                            self.attributes.sanity = self
+                                .attributes
+                                .sanity
+                                .saturating_sub(tuning.mental_damage[sev_idx]);
                         }
                     }
 
@@ -329,7 +368,7 @@ impl Tribute {
         if let TributeStatus::Mauled(animal) = &self.status {
             let number_of_animals = rng.random_range(2..=5);
             let damage = animal.damage() * number_of_animals;
-            self.takes_physical_damage(damage);
+            self.attributes.health = self.attributes.health.saturating_sub(damage);
         }
 
         // Check for escaped Buried afflictions — remove them

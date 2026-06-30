@@ -143,7 +143,7 @@ pub fn calculate_stamina_cost(
     };
 
     // Desperation multiplier: 1.0 + (0.5 × (1.0 - health%))
-    let health_percent = tribute.attributes.health as f32 / 100.0;
+    let health_percent = tribute.effective_health() as f32 / 100.0;
     let desperation_multiplier = 1.0 + (0.5 * (1.0 - health_percent));
 
     // Calculate final cost with all multipliers

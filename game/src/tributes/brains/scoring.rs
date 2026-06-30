@@ -96,7 +96,7 @@ pub fn stamina_override(
     // destination layer fills the destination based on the threat location.
     if !sheltered {
         let any_threat = nearby.iter().any(|other| {
-            other.identifier != tribute.identifier && other.attributes.health > 0 && {
+            other.identifier != tribute.identifier && other.effective_health() > 0 && {
                 let other_band = stamina_band(other.stamina, other.max_stamina, tuning);
                 matches!(other_band, StaminaBand::Fresh | StaminaBand::Winded)
             }
@@ -124,7 +124,7 @@ pub fn target_attack_score(
     use crate::tributes::stamina_band::stamina_band;
     use shared::messages::StaminaBand;
 
-    let base: i32 = -(target.attributes.health as i32);
+    let base: i32 = -(target.effective_health() as i32);
 
     let actor_band = stamina_band(actor.stamina, actor.max_stamina, tuning);
     let target_band = stamina_band(target.stamina, target.max_stamina, tuning);

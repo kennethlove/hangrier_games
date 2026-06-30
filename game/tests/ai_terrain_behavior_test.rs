@@ -118,7 +118,7 @@ fn test_concealed_terrain_boosts_hiding(mut small_rng: SmallRng) {
 fn test_resource_scarce_terrain_boosts_search(mut small_rng: SmallRng) {
     let brain = Brain::default();
     let mut tribute = Tribute::new("Foxface".to_string(), Some(5), None);
-    tribute.attributes.health = 50;
+    tribute.attributes.set_health(50);
 
     // Desert is resource-scarce
     let desert_terrain = TerrainType::new(BaseTerrain::Desert, vec![]).unwrap();
@@ -145,7 +145,7 @@ fn test_resource_scarce_terrain_boosts_search(mut small_rng: SmallRng) {
 fn test_desperate_tributes_flee_to_affinity_terrain() {
     let brain = Brain::default();
     let mut tribute = Tribute::new("Thresh".to_string(), Some(11), None);
-    tribute.attributes.health = 25; // Desperate (< 30)
+    tribute.attributes.set_health(25); // Desperate (< 30)
     tribute.terrain_affinity = vec![BaseTerrain::Grasslands];
 
     let areas = vec![
@@ -225,7 +225,7 @@ fn test_combined_scoring_factors() {
     let brain = Brain::default();
     let mut tribute = Tribute::new("Cato".to_string(), Some(2), None);
     tribute.terrain_affinity = vec![BaseTerrain::UrbanRuins];
-    tribute.attributes.health = 80; // Not desperate
+    tribute.attributes.set_health(80); // Not desperate
 
     let mut perfect_area = AreaDetails::new_with_terrain(
         Some("Ideal Ruins".to_string()),
@@ -253,7 +253,7 @@ fn test_desperate_modifier_strength() {
     let brain = Brain::default();
     let mut tribute = Tribute::new("Marvel".to_string(), Some(1), None);
     tribute.terrain_affinity = vec![BaseTerrain::UrbanRuins];
-    tribute.attributes.health = 20; // Very desperate
+    tribute.attributes.set_health(20); // Very desperate
 
     // Even with items in the non-affinity area, desperate tribute should prefer affinity
     let affinity_area = AreaDetails::new_with_terrain(

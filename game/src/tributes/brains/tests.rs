@@ -50,7 +50,7 @@ fn decide_on_action_default(tribute: Tribute, mut small_rng: SmallRng) {
 #[rstest]
 fn decide_on_action_low_health(mut tribute: Tribute, mut small_rng: SmallRng) {
     // If the tribute has low health, they should rest
-    tribute.attributes.health = 10;
+    tribute.attributes.set_health(10);
     let action = tribute.brain.act(
         &tribute.clone(),
         2,
@@ -67,7 +67,7 @@ fn decide_on_action_low_health(mut tribute: Tribute, mut small_rng: SmallRng) {
 #[rstest]
 fn decide_on_action_no_health(mut tribute: Tribute, mut small_rng: SmallRng) {
     // If the tribute has no health, they should do nothing
-    tribute.attributes.health = 0;
+    tribute.attributes.set_health(0);
     let action = tribute.brain.act(
         &tribute.clone(),
         2,
@@ -105,7 +105,7 @@ fn decide_on_action_no_movement_surrounded_low_health(
 ) {
     // If the tribute has no movement and is not alone, they should hide
     tribute.attributes.movement = 1;
-    tribute.attributes.health = 10;
+    tribute.attributes.set_health(10);
     let action = tribute.brain.act(
         &tribute.clone(),
         5,
@@ -139,7 +139,7 @@ fn decide_on_action_enemies(tribute: Tribute, mut small_rng: SmallRng) {
 fn decide_on_action_enemies_medium_health(mut tribute: Tribute, mut small_rng: SmallRng) {
     // If there are enemies nearby, but the tribute is low on health
     // the tribute should hide
-    tribute.attributes.health = 20;
+    tribute.attributes.set_health(20);
     let action = tribute.brain.act(
         &tribute.clone(),
         2,
@@ -199,7 +199,7 @@ fn prefer_to_use_item_if_available(mut tribute: Tribute, mut small_rng: SmallRng
 
 #[rstest]
 fn prefer_to_hide_at_mid_health_and_visible(mut tribute: Tribute, mut small_rng: SmallRng) {
-    tribute.attributes.health = 25;
+    tribute.attributes.set_health(25);
     let action = tribute.brain.act(
         &tribute.clone(),
         0,
@@ -215,8 +215,8 @@ fn prefer_to_hide_at_mid_health_and_visible(mut tribute: Tribute, mut small_rng:
 
 #[rstest]
 fn prefer_to_move_at_mid_health_and_low_sanity(mut tribute: Tribute, mut small_rng: SmallRng) {
-    tribute.attributes.health = 25;
-    tribute.attributes.sanity = 15;
+    tribute.attributes.set_health(25);
+    tribute.attributes.set_sanity(15);
     let action = tribute.brain.act(
         &tribute.clone(),
         0,
@@ -251,9 +251,9 @@ fn decide_on_action_surrounded_low_health_low_movement_low_sanity(
     mut tribute: Tribute,
     mut small_rng: SmallRng,
 ) {
-    tribute.attributes.health = 10;
+    tribute.attributes.set_health(10);
     tribute.attributes.movement = 0;
-    tribute.attributes.sanity = 15;
+    tribute.attributes.set_sanity(15);
     let action = tribute.brain.act(
         &tribute.clone(),
         3,
@@ -272,8 +272,8 @@ fn decide_on_action_surrounded_low_health_low_sanity(
     mut tribute: Tribute,
     mut small_rng: SmallRng,
 ) {
-    tribute.attributes.health = 15;
-    tribute.attributes.sanity = 10;
+    tribute.attributes.set_health(15);
+    tribute.attributes.set_sanity(10);
     let action = tribute.brain.act(
         &tribute.clone(),
         3,
@@ -290,7 +290,7 @@ fn decide_on_action_surrounded_low_health_low_sanity(
 #[rstest]
 fn decide_on_action_surrounded_hidden_low_health(mut tribute: Tribute, mut small_rng: SmallRng) {
     tribute.attributes.is_hidden = true;
-    tribute.attributes.health = 10;
+    tribute.attributes.set_health(10);
     let action = tribute.brain.act(
         &tribute.clone(),
         3,
@@ -306,8 +306,8 @@ fn decide_on_action_surrounded_hidden_low_health(mut tribute: Tribute, mut small
 
 #[rstest]
 fn decide_on_action_surrounded_ok_health_low_sanity(mut tribute: Tribute, mut small_rng: SmallRng) {
-    tribute.attributes.health = 25;
-    tribute.attributes.sanity = 15;
+    tribute.attributes.set_health(25);
+    tribute.attributes.set_sanity(15);
     let action = tribute.brain.act(
         &tribute.clone(),
         3,
@@ -327,7 +327,7 @@ fn decide_on_action_heavily_surrounded_normal_sanity_and_intelligence(
     mut small_rng: SmallRng,
 ) {
     tribute.attributes.intelligence = 50;
-    tribute.attributes.sanity = 50;
+    tribute.attributes.set_sanity(50);
     let action = tribute.brain.act(
         &tribute.clone(),
         6,
@@ -347,7 +347,7 @@ fn decide_on_action_heavily_surrounded_low_sanity_and_intelligence(
     mut small_rng: SmallRng,
 ) {
     tribute.attributes.intelligence = 20;
-    tribute.attributes.sanity = 20;
+    tribute.attributes.set_sanity(20);
     let action = tribute.brain.act(
         &tribute.clone(),
         6,
@@ -369,7 +369,7 @@ fn decide_on_action_heavily_surrounded_no_sanity_and_intelligence(
     // recklessness = 100 - intelligence - sanity must reach low_intelligence
     // threshold (~91 for Balanced after variance) for the Attack branch.
     tribute.attributes.intelligence = 5;
-    tribute.attributes.sanity = 0;
+    tribute.attributes.set_sanity(0);
     let action = tribute.brain.act(
         &tribute.clone(),
         6,
@@ -386,11 +386,11 @@ fn decide_on_action_heavily_surrounded_no_sanity_and_intelligence(
 #[rstest]
 fn test_psychotic_break_triggers_at_low_sanity(mut small_rng: SmallRng) {
     let mut tribute = Tribute::default();
-    tribute.attributes.sanity = 3; // Below typical break threshold
+    tribute.attributes.set_sanity(3); // Below typical break threshold
 
     tribute
         .brain
-        .check_psychotic_break(tribute.attributes.sanity, &mut small_rng);
+        .check_psychotic_break(tribute.attributes.sanity(), &mut small_rng);
 
     assert!(tribute.brain.psychotic_break.is_some());
 }
@@ -398,11 +398,11 @@ fn test_psychotic_break_triggers_at_low_sanity(mut small_rng: SmallRng) {
 #[rstest]
 fn test_psychotic_break_doesnt_trigger_at_normal_sanity(mut small_rng: SmallRng) {
     let mut tribute = Tribute::default();
-    tribute.attributes.sanity = 50; // Well above break threshold
+    tribute.attributes.set_sanity(50); // Well above break threshold
 
     tribute
         .brain
-        .check_psychotic_break(tribute.attributes.sanity, &mut small_rng);
+        .check_psychotic_break(tribute.attributes.sanity(), &mut small_rng);
 
     assert!(tribute.brain.psychotic_break.is_none());
 }
@@ -415,17 +415,17 @@ fn test_psychotic_break_recovery(mut small_rng: SmallRng) {
         brain: Brain::default(),
         ..Tribute::default()
     };
-    tribute.attributes.sanity = 3;
+    tribute.attributes.set_sanity(3);
 
     // Trigger break
     tribute
         .brain
-        .check_psychotic_break(tribute.attributes.sanity, &mut small_rng);
+        .check_psychotic_break(tribute.attributes.sanity(), &mut small_rng);
     assert!(tribute.brain.psychotic_break.is_some());
 
     // Sanity recovers significantly (needs to be 20+ above threshold)
-    tribute.attributes.sanity = 30;
-    tribute.brain.check_recovery(tribute.attributes.sanity);
+    tribute.attributes.set_sanity(30);
+    tribute.brain.check_recovery(tribute.attributes.sanity());
 
     assert!(tribute.brain.psychotic_break.is_none());
 }
@@ -438,17 +438,17 @@ fn test_psychotic_break_no_recovery_insufficient_sanity(mut small_rng: SmallRng)
         brain: Brain::default(),
         ..Tribute::default()
     };
-    tribute.attributes.sanity = 3;
+    tribute.attributes.set_sanity(3);
 
     // Trigger break
     tribute
         .brain
-        .check_psychotic_break(tribute.attributes.sanity, &mut small_rng);
+        .check_psychotic_break(tribute.attributes.sanity(), &mut small_rng);
     assert!(tribute.brain.psychotic_break.is_some());
 
     // Sanity recovers but not enough
-    tribute.attributes.sanity = 15;
-    tribute.brain.check_recovery(tribute.attributes.sanity);
+    tribute.attributes.set_sanity(15);
+    tribute.brain.check_recovery(tribute.attributes.sanity());
 
     // Should still be broken
     assert!(tribute.brain.psychotic_break.is_some());
@@ -512,7 +512,7 @@ fn test_catatonic_break_does_nothing(mut small_rng: SmallRng) {
 fn test_self_destructive_break_attacks(mut small_rng: SmallRng) {
     let mut tribute = Tribute::default();
     tribute.brain.psychotic_break = Some(PsychoticBreakType::SelfDestructive);
-    tribute.attributes.health = 5; // Very low health - normally would rest/hide
+    tribute.attributes.set_health(5); // Very low health - normally would rest/hide
 
     let action = tribute.brain.act(
         &tribute.clone(),

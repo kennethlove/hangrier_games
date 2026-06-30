@@ -121,7 +121,7 @@ impl Tribute {
             AttackResult::CriticalFumble => {
                 let fumble_content =
                     GameOutput::TributeCriticalFumble(tribute_name.as_str()).to_string();
-                self.takes_physical_damage(5);
+                self.attributes.health = self.attributes.health.saturating_sub(5);
                 self.statistics.defeats += 1;
 
                 if self.attributes.health == 0 {

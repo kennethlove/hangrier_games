@@ -728,7 +728,7 @@ pub(crate) fn apply_combat_results(
         None => {
             // Shield prevented the wound entirely — still reduce health for
             // backward compat, but no wound is created.
-            loser.takes_physical_damage(damage_to_loser);
+            loser.attributes.health = loser.attributes.health.saturating_sub(damage_to_loser);
             loser.statistics.defeats += 1;
             winner.statistics.wins += 1;
             let stress_damage = winner.apply_violence_stress(events, tuning);
@@ -748,7 +748,7 @@ pub(crate) fn apply_combat_results(
 
     loser.create_wound(wound_type, final_severity, body_part);
     loser.drain_blood_from_wounds();
-    loser.takes_physical_damage(damage_to_loser);
+    loser.attributes.health = loser.attributes.health.saturating_sub(damage_to_loser);
 
     loser.statistics.defeats += 1;
     winner.statistics.wins += 1;
@@ -846,7 +846,7 @@ impl Tribute {
                 },
             ));
             // Apply immediate sanity reduction
-            self.takes_mental_damage(stress_damage);
+            self.attributes.sanity = self.attributes.sanity.saturating_sub(stress_damage);
             // Record as condition for ongoing tracking
             self.mental_conditions.push(MentalCondition::Horrified {
                 severity,
@@ -867,7 +867,7 @@ impl Tribute {
         tuning: &crate::tributes::combat_tuning::CombatTuning,
     ) -> AttackOutcome {
         let damage = self.attributes.strength;
-        self.takes_physical_damage(damage);
+        self.attributes.health = self.attributes.health.saturating_sub(damage);
         let mut stress_events: Vec<TaggedEvent> = Vec::new();
         let stress_damage = self.apply_violence_stress(&mut stress_events, tuning);
         events.extend(stress_events);

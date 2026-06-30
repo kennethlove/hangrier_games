@@ -22,20 +22,16 @@ impl Tribute {
 
         if loneliness.round() < 0.25 {
             if self.attributes.sanity < 25 {
-                self.takes_mental_damage(self.attributes.bravery);
+                self.attributes.sanity = self
+                    .attributes
+                    .sanity
+                    .saturating_sub(self.attributes.bravery);
             }
-            self.takes_mental_damage(self.attributes.bravery);
+            self.attributes.sanity = self
+                .attributes
+                .sanity
+                .saturating_sub(self.attributes.bravery);
         }
-    }
-
-    /// Reduces physical health.
-    pub(crate) fn takes_physical_damage(&mut self, damage: u32) {
-        self.attributes.health = self.attributes.health.saturating_sub(damage);
-    }
-
-    /// Reduces mental health.
-    pub(crate) fn takes_mental_damage(&mut self, damage: u32) {
-        self.attributes.sanity = self.attributes.sanity.saturating_sub(damage);
     }
 
     /// Reduces attack strength.
@@ -281,7 +277,7 @@ impl Tribute {
             .map(|c| c.severity().sanity_drain())
             .sum();
         if total_drain > 0 {
-            self.takes_mental_damage(total_drain);
+            self.attributes.sanity = self.attributes.sanity.saturating_sub(total_drain);
         }
         for condition in &mut self.mental_conditions {
             condition.tick();
@@ -301,9 +297,9 @@ mod tests {
     }
 
     #[rstest]
-    fn takes_physical_damage(mut tribute: Tribute) {
+    fn saturating_sub_health(mut tribute: Tribute) {
         let health = tribute.attributes.health;
-        tribute.takes_physical_damage(10);
+        tribute.attributes.health = tribute.attributes.health.saturating_sub(10);
         assert_eq!(tribute.attributes.health, health - 10);
     }
 
@@ -315,16 +311,16 @@ mod tests {
     }
 
     #[rstest]
-    fn takes_mental_damage(mut tribute: Tribute) {
+    fn saturating_sub_sanity(mut tribute: Tribute) {
         let sanity = tribute.attributes.sanity;
-        tribute.takes_mental_damage(10);
+        tribute.attributes.sanity = tribute.attributes.sanity.saturating_sub(10);
         assert_eq!(tribute.attributes.sanity, sanity - 10);
     }
 
     #[rstest]
-    fn takes_no_mental_damage_when_insane(mut tribute: Tribute) {
+    fn sanity_saturates_at_zero(mut tribute: Tribute) {
         tribute.attributes.sanity = 0;
-        tribute.takes_mental_damage(10);
+        tribute.attributes.sanity = tribute.attributes.sanity.saturating_sub(10);
         assert_eq!(tribute.attributes.sanity, 0);
     }
 

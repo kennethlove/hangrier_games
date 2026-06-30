@@ -83,6 +83,8 @@ pub(super) fn new_beat(
 /// state.
 pub struct AttackContestOutcome {
     pub result: AttackResult,
+    /// Pre-computed damage for this result (avoids recomputing in callers).
+    pub damage: u32,
     /// Wear records emitted in attack-roll order: weapon (if equipped) then
     /// shield (if equipped). Items that were `Pristine` are omitted.
     pub wear: Vec<WearReport>,
@@ -401,6 +403,7 @@ pub fn attack_contest(
 
     AttackContestOutcome {
         result,
+        damage: 0, // placeholder — resolved by resolve() after contest
         wear,
         inflicts,
         attacker_inflicts,
@@ -535,6 +538,9 @@ pub fn resolve(
         attacker_stamina_cost: tuning.stamina_cost_attacker,
         target_stamina_cost: tuning.stamina_cost_target,
     };
+
+    let mut contest = contest;
+    contest.damage = damage;
 
     (contest, beat)
 }

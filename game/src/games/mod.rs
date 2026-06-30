@@ -27,10 +27,6 @@ const SLEEP_STAMINA_PER_PHASE: u32 = 25;
 /// HP restored per phase to a sleeping tribute, gated on absence of
 /// Wounded / Infected / Sick.
 const SLEEP_HP_PER_PHASE: u32 = 5;
-/// Soft cap for sleep-driven HP regen so it never exceeds the natural
-/// 100-point ceiling. (Tributes' `attributes.health` is `u32` without an
-/// explicit per-tribute max field.)
-const SLEEP_HP_CAP: u32 = 100;
 
 /// Project a game-side `AreaEvent` onto the cross-cutting
 /// `shared::messages::AreaEventKind` taxonomy used by sleep-interruption
@@ -698,7 +694,7 @@ impl Game {
                     let tribute = &mut self.tributes[tribute_idx];
                     let name = tribute.name.clone();
                     let id = tribute.identifier.clone();
-                    tribute.attributes.health = 0;
+                    tribute.attributes.set_health(0);
                     let cause = match most_severe_event {
                         crate::areas::events::AreaEvent::Wildfire => {
                             shared::afflictions::DeathCause::Fire
@@ -782,8 +778,8 @@ impl Game {
                 let has_item_bonus =
                     is_physical_event && tribute.items.iter().any(|item| item.is_defensive());
 
-                let is_desperate = tribute.attributes.health < 30;
-                let current_health = tribute.attributes.health;
+                let is_desperate = tribute.attributes.health() < 30;
+                let current_health = tribute.attributes.health();
 
                 // Run survival check with config parameters
                 let result = most_severe_event.survival_check(
@@ -814,7 +810,7 @@ impl Game {
 
                 // Apply results
                 if !result.survived {
-                    tribute.attributes.health = 0;
+                    tribute.attributes.set_health(0);
                     let cause = match most_severe_event {
                         crate::areas::events::AreaEvent::Wildfire => {
                             shared::afflictions::DeathCause::Fire
@@ -894,10 +890,7 @@ impl Game {
                     }
 
                     if result.sanity_restored > 0 {
-                        tribute.attributes.sanity = tribute
-                            .attributes
-                            .sanity
-                            .saturating_add(result.sanity_restored);
+                        tribute.attributes.restore_sanity(result.sanity_restored);
                         pending_messages.push((
                             source.clone(),
                             subject.clone(),

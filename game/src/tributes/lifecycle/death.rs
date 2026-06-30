@@ -48,21 +48,23 @@ mod tests {
     #[rstest]
     fn takes_no_physical_damage_when_dead(mut tribute: Tribute) {
         tribute.dies();
-        tribute.attributes.health = tribute.attributes.health.saturating_sub(10);
-        assert_eq!(tribute.attributes.health, 0);
+        tribute
+            .attributes
+            .set_health(tribute.attributes.health().saturating_sub(10));
+        assert_eq!(tribute.attributes.health(), 0);
     }
 
     #[rstest]
     fn does_not_heal_when_dead(mut tribute: Tribute) {
         tribute.dies();
         tribute.heals(10);
-        assert_eq!(tribute.attributes.health, 0);
+        assert_eq!(tribute.attributes.health(), 0);
     }
 
     #[rstest]
     fn dies(mut tribute: Tribute) {
         tribute.dies();
-        assert_eq!(tribute.attributes.health, 0);
+        assert_eq!(tribute.attributes.health(), 0);
         assert_eq!(tribute.status, TributeStatus::Dead);
         assert!(!tribute.attributes.is_hidden);
         assert_eq!(tribute.items.len(), 0);

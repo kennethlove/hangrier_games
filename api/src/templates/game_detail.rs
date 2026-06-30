@@ -270,7 +270,7 @@ pub fn render_commentary_card(seg: &announcers::CommentarySegment) -> String {
 
 pub fn render_tribute_row(tribute: &game::tributes::Tribute) -> String {
     let is_alive = tribute.is_alive();
-    let health = tribute.attributes.health;
+    let health = tribute.attributes.health();
     let health_class = if health > 60 {
         "high"
     } else if health > 20 {
@@ -311,7 +311,7 @@ pub fn render_tribute_row(tribute: &game::tributes::Tribute) -> String {
 
 pub fn render_tribute_card(tribute: &game::tributes::Tribute) -> String {
     let is_alive = tribute.is_alive();
-    let health = tribute.attributes.health;
+    let health = tribute.attributes.health();
     let _health_class = if health > 60 {
         "high"
     } else if health > 20 {
@@ -384,7 +384,7 @@ pub fn render_area_card(area: &game::areas::AreaDetails) -> String {
 
 pub fn render_tribute_detail(tribute: &game::tributes::Tribute, _game_id: &str) -> String {
     let is_alive = tribute.is_alive();
-    let health = tribute.attributes.health;
+    let health = tribute.attributes.health();
     let status_class = if is_alive { "alive" } else { "dead" };
     let status_text = if is_alive { "ALIVE" } else { "DEAD" };
     let hunger = hunger_label(tribute.hunger);

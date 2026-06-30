@@ -25,10 +25,10 @@ fn create_test_game_with_tributes(tributes: Vec<Tribute>) -> Game {
 fn create_tribute(name: &str, is_alive: bool) -> Tribute {
     let mut tribute = Tribute::new(name.to_string(), None, None);
     if is_alive {
-        tribute.attributes.health = 100;
+        tribute.attributes.set_health(100);
         tribute.status = TributeStatus::Healthy;
     } else {
-        tribute.attributes.health = 0;
+        tribute.attributes.set_health(0);
         tribute.status = TributeStatus::Dead;
     }
     tribute
@@ -127,13 +127,13 @@ fn initiative_liveness_gate_still_works() {
     game.start().expect("Failed to start game");
 
     let mut killer = Tribute::new("Killer".to_string(), None, None);
-    killer.attributes.health = 100;
+    killer.attributes.set_health(100);
     killer.attributes.strength = 50;
     killer.attributes.agility = 100;
     killer.area = Area::Cornucopia;
 
     let mut victim = Tribute::new("Victim".to_string(), None, None);
-    victim.attributes.health = 1;
+    victim.attributes.set_health(1);
     victim.attributes.strength = 1;
     victim.attributes.defense = 1;
     victim.attributes.agility = 1;
@@ -487,8 +487,8 @@ fn process_alliance_events_betrayal_removes_pair_on_victim_side() {
     let mut victim = Tribute::new("Victim".to_string(), Some(2), None);
     victim.allies.push(betrayer.id);
     // Sanity force victim to a state where the drain path runs cleanly.
-    victim.attributes.health = 100;
-    betrayer.attributes.health = 100;
+    victim.attributes.set_health(100);
+    betrayer.attributes.set_health(100);
     let bid = betrayer.id;
     let vid = victim.id;
 
@@ -541,8 +541,8 @@ fn process_alliance_events_death_removes_deceased_from_all_ally_lists() {
     b.allies.push(deceased.id);
     // Force ally sanity well above any threshold so the cascade roll
     // never fires; we want to verify the unconditional cleanup path.
-    a.attributes.sanity = 100;
-    b.attributes.sanity = 100;
+    a.attributes.set_sanity(100);
+    b.attributes.set_sanity(100);
 
     let did = deceased.id;
     let mut game = create_test_game_with_tributes(vec![deceased, a, b]);
@@ -811,7 +811,7 @@ fn run_tribute_cycle_enqueues_death_recorded_for_recently_dead_ally() {
     let mut survivor = create_tribute("Katniss", true);
     // Make survivor highly likely to break on cascade: low sanity, high
     // threshold makes deficit_ratio close to 1.0 → near-certain break.
-    survivor.attributes.sanity = 0;
+    survivor.attributes.set_sanity(0);
     survivor.brain.thresholds.extreme_low_sanity = 50;
     survivor.traits = vec![Trait::Tough];
     deceased.traits = vec![Trait::Tough];
@@ -819,7 +819,7 @@ fn run_tribute_cycle_enqueues_death_recorded_for_recently_dead_ally() {
     survivor.allies.push(deceased.id);
     deceased.allies.push(survivor.id);
     // Mark deceased as RecentlyDead going into the cycle.
-    deceased.attributes.health = 0;
+    deceased.attributes.set_health(0);
     deceased.status = TributeStatus::RecentlyDead;
     // Same area so deceased is "in the cycle" but the early skip applies.
     deceased.area = Area::Cornucopia;
@@ -941,7 +941,7 @@ fn run_tribute_cycle_consumes_recently_killed_by_for_combat_death() {
     deceased.allies.push(survivor.id);
 
     // Simulate combat outcome going into the cycle.
-    deceased.attributes.health = 0;
+    deceased.attributes.set_health(0);
     deceased.status = TributeStatus::RecentlyDead;
     deceased.recently_killed_by = Some(kid);
 
@@ -1004,7 +1004,7 @@ fn run_tribute_cycle_environmental_death_emits_killer_none() {
     deceased.allies.push(survivor.id);
 
     // Environmental death: health=0, RecentlyDead, killer field None.
-    deceased.attributes.health = 0;
+    deceased.attributes.set_health(0);
     deceased.status = TributeStatus::RecentlyDead;
     assert!(deceased.recently_killed_by.is_none());
 
@@ -1372,7 +1372,7 @@ fn survival_tick_routes_dehydration_death_through_tribute_killed() {
     // damage (≥ 1 HP at extreme band).
     a.thirst = 4;
     a.dehydration_drain_step = 5;
-    a.attributes.health = 1;
+    a.attributes.set_health(1);
     let mut game = create_test_game_with_tributes(vec![a]);
     game.day = Some(1);
     let _ = game.run_phase(crate::messages::Phase::Day);
@@ -1447,7 +1447,7 @@ fn sleeping_wounded_tribute_does_not_regen_hp() {
     let mut t = create_tribute("Sleeper", true);
     t.sleeping = true;
     t.sleep_remaining = 3;
-    t.attributes.health = 40;
+    t.attributes.set_health(40);
     t.afflictions.insert(
         (AfflictionKind::Wounded, None),
         Affliction {
@@ -1466,14 +1466,15 @@ fn sleeping_wounded_tribute_does_not_regen_hp() {
             trapped_metadata: None,
         },
     );
-    let prior_hp = t.attributes.health;
+    let prior_hp = t.attributes.health();
     let mut game = create_test_game_with_tributes(vec![t.clone()]);
     let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
     game.areas.push(area);
     let mut rng = SmallRng::seed_from_u64(42);
     let _ = game.run_tribute_cycle(Phase::Night, &mut rng, vec![], vec![t], 1);
     assert_eq!(
-        game.tributes[0].attributes.health, prior_hp,
+        game.tributes[0].attributes.health(),
+        prior_hp,
         "wounded tributes do not heal while sleeping"
     );
 }

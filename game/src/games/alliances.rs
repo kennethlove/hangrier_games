@@ -103,7 +103,7 @@ impl Game {
                             // `extreme_low_sanity` is the §7.3a low-limit
                             // mapping (see PersonalityThresholds doc).
                             let limit = ally.brain.thresholds.extreme_low_sanity;
-                            let sanity = ally.attributes.sanity;
+                            let sanity = ally.attributes.sanity();
                             if sanity_break_roll(sanity, limit, rng) {
                                 ally.allies.retain(|x| *x != deceased);
                                 let aid = ally.identifier.clone();

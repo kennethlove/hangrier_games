@@ -375,7 +375,7 @@ impl Brain {
             return None;
         }
 
-        let is_desperate = tribute.attributes.health < 30;
+        let is_desperate = tribute.effective_health() < 30;
 
         let mut best_score = i32::MIN;
         let mut best_area: Option<Area> = None;
@@ -733,22 +733,22 @@ impl Brain {
         let mid_health = self.thresholds.mid_health;
         let low_sanity = self.thresholds.low_sanity;
 
-        match tribute.attributes.health {
+        match tribute.effective_health() {
             h if h < low_health => {
                 self.decide_action_few_enemies_low_health_with_terrain(tribute, is_concealed)
             }
             h if h >= low_health && h <= mid_health => {
                 // Boost hiding in concealed terrain
-                if tribute.attributes.sanity > low_sanity && is_concealed {
+                if tribute.effective_sanity() > low_sanity && is_concealed {
                     Action::Hide
-                } else if tribute.attributes.sanity > low_sanity {
+                } else if tribute.effective_sanity() > low_sanity {
                     Action::Move(None)
                 } else {
                     Action::Attack
                 }
             }
             // High health - normally would attack, but concealed terrain makes hiding attractive
-            _ if is_concealed && tribute.attributes.sanity > low_sanity => Action::Hide,
+            _ if is_concealed && tribute.effective_sanity() > low_sanity => Action::Hide,
             _ => Action::Attack,
         }
     }
@@ -764,7 +764,7 @@ impl Brain {
 
         let stats = (
             tribute.attributes.movement,
-            tribute.attributes.sanity,
+            tribute.effective_sanity(),
             tribute.attributes.is_hidden,
         );
         match stats {
@@ -791,7 +791,7 @@ impl Brain {
 
         let recklessness: u32 = 100_u32
             .saturating_sub(tribute.attributes.intelligence)
-            .saturating_sub(tribute.attributes.sanity);
+            .saturating_sub(tribute.effective_sanity());
         match recklessness {
             r if r < high_intelligence => Action::Move(None),
             r if r >= low_intelligence => Action::Attack,
@@ -828,8 +828,8 @@ impl Brain {
         if tribute.allies.len() >= MAX_ALLIES {
             return false;
         }
-        if tribute.attributes.health < self.thresholds.low_health
-            || tribute.attributes.sanity < self.thresholds.low_sanity
+        if tribute.effective_health() < self.thresholds.low_health
+            || tribute.effective_sanity() < self.thresholds.low_sanity
         {
             return false;
         }
@@ -852,13 +852,13 @@ impl Brain {
         let mid_health = self.thresholds.mid_health;
         let low_sanity = self.thresholds.low_sanity;
 
-        match tribute.attributes.health {
+        match tribute.effective_health() {
             // health is low, rest
             h if h < low_health => Action::Rest,
             // health isn't great, hide
             // unless sanity is also low, then move
             h if h >= low_health && h <= mid_health => {
-                if tribute.attributes.sanity > low_sanity && tribute.is_visible() {
+                if tribute.effective_sanity() > low_sanity && tribute.is_visible() {
                     Action::Hide
                 } else {
                     Action::Move(None)
@@ -892,7 +892,7 @@ impl Brain {
 
         let stats = (
             tribute.attributes.movement,
-            tribute.attributes.sanity,
+            tribute.effective_sanity(),
             tribute.attributes.is_hidden,
         );
         match stats {
@@ -917,10 +917,10 @@ impl Brain {
         let mid_health = self.thresholds.mid_health;
         let low_sanity = self.thresholds.low_sanity;
 
-        match tribute.attributes.health {
+        match tribute.effective_health() {
             h if h < low_health => self.decide_action_few_enemies_low_health(tribute),
             h if h >= low_health && h <= mid_health => {
-                if tribute.attributes.sanity > low_sanity {
+                if tribute.effective_sanity() > low_sanity {
                     Action::Move(None)
                 } else {
                     Action::Attack
@@ -936,7 +936,7 @@ impl Brain {
 
         let recklessness: u32 = 100_u32
             .saturating_sub(tribute.attributes.intelligence)
-            .saturating_sub(tribute.attributes.sanity);
+            .saturating_sub(tribute.effective_sanity());
         match recklessness {
             // Smart enough to know better, moves
             r if r < high_intelligence => Action::Move(None),

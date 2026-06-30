@@ -1649,7 +1649,7 @@ pub fn calculate_stamina_cost(
     };
 
     // Desperation multiplier: 1.0 + (0.5 × (1.0 - health%))
-    let health_percent = tribute.attributes.health as f32 / 100.0;
+    let health_percent = tribute.effective_health() as f32 / 100.0;
     let desperation_multiplier = 1.0 + (0.5 * (1.0 - health_percent));
 
     // Calculate final cost with all multipliers
@@ -1680,9 +1680,9 @@ pub struct Statistics {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Attributes {
     /// How much damage can they take?
-    pub health: u32,
+    health: u32,
     /// How much suffering can they handle? Are they still sane?
-    pub sanity: u32,
+    sanity: u32,
     /// How far can they move before they need a rest?
     pub movement: u32,
     /// How hard do they hit?
@@ -1741,6 +1741,34 @@ impl Attributes {
             agility: rng.random_range(1..=config.max_agility),
             is_hidden: false,
         }
+    }
+
+    pub fn health(&self) -> u32 {
+        self.health
+    }
+    pub fn sanity(&self) -> u32 {
+        self.sanity
+    }
+
+    pub fn set_health(&mut self, value: u32) {
+        self.health = value;
+    }
+    pub fn set_sanity(&mut self, value: u32) {
+        self.sanity = value;
+    }
+
+    pub fn drain_health(&mut self, amount: u32) {
+        self.health = self.health.saturating_sub(amount);
+    }
+    pub fn drain_sanity(&mut self, amount: u32) {
+        self.sanity = self.sanity.saturating_sub(amount);
+    }
+
+    pub fn restore_health(&mut self, amount: u32) {
+        self.health = self.health.saturating_add(amount).min(100);
+    }
+    pub fn restore_sanity(&mut self, amount: u32) {
+        self.sanity = self.sanity.saturating_add(amount).min(100);
     }
 }
 

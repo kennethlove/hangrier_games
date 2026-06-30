@@ -31,15 +31,15 @@ fn combat_events_reach_game_messages_with_tribute_source() {
     let mut attacker = Tribute::random();
     attacker.name = "Attacker".to_string();
     attacker.area = area;
-    attacker.attributes.health = 100;
+    attacker.attributes.set_health(100);
     attacker.attributes.strength = 60;
-    attacker.attributes.sanity = 80;
+    attacker.attributes.set_sanity(80);
     attacker.statistics.game = game.identifier.clone();
 
     let mut defender = Tribute::random();
     defender.name = "Defender".to_string();
     defender.area = area;
-    defender.attributes.health = 5;
+    defender.attributes.set_health(5);
     defender.attributes.defense = 0;
     defender.statistics.game = game.identifier.clone();
     // Different district so attacker classifies them as an enemy.

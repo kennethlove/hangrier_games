@@ -233,6 +233,18 @@ impl Tribute {
         (base + penalty).max(0)
     }
 
+    /// Effective health after wound penalties.
+    pub fn effective_health(&self) -> u32 {
+        let base = self.attributes.health as i32;
+        let mut penalty = 0i32;
+        for wound in &self.wounds {
+            let mut p = wounds::health_penalty(wound.severity);
+            p = (p as f64 * wounds::body_part_penalty_multiplier(wound.body_part)) as i32;
+            penalty += p;
+        }
+        (base + penalty).max(0) as u32
+    }
+
     /// Effective bravery after wound penalties.
     pub fn effective_bravery(&self) -> i32 {
         let base = self.attributes.bravery as i32;
@@ -253,7 +265,7 @@ impl Tribute {
 
     /// Effective sanity after wound-induced mental distress.
     /// Each wound imposes a sanity penalty based on severity.
-    pub fn effective_sanity(&self) -> i32 {
+    pub fn effective_sanity(&self) -> u32 {
         let base = self.attributes.sanity as i32;
         let mut penalty = 0i32;
         for wound in &self.wounds {
@@ -265,7 +277,7 @@ impl Tribute {
             };
             penalty += p;
         }
-        (base + penalty).max(0)
+        (base + penalty).max(0) as u32
     }
 
     /// Ticks all mental conditions: applies sanity drain, advances durations,
@@ -298,37 +310,43 @@ mod tests {
 
     #[rstest]
     fn saturating_sub_health(mut tribute: Tribute) {
-        let health = tribute.attributes.health;
-        tribute.attributes.health = tribute.attributes.health.saturating_sub(10);
-        assert_eq!(tribute.attributes.health, health - 10);
+        let health = tribute.attributes.health();
+        tribute
+            .attributes
+            .set_health(tribute.attributes.health().saturating_sub(10));
+        assert_eq!(tribute.attributes.health(), health - 10);
     }
 
     #[rstest]
     fn heals(mut tribute: Tribute) {
-        tribute.attributes.health = 50;
+        tribute.attributes.set_health(50);
         tribute.heals(10);
-        assert_eq!(tribute.attributes.health, 60);
+        assert_eq!(tribute.attributes.health(), 60);
     }
 
     #[rstest]
     fn saturating_sub_sanity(mut tribute: Tribute) {
-        let sanity = tribute.attributes.sanity;
-        tribute.attributes.sanity = tribute.attributes.sanity.saturating_sub(10);
-        assert_eq!(tribute.attributes.sanity, sanity - 10);
+        let sanity = tribute.attributes.sanity();
+        tribute
+            .attributes
+            .set_sanity(tribute.attributes.sanity().saturating_sub(10));
+        assert_eq!(tribute.attributes.sanity(), sanity - 10);
     }
 
     #[rstest]
     fn sanity_saturates_at_zero(mut tribute: Tribute) {
-        tribute.attributes.sanity = 0;
-        tribute.attributes.sanity = tribute.attributes.sanity.saturating_sub(10);
-        assert_eq!(tribute.attributes.sanity, 0);
+        tribute.attributes.set_sanity(0);
+        tribute
+            .attributes
+            .set_sanity(tribute.attributes.sanity().saturating_sub(10));
+        assert_eq!(tribute.attributes.sanity(), 0);
     }
 
     #[rstest]
     fn heals_mental_damage(mut tribute: Tribute) {
-        tribute.attributes.sanity = 50;
+        tribute.attributes.set_sanity(50);
         tribute.heals_mental_damage(10);
-        assert_eq!(tribute.attributes.sanity, 60);
+        assert_eq!(tribute.attributes.sanity(), 60);
     }
 
     #[rstest]
@@ -341,20 +359,20 @@ mod tests {
     #[rstest]
     fn long_rests(mut tribute: Tribute) {
         tribute.attributes.movement = 0;
-        tribute.attributes.health = 50;
-        tribute.attributes.sanity = 50;
+        tribute.attributes.set_health(50);
+        tribute.attributes.set_sanity(50);
         tribute.long_rests();
         assert_eq!(tribute.attributes.movement, 100);
-        assert_eq!(tribute.attributes.health, 55);
-        assert_eq!(tribute.attributes.sanity, 55);
+        assert_eq!(tribute.attributes.health(), 55);
+        assert_eq!(tribute.attributes.sanity(), 55);
     }
 
     #[rstest]
     fn misses_home(mut tribute: Tribute) {
         tribute.attributes.bravery = 20;
-        tribute.attributes.sanity = 20;
-        let sanity = tribute.attributes.sanity;
+        tribute.attributes.set_sanity(20);
+        let sanity = tribute.attributes.sanity();
         tribute.misses_home();
-        assert!(tribute.attributes.sanity < sanity);
+        assert!(tribute.attributes.sanity() < sanity);
     }
 }

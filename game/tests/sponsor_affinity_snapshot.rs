@@ -24,7 +24,7 @@ fn build_test_game() -> Game {
     for i in 0..6 {
         let mut tribute = Tribute::new(format!("Tribute{}", i), Some((i % 12) + 1), None);
         tribute.area = Area::Sector1;
-        tribute.attributes.health = 100;
+        tribute.attributes.set_health(100);
         tribute.statistics.game = game.identifier.clone();
         game.tributes.push(tribute);
     }

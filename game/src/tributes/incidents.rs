@@ -409,21 +409,21 @@ pub fn apply_sleep_incident(
         }
         SleepIncident::AnimalEncounter { animal } => {
             let sanity_loss = rng.random_range(2..=8);
-            tribute.attributes.sanity = tribute.attributes.sanity.saturating_sub(sanity_loss);
+            tribute.attributes.drain_sanity(sanity_loss);
             format!(
                 "A {} scurries over {}! They lose {} sanity from the fright.",
                 animal, tribute.name, sanity_loss
             )
         }
         SleepIncident::Nightmare { sanity_loss } => {
-            tribute.attributes.sanity = tribute.attributes.sanity.saturating_sub(*sanity_loss);
+            tribute.attributes.drain_sanity(*sanity_loss);
             format!(
                 "{} thrashes in their sleep, tormented by terrible nightmares. Loses {} sanity.",
                 tribute.name, sanity_loss
             )
         }
         SleepIncident::NightTerror { sanity_loss } => {
-            tribute.attributes.sanity = tribute.attributes.sanity.saturating_sub(*sanity_loss);
+            tribute.attributes.drain_sanity(*sanity_loss);
             format!(
                 "{} jolts awake with a scream, heart pounding from a night terror! Loses {} sanity.",
                 tribute.name, sanity_loss
@@ -437,7 +437,7 @@ pub fn apply_sleep_incident(
         }
         SleepIncident::LimbInjury => {
             let hp_loss = rng.random_range(2..=5);
-            tribute.attributes.health = tribute.attributes.health.saturating_sub(hp_loss);
+            tribute.attributes.drain_health(hp_loss);
             let body_part = if rng.random_bool(0.5) { "leg" } else { "arm" };
             format!(
                 "{} wakes to find their {} has completely fallen asleep. Takes {} HP from the panic.",
@@ -535,7 +535,7 @@ mod tests {
     #[test]
     fn apply_nightmare_reduces_sanity() {
         let mut tribute = Tribute::new("Test".to_string(), None, None);
-        let orig_sanity = tribute.attributes.sanity;
+        let orig_sanity = tribute.attributes.sanity();
         let incident = SleepIncident::Nightmare { sanity_loss: 5 };
         let mut rng = SmallRng::seed_from_u64(42);
         let desc = apply_sleep_incident(&mut tribute, &incident, &mut rng);
@@ -544,7 +544,7 @@ mod tests {
             "description should mention sanity loss"
         );
         assert!(
-            tribute.attributes.sanity < orig_sanity,
+            tribute.attributes.sanity() < orig_sanity,
             "sanity should decrease"
         );
     }
@@ -566,7 +566,7 @@ mod tests {
     #[test]
     fn apply_limb_injury_reduces_hp() {
         let mut tribute = Tribute::new("Test".to_string(), None, None);
-        let orig_hp = tribute.attributes.health;
+        let orig_hp = tribute.attributes.health();
         let incident = SleepIncident::LimbInjury;
         let mut rng = SmallRng::seed_from_u64(42);
         let desc = apply_sleep_incident(&mut tribute, &incident, &mut rng);
@@ -574,7 +574,7 @@ mod tests {
             desc.contains("HP"),
             "description should mention HP loss: {desc}"
         );
-        assert!(tribute.attributes.health < orig_hp, "HP should decrease");
+        assert!(tribute.attributes.health() < orig_hp, "HP should decrease");
     }
 
     #[test]
@@ -604,7 +604,7 @@ mod tests {
     #[test]
     fn apply_night_terror_reduces_sanity() {
         let mut tribute = Tribute::new("Test".to_string(), None, None);
-        let orig_sanity = tribute.attributes.sanity;
+        let orig_sanity = tribute.attributes.sanity();
         let incident = SleepIncident::NightTerror { sanity_loss: 7 };
         let mut rng = SmallRng::seed_from_u64(42);
         let desc = apply_sleep_incident(&mut tribute, &incident, &mut rng);
@@ -613,7 +613,7 @@ mod tests {
             "description should mention sanity loss"
         );
         assert!(
-            tribute.attributes.sanity < orig_sanity,
+            tribute.attributes.sanity() < orig_sanity,
             "sanity should decrease"
         );
     }

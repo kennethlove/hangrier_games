@@ -38,9 +38,9 @@ fn movement_and_turn_phase_events_reach_game_messages() {
     let mut lone = Tribute::random();
     lone.name = "Lone".to_string();
     lone.area = Area::Cornucopia;
-    lone.attributes.health = 100;
+    lone.attributes.set_health(100);
     lone.attributes.movement = 80; // high movement → travel branch
-    lone.attributes.sanity = 80;
+    lone.attributes.set_sanity(80);
     lone.statistics.game = game.identifier.clone();
 
     let lone_id = lone.identifier.clone();

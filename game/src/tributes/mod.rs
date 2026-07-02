@@ -170,7 +170,7 @@ pub struct EncounterContext {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Tribute {
     /// Identifier
-    pub identifier: String,
+    pub identifier: shared::ids::TributeId,
     /// Stable typed UUID. Mirrors `identifier` for callers that want a
     /// non-stringly-typed key (alliance graph, betrayal events).
     ///
@@ -179,12 +179,12 @@ pub struct Tribute {
     /// payload that carries a non-RecordId `id` field when a record id is
     /// also specified explicitly via `db.create(("tribute", ...))`.
     #[serde(
-        default = "Uuid::new_v4",
+        default,
         rename = "tribute_id",
         serialize_with = "serialize_uuid_as_string",
         deserialize_with = "deserialize_uuid_lenient"
     )]
-    pub id: Uuid,
+    pub id: shared::ids::TributeId,
     /// Where are they?
     pub area: Area,
     /// What is their current status?

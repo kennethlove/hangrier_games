@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
+use crate::ids::{AreaId, ItemId, TributeId};
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", content = "value")]
 pub enum MessageSource {
@@ -97,19 +99,19 @@ impl FromStr for Phase {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TributeRef {
-    pub identifier: String,
+    pub identifier: TributeId,
     pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AreaRef {
-    pub identifier: String,
+    pub identifier: AreaId,
     pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ItemRef {
-    pub identifier: String,
+    pub identifier: ItemId,
     pub name: String,
 }
 

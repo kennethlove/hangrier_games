@@ -128,8 +128,10 @@ impl MessagePayload {
 
     pub fn involves(&self, tribute_identifier: &str) -> bool {
         let id = tribute_identifier;
-        if self.tribute_refs().iter().any(|t| t.identifier == id) {
-            return true;
+        if let Ok(tid) = crate::ids::TributeId::parse_str(id) {
+            if self.tribute_refs().iter().any(|t| t.identifier == tid) {
+                return true;
+            }
         }
         use MessagePayload::*;
         match self {

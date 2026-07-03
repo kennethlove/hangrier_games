@@ -1,0 +1,50 @@
+---
+source: game/tests/sponsor_affinity_snapshot.rs
+assertion_line: 88
+expression: snapshot
+---
+- - Aesthete
+  - 607d9dad-be3f-5590-8b81-d58fc1422584
+  - -4
+- - Aesthete
+  - 6da5af0b-aa0e-5d11-94b7-202566171f31
+  - 8
+- - Aesthete
+  - 94950ac2-e747-53e3-9707-d102d12b4c7e
+  - 8
+- - Aesthete
+  - ced265e2-4e56-5368-bf31-210a30b23e20
+  - -4
+- - Loyalist
+  - 6da5af0b-aa0e-5d11-94b7-202566171f31
+  - -5
+- - Loyalist
+  - 94950ac2-e747-53e3-9707-d102d12b4c7e
+  - -5
+- - Loyalist
+  - 9dbc5b9a-e0c8-5d69-be12-55d6ffdb2640
+  - -8
+- - Sadist
+  - 607d9dad-be3f-5590-8b81-d58fc1422584
+  - 11
+- - Sadist
+  - ced265e2-4e56-5368-bf31-210a30b23e20
+  - 11
+- - Compassionate
+  - 607d9dad-be3f-5590-8b81-d58fc1422584
+  - -8
+- - Compassionate
+  - ced265e2-4e56-5368-bf31-210a30b23e20
+  - -8
+- - Strategist
+  - 607d9dad-be3f-5590-8b81-d58fc1422584
+  - 4
+- - Strategist
+  - 6da5af0b-aa0e-5d11-94b7-202566171f31
+  - 6
+- - Strategist
+  - 94950ac2-e747-53e3-9707-d102d12b4c7e
+  - 6
+- - Strategist
+  - ced265e2-4e56-5368-bf31-210a30b23e20
+  - 4

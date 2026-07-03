@@ -74,8 +74,6 @@ pub async fn create_game(
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create game: {e}")))?;
 
-    crate::verify_record_persisted(&db, &game_rid, "create_game").await?;
-
     let created_game = game;
 
     // Create tributes concurrently
@@ -145,8 +143,6 @@ pub async fn quickstart(
         .bind(("body", body))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to create game: {e}")))?;
-
-    crate::verify_record_persisted(&db, &game_rid, "quickstart").await?;
 
     // Create 24 tributes
     let tribute_futures =

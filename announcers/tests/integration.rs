@@ -25,23 +25,32 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 static MSG_COUNTER: AtomicU32 = AtomicU32::new(1);
 
+fn test_uuid(name: &str) -> uuid::Uuid {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    name.hash(&mut hasher);
+    let hash = hasher.finish();
+    uuid::Uuid::from_u128(hash as u128)
+}
+
 fn tr(name: &str) -> TributeRef {
     TributeRef {
-        identifier: format!("id-{name}"),
+        identifier: test_uuid(name).into(),
         name: name.into(),
     }
 }
 
 fn ar(name: &str) -> AreaRef {
     AreaRef {
-        identifier: name.into(),
+        identifier: test_uuid(name).into(),
         name: name.into(),
     }
 }
 
 fn ir(name: &str) -> ItemRef {
     ItemRef {
-        identifier: format!("id-{name}"),
+        identifier: test_uuid(name).into(),
         name: name.into(),
     }
 }
@@ -64,7 +73,7 @@ fn make_msg(payload: MessagePayload) -> GameMessage {
 
 fn make_tribute(name: &str, district: u8) -> TributeDigest {
     TributeDigest {
-        identifier: format!("id-{name}"),
+        identifier: test_uuid(name).to_string(),
         name: name.into(),
         district,
         status: "alive".into(),

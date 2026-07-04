@@ -5,6 +5,7 @@
 //! Capped at 8 notable events per tribute (oldest pruned).
 
 use std::collections::HashMap;
+use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 use shared::combat_beat::SwingOutcome;
@@ -201,7 +202,7 @@ impl TributeHistories {
                             .filter(|o| o.identifier != m.identifier)
                             .map(|o| o.name.clone())
                             .collect();
-                        if let Some(digest) = self.inner.get_mut(&m.identifier) {
+                        if let Some(digest) = self.inner.get_mut(&m.identifier.to_string()) {
                             for ally in &allies {
                                 if !digest.allies.contains(ally) {
                                     digest.allies.push(ally.clone());
@@ -232,7 +233,7 @@ impl TributeHistories {
 
                 MessagePayload::AllianceDissolved { members, reason } => {
                     for m in members {
-                        if let Some(digest) = self.inner.get_mut(&m.identifier) {
+                        if let Some(digest) = self.inner.get_mut(&m.identifier.to_string()) {
                             digest.allies.clear();
                         }
                         self.push_event(&m.identifier, &format!("Alliance dissolved — {reason}"));
@@ -557,28 +558,28 @@ impl TributeHistories {
     // Internal helpers
     // -----------------------------------------------------------------------
 
-    fn set_status(&mut self, id: &str, status: &str) {
-        if let Some(digest) = self.inner.get_mut(id) {
+    fn set_status(&mut self, id: &impl Display, status: &str) {
+        if let Some(digest) = self.inner.get_mut(&id.to_string()) {
             digest.status = status.to_string();
         }
     }
 
-    fn set_injury_level(&mut self, id: &str, level: &str) {
-        if let Some(digest) = self.inner.get_mut(id) {
+    fn set_injury_level(&mut self, id: &impl Display, level: &str) {
+        if let Some(digest) = self.inner.get_mut(&id.to_string()) {
             digest.injury_level = level.to_string();
         }
     }
 
-    fn set_location(&mut self, id: &str, location: &str) {
-        if let Some(digest) = self.inner.get_mut(id) {
+    fn set_location(&mut self, id: &impl Display, location: &str) {
+        if let Some(digest) = self.inner.get_mut(&id.to_string()) {
             digest.location = location.to_string();
         }
     }
 
     /// Append a notable event for a tribute. Capped at `MAX_NOTABLE_EVENTS`;
     /// the oldest entry is pruned when the cap is exceeded.
-    fn push_event(&mut self, id: &str, event: &str) {
-        if let Some(digest) = self.inner.get_mut(id) {
+    fn push_event(&mut self, id: &impl Display, event: &str) {
+        if let Some(digest) = self.inner.get_mut(&id.to_string()) {
             digest.notable_events.insert(0, event.to_string());
             digest.notable_events.truncate(MAX_NOTABLE_EVENTS);
         }
@@ -587,8 +588,8 @@ impl TributeHistories {
     /// Append a permanent highlight for a tribute. Capped at `MAX_HIGHLIGHTS`
     /// (20); oldest prunes first. Highlights persist across phases alongside
     /// the rolling `notable_events`.
-    fn push_highlight(&mut self, id: &str, event: &str) {
-        if let Some(digest) = self.inner.get_mut(id) {
+    fn push_highlight(&mut self, id: &impl Display, event: &str) {
+        if let Some(digest) = self.inner.get_mut(&id.to_string()) {
             digest.highlights.push(event.to_string());
             if digest.highlights.len() > crate::types::MAX_HIGHLIGHTS {
                 digest.highlights.remove(0);
@@ -599,8 +600,8 @@ impl TributeHistories {
     /// Increment a tribute's kill streak (they scored a kill this phase).
     /// Fires a milestone event when crossing a spree tier boundary
     /// (2 → "heating up", 4 → "on fire", 6 → "dominating", 8 → "unstoppable").
-    fn bump_streak(&mut self, id: &str) {
-        if let Some(digest) = self.inner.get_mut(id) {
+    fn bump_streak(&mut self, id: &impl Display) {
+        if let Some(digest) = self.inner.get_mut(&id.to_string()) {
             let old = digest.kill_streak;
             let new = digest.kill_streak.saturating_add(1);
             digest.kill_streak = new;
@@ -620,8 +621,8 @@ impl TributeHistories {
 
     /// Reset a tribute's kill streak to 0 (they died or lost a fight).
     /// If they had an active spree (streak >= 2), logs a spree-break event.
-    fn reset_streak(&mut self, id: &str) {
-        if let Some(digest) = self.inner.get_mut(id) {
+    fn reset_streak(&mut self, id: &impl Display) {
+        if let Some(digest) = self.inner.get_mut(&id.to_string()) {
             let had_spree = digest.kill_streak >= 2;
             let old_label = crate::types::spree_label(digest.kill_streak);
             digest.kill_streak = 0;
@@ -679,9 +680,18 @@ mod tests {
     use super::*;
     use shared::messages::Phase;
 
+    fn test_uuid(name: &str) -> uuid::Uuid {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut hasher = DefaultHasher::new();
+        name.hash(&mut hasher);
+        let hash = hasher.finish();
+        uuid::Uuid::from_u128(hash as u128)
+    }
+
     fn make_tribute(name: &str, district: u8) -> TributeDigest {
         TributeDigest {
-            identifier: format!("id-{name}"),
+            identifier: test_uuid(name).to_string(),
             name: name.into(),
             district,
             status: "alive".into(),
@@ -696,7 +706,7 @@ mod tests {
 
     fn tr(name: &str) -> TributeRef {
         TributeRef {
-            identifier: format!("id-{name}"),
+            identifier: test_uuid(name).into(),
             name: name.into(),
         }
     }
@@ -740,7 +750,7 @@ mod tests {
             killer: None,
             cause: shared::afflictions::DeathCause::Starvation,
         })]);
-        let d = h.get("id-Katniss").unwrap();
+        let d = h.get(&test_uuid("Katniss").to_string()).unwrap();
         assert_eq!(d.status, "deceased");
         assert_eq!(d.injury_level, "deceased");
         assert_eq!(d.notable_events[0], "Killed by unknown causes");
@@ -755,7 +765,7 @@ mod tests {
             attacker: Some(tr("Katniss")),
             hp_lost: 12,
         })]);
-        let d = h.get("id-Cato").unwrap();
+        let d = h.get(&test_uuid("Cato").to_string()).unwrap();
         assert_eq!(d.injury_level, "devastating");
         assert!(d.notable_events[0].contains("devastating"));
     }
@@ -767,15 +777,15 @@ mod tests {
         h.update(&[make_msg(MessagePayload::TributeMoved {
             tribute: tr("Peeta"),
             from: shared::messages::AreaRef {
-                identifier: "area-1".into(),
+                identifier: test_uuid("area-1").into(),
                 name: "Cornucopia".into(),
             },
             to: shared::messages::AreaRef {
-                identifier: "area-2".into(),
+                identifier: test_uuid("area-2").into(),
                 name: "Forest".into(),
             },
         })]);
-        let d = h.get("id-Peeta").unwrap();
+        let d = h.get(&test_uuid("Peeta").to_string()).unwrap();
         assert_eq!(d.location, "Forest");
     }
 
@@ -790,11 +800,11 @@ mod tests {
         h.update(&[make_msg(MessagePayload::AllianceFormed {
             members: vec![tr("Katniss"), tr("Rue")],
         })]);
-        let k = h.get("id-Katniss").unwrap();
+        let k = h.get(&test_uuid("Katniss").to_string()).unwrap();
         assert!(k.allies.contains(&"Rue".to_string()));
-        let r = h.get("id-Rue").unwrap();
+        let r = h.get(&test_uuid("Rue").to_string()).unwrap();
         assert!(r.allies.contains(&"Katniss".to_string()));
-        let p = h.get("id-Peeta").unwrap();
+        let p = h.get(&test_uuid("Peeta").to_string()).unwrap();
         assert!(p.allies.is_empty());
     }
 
@@ -812,7 +822,7 @@ mod tests {
             })
             .collect();
         h.update(&events);
-        let d = h.get("id-Test").unwrap();
+        let d = h.get(&test_uuid("Test").to_string()).unwrap();
         assert_eq!(d.notable_events.len(), 30);
     }
 
@@ -834,7 +844,7 @@ mod tests {
         let roster = vec![make_tribute("Katniss", 12)];
         let mut h = TributeHistories::new(roster);
         h.update(&[]);
-        let d = h.get("id-Katniss").unwrap();
+        let d = h.get(&test_uuid("Katniss").to_string()).unwrap();
         assert_eq!(d.notable_events.len(), 0);
         assert_eq!(d.status, "alive");
     }
@@ -848,6 +858,12 @@ mod tests {
             hp_lost: 5,
         })]);
         // Should not panic, just skip
-        assert_eq!(h.get("id-Katniss").unwrap().notable_events.len(), 0);
+        assert_eq!(
+            h.get(&test_uuid("Katniss").to_string())
+                .unwrap()
+                .notable_events
+                .len(),
+            0
+        );
     }
 }

@@ -139,6 +139,15 @@ mod tests {
         }
     }
 
+    fn test_uuid(name: &str) -> uuid::Uuid {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut hasher = DefaultHasher::new();
+        name.hash(&mut hasher);
+        let hash = hasher.finish();
+        uuid::Uuid::from_u128(hash as u128)
+    }
+
     fn make_event() -> GameMessage {
         GameMessage {
             identifier: "evt-1".into(),
@@ -152,15 +161,15 @@ mod tests {
             content: "Katniss found a bow.".into(),
             payload: MessagePayload::ItemFound {
                 tribute: TributeRef {
-                    identifier: "id-Katniss".into(),
+                    identifier: test_uuid("Katniss").into(),
                     name: "Katniss".into(),
                 },
                 item: shared::messages::ItemRef {
-                    identifier: "id-bow".into(),
+                    identifier: test_uuid("bow").into(),
                     name: "bow".into(),
                 },
                 area: shared::messages::AreaRef {
-                    identifier: "Cornucopia".into(),
+                    identifier: test_uuid("Cornucopia").into(),
                     name: "Cornucopia".into(),
                 },
             },

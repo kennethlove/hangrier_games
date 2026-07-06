@@ -175,7 +175,7 @@ pub fn broadcast_game_finished(
     winner: Option<String>,
 ) {
     let winner_ref = winner.map(|name| TributeRef {
-        identifier: String::new(),
+        identifier: String::new().into(),
         name,
     });
     let payload = MessagePayload::GameEnded {

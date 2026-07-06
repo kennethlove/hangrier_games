@@ -127,7 +127,7 @@ pub(crate) async fn save_game(
     }
 
     let area_results = futures::future::join_all(game.areas.iter().map(|area| async {
-        let id = RecordId::new("area", area.identifier.clone());
+        let id = RecordId::new("area", area.identifier.as_str());
         save_area_items(&area.items, id.clone(), db).await?;
 
         let mut area_without_items = area.clone();
@@ -156,7 +156,7 @@ pub(crate) async fn save_game(
     }
 
     let tribute_results = futures::future::join_all(game.tributes.iter().map(|tribute| async {
-        let id = RecordId::new("tribute", tribute.identifier.clone());
+        let id = RecordId::new("tribute", tribute.identifier.as_str());
         if tribute.is_alive() {
             save_tribute_items(&tribute.items, id.clone(), db).await?;
         }

@@ -567,7 +567,7 @@ impl Tribute {
                     format!("{} bled out from their wounds", self.name),
                     MessagePayload::TributeBledOut {
                         tribute: TributeRef {
-                            identifier: self.identifier.clone(),
+                            identifier: self.identifier.clone().into(),
                             name: self.name.clone(),
                         },
                     },
@@ -592,7 +592,7 @@ impl Tribute {
                 line,
                 MessagePayload::TributeKilled {
                     victim: TributeRef {
-                        identifier: self.identifier.clone(),
+                        identifier: self.identifier.clone().into(),
                         name: self.name.clone(),
                     },
                     killer: None,
@@ -750,7 +750,7 @@ impl Tribute {
                     events.push(TaggedEvent::new(
                         line,
                         MessagePayload::AddictionCraving {
-                            tribute: self.identifier.clone(),
+                            tribute: self.identifier.to_string(),
                             substance: substance.to_string(),
                             severity: craving_severity,
                         },
@@ -778,7 +778,7 @@ impl Tribute {
                 continue;
             }
             let set_by = area_details.placed_traps[idx].set_by.clone();
-            if set_by == self.identifier {
+            if self.identifier == set_by {
                 continue; // Setter auto-passes
             }
 
@@ -795,7 +795,7 @@ impl Tribute {
                     line,
                     MessagePayload::TrapTriggered {
                         victim: crate::messages::TributeRef {
-                            identifier: self.identifier.clone(),
+                            identifier: self.identifier.clone().into(),
                             name: self.name.clone(),
                         },
                         trap_kind: trap.kind.to_string(),
@@ -843,7 +843,7 @@ impl Tribute {
                         line,
                         MessagePayload::TributeKilled {
                             victim: TributeRef {
-                                identifier: self.identifier.clone(),
+                                identifier: self.identifier.clone().into(),
                                 name: self.name.clone(),
                             },
                             killer: None,
@@ -894,7 +894,7 @@ impl Tribute {
         events: &mut Vec<TaggedEvent>,
     ) {
         let tribute_ref = TributeRef {
-            identifier: self.identifier.clone(),
+            identifier: self.identifier.clone().into(),
             name: self.name.clone(),
         };
 
@@ -944,7 +944,7 @@ impl Tribute {
 
     fn act_rest(&mut self, events: &mut Vec<TaggedEvent>) {
         let tribute_ref = TributeRef {
-            identifier: self.identifier.clone(),
+            identifier: self.identifier.clone().into(),
             name: self.name.clone(),
         };
         let line = GameOutput::TributeRest(self.name.as_str()).to_string();
@@ -960,13 +960,13 @@ impl Tribute {
 
     fn act_hide(&mut self, events: &mut Vec<TaggedEvent>) {
         let tribute_ref = TributeRef {
-            identifier: self.identifier.clone(),
+            identifier: self.identifier.clone().into(),
             name: self.name.clone(),
         };
         let area_ref = |a: Area| {
             let s = a.to_string();
             AreaRef {
-                identifier: s.clone(),
+                identifier: s.clone().into(),
                 name: s,
             }
         };
@@ -1017,7 +1017,7 @@ impl Tribute {
             id: uuid::Uuid::new_v4().to_string(),
             kind,
             severity,
-            set_by: self.identifier.clone(),
+            set_by: self.identifier.to_string(),
             concealment,
             triggered: false,
         };
@@ -1029,7 +1029,7 @@ impl Tribute {
             line,
             MessagePayload::TrapSet {
                 tribute: crate::messages::TributeRef {
-                    identifier: self.identifier.clone(),
+                    identifier: self.identifier.clone().into(),
                     name: self.name.clone(),
                 },
                 trap_kind: kind.to_string(),
@@ -1133,19 +1133,19 @@ impl Tribute {
         // Original area item logic
         if let Some(item) = self.take_nearby_item(area_details) {
             let tribute_ref = TributeRef {
-                identifier: self.identifier.clone(),
+                identifier: self.identifier.clone().into(),
                 name: self.name.clone(),
             };
             let area_ref = |a: Area| {
                 let s = a.to_string();
                 AreaRef {
-                    identifier: s.clone(),
+                    identifier: s.clone().into(),
                     name: s,
                 }
             };
             let line = GameOutput::TributeTakeItem(self.name.as_str(), &item.name).to_string();
             let item_ref = ItemRef {
-                identifier: item.identifier.clone(),
+                identifier: item.identifier.clone().into(),
                 name: item.name.clone(),
             };
             let current_area = self.area;
@@ -1163,14 +1163,14 @@ impl Tribute {
     fn act_use_item(&mut self, maybe_item: &Option<Item>, events: &mut Vec<TaggedEvent>) {
         if let Some(item) = maybe_item {
             let tribute_ref = TributeRef {
-                identifier: self.identifier.clone(),
+                identifier: self.identifier.clone().into(),
                 name: self.name.clone(),
             };
             if let Err(error) = self.try_use_consumable(item, events, None) {
                 let line = GameOutput::TributeCannotUseItem(self.name.as_str(), &error.to_string())
                     .to_string();
                 let item_ref = ItemRef {
-                    identifier: item.identifier.clone(),
+                    identifier: item.identifier.clone().into(),
                     name: item.name.clone(),
                 };
                 events.push(TaggedEvent::new(
@@ -1183,7 +1183,7 @@ impl Tribute {
             } else {
                 let line = GameOutput::TributeUseItem(self.name.as_str(), item).to_string();
                 let item_ref = ItemRef {
-                    identifier: item.identifier.clone(),
+                    identifier: item.identifier.clone().into(),
                     name: item.name.clone(),
                 };
                 events.push(TaggedEvent::new(
@@ -1208,7 +1208,7 @@ impl Tribute {
         };
 
         let tribute_ref = TributeRef {
-            identifier: self.identifier.clone(),
+            identifier: self.identifier.clone().into(),
             name: self.name.clone(),
         };
 
@@ -1280,7 +1280,7 @@ impl Tribute {
             candidates.choose(rng).cloned().unwrap()
         };
         let target_ref = TributeRef {
-            identifier: target.identifier.clone(),
+            identifier: target.identifier.clone().into(),
             name: target.name.clone(),
         };
 
@@ -1301,7 +1301,7 @@ impl Tribute {
             }
             aff.trauma_metadata
                 .as_ref()
-                .is_some_and(|m| m.observed_by.contains(&target.identifier))
+                .is_some_and(|m| m.observed_by.contains(&target.identifier.to_string()))
         }) {
             0.10
         } else {
@@ -1315,7 +1315,7 @@ impl Tribute {
             .values()
             .filter(|aff| matches!(aff.kind, AfflictionKind::Addiction(_)))
             .filter_map(|aff| aff.addiction_metadata.as_ref())
-            .filter(|meta| meta.observed_by.contains(&target.identifier))
+            .filter(|meta| meta.observed_by.contains(&target.identifier.to_string()))
             .map(|meta| {
                 let aff = self
                     .afflictions
@@ -1367,7 +1367,7 @@ impl Tribute {
         events: &mut Vec<TaggedEvent>,
     ) {
         let tribute_ref = TributeRef {
-            identifier: self.identifier.clone(),
+            identifier: self.identifier.clone().into(),
             name: self.name.clone(),
         };
         self.sleeping = true;
@@ -1407,7 +1407,7 @@ impl Tribute {
             crate::output::GameOutput::TributeWakesInterrupted(self.name.as_str()).to_string(),
             MessagePayload::TributeWoke {
                 tribute: TributeRef {
-                    identifier: self.identifier.clone(),
+                    identifier: self.identifier.clone().into(),
                     name: self.name.clone(),
                 },
                 phase,
@@ -1476,11 +1476,11 @@ impl Tribute {
                 line,
                 MessagePayload::TrustShockBreak {
                     tribute: TributeRef {
-                        identifier: self.identifier.clone(),
+                        identifier: self.identifier.clone().into(),
                         name: self.name.clone(),
                     },
                     partner: TributeRef {
-                        identifier: ally_str.clone(),
+                        identifier: ally_str.clone().into(),
                         name: ally_str,
                     },
                 },
@@ -1950,7 +1950,7 @@ mod tests {
         assert!(tribute.allies.is_empty());
         assert_eq!(tribute.turns_since_last_betrayal, 0);
         // `id` mirrors `identifier`.
-        assert_eq!(tribute.id.to_string(), tribute.identifier);
+        assert_eq!(tribute.id.to_string(), tribute.identifier.to_string());
     }
 
     #[rstest]
@@ -2232,7 +2232,7 @@ mod tests {
         let woke = t.wake_interrupted(
             shared::messages::InterruptionKind::Ambush {
                 attacker: TributeRef {
-                    identifier: "x".to_string(),
+                    identifier: "x".into(),
                     name: "X".to_string(),
                 },
             },

@@ -180,7 +180,7 @@ fn broadcast_package_with_leaders_and_sprees() {
 
 fn tr(name: &str) -> TributeRef {
     TributeRef {
-        identifier: format!("id-{name}"),
+        identifier: format!("id-{name}").into(),
         name: name.into(),
     }
 }

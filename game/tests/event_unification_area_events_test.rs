@@ -102,7 +102,7 @@ fn area_event_survival_narration_reaches_game_messages() {
         match &msg.source {
             MessageSource::Tribute(id) => {
                 assert!(
-                    id == &alpha_id || id == &bravo_id,
+                    id == &alpha_id.to_string() || id == &bravo_id.to_string(),
                     "unexpected tribute identifier in message source: {id}"
                 );
             }

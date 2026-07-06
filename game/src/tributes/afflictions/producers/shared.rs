@@ -128,7 +128,7 @@ pub(super) fn map_cause_to_death_cause(
     cause: &DeathCause,
 ) -> DeathCause {
     if let Some(k) = killer {
-        return DeathCause::Tribute(k.identifier.clone());
+        return DeathCause::Tribute(k.identifier.to_string());
     }
     cause.clone()
 }

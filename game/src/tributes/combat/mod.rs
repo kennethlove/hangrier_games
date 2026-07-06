@@ -57,7 +57,7 @@ impl Tribute {
         if !is_self_attack && target.sleeping {
             target.was_ambushed = true; // Signal to attack_contest: 0 defense
             let attacker_ref = TributeRef {
-                identifier: self.identifier.clone(),
+                identifier: self.identifier.clone().into(),
                 name: self.name.clone(),
             };
             target.wake_interrupted(
@@ -274,7 +274,7 @@ impl Tribute {
                 events.push(TaggedEvent::new(
                     String::new(),
                     MessagePayload::AfflictionAcquired {
-                        tribute_id: target.identifier.clone(),
+                        tribute_id: target.identifier.to_string(),
                         affliction: draft.kind.to_string(),
                         severity: draft.severity.to_string(),
                     },
@@ -292,7 +292,7 @@ impl Tribute {
                 events.push(TaggedEvent::new(
                     String::new(),
                     MessagePayload::AfflictionAcquired {
-                        tribute_id: self.identifier.clone(),
+                        tribute_id: self.identifier.to_string(),
                         affliction: draft.kind.to_string(),
                         severity: draft.severity.to_string(),
                     },

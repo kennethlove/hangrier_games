@@ -11,6 +11,7 @@
 //!   stamped with `(game_day, phase, tick, emit_index)`.
 //! - Terrain-aware narrative helpers used by tribute / area logic.
 
+pub use shared::ids::{AreaId, ItemId, TributeId};
 pub use shared::messages::{
     AreaEventKind, AreaRef, CombatEngagement, CombatOutcome, GameMessage, ItemRef, MessageKind,
     MessagePayload, MessageSource, ParsePhaseError, Phase, TributeRef,

@@ -7,6 +7,7 @@ pub mod afflictions;
 pub mod audience;
 pub mod combat_beat;
 pub mod conditions;
+pub mod ids;
 pub mod messages;
 pub mod sponsors;
 pub mod wounds;

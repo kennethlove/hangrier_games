@@ -112,7 +112,7 @@ pub fn maybe_acquire_item_fixation(tribute: &mut Tribute, item: &Item) {
         return;
     }
 
-    let target = FixationTarget::Item(item.identifier.clone());
+    let target = FixationTarget::Item(item.identifier.to_string());
     let key = (AfflictionKind::Fixation(target.clone()), None);
     let aff = Affliction {
         kind: AfflictionKind::Fixation(target),
@@ -302,20 +302,20 @@ pub fn process_tribute_fixations(
         // ── Emit messages and queue removal ──
         if consummated {
             messages.push(MessagePayload::FixationConsummated {
-                tribute_id: tribute_id.clone(),
+                tribute_id: tribute_id.to_string(),
                 target: target_str,
             });
             to_remove.push(key.clone());
         } else if thwarted {
             messages.push(MessagePayload::FixationThwarted {
-                tribute_id: tribute_id.clone(),
+                tribute_id: tribute_id.to_string(),
                 target: target_str,
                 reason: thwart_reason.to_string(),
             });
             to_remove.push(key.clone());
         } else if should_decay {
             messages.push(MessagePayload::FixationFaded {
-                tribute_id: tribute_id.clone(),
+                tribute_id: tribute_id.to_string(),
                 target: target_str,
             });
             to_remove.push(key.clone());
@@ -533,11 +533,11 @@ mod tests {
             &mut SmallRng::seed_from_u64(99),
         );
 
-        add_fixation(&mut a, FixationTarget::Tribute(b.identifier.clone()));
+        add_fixation(&mut a, FixationTarget::Tribute(b.identifier.to_string()));
 
-        let mut id_to_uuid = HashMap::new();
-        id_to_uuid.insert(a.identifier.clone(), a.id);
-        id_to_uuid.insert(b.identifier.clone(), b.id);
+        let mut id_to_uuid: HashMap<String, Uuid> = HashMap::new();
+        id_to_uuid.insert(a.identifier.to_string(), a.id);
+        id_to_uuid.insert(b.identifier.to_string(), b.id);
 
         let mut dead_killers = HashMap::new();
         dead_killers.insert(b.id, Some(a.id));
@@ -560,7 +560,7 @@ mod tests {
         assert!(matches!(
             &msgs[0],
             MessagePayload::FixationConsummated { target, .. }
-                if target == &FixationTarget::Tribute(b.identifier.clone()).to_string()
+                if target == &FixationTarget::Tribute(b.identifier.to_string()).to_string()
         ));
         assert_eq!(count_fixations(&a.afflictions), 0);
     }
@@ -576,7 +576,7 @@ mod tests {
         );
         let item = Item::new_random_consumable();
         let item_id = item.identifier.clone();
-        let target = FixationTarget::Item(item_id.clone());
+        let target = FixationTarget::Item(item_id.to_string());
         add_fixation(&mut t, target.clone());
         t.add_item(item);
 
@@ -584,7 +584,7 @@ mod tests {
         let dead_killers = HashMap::new();
         let closed_areas = BTreeSet::new();
         let mut all_items = BTreeSet::new();
-        all_items.insert(item_id);
+        all_items.insert(item_id.to_string());
         let tribute_areas = HashMap::new();
         let ctx = ctx_from_refs(
             5,
@@ -664,12 +664,12 @@ mod tests {
             &mut SmallRng::seed_from_u64(11),
         );
 
-        add_fixation(&mut a, FixationTarget::Tribute(b.identifier.clone()));
+        add_fixation(&mut a, FixationTarget::Tribute(b.identifier.to_string()));
 
-        let mut id_to_uuid = HashMap::new();
-        id_to_uuid.insert(a.identifier.clone(), a.id);
-        id_to_uuid.insert(b.identifier.clone(), b.id);
-        id_to_uuid.insert(c.identifier.clone(), c.id);
+        let mut id_to_uuid: HashMap<String, Uuid> = HashMap::new();
+        id_to_uuid.insert(a.identifier.to_string(), a.id);
+        id_to_uuid.insert(b.identifier.to_string(), b.id);
+        id_to_uuid.insert(c.identifier.to_string(), c.id);
 
         let mut dead_killers = HashMap::new();
         dead_killers.insert(b.id, Some(c.id)); // C killed B, not A
@@ -751,11 +751,11 @@ mod tests {
 
         // Acquired fixation with cycles_since_last_contact = 6 (past decay threshold).
         let key = (
-            AfflictionKind::Fixation(FixationTarget::Tribute(b.identifier.clone())),
+            AfflictionKind::Fixation(FixationTarget::Tribute(b.identifier.to_string())),
             None,
         );
         let aff = Affliction {
-            kind: AfflictionKind::Fixation(FixationTarget::Tribute(b.identifier.clone())),
+            kind: AfflictionKind::Fixation(FixationTarget::Tribute(b.identifier.to_string())),
             body_part: None,
             severity: Severity::Mild,
             source: AfflictionSource::Spawn,
@@ -776,16 +776,16 @@ mod tests {
         };
         a.afflictions.insert(key, aff);
 
-        let mut id_to_uuid = HashMap::new();
-        id_to_uuid.insert(a.identifier.clone(), a.id);
-        id_to_uuid.insert(b.identifier.clone(), b.id);
+        let mut id_to_uuid: HashMap<String, Uuid> = HashMap::new();
+        id_to_uuid.insert(a.identifier.to_string(), a.id);
+        id_to_uuid.insert(b.identifier.to_string(), b.id);
         // B is alive → no entry in dead_killers
         let dead_killers = HashMap::new();
         let closed_areas = BTreeSet::new();
         let all_items = BTreeSet::new();
-        let mut tribute_areas = HashMap::new();
-        tribute_areas.insert(a.identifier.clone(), "Cornucopia".to_string());
-        tribute_areas.insert(b.identifier.clone(), "Cornucopia".to_string());
+        let mut tribute_areas: HashMap<String, String> = HashMap::new();
+        tribute_areas.insert(a.identifier.to_string(), "Cornucopia".to_string());
+        tribute_areas.insert(b.identifier.to_string(), "Cornucopia".to_string());
         let ctx = ctx_from_refs(
             5,
             &id_to_uuid,

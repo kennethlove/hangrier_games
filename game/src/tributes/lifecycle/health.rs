@@ -159,7 +159,7 @@ impl Tribute {
                     ),
                     MessagePayload::WoundInfected {
                         tribute: TributeRef {
-                            identifier: tribute_id.clone(),
+                            identifier: tribute_id.clone().into(),
                             name: tribute_name.clone(),
                         },
                         body_part: wound.body_part.to_string(),
@@ -176,7 +176,7 @@ impl Tribute {
                     ),
                     MessagePayload::WoundHealed {
                         tribute: TributeRef {
-                            identifier: tribute_id.clone(),
+                            identifier: tribute_id.clone().into(),
                             name: tribute_name.clone(),
                         },
                         body_part: wound.body_part.to_string(),

@@ -493,21 +493,21 @@ mod tests {
 
     fn tr(name: &str) -> TributeRef {
         TributeRef {
-            identifier: test_uuid(name).into(),
+            identifier: test_uuid(name).to_string().into(),
             name: name.into(),
         }
     }
 
     fn ar(name: &str) -> AreaRef {
         AreaRef {
-            identifier: test_uuid(name).into(),
+            identifier: test_uuid(name).to_string().into(),
             name: name.into(),
         }
     }
 
     fn ir(name: &str) -> ItemRef {
         ItemRef {
-            identifier: test_uuid(name).into(),
+            identifier: test_uuid(name).to_string().into(),
             name: name.into(),
         }
     }

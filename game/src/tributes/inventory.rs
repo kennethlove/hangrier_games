@@ -158,7 +158,7 @@ impl Tribute {
             events.push(TaggedEvent::new(
                 format!("{} used {} ({})", self.name, item.name, substance),
                 MessagePayload::SubstanceUsed {
-                    tribute: self.identifier.clone(),
+                    tribute: self.identifier.to_string(),
                     item: item.name.clone(),
                     substance: substance.to_string(),
                 },
@@ -185,7 +185,7 @@ impl Tribute {
                             events.push(TaggedEvent::new(
                                 format!("{} acquired {} addiction (use #{})", self.name, s, uc),
                                 MessagePayload::AddictionAcquired {
-                                    tribute: self.identifier.clone(),
+                                    tribute: self.identifier.to_string(),
                                     substance: s.to_string(),
                                     severity: "mild".to_string(),
                                     use_count: uc,
@@ -203,7 +203,7 @@ impl Tribute {
                                     self.name, s, severity
                                 ),
                                 MessagePayload::AddictionReinforced {
-                                    tribute: self.identifier.clone(),
+                                    tribute: self.identifier.to_string(),
                                     substance: s.to_string(),
                                     severity: severity.to_string(),
                                 },
@@ -215,7 +215,7 @@ impl Tribute {
                                         self.name, s, severity
                                     ),
                                     MessagePayload::AddictionEscalated {
-                                        tribute: self.identifier.clone(),
+                                        tribute: self.identifier.to_string(),
                                         substance: s.to_string(),
                                         from_severity: "moderate".to_string(),
                                         to_severity: severity.to_string(),
@@ -230,7 +230,7 @@ impl Tribute {
                             events.push(TaggedEvent::new(
                                 format!("{} relapsed into {} addiction", self.name, s),
                                 MessagePayload::AddictionRelapse {
-                                    tribute: self.identifier.clone(),
+                                    tribute: self.identifier.to_string(),
                                     substance: s.to_string(),
                                     prior_uses,
                                 },
@@ -243,7 +243,7 @@ impl Tribute {
                             events.push(TaggedEvent::new(
                                 format!("{} resisted {} addiction ({:?})", self.name, s, reason),
                                 MessagePayload::AddictionResisted {
-                                    tribute: self.identifier.clone(),
+                                    tribute: self.identifier.to_string(),
                                     substance: s.to_string(),
                                     reason: format!("{:?}", reason),
                                 },
@@ -256,7 +256,7 @@ impl Tribute {
                     events.push(TaggedEvent::new(
                         format!("{} is drunk — staggering and bold", self.name),
                         MessagePayload::SubstanceUsed {
-                            tribute: self.identifier.clone(),
+                            tribute: self.identifier.to_string(),
                             item: item.name.clone(),
                             substance: "alcohol".to_string(),
                         },

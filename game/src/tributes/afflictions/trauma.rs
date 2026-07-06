@@ -87,7 +87,7 @@ pub fn process_traumas(
                 .unwrap_or_default();
 
             result.messages.push(MessagePayload::TraumaFlashback {
-                tribute: tribute.identifier.clone(),
+                tribute: tribute.identifier.to_string(),
                 severity: aff.severity.to_string(),
                 source: source_str.clone(),
             });
@@ -99,15 +99,15 @@ pub fn process_traumas(
                     if other_id == &tribute.identifier {
                         continue;
                     }
-                    if !meta.observed_by.contains(other_id) {
-                        meta.observed_by.insert(other_id.clone());
+                    if !meta.observed_by.contains(other_id.as_str()) {
+                        meta.observed_by.insert(other_id.to_string());
                         result.messages.push(MessagePayload::TraumaObserved {
-                            observer: other_id.clone(),
-                            subject: tribute.identifier.clone(),
+                            observer: other_id.to_string(),
+                            subject: tribute.identifier.to_string(),
                             source: source_str.clone(),
                         });
                     }
-                    meta.observer_seen_cycle.insert(other_id.clone(), cycle);
+                    meta.observer_seen_cycle.insert(other_id.to_string(), cycle);
                 }
             }
         }
@@ -134,7 +134,7 @@ pub fn process_traumas(
                 .unwrap_or_default();
             result.messages.push(MessagePayload::TraumaForgotten {
                 observer: observer_id.clone(),
-                subject: tribute.identifier.clone(),
+                subject: tribute.identifier.to_string(),
                 source: source_str,
             });
         }
@@ -146,7 +146,7 @@ pub fn process_traumas(
             if outcome.decayed {
                 if let Some(new_sev) = outcome.new_severity {
                     result.messages.push(MessagePayload::TraumaHabituated {
-                        tribute: tribute.identifier.clone(),
+                        tribute: tribute.identifier.to_string(),
                         from_severity: aff.severity.to_string(),
                         to_severity: Some(new_sev.to_string()),
                     });
@@ -155,7 +155,7 @@ pub fn process_traumas(
                 } else {
                     // Cured — Mild decayed off entirely.
                     result.messages.push(MessagePayload::TraumaHabituated {
-                        tribute: tribute.identifier.clone(),
+                        tribute: tribute.identifier.to_string(),
                         from_severity: aff.severity.to_string(),
                         to_severity: None,
                     });

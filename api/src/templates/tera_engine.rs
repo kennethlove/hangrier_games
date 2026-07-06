@@ -9,12 +9,6 @@ pub static TERA: LazyLock<Tera> = LazyLock::new(|| {
     let pattern = format!("{}/templates/**/*.html", manifest_dir);
     tracing::info!("Loading Tera templates from: {}", pattern);
     let mut tera = Tera::new();
-    tera.load_from_glob(&pattern).unwrap_or_else(|e| {
-        tracing::error!("Tera template init failed: {e}");
-        panic!("Tera template init failed: {e}");
-    });
-    let names: Vec<&str> = tera.get_template_names().collect();
-    tracing::info!("Loaded {} Tera templates: {:?}", names.len(), names);
     tera.register_filter("icon", filters::icon_filter);
     tera.register_filter("narrative_icon", filters::narrative_icon_filter);
     tera.register_filter("status_color", filters::status_color);
@@ -33,6 +27,12 @@ pub static TERA: LazyLock<Tera> = LazyLock::new(|| {
     tera.register_filter("phase_label", filters::phase_label);
     tera.register_filter("phase_class", filters::phase_class);
     tera.register_filter("json", filters::json);
+    tera.load_from_glob(&pattern).unwrap_or_else(|e| {
+        tracing::error!("Tera template init failed: {e}");
+        panic!("Tera template init failed: {e}");
+    });
+    let names: Vec<&str> = tera.get_template_names().collect();
+    tracing::info!("Loaded {} Tera templates: {:?}", names.len(), names);
     tera
 });
 

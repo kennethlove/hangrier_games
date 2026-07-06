@@ -537,7 +537,14 @@ impl TributeHistories {
                 | MessagePayload::PartialRescueProgress { .. }
                 | MessagePayload::TributeBledOut { .. }
                 | MessagePayload::WoundInfected { .. }
-                | MessagePayload::WoundHealed { .. } => {}
+                | MessagePayload::WoundHealed { .. }
+                | MessagePayload::WoundInflicted { .. }
+                | MessagePayload::WoundBled { .. }
+                | MessagePayload::WoundTreated { .. }
+                | MessagePayload::WoundAmputated { .. }
+                | MessagePayload::ConditionAcquired { .. }
+                | MessagePayload::ConditionResolved { .. }
+                | MessagePayload::TributeDesperate { .. } => {}
             }
         }
     }

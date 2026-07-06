@@ -23,6 +23,9 @@ pub enum EventKind {
     Movement,
     Sponsor,
     State,
+    Wound,
+    Condition,
+    Desperate,
     Other,
 }
 

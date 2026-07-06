@@ -288,6 +288,97 @@ impl BroadcastPackageBuilder {
                 })
             }
 
+            MessagePayload::WoundInflicted {
+                tribute, severity, ..
+            } => {
+                let kind = match severity.as_str() {
+                    "critical" | "severe" => EventKind::Wound,
+                    _ => EventKind::State,
+                };
+                let structured = serde_json::json!({
+                    "type": "wound_inflicted",
+                    "tribute": { "id": tribute.identifier, "name": tribute.name },
+                    "severity": severity,
+                });
+                Some(EventLine {
+                    kind,
+                    prose,
+                    structured: Some(structured),
+                })
+            }
+
+            MessagePayload::WoundBled {
+                tribute,
+                blood_lost,
+            } => {
+                let structured = serde_json::json!({
+                    "type": "wound_bled",
+                    "tribute": { "id": tribute.identifier, "name": tribute.name },
+                    "blood_lost": blood_lost,
+                });
+                Some(EventLine {
+                    kind: EventKind::Wound,
+                    prose,
+                    structured: Some(structured),
+                })
+            }
+
+            MessagePayload::WoundTreated { .. } => Some(EventLine {
+                kind: EventKind::Wound,
+                prose,
+                structured: None,
+            }),
+
+            MessagePayload::WoundAmputated { tribute, body_part } => {
+                let structured = serde_json::json!({
+                    "type": "wound_amputated",
+                    "tribute": { "id": tribute.identifier, "name": tribute.name },
+                    "body_part": body_part,
+                });
+                Some(EventLine {
+                    kind: EventKind::Wound,
+                    prose,
+                    structured: Some(structured),
+                })
+            }
+
+            MessagePayload::ConditionAcquired {
+                tribute,
+                condition,
+                severity,
+            } => {
+                let structured = serde_json::json!({
+                    "type": "condition_acquired",
+                    "tribute": { "id": tribute.identifier, "name": tribute.name },
+                    "condition": condition,
+                    "severity": severity,
+                });
+                Some(EventLine {
+                    kind: EventKind::Condition,
+                    prose,
+                    structured: Some(structured),
+                })
+            }
+
+            MessagePayload::ConditionResolved { .. } => Some(EventLine {
+                kind: EventKind::Condition,
+                prose,
+                structured: None,
+            }),
+
+            MessagePayload::TributeDesperate { tribute, reason } => {
+                let structured = serde_json::json!({
+                    "type": "tribute_desperate",
+                    "tribute": { "id": tribute.identifier, "name": tribute.name },
+                    "reason": reason,
+                });
+                Some(EventLine {
+                    kind: EventKind::Desperate,
+                    prose,
+                    structured: Some(structured),
+                })
+            }
+
             // ---- State / survival events: prose-only ----
             MessagePayload::TributeRested { .. }
             | MessagePayload::TributeStarved { .. }

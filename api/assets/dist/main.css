@@ -2290,6 +2290,49 @@ body.broadcast {
 .roster-status.dead {
   color: oklch(48% 0.22 25);
 }
+.broad-header-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.broad-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.broad-emblem {
+  width: 32px;
+  height: 32px;
+  background: var(--broad-accent);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+}
+.broad-emblem-inner {
+  width: 14px;
+  height: 14px;
+  background: var(--broad-bg);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+.roster-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.winner-banner-gold {
+  margin: 0 0 10px;
+  border-color: var(--broad-gold);
+  color: var(--broad-gold);
+  background: rgba(240, 180, 41, 0.08);
+}
+.roster-sort-btn {
+  font-size: 9px;
+  padding: 2px 6px;
+}
+.roster-empty {
+  padding: var(--gap-sm);
+}
 @property --tw-rotate-x {
   syntax: "*";
   inherits: false;

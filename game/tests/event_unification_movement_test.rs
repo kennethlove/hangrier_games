@@ -74,7 +74,8 @@ fn movement_and_turn_phase_events_reach_game_messages() {
         match &msg.source {
             MessageSource::Tribute(id) => {
                 assert_eq!(
-                    id, &lone_id,
+                    id,
+                    &lone_id.to_string(),
                     "unexpected tribute identifier in message source: {id}"
                 );
             }

@@ -41,7 +41,7 @@ impl Tribute {
         let area_ref = |a: Area| {
             let s = a.to_string();
             AreaRef {
-                identifier: s.clone(),
+                identifier: s.clone().into(),
                 name: s,
             }
         };

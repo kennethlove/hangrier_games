@@ -301,15 +301,15 @@ pub fn process_addictions(
                 if other_id == &tribute.identifier {
                     continue;
                 }
-                if !meta.observed_by.contains(other_id) {
-                    meta.observed_by.insert(other_id.clone());
+                if !meta.observed_by.contains(other_id.as_str()) {
+                    meta.observed_by.insert(other_id.to_string());
                     messages.push(MessagePayload::AddictionObserved {
-                        observer: other_id.clone(),
-                        subject: tribute.identifier.clone(),
+                        observer: other_id.to_string(),
+                        subject: tribute.identifier.to_string(),
                         substance: meta.substance.to_string(),
                     });
                 }
-                meta.observer_seen_cycle.insert(other_id.clone(), cycle);
+                meta.observer_seen_cycle.insert(other_id.to_string(), cycle);
             }
         }
 
@@ -319,7 +319,7 @@ pub fn process_addictions(
                 // Cured
                 let substance = meta.substance;
                 messages.push(MessagePayload::AddictionHabituated {
-                    tribute: tribute.identifier.clone(),
+                    tribute: tribute.identifier.to_string(),
                     substance: substance.to_string(),
                     from_severity: aff.severity.to_string(),
                     to_severity: None,
@@ -333,7 +333,7 @@ pub fn process_addictions(
                 aff.severity = new_sev;
                 meta.cycles_since_last_use = 0;
                 messages.push(MessagePayload::AddictionHabituated {
-                    tribute: tribute.identifier.clone(),
+                    tribute: tribute.identifier.to_string(),
                     substance: meta.substance.to_string(),
                     from_severity: from,
                     to_severity: Some(to),
@@ -355,7 +355,7 @@ pub fn process_addictions(
             meta.observer_seen_cycle.remove(observer_id);
             messages.push(MessagePayload::AddictionForgotten {
                 observer: observer_id.clone(),
-                subject: tribute.identifier.clone(),
+                subject: tribute.identifier.to_string(),
                 substance: meta.substance.to_string(),
             });
         }

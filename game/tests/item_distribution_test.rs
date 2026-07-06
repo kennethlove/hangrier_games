@@ -201,7 +201,10 @@ fn test_all_terrains_produce_valid_items() {
             let item = Item::new_random_with_terrain(terrain, None);
 
             // Item should have valid properties
-            assert!(!item.identifier.is_empty(), "Item should have identifier");
+            assert!(
+                !item.identifier.as_str().is_empty(),
+                "Item should have identifier"
+            );
             assert!(!item.name.is_empty(), "Item should have name");
             assert!(
                 item.current_durability > 0,

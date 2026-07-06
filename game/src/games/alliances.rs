@@ -60,7 +60,7 @@ impl Game {
                         };
                         let tick = self.tick_counter.next();
                         self.push_message(
-                            crate::messages::MessageSource::Tribute(v_id),
+                            crate::messages::MessageSource::Tribute(v_id.to_string()),
                             v_name,
                             event.to_string(),
                             payload,
@@ -92,7 +92,7 @@ impl Game {
                             (
                                 Vec::new(),
                                 crate::messages::TributeRef {
-                                    identifier: deceased.to_string(),
+                                    identifier: deceased.to_string().into(),
                                     name: String::new(),
                                 },
                             )
@@ -122,7 +122,7 @@ impl Game {
                                 };
                                 let tick = self.tick_counter.next();
                                 self.push_message(
-                                    crate::messages::MessageSource::Tribute(aid),
+                                    crate::messages::MessageSource::Tribute(aid.to_string()),
                                     aname,
                                     event.to_string(),
                                     payload,
@@ -202,7 +202,7 @@ impl Game {
                         };
                         let tick = self.tick_counter.next();
                         self.push_message(
-                            crate::messages::MessageSource::Tribute(p_id),
+                            crate::messages::MessageSource::Tribute(p_id.to_string()),
                             p_name,
                             event.to_string(),
                             payload,
@@ -243,7 +243,7 @@ impl Game {
                         for ev in wake_events.drain(..) {
                             let tick = self.tick_counter.next();
                             self.push_message(
-                                crate::messages::MessageSource::Tribute(t_id.clone()),
+                                crate::messages::MessageSource::Tribute(t_id.to_string()),
                                 t_name.clone(),
                                 ev.content,
                                 ev.payload,

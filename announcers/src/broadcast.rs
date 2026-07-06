@@ -484,7 +484,7 @@ mod tests {
 
     fn tr(name: &str) -> TributeRef {
         TributeRef {
-            identifier: format!("id-{name}"),
+            identifier: format!("id-{name}").into(),
             name: name.into(),
         }
     }
@@ -498,7 +498,7 @@ mod tests {
 
     fn ir(name: &str) -> ItemRef {
         ItemRef {
-            identifier: format!("id-{name}"),
+            identifier: format!("id-{name}").into(),
             name: name.into(),
         }
     }

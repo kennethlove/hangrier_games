@@ -27,7 +27,7 @@ static MSG_COUNTER: AtomicU32 = AtomicU32::new(1);
 
 fn tr(name: &str) -> TributeRef {
     TributeRef {
-        identifier: format!("id-{name}"),
+        identifier: format!("id-{name}").into(),
         name: name.into(),
     }
 }
@@ -41,7 +41,7 @@ fn ar(name: &str) -> AreaRef {
 
 fn ir(name: &str) -> ItemRef {
     ItemRef {
-        identifier: format!("id-{name}"),
+        identifier: format!("id-{name}").into(),
         name: name.into(),
     }
 }

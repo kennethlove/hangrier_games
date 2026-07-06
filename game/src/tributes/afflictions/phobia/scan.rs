@@ -117,7 +117,7 @@ fn scan_tribute_phobias(
                 cycle,
                 &mut aff.severity,
                 trigger,
-                &tribute.identifier,
+                tribute.identifier.as_str(),
                 ctx,
                 rng,
             );
@@ -136,8 +136,12 @@ fn scan_tribute_phobias(
             let AfflictionKind::Phobia(ref trigger) = aff.kind else {
                 unreachable!()
             };
-            let (msgs, should_remove) =
-                on_phobia_idle(meta, &mut aff.severity, trigger, &tribute.identifier);
+            let (msgs, should_remove) = on_phobia_idle(
+                meta,
+                &mut aff.severity,
+                trigger,
+                tribute.identifier.as_str(),
+            );
             result.messages.extend(msgs);
             if should_remove {
                 tribute.afflictions.remove(key);
@@ -583,7 +587,7 @@ mod tests {
                     observer,
                     subject,
                     ..
-                } if *observer == observer_id && *subject == main_id
+                } if observer_id == *observer && main_id == *subject
             )
         });
         assert!(
@@ -595,7 +599,7 @@ mod tests {
         let (_, aff) = main_tribute.afflictions.iter().next().unwrap();
         let meta = aff.phobia_metadata.as_ref().unwrap();
         assert!(
-            meta.observed_by.contains(&observer_id),
+            meta.observed_by.contains(observer_id.as_str()),
             "observer should be tracked in observed_by"
         );
     }

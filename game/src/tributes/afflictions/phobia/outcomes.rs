@@ -46,15 +46,15 @@ pub(super) fn on_phobia_fire(
             if other_id == tribute_id {
                 continue;
             }
-            if !meta.observed_by.contains(other_id) {
-                meta.observed_by.insert(other_id.clone());
+            if !meta.observed_by.contains(other_id.as_str()) {
+                meta.observed_by.insert(other_id.to_string());
                 messages.push(MessagePayload::PhobiaObserved {
-                    observer: other_id.clone(),
+                    observer: other_id.to_string(),
                     subject: tribute_id.to_string(),
                     trigger: trigger_str.clone(),
                 });
             }
-            meta.observer_seen_cycle.insert(other_id.clone(), cycle);
+            meta.observer_seen_cycle.insert(other_id.to_string(), cycle);
         }
     }
 

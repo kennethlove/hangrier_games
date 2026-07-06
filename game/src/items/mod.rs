@@ -95,7 +95,7 @@ pub trait OwnsItems {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Item {
-    pub identifier: String,
+    pub identifier: crate::messages::ItemId,
     pub name: String,
     pub item_type: ItemType,
     // Legacy `item` rows written before games.rs:1099's CONTENT-bind fix
@@ -123,7 +123,7 @@ impl Display for Item {
 
 impl Default for Item {
     fn default() -> Self {
-        let identifier = Uuid::new_v4().to_string();
+        let identifier = Uuid::new_v4().to_string().into();
         Self {
             identifier,
             name: String::from("Useless health potion"),
@@ -146,7 +146,7 @@ impl Item {
         attribute: Attribute,
         effect: i32,
     ) -> Item {
-        let identifier = Uuid::new_v4().to_string();
+        let identifier = Uuid::new_v4().to_string().into();
         Item {
             identifier,
             name: name.to_string(),

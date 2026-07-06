@@ -19,7 +19,7 @@ fn tribute() -> Tribute {
     tribute.attributes = crate::tributes::Attributes::default();
     // Fixed identifier ensures hash-based trap check is deterministic.
     // "safe-test-id" sums to 1243, not divisible by 7 — never triggers trap.
-    tribute.identifier = "safe-test-id".to_string();
+    tribute.identifier = "safe-test-id".into();
     tribute
 }
 
@@ -878,9 +878,9 @@ pub(crate) mod survival_override_tests {
         fn exhausted_self_does_not_count_as_threat() {
             // Same identifier as actor → not a threat.
             let mut actor = make("E", 10);
-            actor.identifier = "self".to_string();
+            actor.identifier = "self".into();
             let mut clone = make("E", 100);
-            clone.identifier = "self".to_string();
+            clone.identifier = "self".into();
             let result = stamina_override(&actor, &[clone], false, &CombatTuning::default());
             assert_eq!(result, Some(Action::Rest));
         }

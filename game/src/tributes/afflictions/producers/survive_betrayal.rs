@@ -20,7 +20,7 @@ pub(super) fn produce_survive_betrayal(game: &mut Game, phase: Phase) {
         let Some(tribute) = game
             .tributes
             .iter()
-            .find(|t| t.identifier == victim.identifier)
+            .find(|t| victim.identifier == t.identifier)
         else {
             continue;
         };
@@ -30,10 +30,10 @@ pub(super) fn produce_survive_betrayal(game: &mut Game, phase: Phase) {
         }
 
         events.push(TraumaEvent {
-            tribute_id: tribute.identifier.clone(),
+            tribute_id: tribute.identifier.to_string(),
             tribute_name: tribute.name.clone(),
             source: TraumaSource::Betrayal {
-                by: betrayer.identifier.clone(),
+                by: betrayer.identifier.to_string(),
             },
             severity: Severity::Moderate,
             cause_hint: shared::afflictions::DeathCause::Tribute(betrayer.name.clone()),

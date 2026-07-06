@@ -516,7 +516,7 @@ pub async fn timeline_handler(
                     let id = t.get("identifier")?.as_str()?.to_string();
                     let name = t.get("name")?.as_str()?.to_string();
                     Some(shared::messages::TributeRef {
-                        identifier: id,
+                        identifier: id.into(),
                         name,
                     })
                 })

@@ -170,7 +170,7 @@ pub struct EncounterContext {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Tribute {
     /// Identifier
-    pub identifier: String,
+    pub identifier: crate::messages::TributeId,
     /// Stable typed UUID. Mirrors `identifier` for callers that want a
     /// non-stringly-typed key (alliance graph, betrayal events).
     ///
@@ -372,7 +372,7 @@ impl Tribute {
         let brain = Brain::from_traits(&traits, &mut rng);
 
         Self {
-            identifier: id,
+            identifier: id.into(),
             id: id_uuid,
             area: Area::Cornucopia,
             name: name.clone(),
@@ -442,7 +442,7 @@ impl Tribute {
         let brain = Brain::from_traits(&traits, rng);
 
         Self {
-            identifier: id,
+            identifier: id.into(),
             id: id_uuid,
             area: Area::Cornucopia,
             name,
@@ -750,7 +750,7 @@ impl Tribute {
                     events.push(TaggedEvent::new(
                         line,
                         MessagePayload::AddictionCraving {
-                            tribute: self.identifier.clone(),
+                            tribute: self.identifier.to_string(),
                             substance: substance.to_string(),
                             severity: craving_severity,
                         },
@@ -778,7 +778,7 @@ impl Tribute {
                 continue;
             }
             let set_by = area_details.placed_traps[idx].set_by.clone();
-            if set_by == self.identifier {
+            if self.identifier == set_by {
                 continue; // Setter auto-passes
             }
 
@@ -966,7 +966,7 @@ impl Tribute {
         let area_ref = |a: Area| {
             let s = a.to_string();
             AreaRef {
-                identifier: s.clone(),
+                identifier: s.clone().into(),
                 name: s,
             }
         };
@@ -1017,7 +1017,7 @@ impl Tribute {
             id: uuid::Uuid::new_v4().to_string(),
             kind,
             severity,
-            set_by: self.identifier.clone(),
+            set_by: self.identifier.to_string(),
             concealment,
             triggered: false,
         };
@@ -1139,7 +1139,7 @@ impl Tribute {
             let area_ref = |a: Area| {
                 let s = a.to_string();
                 AreaRef {
-                    identifier: s.clone(),
+                    identifier: s.clone().into(),
                     name: s,
                 }
             };
@@ -1301,7 +1301,7 @@ impl Tribute {
             }
             aff.trauma_metadata
                 .as_ref()
-                .is_some_and(|m| m.observed_by.contains(&target.identifier))
+                .is_some_and(|m| m.observed_by.contains(&target.identifier.to_string()))
         }) {
             0.10
         } else {
@@ -1315,7 +1315,7 @@ impl Tribute {
             .values()
             .filter(|aff| matches!(aff.kind, AfflictionKind::Addiction(_)))
             .filter_map(|aff| aff.addiction_metadata.as_ref())
-            .filter(|meta| meta.observed_by.contains(&target.identifier))
+            .filter(|meta| meta.observed_by.contains(&target.identifier.to_string()))
             .map(|meta| {
                 let aff = self
                     .afflictions
@@ -1480,7 +1480,7 @@ impl Tribute {
                         name: self.name.clone(),
                     },
                     partner: TributeRef {
-                        identifier: ally_str.clone(),
+                        identifier: ally_str.clone().into(),
                         name: ally_str,
                     },
                 },
@@ -1950,7 +1950,7 @@ mod tests {
         assert!(tribute.allies.is_empty());
         assert_eq!(tribute.turns_since_last_betrayal, 0);
         // `id` mirrors `identifier`.
-        assert_eq!(tribute.id.to_string(), tribute.identifier);
+        assert_eq!(tribute.id.to_string(), tribute.identifier.to_string());
     }
 
     #[rstest]
@@ -2232,7 +2232,7 @@ mod tests {
         let woke = t.wake_interrupted(
             shared::messages::InterruptionKind::Ambush {
                 attacker: TributeRef {
-                    identifier: "x".to_string(),
+                    identifier: "x".into(),
                     name: "X".to_string(),
                 },
             },

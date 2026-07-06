@@ -22,7 +22,7 @@ pub(super) fn produce_witness_mass_casualty(game: &mut Game, phase: Phase) {
         let Some(vt) = game
             .tributes
             .iter()
-            .find(|t| t.identifier == victim.identifier)
+            .find(|t| victim.identifier == t.identifier)
         else {
             continue;
         };
@@ -47,7 +47,7 @@ pub(super) fn produce_witness_mass_casualty(game: &mut Game, phase: Phase) {
         for t in &game.tributes {
             if t.is_alive() && t.area == *area {
                 events.push(TraumaEvent {
-                    tribute_id: t.identifier.clone(),
+                    tribute_id: t.identifier.to_string(),
                     tribute_name: t.name.clone(),
                     source: TraumaSource::MassCasualty {
                         cause_class: CauseClass::Mixed,

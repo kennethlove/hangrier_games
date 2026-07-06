@@ -199,11 +199,11 @@ impl Game {
                                     {
                                         let line = format!("{}'s {} healed.", tribute.name, kind);
                                         collected_events.push((
-                                            tribute.identifier.clone(),
+                                            tribute.identifier.to_string(),
                                             tribute.name.clone(),
                                             line,
                                             Some(MessagePayload::AfflictionHealed {
-                                                tribute_id: tref.identifier.clone(),
+                                                tribute_id: tref.identifier.to_string(),
                                                 affliction: kind.to_string(),
                                             }),
                                             None,
@@ -214,11 +214,11 @@ impl Game {
                                             tribute.name, kind, from, to
                                         );
                                         collected_events.push((
-                                            tribute.identifier.clone(),
+                                            tribute.identifier.to_string(),
                                             tribute.name.clone(),
                                             line,
                                             Some(MessagePayload::AfflictionProgressed {
-                                                tribute_id: tref.identifier.clone(),
+                                                tribute_id: tref.identifier.to_string(),
                                                 affliction: kind.to_string(),
                                                 from_severity: from.to_string(),
                                                 to_severity: to.to_string(),
@@ -233,11 +233,11 @@ impl Game {
                                         tribute.name, kind, from, to
                                     );
                                     collected_events.push((
-                                        tribute.identifier.clone(),
+                                        tribute.identifier.to_string(),
                                         tribute.name.clone(),
                                         line,
                                         Some(MessagePayload::AfflictionProgressed {
-                                            tribute_id: tref.identifier.clone(),
+                                            tribute_id: tref.identifier.to_string(),
                                             affliction: kind.to_string(),
                                             from_severity: from.to_string(),
                                             to_severity: to.to_string(),
@@ -251,11 +251,11 @@ impl Game {
                                         tribute.name, from, to
                                     );
                                     collected_events.push((
-                                        tribute.identifier.clone(),
+                                        tribute.identifier.to_string(),
                                         tribute.name.clone(),
                                         line,
                                         Some(MessagePayload::AfflictionCascaded {
-                                            tribute_id: tref.identifier.clone(),
+                                            tribute_id: tref.identifier.to_string(),
                                             from_affliction: from.to_string(),
                                             to_affliction: to.to_string(),
                                         }),
@@ -265,7 +265,7 @@ impl Game {
                                 CascadeOutcome::DeathRoll { survived: false } => {
                                     let line = format!("{} succumbs to {}.", tribute.name, kind);
                                     collected_events.push((
-                                        tribute.identifier.clone(),
+                                        tribute.identifier.to_string(),
                                         tribute.name.clone(),
                                         line,
                                         Some(MessagePayload::TributeKilled {
@@ -313,7 +313,7 @@ impl Game {
 
                 if new_hunger != prior_hunger {
                     collected_events.push((
-                        tribute.identifier.clone(),
+                        tribute.identifier.to_string(),
                         tribute.name.clone(),
                         String::new(),
                         Some(MessagePayload::HungerBandChanged {
@@ -326,7 +326,7 @@ impl Game {
                 }
                 if new_thirst != prior_thirst {
                     collected_events.push((
-                        tribute.identifier.clone(),
+                        tribute.identifier.to_string(),
                         tribute.name.clone(),
                         String::new(),
                         Some(MessagePayload::ThirstBandChanged {
@@ -370,7 +370,7 @@ impl Game {
                             tribute.name, prior_band, new_band
                         );
                         collected_events.push((
-                            tribute.identifier.clone(),
+                            tribute.identifier.to_string(),
                             tribute.name.clone(),
                             line,
                             Some(MessagePayload::StaminaBandChanged {
@@ -394,7 +394,7 @@ impl Game {
                     };
                     let line = format!("{} succumbs to {}.", tribute.name, cause);
                     collected_events.push((
-                        tribute.identifier.clone(),
+                        tribute.identifier.to_string(),
                         tribute.name.clone(),
                         line,
                         Some(MessagePayload::TributeKilled {
@@ -441,7 +441,7 @@ impl Game {
                     if woke {
                         for ev in wake_events.drain(..) {
                             collected_events.push((
-                                tribute.identifier.clone(),
+                                tribute.identifier.to_string(),
                                 tribute.name.clone(),
                                 ev.content,
                                 Some(ev.payload),
@@ -491,7 +491,7 @@ impl Game {
                         )
                         .to_string();
                         collected_events.push((
-                            tribute.identifier.clone(),
+                            tribute.identifier.to_string(),
                             tribute.name.clone(),
                             flavor_line,
                             Some(MessagePayload::SleepIncident {
@@ -511,7 +511,7 @@ impl Game {
                         )
                         .to_string();
                         collected_events.push((
-                            tribute.identifier.clone(),
+                            tribute.identifier.to_string(),
                             tribute.name.clone(),
                             incident_msg,
                             Some(MessagePayload::TributeWoke {
@@ -543,7 +543,7 @@ impl Game {
                         )
                         .to_string();
                         collected_events.push((
-                            tribute.identifier.clone(),
+                            tribute.identifier.to_string(),
                             tribute.name.clone(),
                             flavor_line,
                             Some(MessagePayload::SleepIncident {
@@ -611,7 +611,7 @@ impl Game {
                         incident_suffix,
                     );
                     collected_events.push((
-                        tribute.identifier.clone(),
+                        tribute.identifier.to_string(),
                         tribute.name.clone(),
                         line,
                         Some(MessagePayload::TributeWoke {
@@ -672,7 +672,7 @@ impl Game {
                 for msg in scan_result.messages {
                     let line = phobia_message_line(&msg, &self.tributes[idx].name);
                     collected_events.push((
-                        self.tributes[idx].identifier.clone(),
+                        self.tributes[idx].identifier.to_string(),
                         self.tributes[idx].name.clone(),
                         line,
                         Some(msg),
@@ -705,7 +705,7 @@ impl Game {
                 for msg in t_result.messages {
                     let line = format_trauma_message(&msg, &self.tributes[idx].name);
                     collected_events.push((
-                        self.tributes[idx].identifier.clone(),
+                        self.tributes[idx].identifier.to_string(),
                         self.tributes[idx].name.clone(),
                         line,
                         Some(msg),
@@ -738,7 +738,7 @@ impl Game {
                 for msg in msgs {
                     let line = format_addiction_message(&msg, &self.tributes[idx].name);
                     collected_events.push((
-                        self.tributes[idx].identifier.clone(),
+                        self.tributes[idx].identifier.to_string(),
                         self.tributes[idx].name.clone(),
                         line,
                         Some(msg),
@@ -755,7 +755,13 @@ impl Game {
                 t.hangover_cycles_remaining -= 1;
                 if t.hangover_cycles_remaining == 0 {
                     let line = format!("{}'s hangover fades — rough night, clear head", t.name);
-                    collected_events.push((t.identifier.clone(), t.name.clone(), line, None, None));
+                    collected_events.push((
+                        t.identifier.to_string(),
+                        t.name.clone(),
+                        line,
+                        None,
+                        None,
+                    ));
                 }
             }
         }
@@ -895,7 +901,7 @@ impl Game {
             );
             for tagged in tribute_events {
                 collected_events.push((
-                    tribute.identifier.clone(),
+                    tribute.identifier.to_string(),
                     tribute.name.clone(),
                     tagged.content,
                     Some(tagged.payload),
@@ -950,7 +956,7 @@ impl Game {
                 thief_name, item_name, sleeper_name
             );
             collected_events.push((
-                thief.identifier.clone(),
+                thief.identifier.to_string(),
                 thief.name.clone(),
                 line,
                 Some(MessagePayload::ItemFound {
@@ -963,7 +969,7 @@ impl Game {
                         name: item_name,
                     },
                     area: AreaRef {
-                        identifier: thief.area.to_string(),
+                        identifier: thief.area.to_string().into(),
                         name: thief.area.to_string(),
                     },
                 }),
@@ -998,7 +1004,7 @@ impl Game {
                 let id_to_uuid: HashMap<String, Uuid> = self
                     .tributes
                     .iter()
-                    .map(|t| (t.identifier.clone(), t.id))
+                    .map(|t| (t.identifier.to_string(), t.id))
                     .collect();
 
                 // Build dead-tribute → killer lookup from drained alliance events.
@@ -1025,11 +1031,11 @@ impl Game {
                 let all_item_ids: std::collections::BTreeSet<String> = self
                     .tributes
                     .iter()
-                    .flat_map(|t| t.items.iter().map(|i| i.identifier.clone()))
+                    .flat_map(|t| t.items.iter().map(|i| i.identifier.to_string()))
                     .chain(
                         self.areas
                             .iter()
-                            .flat_map(|a| a.items.iter().map(|i| i.identifier.clone())),
+                            .flat_map(|a| a.items.iter().map(|i| i.identifier.to_string())),
                     )
                     .collect();
 
@@ -1037,7 +1043,7 @@ impl Game {
                 let tribute_areas: HashMap<String, String> = self
                     .tributes
                     .iter()
-                    .map(|t| (t.identifier.clone(), t.area.to_string()))
+                    .map(|t| (t.identifier.to_string(), t.area.to_string()))
                     .collect();
 
                 let fix_ctx = FixationContext {
@@ -1054,7 +1060,7 @@ impl Game {
                     for msg in msgs {
                         let line = fixation_message_line(&msg, &self.tributes[*idx].name);
                         collected_events.push((
-                            self.tributes[*idx].identifier.clone(),
+                            self.tributes[*idx].identifier.to_string(),
                             self.tributes[*idx].name.clone(),
                             line,
                             Some(msg),
@@ -1174,7 +1180,8 @@ impl Game {
                     _ => unreachable!(),
                 };
                 let line =
-                    crate::output::GameOutput::SponsorGift(&recipient_id, &gift.item).to_string();
+                    crate::output::GameOutput::SponsorGift(recipient_id.as_ref(), &gift.item)
+                        .to_string();
                 let source = crate::messages::MessageSource::Game(self.identifier.clone());
                 let subject = format!("sponsor_gift:{recipient_id}");
                 let tick = self.tick_counter.next();
@@ -1182,7 +1189,7 @@ impl Game {
                 if let Some(tribute) = self
                     .tributes
                     .iter_mut()
-                    .find(|t| t.identifier == recipient_id)
+                    .find(|t| recipient_id == t.identifier)
                 {
                     tribute.add_item(gift.item);
                 }

@@ -243,7 +243,7 @@ mod tests {
             content: String::new(),
             payload: MessagePayload::TributeKilled {
                 victim: TributeRef {
-                    identifier: "victim".to_string(),
+                    identifier: "victim".into(),
                     name: "Victim".to_string(),
                 },
                 killer: None,

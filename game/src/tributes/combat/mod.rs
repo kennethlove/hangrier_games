@@ -274,7 +274,7 @@ impl Tribute {
                 events.push(TaggedEvent::new(
                     String::new(),
                     MessagePayload::AfflictionAcquired {
-                        tribute_id: target.identifier.clone(),
+                        tribute_id: target.identifier.to_string(),
                         affliction: draft.kind.to_string(),
                         severity: draft.severity.to_string(),
                     },
@@ -292,7 +292,7 @@ impl Tribute {
                 events.push(TaggedEvent::new(
                     String::new(),
                     MessagePayload::AfflictionAcquired {
-                        tribute_id: self.identifier.clone(),
+                        tribute_id: self.identifier.to_string(),
                         affliction: draft.kind.to_string(),
                         severity: draft.severity.to_string(),
                     },

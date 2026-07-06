@@ -20,7 +20,7 @@ mod tests {
 
     fn sample_item() -> Item {
         Item {
-            identifier: "33333333-3333-3333-3333-333333333333".to_string(),
+            identifier: "33333333-3333-3333-3333-333333333333".to_string().into(),
             name: "elixir".to_string(),
             item_type: ItemType::Consumable,
             rarity: ItemRarity::Common,

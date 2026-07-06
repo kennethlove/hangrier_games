@@ -71,7 +71,7 @@ fn witness_ally_death_acquires_mild_trauma() {
     game.tributes.push(witness);
 
     game.messages.push(make_killed_msg(
-        &game.tributes[0].identifier,
+        game.tributes[0].identifier.as_str(),
         "Victim",
         Phase::Day,
     ));
@@ -110,7 +110,7 @@ fn witness_different_area_no_trauma() {
     game.tributes.push(witness);
 
     game.messages.push(make_killed_msg(
-        &game.tributes[0].identifier,
+        game.tributes[0].identifier.as_str(),
         "Victim",
         Phase::Day,
     ));
@@ -284,7 +284,7 @@ fn mass_casualty_three_deaths_moderate() {
 
     for v in &game.tributes[..3] {
         game.messages
-            .push(make_killed_msg(&v.identifier, &v.name, Phase::Day));
+            .push(make_killed_msg(v.identifier.as_str(), &v.name, Phase::Day));
     }
 
     run_trauma_producers(&mut game);
@@ -320,7 +320,7 @@ fn mass_casualty_five_deaths_severe() {
 
     for v in &game.tributes[..5] {
         game.messages
-            .push(make_killed_msg(&v.identifier, &v.name, Phase::Day));
+            .push(make_killed_msg(v.identifier.as_str(), &v.name, Phase::Day));
     }
 
     run_trauma_producers(&mut game);
@@ -358,7 +358,7 @@ fn different_phase_messages_ignored() {
 
     // Message from different phase
     game.messages.push(make_killed_msg(
-        &game.tributes[0].identifier,
+        game.tributes[0].identifier.as_str(),
         "Victim",
         Phase::Night,
     ));

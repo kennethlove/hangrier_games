@@ -122,7 +122,7 @@ pub struct DestinationInfo {
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct AreaDetails {
-    pub identifier: String,
+    pub identifier: crate::messages::AreaId,
     pub name: String,
     pub area: Option<Area>,
     #[serde(default)]
@@ -149,7 +149,7 @@ fn default_terrain() -> TerrainType {
 impl Default for AreaDetails {
     fn default() -> Self {
         Self {
-            identifier: Uuid::new_v4().to_string(),
+            identifier: Uuid::new_v4().to_string().into(),
             name: String::new(),
             area: None,
             items: vec![],
@@ -198,7 +198,7 @@ impl OwnsItems for AreaDetails {
 impl AreaDetails {
     pub fn new(name: Option<String>, area: Area) -> Self {
         Self {
-            identifier: Uuid::new_v4().to_string(),
+            identifier: Uuid::new_v4().to_string().into(),
             name: name.unwrap_or(area.to_string()),
             area: Some(area),
             items: vec![],
@@ -211,7 +211,7 @@ impl AreaDetails {
 
     pub fn new_with_terrain(name: Option<String>, area: Area, terrain: TerrainType) -> Self {
         Self {
-            identifier: Uuid::new_v4().to_string(),
+            identifier: Uuid::new_v4().to_string().into(),
             name: name.unwrap_or(area.to_string()),
             area: Some(area),
             items: vec![],

@@ -346,7 +346,7 @@ impl Tribute {
                     events.push(TaggedEvent::new(
                         format!("{} is still trapped", tribute_name),
                         MessagePayload::Struggling {
-                            tribute: tribute_id,
+                            tribute: tribute_id.to_string(),
                             kind: kind_copy,
                             severity: buried_severity.unwrap_or(Severity::Mild),
                             cycles_trapped: cycles_trapped + 1,
@@ -391,7 +391,7 @@ impl Tribute {
                 events.push(TaggedEvent::new(
                     format!("{} escaped!", self.name),
                     MessagePayload::TrappedEscaped {
-                        tribute: self.identifier.clone(),
+                        tribute: self.identifier.to_string(),
                         kind: *trap_kind,
                         cycles_trapped: cycles,
                         rescued_by: Vec::new(),

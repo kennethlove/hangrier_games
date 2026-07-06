@@ -111,7 +111,7 @@ pub fn translate(
             // Check if the victim actually has a Trapped affliction
             // (extra disapproval for attacking defenseless tributes)
             let is_victim_trapped = ctx.tributes.iter().any(|t| {
-                t.identifier == victim.identifier
+                victim.identifier == t.identifier
                     && t.afflictions
                         .values()
                         .any(|a| matches!(a.kind, AfflictionKind::Trapped(_)))
@@ -177,7 +177,7 @@ pub fn update_affinities(game: &mut Game, events: &[AudienceEvent]) {
             for tribute in ev.affected_tributes() {
                 let entry = sponsor
                     .affinity
-                    .entry(tribute.identifier.clone())
+                    .entry(tribute.identifier.to_string())
                     .or_insert(0);
                 *entry = (*entry + delta).clamp(MIN_AFFINITY, MAX_AFFINITY);
             }
@@ -196,7 +196,7 @@ fn loyalist_district_modifier(
     let actor_in_district = |tref: &shared::messages::TributeRef| -> bool {
         tributes
             .iter()
-            .any(|t| t.identifier == tref.identifier && t.district as u8 == district)
+            .any(|t| tref.identifier == t.identifier && t.district as u8 == district)
     };
     match ev {
         AudienceEvent::KillMade { actor, .. }
@@ -251,7 +251,7 @@ pub fn resolve_gifts(
         }
 
         for tribute_ref in ev.affected_tributes() {
-            if gifted_this_cycle.contains(&tribute_ref.identifier) {
+            if gifted_this_cycle.contains(&tribute_ref.identifier.to_string()) {
                 continue;
             }
 
@@ -261,7 +261,7 @@ pub fn resolve_gifts(
                 .filter(|s| s.budget_remaining > 0)
                 .filter(|s| {
                     s.affinity
-                        .get(&tribute_ref.identifier)
+                        .get(&tribute_ref.identifier.to_string())
                         .copied()
                         .unwrap_or(0)
                         >= AFFINITY_FLOOR
@@ -275,7 +275,7 @@ pub fn resolve_gifts(
             let winner = candidates.iter().max_by_key(|s| {
                 let affinity = s
                     .affinity
-                    .get(&tribute_ref.identifier)
+                    .get(&tribute_ref.identifier.to_string())
                     .copied()
                     .unwrap_or(0);
                 let rank = priority_rank(s.archetype);
@@ -301,7 +301,7 @@ pub fn resolve_gifts(
             }
 
             game.sponsors[sponsor_idx].budget_remaining -= cost;
-            gifted_this_cycle.insert(tribute_ref.identifier.clone());
+            gifted_this_cycle.insert(tribute_ref.identifier.to_string());
 
             let donor = game.sponsors[sponsor_idx].canonical_name().to_string();
             let payload = MessagePayload::SponsorGift {

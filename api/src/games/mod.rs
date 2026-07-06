@@ -633,7 +633,7 @@ impl From<GameLog> for GameMessage {
             );
             shared::messages::MessagePayload::AreaEvent {
                 area: shared::messages::AreaRef {
-                    identifier: String::new(),
+                    identifier: String::new().into(),
                     name: String::new(),
                 },
                 kind: shared::messages::AreaEventKind::Other,
@@ -658,7 +658,7 @@ impl From<GameLog> for GameMessage {
 /// Build a fresh [`announcers::TributeDigest`] from a game Tribute.
 fn build_tribute_digest(t: &game::tributes::Tribute) -> announcers::TributeDigest {
     announcers::TributeDigest {
-        identifier: t.identifier.clone(),
+        identifier: t.identifier.to_string(),
         name: t.name.clone(),
         district: t.district as u8,
         status: if t.is_alive() {

@@ -27,10 +27,10 @@ pub(super) fn produce_witness_ally_death(game: &mut Game, phase: Phase) {
             } => game
                 .tributes
                 .iter()
-                .find(|t| t.identifier == victim.identifier)
+                .find(|t| victim.identifier == t.identifier)
                 .map(|vt| {
                     (
-                        victim.identifier.clone(),
+                        victim.identifier.to_string(),
                         vt.area,
                         vt.id,
                         killer.clone(),
@@ -48,7 +48,7 @@ pub(super) fn produce_witness_ally_death(game: &mut Game, phase: Phase) {
             if t.is_alive() && t.allies.contains(victim_uuid) && t.area == *victim_area {
                 let death_cause = map_cause_to_death_cause(killer.as_ref(), cause);
                 events.push(TraumaEvent {
-                    tribute_id: t.identifier.clone(),
+                    tribute_id: t.identifier.to_string(),
                     tribute_name: t.name.clone(),
                     source: TraumaSource::WitnessedAllyDeath {
                         ally: victim_id.clone(),

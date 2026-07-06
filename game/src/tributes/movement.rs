@@ -35,13 +35,13 @@ impl Tribute {
         let current_area = self.area;
 
         let tribute_ref = || TributeRef {
-            identifier: self.identifier.clone(),
+            identifier: self.identifier.clone().into(),
             name: self.name.clone(),
         };
         let area_ref = |a: Area| {
             let s = a.to_string();
             AreaRef {
-                identifier: s.clone(),
+                identifier: s.clone().into(),
                 name: s,
             }
         };

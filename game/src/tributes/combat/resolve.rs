@@ -30,15 +30,14 @@ use std::cmp::Ordering;
 /// Build a `TributeRef` from a tribute.
 pub(super) fn tref(t: &Tribute) -> TributeRef {
     TributeRef {
-        identifier: t.identifier.clone(),
+        identifier: t.identifier.clone().into(),
         name: t.name.clone(),
     }
 }
 
-/// Build an `ItemRef` from an item.
 pub(super) fn iref(i: &Item) -> ItemRef {
     ItemRef {
-        identifier: i.identifier.clone(),
+        identifier: i.identifier.clone().into(),
         name: i.name.clone(),
     }
 }
@@ -149,7 +148,7 @@ pub fn attack_contest(
         weapon_kind = classify_weapon(&weapon);
         let attacker_ref = tref(attacker);
         let item_ref = ItemRef {
-            identifier: weapon.identifier.clone(),
+            identifier: weapon.identifier.clone().into(),
             name: weapon.name.clone(),
         };
         match outcome {
@@ -261,7 +260,7 @@ pub fn attack_contest(
     if let Some((shield, outcome)) = shield_outcome {
         let target_ref = tref(target);
         let item_ref = ItemRef {
-            identifier: shield.identifier.clone(),
+            identifier: shield.identifier.clone().into(),
             name: shield.name.clone(),
         };
         match outcome {

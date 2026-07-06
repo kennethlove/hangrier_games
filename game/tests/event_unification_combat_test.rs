@@ -87,7 +87,7 @@ fn combat_events_reach_game_messages_with_tribute_source() {
         match &msg.source {
             MessageSource::Tribute(id) => {
                 assert!(
-                    id == &attacker_id || id == &defender_id,
+                    id == &attacker_id.to_string() || id == &defender_id.to_string(),
                     "unexpected tribute identifier in message source: {id}"
                 );
             }

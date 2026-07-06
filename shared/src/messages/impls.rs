@@ -1,4 +1,5 @@
 use super::*;
+use crate::ids::TributeId;
 
 impl MessagePayload {
     pub fn kind(&self) -> MessageKind {
@@ -127,7 +128,7 @@ impl MessagePayload {
     }
 
     pub fn involves(&self, tribute_identifier: &str) -> bool {
-        let id = tribute_identifier;
+        let id = tribute_identifier.parse::<TributeId>().unwrap();
         if self.tribute_refs().iter().any(|t| t.identifier == id) {
             return true;
         }
@@ -230,7 +231,7 @@ impl MessagePayload {
             | TributeDiedWhileTrapped {
                 tribute: tribute_id,
                 ..
-            } => tribute_id == id,
+            } => tribute_id.parse::<TributeId>().ok() == Some(id),
             PhobiaObserved {
                 observer, subject, ..
             }
@@ -248,13 +249,19 @@ impl MessagePayload {
             }
             | AddictionForgotten {
                 observer, subject, ..
-            } => observer == id || subject == id,
+            } => {
+                observer.parse::<TributeId>().ok() == Some(id.clone())
+                    || subject.parse::<TributeId>().ok() == Some(id)
+            }
             RescueAttempted {
                 rescuer, target, ..
             }
             | PartialRescueProgress {
                 rescuer, target, ..
-            } => rescuer == id || target == id,
+            } => {
+                rescuer.parse::<TributeId>().ok() == Some(id.clone())
+                    || target.parse::<TributeId>().ok() == Some(id)
+            }
             _ => false,
         }
     }

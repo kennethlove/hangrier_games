@@ -26,7 +26,7 @@ pub(super) fn produce_survive_near_death(game: &mut Game, phase: Phase) {
         let Some(tribute) = game
             .tributes
             .iter()
-            .find(|t| t.identifier == victim.identifier)
+            .find(|t| victim.identifier == t.identifier)
         else {
             continue;
         };
@@ -37,11 +37,11 @@ pub(super) fn produce_survive_near_death(game: &mut Game, phase: Phase) {
         if hp_percent <= 10 && tribute.is_alive() {
             let death_cause = attacker
                 .as_ref()
-                .map(|a| DeathCause::Tribute(a.identifier.clone()))
+                .map(|a| DeathCause::Tribute(a.identifier.to_string()))
                 .unwrap_or(DeathCause::Unknown);
 
             events.push(TraumaEvent {
-                tribute_id: tribute.identifier.clone(),
+                tribute_id: tribute.identifier.to_string(),
                 tribute_name: tribute.name.clone(),
                 source: TraumaSource::NearDeath { cause: death_cause },
                 severity: Severity::Moderate,

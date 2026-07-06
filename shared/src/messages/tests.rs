@@ -1,7 +1,7 @@
 use super::*;
 fn t(name: &str) -> TributeRef {
     TributeRef {
-        identifier: format!("id-{name}"),
+        identifier: format!("id-{name}").into(),
         name: name.into(),
     }
 }

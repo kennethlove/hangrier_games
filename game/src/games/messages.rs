@@ -13,13 +13,13 @@ impl Game {
         match source {
             MessageSource::Tribute(id) => MessagePayload::SanityBreak {
                 tribute: TributeRef {
-                    identifier: id.clone(),
+                    identifier: id.clone().into(),
                     name: String::new(),
                 },
             },
             MessageSource::Area(name) => MessagePayload::AreaEvent {
                 area: AreaRef {
-                    identifier: name.clone(),
+                    identifier: name.clone().into(),
                     name: name.clone(),
                 },
                 kind: AreaEventKind::Other,

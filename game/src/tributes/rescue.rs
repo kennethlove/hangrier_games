@@ -98,8 +98,8 @@ pub fn resolve_rescue(
                         rescuer.name, target.name, meta.escape_progress, PARTIAL_RESCUE_THRESHOLD
                     ),
                     MessagePayload::PartialRescueProgress {
-                        rescuer: rescuer.identifier.clone(),
-                        target: target.identifier.clone(),
+                        rescuer: rescuer.identifier.to_string(),
+                        target: target.identifier.to_string(),
                         kind: trap_kind,
                         severity,
                         bonus,
@@ -133,8 +133,8 @@ pub fn resolve_rescue(
                 rescuer.name, target.name, bonus
             ),
             MessagePayload::RescueAttempted {
-                rescuer: rescuer.identifier.clone(),
-                target: target.identifier.clone(),
+                rescuer: rescuer.identifier.to_string(),
+                target: target.identifier.to_string(),
                 kind: trap_kind,
                 severity,
                 bonus,
@@ -178,7 +178,7 @@ pub fn evaluate_rescue_opportunity(
     let base_chance = 0.30;
 
     if rng.random_bool(base_chance) {
-        Some(target.identifier.clone())
+        Some(target.identifier.to_string())
     } else {
         None
     }

@@ -61,7 +61,7 @@ fn stamina_band_change_round_trips_and_routes_to_state() {
     let back: MessagePayload = serde_json::from_str(&json).unwrap();
     assert_eq!(format!("{:?}", p), format!("{:?}", back));
     assert_eq!(p.kind(), MessageKind::StaminaBandChanged);
-    assert!(p.involves(&tref().identifier));
+    assert!(p.involves(tref().identifier.as_str()));
 }
 
 #[test]

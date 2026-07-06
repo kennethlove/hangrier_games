@@ -478,7 +478,7 @@ impl Game {
             let game_id = self.identifier.clone();
             let payload = crate::messages::MessagePayload::GameEnded {
                 winner: Some(crate::messages::TributeRef {
-                    identifier: winner.identifier.clone(),
+                    identifier: winner.identifier.clone().into(),
                     name: winner.name.clone(),
                 }),
             };
@@ -725,12 +725,12 @@ impl Game {
                 };
 
                 let content = format!("{} falls into a sinkhole and dies.", name);
-                let source = crate::messages::MessageSource::Tribute(id.clone());
+                let source = crate::messages::MessageSource::Tribute(id.to_string());
                 let subject = format!("tribute:{}", id);
                 let tick = self.tick_counter.next();
                 let payload = crate::messages::MessagePayload::TributeKilled {
                     victim: crate::messages::TributeRef {
-                        identifier: id.clone(),
+                        identifier: id.clone().into(),
                         name: name.clone(),
                     },
                     killer: None,
@@ -793,7 +793,8 @@ impl Game {
                     rng,
                 );
 
-                let source = crate::messages::MessageSource::Tribute(tribute.identifier.clone());
+                let source =
+                    crate::messages::MessageSource::Tribute(tribute.identifier.to_string());
                 let subject = format!("tribute:{}", tribute.identifier);
                 let roll_detail = format!(
                     "[{:?} severity, rolled {}{}]",
@@ -855,7 +856,7 @@ impl Game {
                     };
                     let payload = crate::messages::MessagePayload::TributeKilled {
                         victim: crate::messages::TributeRef {
-                            identifier: tribute.identifier.clone(),
+                            identifier: tribute.identifier.clone().into(),
                             name: tribute.name.clone(),
                         },
                         killer: None,

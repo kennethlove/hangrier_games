@@ -161,15 +161,15 @@ mod tests {
             content: "Katniss found a bow.".into(),
             payload: MessagePayload::ItemFound {
                 tribute: TributeRef {
-                    identifier: test_uuid("Katniss").into(),
+                    identifier: test_uuid("Katniss").to_string().into(),
                     name: "Katniss".into(),
                 },
                 item: shared::messages::ItemRef {
-                    identifier: test_uuid("bow").into(),
+                    identifier: test_uuid("bow").to_string().into(),
                     name: "bow".into(),
                 },
                 area: shared::messages::AreaRef {
-                    identifier: test_uuid("Cornucopia").into(),
+                    identifier: test_uuid("Cornucopia").to_string().into(),
                     name: "Cornucopia".into(),
                 },
             },

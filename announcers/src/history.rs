@@ -202,7 +202,7 @@ impl TributeHistories {
                             .filter(|o| o.identifier != m.identifier)
                             .map(|o| o.name.clone())
                             .collect();
-                        if let Some(digest) = self.inner.get_mut(&m.identifier.to_string()) {
+                        if let Some(digest) = self.inner.get_mut(m.identifier.as_str()) {
                             for ally in &allies {
                                 if !digest.allies.contains(ally) {
                                     digest.allies.push(ally.clone());
@@ -233,7 +233,7 @@ impl TributeHistories {
 
                 MessagePayload::AllianceDissolved { members, reason } => {
                     for m in members {
-                        if let Some(digest) = self.inner.get_mut(&m.identifier.to_string()) {
+                        if let Some(digest) = self.inner.get_mut(m.identifier.as_str()) {
                             digest.allies.clear();
                         }
                         self.push_event(&m.identifier, &format!("Alliance dissolved — {reason}"));
@@ -706,7 +706,7 @@ mod tests {
 
     fn tr(name: &str) -> TributeRef {
         TributeRef {
-            identifier: test_uuid(name).into(),
+            identifier: test_uuid(name).to_string().into(),
             name: name.into(),
         }
     }
@@ -777,11 +777,11 @@ mod tests {
         h.update(&[make_msg(MessagePayload::TributeMoved {
             tribute: tr("Peeta"),
             from: shared::messages::AreaRef {
-                identifier: test_uuid("area-1").into(),
+                identifier: test_uuid("area-1").to_string().into(),
                 name: "Cornucopia".into(),
             },
             to: shared::messages::AreaRef {
-                identifier: test_uuid("area-2").into(),
+                identifier: test_uuid("area-2").to_string().into(),
                 name: "Forest".into(),
             },
         })]);

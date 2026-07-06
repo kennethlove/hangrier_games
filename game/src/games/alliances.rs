@@ -50,17 +50,17 @@ impl Game {
                         };
                         let payload = crate::messages::MessagePayload::BetrayalTriggered {
                             betrayer: crate::messages::TributeRef {
-                                identifier: b_id,
+                                identifier: b_id.into(),
                                 name: b_name,
                             },
                             victim: crate::messages::TributeRef {
-                                identifier: v_id.clone(),
+                                identifier: v_id.clone().into(),
                                 name: v_name.clone(),
                             },
                         };
                         let tick = self.tick_counter.next();
                         self.push_message(
-                            crate::messages::MessageSource::Tribute(v_id),
+                            crate::messages::MessageSource::Tribute(v_id.to_string()),
                             v_name,
                             event.to_string(),
                             payload,
@@ -83,7 +83,7 @@ impl Game {
                             (
                                 d.allies.clone(),
                                 crate::messages::TributeRef {
-                                    identifier: d.identifier.clone(),
+                                    identifier: d.identifier.clone().into(),
                                     name: d.name.clone(),
                                 },
                             )
@@ -92,7 +92,7 @@ impl Game {
                             (
                                 Vec::new(),
                                 crate::messages::TributeRef {
-                                    identifier: deceased.to_string(),
+                                    identifier: deceased.to_string().into(),
                                     name: String::new(),
                                 },
                             )
@@ -100,8 +100,6 @@ impl Game {
 
                     for ally_id in allies_of_deceased {
                         if let Some(ally) = self.tributes.iter_mut().find(|t| t.id == ally_id) {
-                            // `extreme_low_sanity` is the §7.3a low-limit
-                            // mapping (see PersonalityThresholds doc).
                             let limit = ally.brain.thresholds.extreme_low_sanity;
                             let sanity = ally.attributes.sanity();
                             if sanity_break_roll(sanity, limit, rng) {
@@ -115,14 +113,14 @@ impl Game {
                                 };
                                 let payload = crate::messages::MessagePayload::TrustShockBreak {
                                     tribute: crate::messages::TributeRef {
-                                        identifier: aid.clone(),
+                                        identifier: aid.clone().into(),
                                         name: aname.clone(),
                                     },
                                     partner: deceased_ref.clone(),
                                 };
                                 let tick = self.tick_counter.next();
                                 self.push_message(
-                                    crate::messages::MessageSource::Tribute(aid),
+                                    crate::messages::MessageSource::Tribute(aid.to_string()),
                                     aname,
                                     event.to_string(),
                                     payload,
@@ -191,18 +189,18 @@ impl Game {
                         let payload = crate::messages::MessagePayload::AllianceFormed {
                             members: vec![
                                 crate::messages::TributeRef {
-                                    identifier: p_id.clone(),
+                                    identifier: p_id.clone().into(),
                                     name: p_name.clone(),
                                 },
                                 crate::messages::TributeRef {
-                                    identifier: t_id,
+                                    identifier: t_id.into(),
                                     name: t_name,
                                 },
                             ],
                         };
                         let tick = self.tick_counter.next();
                         self.push_message(
-                            crate::messages::MessageSource::Tribute(p_id),
+                            crate::messages::MessageSource::Tribute(p_id.to_string()),
                             p_name,
                             event.to_string(),
                             payload,
@@ -218,7 +216,7 @@ impl Game {
                     // sleeping allies through the standard alliance pipeline.
                     let summoner_ref = self.tributes.iter().find(|t| t.id == summoner).map(|t| {
                         crate::messages::TributeRef {
-                            identifier: t.identifier.clone(),
+                            identifier: t.identifier.clone().into(),
                             name: t.name.clone(),
                         }
                     });
@@ -243,7 +241,7 @@ impl Game {
                         for ev in wake_events.drain(..) {
                             let tick = self.tick_counter.next();
                             self.push_message(
-                                crate::messages::MessageSource::Tribute(t_id.clone()),
+                                crate::messages::MessageSource::Tribute(t_id.to_string()),
                                 t_name.clone(),
                                 ev.content,
                                 ev.payload,

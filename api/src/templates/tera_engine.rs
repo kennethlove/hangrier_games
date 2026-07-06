@@ -1,31 +1,15 @@
 use std::sync::LazyLock;
-use tera::{Context, Tera, load_from_glob};
+use tera::{Context, Tera};
 
 use crate::templates::AuthState;
 use crate::templates::filters;
 
 pub static TERA: LazyLock<Tera> = LazyLock::new(|| {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let templates_dir = format!("{}/templates", manifest_dir);
     let pattern = format!("{}/templates/**/*.html", manifest_dir);
     tracing::info!("Loading Tera templates from: {}", pattern);
     let mut tera = Tera::new();
-    let templates = load_from_glob(&pattern).unwrap_or_else(|e| {
-        tracing::error!("Tera template init failed: {e}");
-        panic!("Tera template init failed: {e}");
-    });
-    let templates: Vec<(String, String)> = templates
-        .into_iter()
-        .map(|(path, content)| {
-            let name = path
-                .strip_prefix(&templates_dir)
-                .unwrap_or(&path)
-                .to_string_lossy()
-                .into_owned();
-            (name, content)
-        })
-        .collect();
-    tera.add_raw_templates(templates).unwrap_or_else(|e| {
+    tera.load_from_glob(&pattern).unwrap_or_else(|e| {
         tracing::error!("Tera template init failed: {e}");
         panic!("Tera template init failed: {e}");
     });

@@ -1,21 +1,20 @@
-use std::collections::HashMap;
-use tera::{Error, Value};
+use tera::{Kwargs, State, TeraResult, Value};
 
-pub fn icon_filter(value: &Value, _: &HashMap<String, Value>) -> Result<Value, Error> {
+pub fn icon_filter(value: &Value, _: Kwargs, _: &State) -> TeraResult<Value> {
     let name = value.as_str().unwrap_or("");
-    Ok(Value::String(format!(
+    Ok(Value::from(format!(
         "<svg class=\"icon\"><use href=\"#icon_ui_{name}\"/></svg>"
     )))
 }
 
-pub fn narrative_icon_filter(value: &Value, _: &HashMap<String, Value>) -> Result<Value, Error> {
+pub fn narrative_icon_filter(value: &Value, _: Kwargs, _: &State) -> TeraResult<Value> {
     let name = value.as_str().unwrap_or("");
-    Ok(Value::String(format!(
+    Ok(Value::from(format!(
         "<svg class=\"icon\"><use href=\"#icon_narrative_{name}\"/></svg>"
     )))
 }
 
-pub fn status_color(value: &Value, _: &HashMap<String, Value>) -> Result<Value, Error> {
+pub fn status_color(value: &Value, _: Kwargs, _: &State) -> TeraResult<Value> {
     let status = value.as_str().unwrap_or("");
     let color = match status {
         "in_progress" => "var(--running)",
@@ -23,10 +22,10 @@ pub fn status_color(value: &Value, _: &HashMap<String, Value>) -> Result<Value, 
         "finished" => "var(--finished)",
         _ => "var(--muted)",
     };
-    Ok(Value::String(color.to_string()))
+    Ok(Value::from(color))
 }
 
-pub fn hunger_label(value: &Value, _: &HashMap<String, Value>) -> Result<Value, Error> {
+pub fn hunger_label(value: &Value, _: Kwargs, _: &State) -> TeraResult<Value> {
     let v = value.as_u64().unwrap_or(0) as u8;
     let label = match v {
         0 => "Sated",
@@ -34,20 +33,20 @@ pub fn hunger_label(value: &Value, _: &HashMap<String, Value>) -> Result<Value, 
         2 => "Starving",
         _ => "Unknown",
     };
-    Ok(Value::String(label.to_string()))
+    Ok(Value::from(label))
 }
 
-pub fn hunger_color(value: &Value, _: &HashMap<String, Value>) -> Result<Value, Error> {
+pub fn hunger_color(value: &Value, _: Kwargs, _: &State) -> TeraResult<Value> {
     let v = value.as_u64().unwrap_or(0) as u8;
     let color = match v {
         0 => "var(--running)",
         1 => "var(--waiting)",
         _ => "var(--danger)",
     };
-    Ok(Value::String(color.to_string()))
+    Ok(Value::from(color))
 }
 
-pub fn thirst_label(value: &Value, _: &HashMap<String, Value>) -> Result<Value, Error> {
+pub fn thirst_label(value: &Value, _: Kwargs, _: &State) -> TeraResult<Value> {
     let v = value.as_u64().unwrap_or(0) as u8;
     let label = match v {
         0 => "Hydrated",
@@ -55,22 +54,22 @@ pub fn thirst_label(value: &Value, _: &HashMap<String, Value>) -> Result<Value, 
         2 => "Dehydrated",
         _ => "Unknown",
     };
-    Ok(Value::String(label.to_string()))
+    Ok(Value::from(label))
 }
 
-pub fn thirst_color(value: &Value, _: &HashMap<String, Value>) -> Result<Value, Error> {
+pub fn thirst_color(value: &Value, _: Kwargs, _: &State) -> TeraResult<Value> {
     let v = value.as_u64().unwrap_or(0) as u8;
     let color = match v {
         0 => "var(--running)",
         1 => "var(--waiting)",
         _ => "var(--danger)",
     };
-    Ok(Value::String(color.to_string()))
+    Ok(Value::from(color))
 }
 
-pub fn stamina_label(value: &Value, args: &HashMap<String, Value>) -> Result<Value, Error> {
+pub fn stamina_label(value: &Value, kwargs: Kwargs, _: &State) -> TeraResult<Value> {
     let stamina = value.as_u64().unwrap_or(0) as u32;
-    let max = args.get("max").and_then(|a| a.as_u64()).unwrap_or(100) as u32;
+    let max = kwargs.get::<u64>("max")?.unwrap_or(100) as u32;
     let pct = stamina
         .checked_mul(100)
         .and_then(|v| v.checked_div(max))
@@ -80,12 +79,12 @@ pub fn stamina_label(value: &Value, args: &HashMap<String, Value>) -> Result<Val
         26..=50 => "Winded",
         _ => "Fresh",
     };
-    Ok(Value::String(label.to_string()))
+    Ok(Value::from(label))
 }
 
-pub fn stamina_color(value: &Value, args: &HashMap<String, Value>) -> Result<Value, Error> {
+pub fn stamina_color(value: &Value, kwargs: Kwargs, _: &State) -> TeraResult<Value> {
     let stamina = value.as_u64().unwrap_or(0) as u32;
-    let max = args.get("max").and_then(|a| a.as_u64()).unwrap_or(100) as u32;
+    let max = kwargs.get::<u64>("max")?.unwrap_or(100) as u32;
     let pct = stamina
         .checked_mul(100)
         .and_then(|v| v.checked_div(max))
@@ -95,10 +94,10 @@ pub fn stamina_color(value: &Value, args: &HashMap<String, Value>) -> Result<Val
         26..=50 => "var(--waiting)",
         _ => "var(--running)",
     };
-    Ok(Value::String(color.to_string()))
+    Ok(Value::from(color))
 }
 
-pub fn message_kind(value: &Value, _: &HashMap<String, Value>) -> Result<Value, Error> {
+pub fn message_kind(value: &Value, _: Kwargs, _: &State) -> TeraResult<Value> {
     let kind = value.as_str().unwrap_or("");
     let archetype = match kind {
         "death" | "wound" | "attack" | "combat" => "action",
@@ -110,10 +109,10 @@ pub fn message_kind(value: &Value, _: &HashMap<String, Value>) -> Result<Value, 
         "item_found" | "item_used" | "item_dropped" => "action",
         _ => "action",
     };
-    Ok(Value::String(archetype.to_string()))
+    Ok(Value::from(archetype))
 }
 
-pub fn archetype_label(value: &Value, _: &HashMap<String, Value>) -> Result<Value, Error> {
+pub fn archetype_label(value: &Value, _: Kwargs, _: &State) -> TeraResult<Value> {
     let archetype = value.as_str().unwrap_or("");
     let label = match archetype {
         "action" => "ACTION",
@@ -122,10 +121,10 @@ pub fn archetype_label(value: &Value, _: &HashMap<String, Value>) -> Result<Valu
         "commentary" => "COMMS",
         _ => "OTHER",
     };
-    Ok(Value::String(label.to_string()))
+    Ok(Value::from(label))
 }
 
-pub fn kind_color(value: &Value, _: &HashMap<String, Value>) -> Result<Value, Error> {
+pub fn kind_color(value: &Value, _: Kwargs, _: &State) -> TeraResult<Value> {
     let kind = value.as_str().unwrap_or("");
     let color = match kind {
         "death" => "var(--danger)",
@@ -136,10 +135,10 @@ pub fn kind_color(value: &Value, _: &HashMap<String, Value>) -> Result<Value, Er
         "hazard" | "event" => "var(--purple)",
         _ => "var(--muted)",
     };
-    Ok(Value::String(color.to_string()))
+    Ok(Value::from(color))
 }
 
-pub fn format_words(value: &Value, _: &HashMap<String, Value>) -> Result<Value, Error> {
+pub fn format_words(value: &Value, _: Kwargs, _: &State) -> TeraResult<Value> {
     let s = value.as_str().unwrap_or("");
     let formatted = s
         .replace('_', " ")
@@ -153,20 +152,20 @@ pub fn format_words(value: &Value, _: &HashMap<String, Value>) -> Result<Value, 
         })
         .collect::<Vec<_>>()
         .join(" ");
-    Ok(Value::String(formatted))
+    Ok(Value::from(formatted))
 }
 
-pub fn upper(value: &Value, _: &HashMap<String, Value>) -> Result<Value, Error> {
+pub fn upper(value: &Value, _: Kwargs, _: &State) -> TeraResult<Value> {
     let s = value.as_str().unwrap_or("");
-    Ok(Value::String(s.to_uppercase()))
+    Ok(Value::from(s.to_uppercase()))
 }
 
-pub fn lower(value: &Value, _: &HashMap<String, Value>) -> Result<Value, Error> {
+pub fn lower(value: &Value, _: Kwargs, _: &State) -> TeraResult<Value> {
     let s = value.as_str().unwrap_or("");
-    Ok(Value::String(s.to_lowercase()))
+    Ok(Value::from(s.to_lowercase()))
 }
 
-pub fn phase_label(value: &Value, _: &HashMap<String, Value>) -> Result<Value, Error> {
+pub fn phase_label(value: &Value, _: Kwargs, _: &State) -> TeraResult<Value> {
     let phase = value.as_str().unwrap_or("");
     let label = match phase {
         "dawn" => "DAWN",
@@ -175,10 +174,10 @@ pub fn phase_label(value: &Value, _: &HashMap<String, Value>) -> Result<Value, E
         "night" => "NIGHT",
         _ => "STAGING",
     };
-    Ok(Value::String(label.to_string()))
+    Ok(Value::from(label))
 }
 
-pub fn phase_class(value: &Value, _: &HashMap<String, Value>) -> Result<Value, Error> {
+pub fn phase_class(value: &Value, _: Kwargs, _: &State) -> TeraResult<Value> {
     let phase = value.as_str().unwrap_or("");
     let class = match phase {
         "dawn" => "phase-dawn",
@@ -187,11 +186,11 @@ pub fn phase_class(value: &Value, _: &HashMap<String, Value>) -> Result<Value, E
         "night" => "phase-night",
         _ => "phase-day",
     };
-    Ok(Value::String(class.to_string()))
+    Ok(Value::from(class))
 }
 
-pub fn json(value: &Value, _: &HashMap<String, Value>) -> Result<Value, Error> {
-    Ok(Value::String(
+pub fn json(value: &Value, _: Kwargs, _: &State) -> TeraResult<Value> {
+    Ok(Value::from(
         serde_json::to_string(value).unwrap_or_default(),
     ))
 }

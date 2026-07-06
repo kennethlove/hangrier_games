@@ -415,6 +415,44 @@ pub enum MessagePayload {
         tribute: TributeRef,
         body_part: String,
     },
+    /// Emitted when a wound is inflicted on a tribute.
+    WoundInflicted {
+        tribute: TributeRef,
+        wound_type: String,
+        severity: String,
+        body_part: String,
+    },
+    /// Emitted when a tribute bleeds from wounds.
+    WoundBled {
+        tribute: TributeRef,
+        blood_lost: u32,
+    },
+    /// Emitted when a wound is treated (bleeding stopped).
+    WoundTreated {
+        tribute: TributeRef,
+        body_part: String,
+    },
+    /// Emitted when a limb is amputated due to severe wound.
+    WoundAmputated {
+        tribute: TributeRef,
+        body_part: String,
+    },
+    /// Emitted when a mental condition is acquired.
+    ConditionAcquired {
+        tribute: TributeRef,
+        condition: String,
+        severity: String,
+    },
+    /// Emitted when a mental condition resolves.
+    ConditionResolved {
+        tribute: TributeRef,
+        condition: String,
+    },
+    /// Emitted when a tribute becomes desperate (very low blood/sanity).
+    TributeDesperate {
+        tribute: TributeRef,
+        reason: String,
+    },
 
     // Survival events (shelter + hunger/thirst spec).
     HungerBandChanged {

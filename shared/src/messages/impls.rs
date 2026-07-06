@@ -116,6 +116,13 @@ impl MessagePayload {
             | TraumaForgotten { .. }
             | AddictionObserved { .. }
             | AddictionForgotten { .. }
+            | WoundInflicted { .. }
+            | WoundBled { .. }
+            | WoundTreated { .. }
+            | WoundAmputated { .. }
+            | ConditionAcquired { .. }
+            | ConditionResolved { .. }
+            | TributeDesperate { .. }
             | Generic
             | AreaClosed { .. }
             | AreaEvent { .. }

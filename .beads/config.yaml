@@ -52,3 +52,5 @@
 # - linear.api-key
 # - github.org
 # - github.repo
+
+sync.remote: "git+https://x-access-token:${BEADS_GITHUB_TOKEN}@github.com/kennethlove/hangrier_games.git"

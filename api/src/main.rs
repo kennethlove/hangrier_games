@@ -446,9 +446,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .into_inner(),
         );
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+    let port: u16 = std::env::var("API_PORT")
+        .unwrap_or_else(|_| "3000".to_string())
+        .parse()
+        .map_err(|e| format!("Invalid API_PORT: {}", e))?;
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port))
         .await
-        .map_err(|e| format!("Failed to bind to 0.0.0.0:3000: {}", e))?;
+        .map_err(|e| format!("Failed to bind to 0.0.0.0:{}: {}", port, e))?;
     let local_addr = listener
         .local_addr()
         .map_err(|e| format!("Failed to get local address: {}", e))?;

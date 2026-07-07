@@ -43,6 +43,27 @@
   --radius-sm: 4px;
   --radius: 8px;
   --radius-md: 12px;
+  --topnav-gradient-start: #e2e5ea;
+  --commentary-bg: oklch(96% 0.01 260);
+  --commentary-border: oklch(85% 0.03 260);
+  --commentary-header: oklch(30% 0.08 260);
+  --commentary-speaker: oklch(30% 0.08 260);
+  --commentary-footer: oklch(50% 0.02 260);
+  --severity-mild-bg: oklch(92% 0.06 85);
+  --severity-mild-text: oklch(45% 0.15 85);
+  --severity-moderate-bg: oklch(92% 0.08 50);
+  --severity-moderate-text: oklch(45% 0.18 50);
+  --severity-severe-bg: oklch(92% 0.1 25);
+  --severity-severe-text: oklch(45% 0.2 25);
+  --kind-death: oklch(50% 0.22 25);
+  --kind-alliance: oklch(50% 0.18 240);
+  --kind-item: oklch(55% 0.18 85);
+  --kind-affliction: oklch(50% 0.2 60);
+  --kind-phobia: oklch(50% 0.22 290);
+  --kind-trauma: oklch(50% 0.18 310);
+  --band-danger: oklch(45% 0.22 25);
+  --error-banner-border: oklch(60% 0.22 25);
+  --error-banner-bg: oklch(60% 0.22 25 / 0.1);
 }
 
 /* Dark theme */
@@ -67,7 +88,71 @@
   --info:      #3b82f6;
   --purple:    #8b5cf6;
   --gold:      #f0b429;
+  --topnav-gradient-start: #0f1522;
+  --commentary-bg: oklch(25% 0.03 260);
+  --commentary-border: oklch(35% 0.06 260);
+  --commentary-header: oklch(75% 0.12 260);
+  --commentary-speaker: oklch(75% 0.12 260);
+  --commentary-footer: oklch(50% 0.02 260);
+  --severity-mild-bg: oklch(75% 0.15 85 / 0.2);
+  --severity-mild-text: oklch(80% 0.18 85);
+  --severity-moderate-bg: oklch(65% 0.2 50 / 0.2);
+  --severity-moderate-text: oklch(70% 0.22 50);
+  --severity-severe-bg: oklch(55% 0.22 25 / 0.2);
+  --severity-severe-text: oklch(60% 0.25 25);
+  --kind-death: oklch(55% 0.2 25);
+  --kind-alliance: oklch(55% 0.18 240);
+  --kind-item: oklch(65% 0.18 85);
+  --kind-affliction: oklch(65% 0.2 60);
+  --kind-phobia: oklch(60% 0.22 290);
+  --kind-trauma: oklch(55% 0.18 310);
+  --band-danger: oklch(55% 0.2 25);
+  --error-banner-border: oklch(60% 0.22 25);
+  --error-banner-bg: oklch(60% 0.22 25 / 0.1);
   background: var(--bg);
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --bg:      #eef1f5;
+  --surface: #ffffff;
+  --fg:      #111318;
+  --muted:   #5b6370;
+  --border:  #d1d5db;
+  --border-strong: #9ca3af;
+  --accent:  #0891b2;
+  --accent-soft: color-mix(in oklab, var(--accent), transparent 90%);
+  --fg-soft: color-mix(in oklab, var(--fg), transparent 95%);
+  --running:   #16a34a;
+  --waiting:   #d97706;
+  --finished:  #5b6370;
+  --success:   #16a34a;
+  --danger:    #dc2626;
+  --warning:   #f97316;
+  --info:      #3b82f6;
+  --purple:    #8b5cf6;
+  --gold:      #d97706;
+  --topnav-gradient-start: #e2e5ea;
+  --commentary-bg: oklch(96% 0.01 260);
+  --commentary-border: oklch(85% 0.03 260);
+  --commentary-header: oklch(30% 0.08 260);
+  --commentary-speaker: oklch(30% 0.08 260);
+  --commentary-footer: oklch(50% 0.02 260);
+  --severity-mild-bg: oklch(92% 0.06 85);
+  --severity-mild-text: oklch(45% 0.15 85);
+  --severity-moderate-bg: oklch(92% 0.08 50);
+  --severity-moderate-text: oklch(45% 0.18 50);
+  --severity-severe-bg: oklch(92% 0.1 25);
+  --severity-severe-text: oklch(45% 0.2 25);
+  --kind-death: oklch(50% 0.22 25);
+  --kind-alliance: oklch(50% 0.18 240);
+  --kind-item: oklch(55% 0.18 85);
+  --kind-affliction: oklch(50% 0.2 60);
+  --kind-phobia: oklch(50% 0.22 290);
+  --kind-trauma: oklch(50% 0.18 310);
+  --band-danger: oklch(45% 0.22 25);
+  --error-banner-border: oklch(60% 0.22 25);
+  --error-banner-bg: oklch(60% 0.22 25 / 0.1);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -91,7 +176,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
 /* Top navigation */
 .topnav {
   position: sticky; top: 0; z-index: 10;
-  background: linear-gradient(90deg, #0f1522, var(--surface));
+  background: linear-gradient(90deg, var(--topnav-gradient-start), var(--surface));
   border: 2px solid var(--border-strong);
   border-bottom: none;
   font-size: var(--fs-xs);
@@ -738,8 +823,8 @@ h1, h2, h3, h4 { text-wrap: balance; }
 /* Commentary segment — sportscast-style block */
 .commentary-segment {
   padding: var(--gap-sm);
-  background: oklch(25% 0.03 260);
-  border: 1px solid oklch(35% 0.06 260);
+  background: var(--commentary-bg);
+  border: 1px solid var(--commentary-border);
   border-radius: var(--radius);
   margin-bottom: var(--gap-sm);
 }
@@ -749,12 +834,12 @@ h1, h2, h3, h4 { text-wrap: balance; }
   gap: var(--gap-xs);
   font-size: var(--fs-xs);
   font-weight: 600;
-  color: oklch(75% 0.12 260);
+  color: var(--commentary-header);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: var(--gap-xs);
   padding-bottom: var(--gap-xs);
-  border-bottom: 1px solid oklch(35% 0.06 260 / 0.5);
+  border-bottom: 1px solid var(--commentary-border);
 }
 .commentary-body {
   display: flex;
@@ -769,7 +854,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
 .commentary-speaker {
   font-weight: 700;
   font-size: var(--fs-xs);
-  color: oklch(75% 0.12 260);
+  color: var(--commentary-speaker);
   min-width: 5em;
   text-align: right;
   flex-shrink: 0;
@@ -780,35 +865,35 @@ h1, h2, h3, h4 { text-wrap: balance; }
 }
 .commentary-footer {
   font-size: var(--fs-xs);
-  color: oklch(50% 0.02 260);
+  color: var(--commentary-footer);
   margin-top: var(--gap-xs);
   padding-top: var(--gap-xs);
-  border-top: 1px solid oklch(35% 0.06 260 / 0.3);
+  border-top: 1px solid var(--commentary-border);
 }
 
 /* Kind colors for log entries */
-.kind-death { color: oklch(55% 0.2 25); }
+.kind-death { color: var(--kind-death); }
 .kind-combat { color: var(--waiting); }
-.kind-alliance { color: oklch(55% 0.18 240); }
+.kind-alliance { color: var(--kind-alliance); }
 .kind-movement { color: var(--accent); }
-.kind-item { color: oklch(65% 0.18 85); }
+.kind-item { color: var(--kind-item); }
 .kind-state { color: var(--muted); }
-.kind-affliction { color: oklch(65% 0.2 60); }
-.kind-phobia { color: oklch(60% 0.22 290); }
-.kind-trauma { color: oklch(55% 0.18 310); }
+.kind-affliction { color: var(--kind-affliction); }
+.kind-phobia { color: var(--kind-phobia); }
+.kind-trauma { color: var(--kind-trauma); }
 
 /* Severity badge colors */
 .severity-mild {
-  background: oklch(75% 0.15 85 / 0.2);
-  color: oklch(80% 0.18 85);
+  background: var(--severity-mild-bg);
+  color: var(--severity-mild-text);
 }
 .severity-moderate {
-  background: oklch(65% 0.2 50 / 0.2);
-  color: oklch(70% 0.22 50);
+  background: var(--severity-moderate-bg);
+  color: var(--severity-moderate-text);
 }
 .severity-severe {
-  background: oklch(55% 0.22 25 / 0.2);
-  color: oklch(60% 0.25 25);
+  background: var(--severity-severe-bg);
+  color: var(--severity-severe-text);
 }
 .affliction-badge {
   display: inline-flex;
@@ -866,7 +951,7 @@ h1, h2, h3, h4 { text-wrap: balance; }
 /* Survival band colors */
 .band-good { color: var(--running); }
 .band-warn { color: var(--waiting); }
-.band-danger { color: oklch(55% 0.2 25); }
+.band-danger { color: var(--band-danger); }
 .band-none { color: var(--muted); }
 
 /* Spinner */
@@ -1014,8 +1099,8 @@ h1, h2, h3, h4 { text-wrap: balance; }
 
 .error-banner {
   margin-bottom: var(--gap-md); padding: 10px 12px;
-  border: 1px solid oklch(60% 0.22 25); border-radius: var(--radius-sm);
-  background: oklch(60% 0.22 25 / 0.1); color: oklch(60% 0.22 25);
+  border: 1px solid var(--error-banner-border); border-radius: var(--radius-sm);
+  background: var(--error-banner-bg); color: var(--error-banner-border);
   font-size: var(--fs-meta);
 }
 
@@ -1089,10 +1174,49 @@ h1, h2, h3, h4 { text-wrap: balance; }
   --fs-sm: 12px;
   --fs-xs: 10px;
   --fs-xxs: 9px;
+
+  --broad-stat-bg: rgba(255, 255, 255, 0.03);
+  --broad-action-bg: rgba(59, 130, 246, 0.04);
+  --broad-death-bg: rgba(239, 68, 85, 0.04);
+  --broad-event-bg: rgba(139, 92, 246, 0.04);
+  --broad-commentary-bg: rgba(240, 180, 41, 0.03);
+  --broad-winner-gold-bg: rgba(240, 180, 41, 0.08);
+}
+
+/* Light broadcast tokens */
+[data-theme="light"] .broadcast-theme {
+  --broad-bg: #eef1f5;
+  --broad-surface: #ffffff;
+  --broad-surface-alt: #f3f5f8;
+  --broad-surface-hover: #e8ecf0;
+  --broad-fg: #111318;
+  --broad-fg-muted: #5b6370;
+  --broad-border: #d1d5db;
+  --broad-border-strong: #9ca3af;
+
+  --broad-accent: #0891b2;
+  --broad-gold: #d97706;
+  --broad-danger: #dc2626;
+  --broad-success: #16a34a;
+  --broad-warning: #d97706;
+  --broad-info: #3b82f6;
+  --broad-purple: #7c3aed;
+
+  --phase-dawn: oklch(60% 0.15 85);
+  --phase-day: oklch(60% 0.15 95);
+  --phase-dusk: oklch(50% 0.14 65);
+  --phase-night: oklch(40% 0.1 260);
+
+  --broad-stat-bg: rgba(0, 0, 0, 0.03);
+  --broad-action-bg: color-mix(in oklab, var(--broad-info) 4%, transparent);
+  --broad-death-bg: color-mix(in oklab, var(--broad-danger) 4%, transparent);
+  --broad-event-bg: color-mix(in oklab, var(--broad-purple) 4%, transparent);
+  --broad-commentary-bg: color-mix(in oklab, var(--broad-gold) 3%, transparent);
+  --broad-winner-gold-bg: color-mix(in oklab, var(--broad-gold) 8%, transparent);
 }
 
 /* Broadcast tokens on body so nav/footer can inherit */
-body.broadcast {
+[data-theme="dark"] body.broadcast {
   --bg: oklch(15% 0.02 260);
   --surface: oklch(20% 0.025 260);
   --fg: oklch(90% 0.01 260);
@@ -1100,6 +1224,17 @@ body.broadcast {
   --border: oklch(28% 0.04 260);
   --accent: oklch(65% 0.18 220);
   background: oklch(15% 0.02 260);
+}
+
+/* Light broadcast tokens on body so nav/footer can inherit */
+[data-theme="light"] body.broadcast {
+  --bg: #eef1f5;
+  --surface: #ffffff;
+  --fg: #111318;
+  --muted: #5b6370;
+  --border: #d1d5db;
+  --accent: #0891b2;
+  background: #eef1f5;
 }
 
 /* 2. Main Grid — 50/50 Layout */
@@ -1180,7 +1315,7 @@ body.broadcast {
   gap: 4px;
   padding: 3px 10px;
   border: 1px solid var(--broad-border);
-  background: rgba(255,255,255,0.03);
+  background: var(--broad-stat-bg);
 }
 .broad-stats .stat .num { font-weight: 700; }
 .broad-stats .stat .alive { color: var(--broad-success); }
@@ -1416,7 +1551,7 @@ body.broadcast {
 /* ACTION card — blue */
 .event-card.action {
   border-left: 3px solid var(--broad-info);
-  background: rgba(59, 130, 246, 0.04);
+  background: var(--broad-action-bg);
 }
 .event-card.action .card-badge { background: var(--broad-info); color: var(--broad-bg); }
 .event-card.action .card-body {
@@ -1435,7 +1570,7 @@ body.broadcast {
 /* DEATH card — red */
 .event-card.death {
   border: 2px solid var(--broad-danger);
-  background: rgba(239, 68, 85, 0.04);
+  background: var(--broad-death-bg);
 }
 .event-card.death .card-badge { background: var(--broad-danger); color: var(--broad-bg); }
 .event-card.death .card-body { padding: 6px 10px 8px; }
@@ -1448,7 +1583,7 @@ body.broadcast {
 /* ARENA EVENT card — purple */
 .event-card.event {
   border-top: 3px solid var(--broad-purple);
-  background: rgba(139, 92, 246, 0.04);
+  background: var(--broad-event-bg);
 }
 .event-card.event .card-badge { background: var(--broad-purple); color: var(--broad-bg); }
 .event-card.event .card-body { padding: 5px 10px 8px; }
@@ -1463,7 +1598,7 @@ body.broadcast {
 /* ANALYSIS card — gold */
 .event-card.commentary {
   border-left: 3px solid var(--broad-gold);
-  background: rgba(240, 180, 41, 0.03);
+  background: var(--broad-commentary-bg);
 }
 .event-card.commentary .card-badge { background: var(--broad-gold); color: var(--broad-bg); }
 .event-card.commentary .card-body { padding: 5px 10px 8px; }
@@ -1706,7 +1841,7 @@ body.broadcast {
   margin: 0 0 10px;
   border-color: var(--broad-gold);
   color: var(--broad-gold);
-  background: rgba(240, 180, 41, 0.08);
+  background: var(--broad-winner-gold-bg);
 }
 .roster-sort-btn {
   font-size: 9px;

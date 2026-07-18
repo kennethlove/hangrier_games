@@ -24,13 +24,11 @@ const FROZEN_MOVEMENT_REDUCTION: u32 = 1;
 const OVERHEATED_MOVEMENT_REDUCTION: u32 = 1;
 const DEHYDRATED_STRENGTH_REDUCTION: u32 = 1;
 const STARVING_STRENGTH_REDUCTION: u32 = 1;
-const POISONED_MENTAL_DAMAGE: u32 = 5;
 const BROKEN_BONE_LEG_MOVEMENT_REDUCTION: u32 = 10;
 const BROKEN_BONE_ARM_STRENGTH_REDUCTION: u32 = 5;
 const BROKEN_BONE_SKULL_INTELLIGENCE_REDUCTION: u32 = 5;
 const BROKEN_BONE_RIB_DAMAGE: u32 = 5;
 const INFECTED_DAMAGE: u32 = 2;
-const INFECTED_MENTAL_DAMAGE: u32 = 5;
 const BURNED_DAMAGE: u32 = 5;
 
 impl Tribute {
@@ -126,7 +124,7 @@ impl Tribute {
 
         self.events.clear();
 
-        if self.attributes.health == 0 {
+        if self.blood == 0 {
             let killer = self.status.clone();
             let line = GameOutput::TributeDiesFromStatus(self.name.as_str(), &killer.to_string())
                 .to_string();
@@ -178,15 +176,14 @@ impl Tribute {
         for kind in &kinds {
             match kind {
                 AfflictionKind::Wounded => {
-                    self.attributes.health = self.attributes.health.saturating_sub(WOUNDED_DAMAGE);
+                    self.blood = self.blood.saturating_sub(WOUNDED_DAMAGE * 10);
                 }
                 AfflictionKind::Sick => {
                     self.reduce_strength(SICK_STRENGTH_REDUCTION);
                     self.reduce_movement(SICK_MOVEMENT_REDUCTION);
                 }
                 AfflictionKind::Electrocuted => {
-                    self.attributes.health =
-                        self.attributes.health.saturating_sub(ELECTROCUTED_DAMAGE);
+                    self.blood = self.blood.saturating_sub(ELECTROCUTED_DAMAGE * 10);
                 }
                 AfflictionKind::Frozen => {
                     self.reduce_movement(FROZEN_MOVEMENT_REDUCTION);
@@ -201,10 +198,11 @@ impl Tribute {
                     self.reduce_strength(STARVING_STRENGTH_REDUCTION);
                 }
                 AfflictionKind::Poisoned => {
-                    self.attributes.sanity = self
-                        .attributes
-                        .sanity
-                        .saturating_sub(POISONED_MENTAL_DAMAGE);
+                    self.mental_conditions
+                        .push(shared::conditions::MentalCondition::Horrified {
+                            severity: shared::conditions::ConditionSeverity::Moderate,
+                            remaining_periods: 3,
+                        });
                 }
                 AfflictionKind::BrokenBone => {
                     let bone = rng.random_range(0..4);
@@ -212,23 +210,19 @@ impl Tribute {
                         0 => self.reduce_movement(BROKEN_BONE_LEG_MOVEMENT_REDUCTION),
                         1 => self.reduce_strength(BROKEN_BONE_ARM_STRENGTH_REDUCTION),
                         2 => self.reduce_intelligence(BROKEN_BONE_SKULL_INTELLIGENCE_REDUCTION),
-                        _ => {
-                            self.attributes.health = self
-                                .attributes
-                                .health
-                                .saturating_sub(BROKEN_BONE_RIB_DAMAGE)
-                        }
+                        _ => self.blood = self.blood.saturating_sub(BROKEN_BONE_RIB_DAMAGE * 10),
                     }
                 }
                 AfflictionKind::Infected => {
-                    self.attributes.health = self.attributes.health.saturating_sub(INFECTED_DAMAGE);
-                    self.attributes.sanity = self
-                        .attributes
-                        .sanity
-                        .saturating_sub(INFECTED_MENTAL_DAMAGE);
+                    self.blood = self.blood.saturating_sub(INFECTED_DAMAGE * 10);
+                    self.mental_conditions
+                        .push(shared::conditions::MentalCondition::Horrified {
+                            severity: shared::conditions::ConditionSeverity::Mild,
+                            remaining_periods: 2,
+                        });
                 }
                 AfflictionKind::Burned => {
-                    self.attributes.health = self.attributes.health.saturating_sub(BURNED_DAMAGE);
+                    self.blood = self.blood.saturating_sub(BURNED_DAMAGE * 10);
                 }
                 AfflictionKind::Trapped(kind) => {
                     let tuning = trap_tuning_for(*kind);
@@ -257,57 +251,57 @@ impl Tribute {
 
                     match kind {
                         TrapKind::Drowning => {
-                            self.attributes.sanity = self
-                                .attributes
-                                .sanity
-                                .saturating_sub(tuning.mental_damage[sev_idx]);
+                            self.mental_conditions.push(
+                                shared::conditions::MentalCondition::Horrified {
+                                    severity: shared::conditions::ConditionSeverity::Moderate,
+                                    remaining_periods: 2,
+                                },
+                            );
                         }
                         TrapKind::Buried => {
                             let progressive =
                                 tuning.progressive_damage_per_cycle * cycles_trapped as u32;
-                            self.attributes.health = self
-                                .attributes
-                                .health
-                                .saturating_sub(tuning.hp_damage[sev_idx] + progressive);
-                            self.attributes.sanity = self
-                                .attributes
-                                .sanity
-                                .saturating_sub(tuning.mental_damage[sev_idx]);
+                            self.blood = self
+                                .blood
+                                .saturating_sub((tuning.hp_damage[sev_idx] + progressive) * 10);
+                            self.mental_conditions.push(
+                                shared::conditions::MentalCondition::Horrified {
+                                    severity: shared::conditions::ConditionSeverity::Moderate,
+                                    remaining_periods: 2,
+                                },
+                            );
                         }
                         // Pitfall: HP + mental damage per cycle
                         TrapKind::Pitfall => {
-                            self.attributes.health = self
-                                .attributes
-                                .health
-                                .saturating_sub(tuning.hp_damage[sev_idx]);
-                            self.attributes.sanity = self
-                                .attributes
-                                .sanity
-                                .saturating_sub(tuning.mental_damage[sev_idx]);
+                            self.blood = self.blood.saturating_sub(tuning.hp_damage[sev_idx] * 10);
+                            self.mental_conditions.push(
+                                shared::conditions::MentalCondition::Horrified {
+                                    severity: shared::conditions::ConditionSeverity::Moderate,
+                                    remaining_periods: 2,
+                                },
+                            );
                         }
                         // SpikedPitfall: stub — instant death handled upstream
                         TrapKind::SpikedPitfall => { /* no-op */ }
                         // Snared: HP + mental damage per cycle
                         TrapKind::Snared => {
-                            self.attributes.health = self
-                                .attributes
-                                .health
-                                .saturating_sub(tuning.hp_damage[sev_idx]);
-                            self.attributes.sanity = self
-                                .attributes
-                                .sanity
-                                .saturating_sub(tuning.mental_damage[sev_idx]);
+                            self.blood = self.blood.saturating_sub(tuning.hp_damage[sev_idx] * 10);
+                            self.mental_conditions.push(
+                                shared::conditions::MentalCondition::Horrified {
+                                    severity: shared::conditions::ConditionSeverity::Moderate,
+                                    remaining_periods: 2,
+                                },
+                            );
                         }
                         // Pinned: HP + mental damage per cycle
                         TrapKind::Pinned => {
-                            self.attributes.health = self
-                                .attributes
-                                .health
-                                .saturating_sub(tuning.hp_damage[sev_idx]);
-                            self.attributes.sanity = self
-                                .attributes
-                                .sanity
-                                .saturating_sub(tuning.mental_damage[sev_idx]);
+                            self.blood = self.blood.saturating_sub(tuning.hp_damage[sev_idx] * 10);
+                            self.mental_conditions.push(
+                                shared::conditions::MentalCondition::Horrified {
+                                    severity: shared::conditions::ConditionSeverity::Moderate,
+                                    remaining_periods: 2,
+                                },
+                            );
                         }
                     }
 
@@ -368,7 +362,7 @@ impl Tribute {
         if let TributeStatus::Mauled(animal) = &self.status {
             let number_of_animals = rng.random_range(2..=5);
             let damage = animal.damage() * number_of_animals;
-            self.attributes.health = self.attributes.health.saturating_sub(damage);
+            self.blood = self.blood.saturating_sub(damage * 10);
         }
 
         // Check for escaped Buried afflictions — remove them
@@ -429,12 +423,12 @@ mod tests {
 
     #[rstest]
     fn process_status_mauled(mut tribute: Tribute, mut small_rng: SmallRng) {
-        let health = tribute.attributes.health;
+        let blood = tribute.blood;
         tribute.status = TributeStatus::Mauled(Animal::Bear);
         let area_details =
             AreaDetails::new(Some("Forest".to_string()), crate::areas::Area::Cornucopia);
         tribute.process_status(&area_details, &mut small_rng, &mut Vec::new());
-        assert!(tribute.attributes.health < health);
+        assert!(tribute.blood < blood);
     }
 
     #[rstest]
@@ -453,7 +447,7 @@ mod tests {
 
     #[rstest]
     fn process_status_dies(mut tribute: Tribute, mut small_rng: SmallRng) {
-        tribute.attributes.health = 1;
+        tribute.blood = 10;
         tribute.try_acquire_affliction(AfflictionDraft {
             kind: AfflictionKind::Electrocuted,
             body_part: None,
@@ -464,7 +458,7 @@ mod tests {
         let area_details =
             AreaDetails::new(Some("Forest".to_string()), crate::areas::Area::Cornucopia);
         tribute.process_status(&area_details, &mut small_rng, &mut Vec::new());
-        assert_eq!(tribute.attributes.health, 0);
+        assert_eq!(tribute.blood, 0);
         assert_eq!(tribute.status, TributeStatus::RecentlyDead);
     }
 

@@ -694,7 +694,7 @@ impl Game {
                     let tribute = &mut self.tributes[tribute_idx];
                     let name = tribute.name.clone();
                     let id = tribute.identifier.clone();
-                    tribute.attributes.set_health(0);
+                    tribute.blood = 0;
                     let cause = match most_severe_event {
                         crate::areas::events::AreaEvent::Wildfire => {
                             shared::afflictions::DeathCause::Fire
@@ -778,8 +778,8 @@ impl Game {
                 let has_item_bonus =
                     is_physical_event && tribute.items.iter().any(|item| item.is_defensive());
 
-                let is_desperate = tribute.attributes.health() < 30;
-                let current_health = tribute.attributes.health();
+                let is_desperate = tribute.effective_health() < 30;
+                let current_health = tribute.effective_health();
 
                 // Run survival check with config parameters
                 let result = most_severe_event.survival_check(
@@ -811,7 +811,7 @@ impl Game {
 
                 // Apply results
                 if !result.survived {
-                    tribute.attributes.set_health(0);
+                    tribute.blood = 0;
                     let cause = match most_severe_event {
                         crate::areas::events::AreaEvent::Wildfire => {
                             shared::afflictions::DeathCause::Fire
@@ -891,7 +891,9 @@ impl Game {
                     }
 
                     if result.sanity_restored > 0 {
-                        tribute.attributes.restore_sanity(result.sanity_restored);
+                        // ponytail: sanity_restored no longer applicable — sanity is now
+                        // computed from wounds/conditions. Remove this branch when
+                        // survival_check result is cleaned up.
                         pending_messages.push((
                             source.clone(),
                             subject.clone(),

@@ -92,13 +92,13 @@ fn initiative_liveness_gate_still_works() {
     game.start().expect("Failed to start game");
 
     let mut killer = Tribute::new("Killer".to_string(), None, None);
-    killer.attributes.set_health(100);
+    killer.blood = 1000;
     killer.attributes.strength = 50;
     killer.attributes.agility = 100;
     killer.area = Area::Cornucopia;
 
     let mut victim = Tribute::new("Victim".to_string(), None, None);
-    victim.attributes.set_health(1);
+    victim.blood = 10;
     victim.attributes.strength = 1;
     victim.attributes.defense = 1;
     victim.attributes.agility = 1;
@@ -341,7 +341,7 @@ fn survival_tick_routes_dehydration_death_through_tribute_killed() {
     let mut a = Tribute::new("Doomed".to_string(), Some(1), None);
     a.thirst = 4;
     a.dehydration_drain_step = 5;
-    a.attributes.set_health(1);
+    a.blood = 10;
     let mut game = create_test_game_with_tributes(vec![a]);
     game.day = Some(1);
     let _ = game.run_phase(crate::messages::Phase::Day);
@@ -414,7 +414,7 @@ fn sleeping_wounded_tribute_does_not_regen_hp() {
     let mut t = create_tribute("Sleeper", true);
     t.sleeping = true;
     t.sleep_remaining = 3;
-    t.attributes.set_health(40);
+    t.blood = 400;
     t.afflictions.insert(
         (AfflictionKind::Wounded, None),
         Affliction {
@@ -433,14 +433,14 @@ fn sleeping_wounded_tribute_does_not_regen_hp() {
             trapped_metadata: None,
         },
     );
-    let prior_hp = t.attributes.health();
+    let prior_hp = t.effective_health();
     let mut game = create_test_game_with_tributes(vec![t.clone()]);
     let area = AreaDetails::new(Some("Lake".to_string()), Area::Cornucopia);
     game.areas.push(area);
     let mut rng = SmallRng::seed_from_u64(42);
     let _ = game.run_tribute_cycle(Phase::Night, &mut rng, vec![], vec![t], 1);
     assert_eq!(
-        game.tributes[0].attributes.health(),
+        game.tributes[0].effective_health(),
         prior_hp,
         "wounded tributes do not heal while sleeping"
     );

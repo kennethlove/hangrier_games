@@ -120,10 +120,10 @@ impl Tribute {
             AttackResult::CriticalFumble => {
                 let fumble_content =
                     GameOutput::TributeCriticalFumble(tribute_name.as_str()).to_string();
-                self.attributes.health = self.attributes.health.saturating_sub(5);
+                self.blood = self.blood.saturating_sub(50);
                 self.statistics.defeats += 1;
 
-                if self.attributes.health == 0 {
+                if self.blood == 0 {
                     self.statistics.killed_by = Some("themselves (fumble)".to_string());
                     self.status = crate::tributes::statuses::TributeStatus::RecentlyDead;
                     self.recently_killed_by = Some(self.id);
@@ -300,7 +300,7 @@ impl Tribute {
             }
         }
 
-        let (outcome, attack_outcome) = if self.attributes.health == 0 {
+        let (outcome, attack_outcome) = if self.blood == 0 {
             self.statistics.killed_by = Some(target_name.clone());
             self.status = crate::tributes::statuses::TributeStatus::RecentlyDead;
             self.recently_killed_by = Some(target.id);
@@ -314,7 +314,7 @@ impl Tribute {
                 CombatOutcome::Killed,
                 AttackOutcome::Kill(target.clone(), self.clone()),
             )
-        } else if target.attributes.health == 0 {
+        } else if target.blood == 0 {
             target.statistics.killed_by = Some(tribute_name.clone());
             target.status = crate::tributes::statuses::TributeStatus::RecentlyDead;
             target.recently_killed_by = Some(self.id);

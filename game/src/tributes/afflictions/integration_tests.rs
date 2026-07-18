@@ -70,10 +70,10 @@ mod tests {
             let mut rng = SmallRng::seed_from_u64(seed);
             let mut attacker = Tribute::new("Attacker".to_string(), None, None);
             attacker.attributes.strength = 30;
-            attacker.attributes.health = 100;
+            attacker.blood = 1000;
             let mut target = Tribute::new("Target".to_string(), None, None);
             target.attributes.defense = 10;
-            target.attributes.health = 100;
+            target.blood = 1000;
 
             let mut events = Vec::new();
             let _ = attacker.attacks(
@@ -88,10 +88,10 @@ mod tests {
             let mut rng2 = SmallRng::seed_from_u64(seed);
             let mut attacker2 = Tribute::new("Attacker".to_string(), None, None);
             attacker2.attributes.strength = 30;
-            attacker2.attributes.health = 100;
+            attacker2.blood = 1000;
             let mut target2 = Tribute::new("Target".to_string(), None, None);
             target2.attributes.defense = 10;
-            target2.attributes.health = 100;
+            target2.blood = 1000;
 
             let mut events2 = Vec::new();
             let _ = attacker2.attacks(
@@ -129,10 +129,10 @@ mod tests {
             let mut rng = SmallRng::seed_from_u64(seed);
             let mut attacker = Tribute::new("A".to_string(), None, None);
             attacker.attributes.strength = 30;
-            attacker.attributes.health = 100;
+            attacker.blood = 1000;
             let mut target = Tribute::new("T".to_string(), None, None);
             target.attributes.defense = 10;
-            target.attributes.health = 100;
+            target.blood = 1000;
 
             let mut events = Vec::new();
             let _ = attacker.attacks(
@@ -166,10 +166,10 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(42);
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         attacker.attributes.strength = 30;
-        attacker.attributes.health = 100;
+        attacker.blood = 1000;
         let mut target = Tribute::new("Clove".to_string(), None, None);
         target.attributes.defense = 10;
-        target.attributes.health = 100;
+        target.blood = 1000;
 
         let mut events = Vec::new();
         let _ = attacker.attacks(
@@ -195,10 +195,10 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(7);
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         attacker.attributes.strength = 30;
-        attacker.attributes.health = 100;
+        attacker.blood = 1000;
         let mut target = Tribute::new("Clove".to_string(), None, None);
         target.attributes.defense = 10;
-        target.attributes.health = 100;
+        target.blood = 1000;
 
         let mut events = Vec::new();
         let _ = attacker.attacks(
@@ -452,10 +452,10 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(42);
         let mut attacker = Tribute::new("Katniss".to_string(), None, None);
         attacker.attributes.strength = 30;
-        attacker.attributes.health = 100;
+        attacker.blood = 1000;
         let mut target = Tribute::new("Clove".to_string(), None, None);
         target.attributes.defense = 10;
-        target.attributes.health = 100;
+        target.blood = 1000;
 
         let mut events = Vec::new();
         let _ = attacker.attacks(
@@ -502,10 +502,10 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(100);
         let mut attacker = Tribute::new("Attacker".to_string(), None, None);
         attacker.attributes.strength = 50;
-        attacker.attributes.health = 100;
+        attacker.blood = 1000;
         let mut target = Tribute::new("Target".to_string(), None, None);
         target.attributes.defense = 5;
-        target.attributes.health = 100;
+        target.blood = 1000;
 
         let mut events = Vec::new();
         let _ = attacker.attacks(
@@ -528,10 +528,10 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(42);
         let mut attacker = Tribute::new("A".to_string(), None, None);
         attacker.attributes.strength = 30;
-        attacker.attributes.health = 100;
+        attacker.blood = 1000;
         let mut target = Tribute::new("T".to_string(), None, None);
         target.attributes.defense = 10;
-        target.attributes.health = 100;
+        target.blood = 1000;
 
         let mut events = Vec::new();
         let _ = attacker.attacks(
@@ -657,14 +657,14 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(55);
         let mut attacker = Tribute::new("Career".to_string(), None, None);
         attacker.attributes.strength = 40;
-        attacker.attributes.health = 100;
+        attacker.blood = 1000;
         let mut target = Tribute::new("District12".to_string(), None, None);
         target.attributes.defense = 5;
-        target.attributes.health = 100;
+        target.blood = 1000;
 
         let mut events = Vec::new();
         let mut swings = 0;
-        while target.attributes.health > 0 && swings < 10 {
+        while target.blood > 0 && swings < 10 {
             let mut attacker_clone = attacker.clone();
             let mut target_clone = target.clone();
             let mut swing_events = Vec::new();

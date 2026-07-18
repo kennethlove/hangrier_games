@@ -9,9 +9,6 @@ use crate::tributes::Tribute;
 use crate::tributes::afflictions::TraumaAcquisition;
 use shared::afflictions::{DeathCause, Severity, TraumaSource};
 
-/// Maximum health value used for near-death percentage calculations.
-pub(super) const MAX_HEALTH: u32 = 100;
-
 /// Collected trauma event before application (avoids borrow conflicts).
 pub(super) struct TraumaEvent {
     pub(super) tribute_id: String,

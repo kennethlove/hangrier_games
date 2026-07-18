@@ -11,7 +11,7 @@ use game::tributes::survival::{
 
 fn mid_tribute(name: &str) -> Tribute {
     let mut t = Tribute::new(name.to_string(), None, None);
-    t.attributes.set_health(100);
+    t.blood = 1000;
     // Mid-range strength so the hunger tick lands the +1 base path.
     t.attributes.strength = 50;
     // Stamina at half-max so the thirst tick lands +1 / phase, not the
@@ -31,7 +31,7 @@ fn no_food_no_water_dies_of_dehydration_first() {
         }
         let _ = apply_dehydration_drain(&mut t);
         let _ = apply_starvation_drain(&mut t);
-        if t.attributes.health() == 0 {
+        if t.effective_health() == 0 {
             // Confirm thirst drove the death.
             assert_eq!(thirst_band(t.thirst), ThirstBand::Dehydrated);
             assert!(
@@ -57,7 +57,7 @@ fn carrying_water_extends_survival() {
             }
             let _ = apply_dehydration_drain(&mut t);
             let _ = apply_starvation_drain(&mut t);
-            if t.attributes.health() == 0 {
+            if t.effective_health() == 0 {
                 return phase;
             }
         }

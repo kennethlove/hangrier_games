@@ -24,10 +24,10 @@ pub(crate) fn create_test_game_with_tributes(tributes: Vec<Tribute>) -> Game {
 pub(crate) fn create_tribute(name: &str, is_alive: bool) -> Tribute {
     let mut tribute = Tribute::new(name.to_string(), None, None);
     if is_alive {
-        tribute.attributes.set_health(100);
+        tribute.blood = 1000;
         tribute.status = TributeStatus::Healthy;
     } else {
-        tribute.attributes.set_health(0);
+        tribute.blood = 0;
         tribute.status = TributeStatus::Dead;
     }
     tribute

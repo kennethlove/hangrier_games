@@ -23,7 +23,7 @@ fn test_wildfire_in_forest_kills_tributes() {
     // Create tribute in forest area with low health
     let mut tribute = Tribute::random();
     tribute.area = area_name;
-    tribute.attributes.set_health(50); // Not desperate but vulnerable
+    tribute.blood = 500;
     tribute.terrain_affinity = vec![]; // No affinity bonus
     tribute.statistics.game = game.identifier.clone(); // Set game identifier
     game.tributes.push(tribute.clone());
@@ -39,7 +39,7 @@ fn test_wildfire_in_forest_kills_tributes() {
         test_game
             .process_event_for_area(&area_name, &event, &mut rng)
             .unwrap();
-        if test_game.tributes[0].attributes.health() == 0 {
+        if test_game.tributes[0].effective_health() == 0 {
             death_count += 1;
         }
     }
@@ -67,7 +67,7 @@ fn test_wildfire_in_desert_minor_impact() {
     // Create tribute
     let mut tribute = Tribute::random();
     tribute.area = Area::Sector4;
-    tribute.attributes.set_health(50);
+    tribute.blood = 500;
     tribute.terrain_affinity = vec![];
     tribute.statistics.game = game.identifier.clone();
     game.tributes.push(tribute);
@@ -83,7 +83,7 @@ fn test_wildfire_in_desert_minor_impact() {
         test_game
             .process_event_for_area(&area_name, &event, &mut rng)
             .unwrap();
-        if test_game.tributes[0].attributes.health() == 0 {
+        if test_game.tributes[0].effective_health() == 0 {
             death_count += 1;
         }
     }

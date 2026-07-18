@@ -1,3 +1,5 @@
+#![allow(clippy::field_reassign_with_default)]
+
 use game::terrain::{BaseTerrain, TerrainType};
 use game::tributes::actions::Action;
 use game::tributes::{Tribute, calculate_stamina_cost};
@@ -16,7 +18,7 @@ fn test_base_stamina_costs(#[case] action: Action, #[case] expected_base: u32) {
     // Neutral conditions: Clearing (1.0x), no affinity (1.0x), full health (1.0x)
     let terrain = TerrainType::new(BaseTerrain::Clearing, vec![]).unwrap();
     let mut tribute = Tribute::default();
-    tribute.attributes.set_health(100); // Full health for no desperation
+    tribute.blood = 1000;
 
     let cost = calculate_stamina_cost(&action, &terrain, &tribute);
 
@@ -44,7 +46,7 @@ fn test_base_stamina_costs(#[case] action: Action, #[case] expected_base: u32) {
 fn test_terrain_multiplier(#[case] base_terrain: BaseTerrain, #[case] multiplier: f32) {
     let terrain = TerrainType::new(base_terrain, vec![]).unwrap();
     let mut tribute = Tribute::default();
-    tribute.attributes.set_health(100); // Full health
+    tribute.blood = 1000;
 
     let action = Action::Move(None); // Base cost 20
     let cost = calculate_stamina_cost(&action, &terrain, &tribute);
@@ -62,7 +64,7 @@ fn test_terrain_multiplier(#[case] base_terrain: BaseTerrain, #[case] multiplier
 fn test_affinity_modifier_with_affinity() {
     let terrain = TerrainType::new(BaseTerrain::Desert, vec![]).unwrap();
     let mut tribute = Tribute::default();
-    tribute.attributes.set_health(100);
+    tribute.blood = 1000;
     tribute.terrain_affinity = vec![BaseTerrain::Desert]; // Has affinity
 
     let action = Action::Move(None); // Base 20
@@ -76,7 +78,7 @@ fn test_affinity_modifier_with_affinity() {
 fn test_affinity_modifier_without_affinity() {
     let terrain = TerrainType::new(BaseTerrain::Desert, vec![]).unwrap();
     let mut tribute = Tribute::default();
-    tribute.attributes.set_health(100);
+    tribute.blood = 1000;
     tribute.terrain_affinity = vec![BaseTerrain::Forest]; // Different affinity
 
     let action = Action::Move(None); // Base 20
@@ -100,7 +102,7 @@ fn test_affinity_modifier_without_affinity() {
 fn test_desperation_multiplier(#[case] health: u32, #[case] desperation: f32) {
     let terrain = TerrainType::new(BaseTerrain::Clearing, vec![]).unwrap();
     let mut tribute = Tribute::default();
-    tribute.attributes.set_health(health);
+    tribute.blood = health * 10;
 
     let action = Action::Move(None); // Base 20
     let cost = calculate_stamina_cost(&action, &terrain, &tribute);
@@ -119,7 +121,7 @@ fn test_all_multipliers_combined() {
     // Worst case: Desert (2.0x), no affinity (1.0x), near death (1.5x)
     let terrain = TerrainType::new(BaseTerrain::Desert, vec![]).unwrap();
     let mut tribute = Tribute::default();
-    tribute.attributes.set_health(0); // Near death
+    tribute.blood = 0;
     tribute.terrain_affinity = vec![]; // No affinity
 
     let action = Action::Attack; // Base 25
@@ -134,7 +136,7 @@ fn test_best_case_combined() {
     // Best case: Grasslands (0.9x), with affinity (0.8x), full health (1.0x)
     let terrain = TerrainType::new(BaseTerrain::Grasslands, vec![]).unwrap();
     let mut tribute = Tribute::default();
-    tribute.attributes.set_health(100);
+    tribute.blood = 1000;
     tribute.terrain_affinity = vec![BaseTerrain::Grasslands];
 
     let action = Action::Hide; // Base 15
@@ -181,7 +183,7 @@ fn test_zero_stamina_calculation() {
         stamina: 0, // Depleted stamina
         ..Tribute::default()
     };
-    tribute.attributes.set_health(100);
+    tribute.blood = 1000;
 
     let action = Action::Rest; // Base cost 0
     let cost = calculate_stamina_cost(&action, &terrain, &tribute);
@@ -194,7 +196,7 @@ fn test_zero_stamina_calculation() {
 fn test_cost_exceeds_max_stamina() {
     let terrain = TerrainType::new(BaseTerrain::Desert, vec![]).unwrap();
     let mut tribute = Tribute::default();
-    tribute.attributes.set_health(1); // Near death for max desperation
+    tribute.blood = 10;
     tribute.max_stamina = 50; // Lower max stamina
     tribute.stamina = 50;
 
@@ -213,7 +215,7 @@ fn test_cost_exceeds_max_stamina() {
 fn test_multiple_terrain_affinities() {
     let terrain = TerrainType::new(BaseTerrain::Forest, vec![]).unwrap();
     let mut tribute = Tribute::default();
-    tribute.attributes.set_health(100);
+    tribute.blood = 1000;
     tribute.terrain_affinity = vec![
         BaseTerrain::Desert,
         BaseTerrain::Forest,
@@ -235,7 +237,7 @@ fn test_multiple_terrain_affinities() {
 fn test_negative_health_clamped() {
     let terrain = TerrainType::new(BaseTerrain::Clearing, vec![]).unwrap();
     let mut tribute = Tribute::default();
-    tribute.attributes.set_health(0); // Dead tribute
+    tribute.blood = 0;
 
     let action = Action::Move(None); // Base 20
     let cost = calculate_stamina_cost(&action, &terrain, &tribute);
@@ -261,7 +263,7 @@ fn test_tribute_new_initializes_stamina() {
 fn test_action_type_ordering() {
     let terrain = TerrainType::new(BaseTerrain::Clearing, vec![]).unwrap();
     let mut tribute = Tribute::default();
-    tribute.attributes.set_health(100);
+    tribute.blood = 1000;
 
     let attack_cost = calculate_stamina_cost(&Action::Attack, &terrain, &tribute);
     let move_cost = calculate_stamina_cost(&Action::Move(None), &terrain, &tribute);
@@ -281,7 +283,7 @@ fn test_action_type_ordering() {
 fn test_rounding_behavior() {
     let terrain = TerrainType::new(BaseTerrain::Grasslands, vec![]).unwrap();
     let mut tribute = Tribute::default();
-    tribute.attributes.set_health(100);
+    tribute.blood = 1000;
     tribute.terrain_affinity = vec![BaseTerrain::Grasslands];
 
     let action = Action::TakeItem; // Base 10
@@ -295,7 +297,7 @@ fn test_rounding_behavior() {
 fn test_rounding_up() {
     let terrain = TerrainType::new(BaseTerrain::UrbanRuins, vec![]).unwrap();
     let mut tribute = Tribute::default();
-    tribute.attributes.set_health(90);
+    tribute.blood = 900;
     tribute.terrain_affinity = vec![];
 
     let action = Action::Hide; // Base 15

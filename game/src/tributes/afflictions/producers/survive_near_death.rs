@@ -4,7 +4,7 @@ use crate::games::Game;
 use crate::messages::{MessagePayload, Phase};
 use shared::afflictions::{DeathCause, Severity, TraumaSource};
 
-use super::shared::{MAX_HEALTH, TraumaEvent, apply_trauma_events};
+use super::shared::{TraumaEvent, apply_trauma_events};
 
 pub(super) fn produce_survive_near_death(game: &mut Game, phase: Phase) {
     // Collect wound events that pushed a tribute to <= 10% HP
@@ -31,8 +31,8 @@ pub(super) fn produce_survive_near_death(game: &mut Game, phase: Phase) {
             continue;
         };
 
-        let hp_after = tribute.attributes.health;
-        let hp_percent = hp_after * 100 / MAX_HEALTH;
+        let hp_after = tribute.effective_health();
+        let hp_percent = hp_after;
 
         if hp_percent <= 10 && tribute.is_alive() {
             let death_cause = attacker

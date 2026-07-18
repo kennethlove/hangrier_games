@@ -157,9 +157,9 @@ fn new() {
     assert_eq!(tribute.district, 12);
     // Attributes::new() randomizes health in 50..=max_health.
     assert!(
-        (50..=100).contains(&tribute.attributes.health()),
+        (50..=100).contains(&tribute.effective_health()),
         "health {} out of range",
-        tribute.attributes.health()
+        tribute.effective_health()
     );
 }
 
@@ -273,7 +273,12 @@ fn consume_pending_trust_shock_breaks_allies_on_success_and_clears_flag() {
     // Force trust_shock to fire deterministically: sanity=0, threshold>0
     // gives p = 0.5 + 0.5 * 1.0 = 1.0 → always true.
     let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
-    tribute.attributes.set_sanity(0);
+    // ponytail: set_sanity(0) → 10 Critical conditions drain 100 → effective_sanity = 0
+    tribute.mental_conditions = (0..10)
+        .map(|_| shared::conditions::MentalCondition::Pain {
+            severity: shared::conditions::ConditionSeverity::Critical,
+        })
+        .collect();
     tribute.brain.thresholds.extreme_low_sanity = 50;
     let ally1 = uuid::Uuid::new_v4();
     let ally2 = uuid::Uuid::new_v4();
@@ -297,7 +302,7 @@ fn consume_pending_trust_shock_breaks_allies_on_success_and_clears_flag() {
 fn consume_pending_trust_shock_no_break_when_sanity_above_threshold() {
     // Sanity at/above threshold → trust_shock_roll returns false → no break.
     let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
-    tribute.attributes.set_sanity(100);
+    // No mental conditions → effective_sanity = 100
     tribute.brain.thresholds.extreme_low_sanity = 50;
     let ally = uuid::Uuid::new_v4();
     tribute.allies.push(ally);
@@ -323,7 +328,7 @@ fn new_tribute_has_traits_for_valid_district() {
 fn pick_target_skips_allies() {
     // An ally is in the same area but must not be picked as a target.
     let mut me = Tribute::new("Katniss".to_string(), Some(12), None);
-    me.attributes.set_sanity(100); // not suicidal
+    // No mental conditions → effective_sanity = 100 → not suicidal
     let ally = Tribute::new("Peeta".to_string(), Some(12), None);
     me.allies.push(ally.id);
 
@@ -349,7 +354,7 @@ fn pick_target_allows_same_district_when_not_ally() {
 fn pick_target_final_confrontation_overrides_alliance() {
     // When only two tributes remain alive, even an ally is a valid target.
     let mut me = Tribute::new("Katniss".to_string(), Some(12), None);
-    me.attributes.set_sanity(100);
+    // No mental conditions → effective_sanity = 100 → not suicidal
     let ally = Tribute::new("Peeta".to_string(), Some(12), None);
     me.allies.push(ally.id);
 
@@ -383,7 +388,7 @@ fn tick_alliance_timers_saturates_does_not_overflow() {
 fn tick_alliance_timers_skips_dead_tributes() {
     // Dead tributes don't accumulate betrayal cooldown.
     let mut tribute = Tribute::new("Cinna".to_string(), Some(1), None);
-    tribute.attributes.set_health(0);
+    tribute.blood = 0;
     tribute.status = crate::tributes::TributeStatus::RecentlyDead;
     tribute.tick_alliance_timers();
     assert_eq!(tribute.turns_since_last_betrayal, 0);
@@ -396,7 +401,7 @@ fn pick_target_picks_ex_ally_after_trust_shock_breaks_bond() {
     // victim's `allies`, the victim's next `pick_target` call must
     // consider that ex-ally a valid target.
     let mut victim = Tribute::new("Glimmer".to_string(), Some(1), None);
-    victim.attributes.set_sanity(100); // not suicidal
+    // No mental conditions → effective_sanity = 100 → not suicidal
     let ex_ally = Tribute::new("Cato".to_string(), Some(2), None);
     // Pre-condition: bonded.
     victim.allies.push(ex_ally.id);
@@ -421,7 +426,12 @@ fn consume_pending_trust_shock_leaves_asymmetric_back_edge() {
     // for trust-shock breaks: only `self` is mutated. This regression
     // test pins that contract so any future tightening is intentional.
     let mut victim = Tribute::new("Glimmer".to_string(), Some(1), None);
-    victim.attributes.set_sanity(0); // force a break
+    // ponytail: set_sanity(0) → 10 Critical conditions drain 100 → effective_sanity = 0
+    victim.mental_conditions = (0..10)
+        .map(|_| shared::conditions::MentalCondition::Pain {
+            severity: shared::conditions::ConditionSeverity::Critical,
+        })
+        .collect();
     victim.brain.thresholds.extreme_low_sanity = 100;
     let betrayer_id = uuid::Uuid::new_v4();
     victim.allies.push(betrayer_id);

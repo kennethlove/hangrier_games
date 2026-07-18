@@ -116,7 +116,7 @@ pub fn apply_starvation_drain(tribute: &mut Tribute) -> u32 {
     }
     tribute.starvation_drain_step = tribute.starvation_drain_step.saturating_add(1);
     let lost = tribute.starvation_drain_step as u32;
-    tribute.attributes.health = tribute.attributes.health.saturating_sub(lost);
+    tribute.blood = tribute.blood.saturating_sub(lost * 10);
     lost
 }
 
@@ -127,7 +127,7 @@ pub fn apply_dehydration_drain(tribute: &mut Tribute) -> u32 {
     }
     tribute.dehydration_drain_step = tribute.dehydration_drain_step.saturating_add(1);
     let lost = tribute.dehydration_drain_step as u32;
-    tribute.attributes.health = tribute.attributes.health.saturating_sub(lost);
+    tribute.blood = tribute.blood.saturating_sub(lost * 10);
     lost
 }
 
@@ -261,7 +261,7 @@ mod tests {
     fn starving_tribute() -> Tribute {
         let mut t = baseline_tribute();
         t.hunger = 5;
-        t.attributes.health = 100;
+        t.blood = 1000;
         t.starvation_drain_step = 0;
         t
     }
@@ -271,16 +271,16 @@ mod tests {
         let mut t = starving_tribute();
         let lost1 = apply_starvation_drain(&mut t);
         assert_eq!(lost1, 1);
-        assert_eq!(t.attributes.health, 99);
+        assert_eq!(t.blood, 990);
         assert_eq!(t.starvation_drain_step, 1);
 
         let lost2 = apply_starvation_drain(&mut t);
         assert_eq!(lost2, 2);
-        assert_eq!(t.attributes.health, 97);
+        assert_eq!(t.blood, 970);
 
         let lost3 = apply_starvation_drain(&mut t);
         assert_eq!(lost3, 3);
-        assert_eq!(t.attributes.health, 94);
+        assert_eq!(t.blood, 940);
     }
 
     #[test]
@@ -307,12 +307,12 @@ mod tests {
         let mut t = baseline_tribute();
         t.thirst = 3;
         t.hunger = 5;
-        t.attributes.health = 100;
+        t.blood = 1000;
         let h1 = apply_dehydration_drain(&mut t);
         let s1 = apply_starvation_drain(&mut t);
         assert_eq!(h1, 1);
         assert_eq!(s1, 1);
-        assert_eq!(t.attributes.health, 98);
+        assert_eq!(t.blood, 980);
     }
 
     #[test]

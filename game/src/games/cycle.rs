@@ -344,7 +344,7 @@ impl Game {
                 // the action chosen by `process_turn_phase` is plumbed back
                 // here. `sheltered` reuses the value computed above for the
                 // hunger/thirst tick.
-                if tribute.attributes.health() > 0 {
+                if tribute.blood > 0 {
                     use crate::tributes::stamina_band::stamina_band;
 
                     let prior_band = stamina_band(
@@ -386,7 +386,7 @@ impl Game {
                 // Death routing for survival-induced 0 HP. Dehydration takes
                 // precedence over starvation when both landed in the same
                 // tick.
-                if tribute.attributes.health() == 0 && (hp_lost_starv > 0 || hp_lost_dehy > 0) {
+                if tribute.blood == 0 && (hp_lost_starv > 0 || hp_lost_dehy > 0) {
                     let cause = if hp_lost_dehy > 0 {
                         DeathCause::Dehydration
                     } else {
@@ -569,16 +569,19 @@ impl Game {
                     )
                 });
                 let prior_stamina = tribute.stamina;
-                let prior_hp = tribute.attributes.health();
+                let prior_hp = tribute.blood;
                 tribute.stamina = tribute
                     .stamina
                     .saturating_add(SLEEP_STAMINA_PER_PHASE)
                     .min(tribute.max_stamina);
                 if !blocked {
-                    tribute.attributes.restore_health(SLEEP_HP_PER_PHASE);
+                    tribute.blood = tribute
+                        .blood
+                        .saturating_add(SLEEP_HP_PER_PHASE)
+                        .min(crate::tributes::wounds::MAX_BLOOD);
                 }
                 let restored_stamina = tribute.stamina.saturating_sub(prior_stamina);
-                let restored_hp = tribute.attributes.health().saturating_sub(prior_hp);
+                let restored_hp = tribute.blood.saturating_sub(prior_hp);
 
                 // The TributeSlept emission for the *entry* phase happens
                 // in process_turn_phase. Each subsequent phase the sleeper

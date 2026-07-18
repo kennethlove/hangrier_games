@@ -112,8 +112,8 @@ fn attack_contest_draw(mut small_rng: SmallRng) {
 fn attacks_self(mut small_rng: SmallRng) {
     let mut attacker = Tribute::new("Katniss".to_string(), None, None);
     attacker.attributes.strength = 25;
-    attacker.attributes.sanity = 50;
-    let sanity = 50;
+    // Sanity is now derived from mental_conditions; start at full sanity
+    let sanity = attacker.effective_sanity();
     let mut target = attacker.clone();
 
     let outcome = attacker.attacks(
@@ -124,7 +124,7 @@ fn attacks_self(mut small_rng: SmallRng) {
         &CombatTuning::default(),
     );
     assert_eq!(outcome, AttackOutcome::Wound(attacker.clone(), target));
-    assert!(attacker.attributes.sanity < sanity);
+    assert!(attacker.effective_sanity() < sanity);
 }
 
 #[rstest]
@@ -146,7 +146,7 @@ fn attacks_self_suicide(mut small_rng: SmallRng) {
 #[rstest]
 fn attacks_wound(mut small_rng: SmallRng) {
     let mut attacker = Tribute::new("Katniss".to_string(), None, None);
-    let sanity = attacker.attributes.sanity;
+    let sanity = attacker.effective_sanity();
     let mut target = Tribute::new("Peeta".to_string(), None, None);
 
     attacker.attributes.strength = 25;
@@ -165,7 +165,7 @@ fn attacks_wound(mut small_rng: SmallRng) {
     );
     assert_eq!(attacker.statistics.wins, 1);
     assert_eq!(target.statistics.defeats, 1);
-    assert!(attacker.attributes.sanity < sanity);
+    assert!(attacker.effective_sanity() < sanity);
 }
 
 #[rstest]
@@ -175,7 +175,7 @@ fn attacks_kill(mut small_rng: SmallRng) {
 
     attacker.attributes.strength = 50;
     target.attributes.defense = 0;
-    target.attributes.health = 10;
+    target.blood = 100;
 
     let result = attacker.attacks(
         &mut target,
@@ -185,7 +185,7 @@ fn attacks_kill(mut small_rng: SmallRng) {
         &CombatTuning::default(),
     );
     assert!(matches!(result, AttackOutcome::Kill(_, _)));
-    assert_eq!(target.attributes.health, 0);
+    assert_eq!(target.blood, 0);
     assert_eq!(attacker.statistics.wins, 1);
     assert_eq!(target.statistics.defeats, 1);
 }
@@ -265,12 +265,12 @@ fn attacker_winded_takes_attack_roll_penalty() {
         let mut t1 = Tribute::new("T1".to_string(), None, None);
         t1.stamina = 100;
         t1.max_stamina = 100;
-        t1.attributes.health = 100;
+        t1.blood = 1000;
         t1.attributes.defense = 10;
         let mut t2 = Tribute::new("T2".to_string(), None, None);
         t2.stamina = 100;
         t2.max_stamina = 100;
-        t2.attributes.health = 100;
+        t2.blood = 1000;
         t2.attributes.defense = 10;
 
         let mut rng_a = SmallRng::seed_from_u64(seed);
@@ -290,7 +290,7 @@ fn attacker_winded_takes_attack_roll_penalty() {
             &tuning,
         );
 
-        if t1.attributes.health != t2.attributes.health {
+        if t1.blood != t2.blood {
             return; // Found a seed where penalty changes outcome
         }
         let _ = (out_a, out_b);
@@ -353,7 +353,7 @@ fn test_critical_hit() {
     let mut target = Tribute::new("Peeta".to_string(), None, None);
 
     attacker.attributes.strength = 10;
-    target.attributes.health = 100;
+    target.blood = 1000;
 
     let result = attack_contest(
         &mut attacker,
@@ -476,13 +476,13 @@ fn test_critical_hit_triple_damage(mut _small_rng: SmallRng) {
 #[rstest]
 fn test_fumble_self_damage(_small_rng: SmallRng) {
     let mut attacker = Tribute::new("Katniss".to_string(), None, None);
-    attacker.attributes.health = 100;
-    let initial_health = attacker.attributes.health;
+    attacker.blood = 1000;
+    let initial_blood = attacker.blood;
 
-    // Simulate fumble damage
-    attacker.attributes.health = attacker.attributes.health.saturating_sub(5);
+    // Simulate fumble damage (5 in old scale = 50 in blood)
+    attacker.blood = attacker.blood.saturating_sub(50);
 
-    assert_eq!(attacker.attributes.health, initial_health - 5);
+    assert_eq!(attacker.blood, initial_blood - 50);
 }
 
 /// Regression test for the clone-mutation bug where weapon wear was
@@ -537,7 +537,7 @@ fn attacks_target_killed_records_killer_id() {
     let mut target = Tribute::new("Peeta".to_string(), None, None);
 
     attacker.attributes.strength = 100;
-    target.attributes.health = 1;
+    target.blood = 10;
     target.attributes.defense = 0;
     let attacker_id = attacker.id;
 
@@ -552,10 +552,7 @@ fn attacks_target_killed_records_killer_id() {
         &CombatTuning::default(),
     );
 
-    assert_eq!(
-        target.attributes.health, 0,
-        "target should be dead in this scenario"
-    );
+    assert_eq!(target.blood, 0, "target should be dead in this scenario");
     assert_eq!(
         target.status,
         crate::tributes::statuses::TributeStatus::RecentlyDead
@@ -578,7 +575,7 @@ fn attacks_attacker_killed_records_target_id() {
     let mut attacker = Tribute::new("Katniss".to_string(), None, None);
     let mut target = Tribute::new("Peeta".to_string(), None, None);
 
-    attacker.attributes.health = 1;
+    attacker.blood = 10;
     attacker.attributes.strength = 0;
     attacker.attributes.defense = 0;
     target.attributes.strength = 100;
@@ -594,7 +591,7 @@ fn attacks_attacker_killed_records_target_id() {
         &CombatTuning::default(),
     );
 
-    if attacker.attributes.health == 0 {
+    if attacker.blood == 0 {
         assert_eq!(
             attacker.status,
             crate::tributes::statuses::TributeStatus::RecentlyDead
@@ -621,7 +618,7 @@ fn attacks_emits_one_combat_taggedevent(mut small_rng: SmallRng) {
 
     attacker.attributes.strength = 50;
     target.attributes.defense = 0;
-    target.attributes.health = 10;
+    target.blood = 100;
 
     let mut events: Vec<TaggedEvent> = Vec::new();
     attacker.attacks(
@@ -1002,7 +999,7 @@ fn combat_swing_records_stress_damage() {
 
     let mut target = Tribute::new("Tgt".into(), None, None);
     target.attributes.defense = 0;
-    target.attributes.health = 1;
+    target.blood = 10;
 
     let mut events: Vec<TaggedEvent> = Vec::new();
     let mut rng = SmallRng::seed_from_u64(1);
@@ -1043,7 +1040,7 @@ fn combat_beat_stress_matches_engagement_horrified_line() {
 
         let mut target = Tribute::new(format!("Tgt{seed}"), None, None);
         target.attributes.defense = 0;
-        target.attributes.health = 100;
+        target.blood = 1000;
 
         let mut events: Vec<TaggedEvent> = Vec::new();
         let mut rng = SmallRng::seed_from_u64(seed);

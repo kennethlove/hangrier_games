@@ -27,7 +27,7 @@ fn test_event_survival_integration_with_game_loop() {
     for i in 0..5 {
         let mut tribute = Tribute::new(format!("Tribute{}", i), Some((i % 12) + 1), None);
         tribute.area = Area::Sector1;
-        tribute.attributes.set_health(50); // Vulnerable
+        tribute.blood = 500;
         tribute.terrain_affinity = vec![]; // No protection
         tribute.statistics.game = game.identifier.clone();
         game.tributes.push(tribute);
@@ -99,7 +99,7 @@ fn test_trigger_cycle_events_calls_process_event() {
     for i in 0..6 {
         let mut tribute = Tribute::new(format!("Tribute{}", i), Some((i % 12) + 1), None);
         tribute.area = if i < 3 { Area::Sector1 } else { Area::Sector4 };
-        tribute.attributes.set_health(50);
+        tribute.blood = 500;
         tribute.terrain_affinity = vec![];
         tribute.statistics.game = game.identifier.clone();
         game.tributes.push(tribute);
@@ -168,7 +168,7 @@ fn test_terrain_affinity_improves_survival() {
 
         let mut tribute = Tribute::new("Affinity Tribute".to_string(), Some(1), None);
         tribute.area = Area::Sector1;
-        tribute.attributes.set_health(50);
+        tribute.blood = 500;
         tribute.terrain_affinity = vec![BaseTerrain::Forest]; // HAS affinity
         tribute.statistics.game = game_with.identifier.clone();
         game_with.tributes.push(tribute);
@@ -177,7 +177,7 @@ fn test_terrain_affinity_improves_survival() {
             .process_event_for_area(&Area::Sector1, &AreaEvent::Flood, &mut rng_with)
             .unwrap();
 
-        if game_with.tributes[0].attributes.health() == 0 {
+        if game_with.tributes[0].effective_health() == 0 {
             with_affinity_deaths += 1;
         }
 
@@ -195,7 +195,7 @@ fn test_terrain_affinity_improves_survival() {
 
         let mut tribute2 = Tribute::new("No Affinity Tribute".to_string(), Some(1), None);
         tribute2.area = Area::Sector1;
-        tribute2.attributes.set_health(50);
+        tribute2.blood = 500;
         tribute2.terrain_affinity = vec![]; // NO affinity
         tribute2.statistics.game = game_without.identifier.clone();
         game_without.tributes.push(tribute2);
@@ -204,7 +204,7 @@ fn test_terrain_affinity_improves_survival() {
             .process_event_for_area(&Area::Sector1, &AreaEvent::Flood, &mut rng_without)
             .unwrap();
 
-        if game_without.tributes[0].attributes.health() == 0 {
+        if game_without.tributes[0].effective_health() == 0 {
             without_affinity_deaths += 1;
         }
     }

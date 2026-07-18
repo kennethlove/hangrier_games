@@ -442,7 +442,8 @@ pub fn resolve(
     let contest = attack_contest(attacker, defender, rng, sub_events, tuning);
     let result = &contest.result;
 
-    // Compute damage based on result.
+    // Compute damage based on result (strength scale 0-50, result multipliers up to 3x).
+    // Scale to blood system: multiply by 10 so damage is in the 0-1000 blood range.
     let damage: u32 = match result {
         AttackResult::CriticalHit => attacker.attributes.strength * 3,
         AttackResult::AttackerWins => attacker.attributes.strength,
@@ -451,13 +452,13 @@ pub fn resolve(
         AttackResult::DefenderWins => defender.attributes.strength,
         AttackResult::DefenderWinsDecisively => defender.attributes.strength * 2,
         AttackResult::CriticalFumble | AttackResult::Miss => 0,
-    };
+    } * 10;
 
     // Determine SwingOutcome from result and pre-damage health.
     let swing_outcome = match result {
         AttackResult::Miss => SwingOutcome::Miss,
         AttackResult::CriticalFumble => {
-            if attacker.attributes.health <= 5 {
+            if attacker.blood <= 50 {
                 SwingOutcome::FumbleDeath { self_damage: 5 }
             } else {
                 SwingOutcome::FumbleSurvive { self_damage: 5 }
@@ -471,9 +472,9 @@ pub fn resolve(
                     | AttackResult::DefenderWinsDecisively
             );
             let victim_health = if is_counter {
-                attacker.attributes.health
+                attacker.blood
             } else {
-                defender.attributes.health
+                defender.blood
             };
 
             if victim_health <= damage {
@@ -502,12 +503,12 @@ pub fn resolve(
             | AttackResult::AttackerWinsDecisively => (
                 attacker.statistics.kills,
                 attacker.statistics.wins + 1,
-                attacker.attributes.sanity,
+                attacker.effective_sanity(),
             ),
             _ => (
                 defender.statistics.kills,
                 defender.statistics.wins + 1,
-                defender.attributes.sanity,
+                defender.effective_sanity(),
             ),
         };
         calculate_violence_stress(winner_kills, winner_wins, winner_sanity, tuning)
@@ -731,9 +732,9 @@ pub(crate) fn apply_combat_results(
     // Shield may prevent or mitigate the wound
     let final_severity = match shield_injury_prevention(loser, severity, rng) {
         None => {
-            // Shield prevented the wound entirely — still reduce health for
+            // Shield prevented the wound entirely — still reduce blood for
             // backward compat, but no wound is created.
-            loser.attributes.health = loser.attributes.health.saturating_sub(damage_to_loser);
+            loser.blood = loser.blood.saturating_sub(damage_to_loser);
             loser.statistics.defeats += 1;
             winner.statistics.wins += 1;
             let stress_damage = winner.apply_violence_stress(events, tuning);
@@ -753,7 +754,7 @@ pub(crate) fn apply_combat_results(
 
     loser.create_wound(wound_type, final_severity, body_part);
     loser.drain_blood_from_wounds();
-    loser.attributes.health = loser.attributes.health.saturating_sub(damage_to_loser);
+    loser.blood = loser.blood.saturating_sub(damage_to_loser);
 
     loser.statistics.defeats += 1;
     winner.statistics.wins += 1;
@@ -827,7 +828,7 @@ impl Tribute {
         let stress_damage = calculate_violence_stress(
             self.statistics.kills,
             self.statistics.wins,
-            self.attributes.sanity,
+            self.effective_sanity(),
             tuning,
         );
 
@@ -850,9 +851,7 @@ impl Tribute {
                     tribute: tref(self),
                 },
             ));
-            // Apply immediate sanity reduction
-            self.attributes.sanity = self.attributes.sanity.saturating_sub(stress_damage);
-            // Record as condition for ongoing tracking
+            // Apply immediate sanity reduction via mental condition
             self.mental_conditions.push(MentalCondition::Horrified {
                 severity,
                 remaining_periods: 3,
@@ -871,13 +870,13 @@ impl Tribute {
         events: &mut Vec<TaggedEvent>,
         tuning: &crate::tributes::combat_tuning::CombatTuning,
     ) -> AttackOutcome {
-        let damage = self.attributes.strength;
-        self.attributes.health = self.attributes.health.saturating_sub(damage);
+        let damage = self.attributes.strength * 10;
+        self.blood = self.blood.saturating_sub(damage);
         let mut stress_events: Vec<TaggedEvent> = Vec::new();
         let stress_damage = self.apply_violence_stress(&mut stress_events, tuning);
         events.extend(stress_events);
 
-        if self.attributes.health > 0 {
+        if self.blood > 0 {
             let content = GameOutput::TributeSelfHarm(self.name.as_str()).to_string();
             events.push(TaggedEvent::new(
                 content,

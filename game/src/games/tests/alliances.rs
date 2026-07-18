@@ -5,8 +5,8 @@ fn process_alliance_events_betrayal_removes_pair_on_victim_side() {
     let mut betrayer = Tribute::new("Betrayer".to_string(), Some(1), None);
     let mut victim = Tribute::new("Victim".to_string(), Some(2), None);
     victim.allies.push(betrayer.id);
-    victim.attributes.set_health(100);
-    betrayer.attributes.set_health(100);
+    victim.blood = 1000;
+    betrayer.blood = 1000;
     let bid = betrayer.id;
     let vid = victim.id;
 
@@ -56,8 +56,8 @@ fn process_alliance_events_death_removes_deceased_from_all_ally_lists() {
     let mut b = Tribute::new("B".to_string(), Some(3), None);
     a.allies.push(deceased.id);
     b.allies.push(deceased.id);
-    a.attributes.set_sanity(100);
-    b.attributes.set_sanity(100);
+    // Sanity is now derived from mental_conditions; full sanity by default (no conditions)
+    // a and b start with 100 sanity via effective_sanity()
 
     let did = deceased.id;
     let mut game = create_test_game_with_tributes(vec![deceased, a, b]);
@@ -275,13 +275,12 @@ fn run_tribute_cycle_enqueues_death_recorded_for_recently_dead_ally() {
 
     let mut deceased = create_tribute("Rue", true);
     let mut survivor = create_tribute("Katniss", true);
-    survivor.attributes.set_sanity(0);
     survivor.brain.thresholds.extreme_low_sanity = 50;
     survivor.traits = vec![Trait::Tough];
     deceased.traits = vec![Trait::Tough];
     survivor.allies.push(deceased.id);
     deceased.allies.push(survivor.id);
-    deceased.attributes.set_health(0);
+    deceased.blood = 0;
     deceased.status = TributeStatus::RecentlyDead;
     deceased.area = Area::Cornucopia;
     survivor.area = Area::Cornucopia;
@@ -380,7 +379,7 @@ fn run_tribute_cycle_consumes_recently_killed_by_for_combat_death() {
     survivor.allies.push(deceased.id);
     deceased.allies.push(survivor.id);
 
-    deceased.attributes.set_health(0);
+    deceased.blood = 0;
     deceased.status = TributeStatus::RecentlyDead;
     deceased.recently_killed_by = Some(kid);
 
@@ -435,7 +434,7 @@ fn run_tribute_cycle_environmental_death_emits_killer_none() {
     survivor.allies.push(deceased.id);
     deceased.allies.push(survivor.id);
 
-    deceased.attributes.set_health(0);
+    deceased.blood = 0;
     deceased.status = TributeStatus::RecentlyDead;
     assert!(deceased.recently_killed_by.is_none());
 

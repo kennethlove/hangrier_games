@@ -10,7 +10,7 @@ fn create_test_game(tribute_count: usize) -> Game {
 
     for i in 0..tribute_count {
         let mut tribute = Tribute::new(format!("Tribute {}", i), None, None);
-        tribute.attributes.health = 100;
+        tribute.blood = 1000;
         tribute.status = TributeStatus::Healthy;
         game.tributes.push(tribute);
     }
@@ -31,7 +31,7 @@ fn bench_living_tributes_half(c: &mut Criterion) {
 
     // Kill half the tributes
     for i in 0..12 {
-        game.tributes[i].attributes.health = 0;
+        game.tributes[i].blood = 0;
         game.tributes[i].status = TributeStatus::Dead;
     }
 
@@ -45,7 +45,7 @@ fn bench_living_tributes_few(c: &mut Criterion) {
 
     // Kill all but 2 tributes
     for i in 0..22 {
-        game.tributes[i].attributes.health = 0;
+        game.tributes[i].blood = 0;
         game.tributes[i].status = TributeStatus::Dead;
     }
 

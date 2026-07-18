@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 fn make_tribute(name: &str) -> Tribute {
     let mut t = Tribute::new(name.to_string(), None, None);
-    t.attributes.health = 100;
+    t.blood = 1000;
     t
 }
 
@@ -62,7 +62,7 @@ fn witness_ally_death_acquires_mild_trauma() {
     let mut victim = make_tribute("Victim");
     let victim_id = victim.id;
     victim.area = Area::Sector1;
-    victim.attributes.health = 0;
+    victim.blood = 0;
     game.tributes.push(victim);
 
     let mut witness = make_tribute("Witness");
@@ -133,7 +133,7 @@ fn survive_near_death_acquires_moderate_trauma() {
     game.current_phase = Phase::Day;
 
     let mut t = make_tribute("Survivor");
-    t.attributes.health = 8; // 8% HP, below 10% threshold
+    t.blood = 80; // 8% HP, below 10% threshold
     game.tributes.push(t);
 
     game.messages.push(GameMessage::new(
@@ -180,7 +180,7 @@ fn survive_near_death_above_threshold_no_trauma() {
     game.current_phase = Phase::Day;
 
     let mut t = make_tribute("Lucky");
-    t.attributes.health = 15; // 15% HP, above 10% threshold
+    t.blood = 150; // 15% HP, above 10% threshold
     game.tributes.push(t);
 
     game.messages.push(GameMessage::new(
@@ -273,7 +273,7 @@ fn mass_casualty_three_deaths_moderate() {
     for name in ["V1", "V2", "V3"] {
         let mut v = make_tribute(name);
         v.area = Area::Sector1;
-        v.attributes.health = 0;
+        v.blood = 0;
         game.tributes.push(v);
     }
 
@@ -310,7 +310,7 @@ fn mass_casualty_five_deaths_severe() {
     for name in ["V1", "V2", "V3", "V4", "V5"] {
         let mut v = make_tribute(name);
         v.area = Area::Sector1;
-        v.attributes.health = 0;
+        v.blood = 0;
         game.tributes.push(v);
     }
 

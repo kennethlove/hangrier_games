@@ -5,8 +5,6 @@ use rand::RngExt;
 use shared::wounds::{BodyPart, Wound, WoundSeverity, WoundType};
 
 /// Attribute maximums
-const MAX_HEALTH: u32 = 100;
-const MAX_SANITY: u32 = 100;
 const MAX_MOVEMENT: u32 = 100;
 const MAX_STRENGTH: u32 = 50;
 const MAX_BRAVERY: u32 = 100;
@@ -17,20 +15,19 @@ const DEFAULT_MENTAL_HEAL: u32 = 5;
 
 impl Tribute {
     /// Tribute is lonely/homesick/etc., loses some sanity.
+    /// Sanity is now derived from mental conditions; this pushes a Despondent
+    /// condition whose severity scales with bravery.
     pub(crate) fn misses_home(&mut self) {
-        let loneliness = self.attributes.bravery as f64 / 100.0; // how lonely is the tribute?
+        let loneliness = self.attributes.bravery as f64 / 100.0;
 
         if loneliness.round() < 0.25 {
-            if self.attributes.sanity < 25 {
-                self.attributes.sanity = self
-                    .attributes
-                    .sanity
-                    .saturating_sub(self.attributes.bravery);
-            }
-            self.attributes.sanity = self
-                .attributes
-                .sanity
-                .saturating_sub(self.attributes.bravery);
+            let severity = if self.effective_sanity() < 25 {
+                shared::conditions::ConditionSeverity::Severe
+            } else {
+                shared::conditions::ConditionSeverity::Mild
+            };
+            self.mental_conditions
+                .push(shared::conditions::MentalCondition::Despondent { severity });
         }
     }
 
@@ -76,24 +73,36 @@ impl Tribute {
             .min(MAX_MOVEMENT);
     }
 
-    /// Restores health.
+    /// Restores health (heals in old 0-100 scale, converted to blood 0-1000).
     pub(crate) fn heals(&mut self, health: u32) {
         if self.is_alive() {
-            self.attributes.health = self
-                .attributes
-                .health
-                .saturating_add(health)
-                .min(MAX_HEALTH);
+            self.blood = self
+                .blood
+                .saturating_add(health * 10)
+                .min(wounds::MAX_BLOOD);
         }
     }
 
-    /// Restores mental health.
+    /// Restores mental health by removing mental conditions.
+    /// Higher heal amounts remove more severe conditions.
     pub(crate) fn heals_mental_damage(&mut self, sanity: u32) {
-        self.attributes.sanity = self
-            .attributes
-            .sanity
-            .saturating_add(sanity)
-            .min(MAX_SANITY);
+        if self.mental_conditions.is_empty() {
+            return;
+        }
+        // Remove conditions up to the heal budget
+        let mut budget = sanity;
+        self.mental_conditions.retain(|c| {
+            if budget == 0 {
+                return true;
+            }
+            let drain = c.severity().sanity_drain();
+            if drain <= budget {
+                budget -= drain;
+                false // remove this condition
+            } else {
+                true // keep it
+            }
+        });
     }
 
     /// Restores movement.
@@ -233,16 +242,9 @@ impl Tribute {
         (base + penalty).max(0)
     }
 
-    /// Effective health after wound penalties.
+    /// Effective health derived from blood pool. Normalizes 0-1000 blood to 0-100 scale.
     pub fn effective_health(&self) -> u32 {
-        let base = self.attributes.health as i32;
-        let mut penalty = 0i32;
-        for wound in &self.wounds {
-            let mut p = wounds::health_penalty(wound.severity);
-            p = (p as f64 * wounds::body_part_penalty_multiplier(wound.body_part)) as i32;
-            penalty += p;
-        }
-        (base + penalty).max(0) as u32
+        (self.blood / 10).min(100)
     }
 
     /// Effective bravery after wound penalties.
@@ -263,34 +265,23 @@ impl Tribute {
         blood_ratio <= wounds::HEROISM_BLOOD_THRESHOLD
     }
 
-    /// Effective sanity after wound-induced mental distress.
-    /// Each wound imposes a sanity penalty based on severity.
+    /// Effective sanity derived from active mental conditions.
+    /// No conditions → full sanity (100). Each condition drains by its severity.
     pub fn effective_sanity(&self) -> u32 {
-        let base = self.attributes.sanity as i32;
-        let mut penalty = 0i32;
-        for wound in &self.wounds {
-            let p = match wound.severity {
-                WoundSeverity::Minor => -1,
-                WoundSeverity::Moderate => -3,
-                WoundSeverity::Severe => -5,
-                WoundSeverity::Critical => -10,
-            };
-            penalty += p;
+        if self.mental_conditions.is_empty() {
+            100
+        } else {
+            100u32.saturating_sub(
+                self.mental_conditions
+                    .iter()
+                    .map(|c| c.severity().sanity_drain())
+                    .sum::<u32>(),
+            )
         }
-        (base + penalty).max(0) as u32
     }
 
-    /// Ticks all mental conditions: applies sanity drain, advances durations,
-    /// and removes expired conditions.
+    /// Ticks all mental conditions: advances durations and removes expired conditions.
     pub(crate) fn tick_mental_conditions(&mut self) {
-        let total_drain: u32 = self
-            .mental_conditions
-            .iter()
-            .map(|c| c.severity().sanity_drain())
-            .sum();
-        if total_drain > 0 {
-            self.attributes.sanity = self.attributes.sanity.saturating_sub(total_drain);
-        }
         for condition in &mut self.mental_conditions {
             condition.tick();
         }
@@ -310,43 +301,28 @@ mod tests {
 
     #[rstest]
     fn saturating_sub_health(mut tribute: Tribute) {
-        let health = tribute.attributes.health();
-        tribute
-            .attributes
-            .set_health(tribute.attributes.health().saturating_sub(10));
-        assert_eq!(tribute.attributes.health(), health - 10);
+        let health = tribute.effective_health();
+        tribute.blood = tribute.blood.saturating_sub(100);
+        assert_eq!(tribute.effective_health(), health - 10);
     }
 
     #[rstest]
     fn heals(mut tribute: Tribute) {
-        tribute.attributes.set_health(50);
+        tribute.blood = 500;
         tribute.heals(10);
-        assert_eq!(tribute.attributes.health(), 60);
-    }
-
-    #[rstest]
-    fn saturating_sub_sanity(mut tribute: Tribute) {
-        let sanity = tribute.attributes.sanity();
-        tribute
-            .attributes
-            .set_sanity(tribute.attributes.sanity().saturating_sub(10));
-        assert_eq!(tribute.attributes.sanity(), sanity - 10);
-    }
-
-    #[rstest]
-    fn sanity_saturates_at_zero(mut tribute: Tribute) {
-        tribute.attributes.set_sanity(0);
-        tribute
-            .attributes
-            .set_sanity(tribute.attributes.sanity().saturating_sub(10));
-        assert_eq!(tribute.attributes.sanity(), 0);
+        assert_eq!(tribute.effective_health(), 60);
     }
 
     #[rstest]
     fn heals_mental_damage(mut tribute: Tribute) {
-        tribute.attributes.set_sanity(50);
-        tribute.heals_mental_damage(10);
-        assert_eq!(tribute.attributes.sanity(), 60);
+        use shared::conditions::{ConditionSeverity, MentalCondition};
+        tribute.mental_conditions.push(MentalCondition::Horrified {
+            severity: ConditionSeverity::Mild,
+            remaining_periods: 5,
+        });
+        assert_eq!(tribute.effective_sanity(), 99);
+        tribute.heals_mental_damage(5);
+        assert_eq!(tribute.effective_sanity(), 100);
     }
 
     #[rstest]
@@ -359,20 +335,18 @@ mod tests {
     #[rstest]
     fn long_rests(mut tribute: Tribute) {
         tribute.attributes.movement = 0;
-        tribute.attributes.set_health(50);
-        tribute.attributes.set_sanity(50);
+        tribute.blood = 500;
         tribute.long_rests();
         assert_eq!(tribute.attributes.movement, 100);
-        assert_eq!(tribute.attributes.health(), 55);
-        assert_eq!(tribute.attributes.sanity(), 55);
+        assert_eq!(tribute.effective_health(), 55);
     }
 
     #[rstest]
     fn misses_home(mut tribute: Tribute) {
         tribute.attributes.bravery = 20;
-        tribute.attributes.set_sanity(20);
-        let sanity = tribute.attributes.sanity();
+        // With bravery 20, loneliness = 0.2, rounds to 0 < 0.25 → pushes condition
+        assert!(tribute.mental_conditions.is_empty());
         tribute.misses_home();
-        assert!(tribute.attributes.sanity() < sanity);
+        assert!(!tribute.mental_conditions.is_empty());
     }
 }

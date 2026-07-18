@@ -101,7 +101,7 @@ impl Game {
                     for ally_id in allies_of_deceased {
                         if let Some(ally) = self.tributes.iter_mut().find(|t| t.id == ally_id) {
                             let limit = ally.brain.thresholds.extreme_low_sanity;
-                            let sanity = ally.attributes.sanity();
+                            let sanity = ally.effective_sanity();
                             if sanity_break_roll(sanity, limit, rng) {
                                 ally.allies.retain(|x| *x != deceased);
                                 let aid = ally.identifier.clone();

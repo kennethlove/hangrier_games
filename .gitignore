@@ -35,3 +35,6 @@ history.txt
 # Cate IDE
 .cate/
 package-lock.json
+
+# Beads / Dolt files (added by bd init)
+.beads/proxieddb/

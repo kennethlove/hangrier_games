@@ -289,6 +289,7 @@ SELECT (
     let sse_events = "death,wound,attack,combat,alliance_formed,alliance_proposed,alliance_dissolved,betrayal,trust_shock_break,sponsor_gift,movement,hidden,area_closed,area_event,item_found,item_used,item_dropped,rested,starved,dehydrated,sanity_break,hunger_band_changed,thirst_band_changed,stamina_band_changed,shelter_sought,foraged,drank,ate,cycle_start,cycle_end,phase_started,phase_ended,slept,woke,game_ended,wounded,attacked,affliction_acquired,affliction_progressed,affliction_healed,affliction_cascaded,trauma_acquired,trauma_reinforced,trauma_escalated,trauma_flashback,trauma_avoidance,trauma_observed,trauma_forgotten,trauma_habituated,phobia_acquired,phobia_triggered,phobia_escalated,phobia_habituated,phobia_observed,phobia_forgotten,fixation_acquired,fixation_escalated,fixation_fired,fixation_consummated,fixation_thwarted,fixation_faded,generic,trapped,struggling,trapped_escaped,died_while_trapped,trap_set,trap_triggered,rescue_attempted,sleep_incident,partial_rescue_progress";
 
     let mut ctx = tera_engine::base_context(&game.name, &auth);
+    ctx.insert("body_class", "broadcast");
     ctx.insert("game", &game);
     ctx.insert("alive", &alive);
     ctx.insert("fallen", &fallen);

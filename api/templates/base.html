@@ -4,7 +4,33 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ title }} — Hangry Games</title>
-  <link rel="stylesheet" href="/assets/main.css">
+  <script>
+  (function() {
+    var root = document.documentElement;
+    var saved = localStorage.getItem('theme') || 'auto';
+    function apply(t) {
+      if (t === 'dark') root.setAttribute('data-theme', 'dark');
+      else if (t === 'light') root.setAttribute('data-theme', 'light');
+      else {
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+          root.setAttribute('data-theme', 'dark');
+        else root.setAttribute('data-theme', 'light');
+      }
+      document.querySelectorAll('.theme-switcher button').forEach(function(b) {
+        b.classList.toggle('active', b.title.toLowerCase() === t);
+      });
+    }
+    apply(saved);
+    window.setTheme = function(t) {
+      localStorage.setItem('theme', t);
+      apply(t);
+    };
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+      if ((localStorage.getItem('theme') || 'auto') === 'auto') apply('auto');
+    });
+  })();
+  </script>
+  <link rel="stylesheet" href="/assets/main.css?v=2">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script src="https://unpkg.com/htmx-ext-sse@2.2.3"></script>
 </head>
@@ -55,31 +81,5 @@
     </div>
   </footer>
 
-  <script>
-  (function() {
-    var root = document.documentElement;
-    var saved = localStorage.getItem('theme') || 'dark';
-    function apply(t) {
-      if (t === 'dark') root.setAttribute('data-theme', 'dark');
-      else if (t === 'light') root.removeAttribute('data-theme');
-      else {
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches)
-          root.setAttribute('data-theme', 'dark');
-        else root.removeAttribute('data-theme');
-      }
-      document.querySelectorAll('.theme-switcher button').forEach(function(b) {
-        b.classList.toggle('active', b.title.toLowerCase() === t);
-      });
-    }
-    apply(saved);
-    window.setTheme = function(t) {
-      localStorage.setItem('theme', t);
-      apply(t);
-    };
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
-      if ((localStorage.getItem('theme') || 'dark') === 'auto') apply('auto');
-    });
-  })();
-  </script>
 </body>
 </html>

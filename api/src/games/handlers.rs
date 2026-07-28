@@ -184,8 +184,13 @@ pub async fn quickstart(
     )
     .await?;
 
-    // Redirect to game detail page
-    Ok(axum::response::Redirect::to(&format!("/games/{game_identifier}")).into_response())
+    // HX-Redirect: full page navigation via HTMX (not a 302)
+    let mut headers = axum::http::HeaderMap::new();
+    headers.insert(
+        "HX-Redirect",
+        axum::http::HeaderValue::from_str(&format!("/games/{game_identifier}")).unwrap(),
+    );
+    Ok((StatusCode::OK, headers, "").into_response())
 }
 
 /// Delete a game and all its associated pieces (tributes, items, areas).

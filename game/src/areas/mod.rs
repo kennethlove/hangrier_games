@@ -47,11 +47,17 @@ impl<'de> Deserialize<'de> for Area {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         // ponytail: null → default. The SQL subquery sometimes returns null
         // for area (e.g. tribute created before area field existed).
-        let s = Option::<String>::deserialize(d)?.unwrap_or_default();
-        if s.is_empty() {
-            return Ok(Area::default());
+        let s = Option::<String>::deserialize(d)?;
+        match s {
+            None => {
+                tracing::warn!(
+                    "Area field was null in SurrealDB response, defaulting to Cornucopia"
+                );
+                Ok(Area::default())
+            }
+            Some(s) if s.is_empty() => Ok(Area::default()),
+            Some(s) => Area::from_str(&s).map_err(serde::de::Error::custom),
         }
-        Area::from_str(&s).map_err(serde::de::Error::custom)
     }
 }
 

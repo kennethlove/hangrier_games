@@ -45,7 +45,12 @@ impl Serialize for Area {
 
 impl<'de> Deserialize<'de> for Area {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(d)?;
+        // ponytail: null → default. The SQL subquery sometimes returns null
+        // for area (e.g. tribute created before area field existed).
+        let s = Option::<String>::deserialize(d)?.unwrap_or_default();
+        if s.is_empty() {
+            return Ok(Area::default());
+        }
         Area::from_str(&s).map_err(serde::de::Error::custom)
     }
 }

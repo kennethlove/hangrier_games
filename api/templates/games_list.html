@@ -10,7 +10,7 @@
 <div class="container">
   <div class="action-row">
     <div class="launch-block">
-      <button class="quickstart-btn" hx-post="/api/games/quickstart">⚡ Quickstart — New 24-Tribute Game</button>
+      <button class="quickstart-btn" hx-post="/api/games/quickstart" hx-swap="none">⚡ Quickstart — New 24-Tribute Game</button>
       <div class="or-divider"><span>or</span></div>
       <div class="create-form">
         <h3>Create a Game</h3>
@@ -92,6 +92,8 @@
                     <a href="/games/{{ game.identifier }}/tributes" class="reveal-btn">Tributes</a>
                     <a href="/games/{{ game.identifier }}/areas" class="reveal-btn">Arena Map</a>
                     <a href="/games/{{ game.identifier }}/odds" class="reveal-btn">Odds</a>
+                    <button class="reveal-btn" hx-put="/api/games/{{ game.identifier }}/next" hx-swap="none" hx-on::after-request="window.location.reload()">Advance</button>
+                    <button class="reveal-btn danger" hx-delete="/api/games/{{ game.identifier }}" hx-confirm="Delete this game? This cannot be undone." hx-target="closest .game-card" hx-swap="outerHTML">Delete</button>
                   </div>
                 </div>
                 <div class="game-status">
@@ -124,6 +126,8 @@
                     <a href="/games/{{ game.identifier }}" class="reveal-btn">Broadcast</a>
                     <a href="/games/{{ game.identifier }}/tributes" class="reveal-btn">Tributes</a>
                     <a href="/games/{{ game.identifier }}/areas" class="reveal-btn">Arena Map</a>
+                    <button class="reveal-btn" hx-put="/api/games/{{ game.identifier }}/next" hx-swap="none" hx-on::after-request="window.location.reload()">Advance</button>
+                    <button class="reveal-btn danger" hx-delete="/api/games/{{ game.identifier }}" hx-confirm="Delete this game? This cannot be undone." hx-target="closest .game-card" hx-swap="outerHTML">Delete</button>
                   </div>
                 </div>
                 <div class="game-status">
@@ -141,9 +145,8 @@
                   <span><span class="num">{{ game.tribute_count }}</span> tributes</span>
                 </div>
                 <div class="reveal-actions">
-                  <a href="/games/{{ game.identifier }}/launch" class="reveal-btn">Launch</a>
-                  <a href="/games/{{ game.identifier }}/configure" class="reveal-btn">Configure</a>
-                  <button class="reveal-btn" type="button">Delete</button>
+                  <button class="reveal-btn" hx-put="/api/games/{{ game.identifier }}/next" hx-swap="none" hx-on::after-request="window.location.reload()">Start</button>
+                  <button class="reveal-btn danger" hx-delete="/api/games/{{ game.identifier }}" hx-confirm="Delete this game? This cannot be undone." hx-target="closest .game-card" hx-swap="outerHTML">Delete</button>
                 </div>
               </div>
               <div class="game-status">
@@ -177,6 +180,7 @@
                   <a href="/games/{{ game.identifier }}/recap" class="reveal-btn">Recap</a>
                   <a href="/games/{{ game.identifier }}/tributes" class="reveal-btn">Tributes</a>
                   <a href="/games/{{ game.identifier }}/areas" class="reveal-btn">Arena</a>
+                  <button class="reveal-btn danger" hx-delete="/api/games/{{ game.identifier }}" hx-confirm="Delete this finished game?" hx-target="closest .game-card" hx-swap="outerHTML">Delete</button>
                 </div>
               </div>
               <div class="game-status">

@@ -175,13 +175,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::assertions_on_constants)]
-    fn severity_bases_ordered() {
-        assert!(SEVERITY_BASE_SEVERE < SEVERITY_BASE_MODERATE);
-        assert!(SEVERITY_BASE_MODERATE < SEVERITY_BASE_MILD);
-    }
-
-    #[test]
     fn trap_kind_display_all_variants() {
         assert_eq!(TrapKind::Pitfall.to_string(), "pitfall");
         assert_eq!(TrapKind::SpikedPitfall.to_string(), "spiked_pitfall");

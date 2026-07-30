@@ -57,12 +57,6 @@ fn initialize_logging() {
     // a layer that logs events to stdout
     let stdout_log = tracing_subscriber::fmt::layer().pretty();
 
-    // a layer that logs events to a file, using the JSON format
-    // let file = File::create("debug_log.json").expect("Failed to create log file");
-    // let debug_log = tracing_subscriber::fmt::layer()
-    //     .with_writer(Arc::new(file))
-    //     .json();
-
     let production = env::var("PRODUCTION").unwrap_or("true".to_string());
     let tracing_level = if production == "true" {
         "info"

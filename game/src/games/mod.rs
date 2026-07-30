@@ -464,7 +464,6 @@ impl Game {
     }
 
     /// Returns a vec of closed areas.
-    #[allow(dead_code)]
     fn closed_areas(&self) -> Vec<AreaDetails> {
         self.areas
             .iter()

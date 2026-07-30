@@ -204,7 +204,6 @@ impl Commentator for OllamaCommentator {
         })
     }
 
-    #[allow(clippy::type_complexity)]
     fn generate_stream(
         &self,
         package: &BroadcastPackage,
@@ -344,7 +343,6 @@ impl Commentator for OllamaCommentator {
 }
 
 /// Internal state for the `generate_stream` unfold.
-#[allow(clippy::type_complexity)]
 struct OllamaStreamState {
     base_url: String,
     model: String,

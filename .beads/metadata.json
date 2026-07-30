@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "hangrier_games",
+  "project_id": "c7446629-1690-4b55-87ab-c7ee16f4d8a5"
+}

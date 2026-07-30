@@ -418,7 +418,6 @@ impl Tribute {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn new_with_rng(
         name: String,
         district: Option<u32>,

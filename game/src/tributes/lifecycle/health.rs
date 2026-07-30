@@ -198,12 +198,6 @@ impl Tribute {
             .retain(|w| w.bleeding || w.infected || w.severity != WoundSeverity::Minor);
     }
 
-    /// Restores blood from rest/food.
-    #[allow(dead_code)]
-    pub(crate) fn restores_blood(&mut self, amount: u32) {
-        self.blood = self.blood.saturating_add(amount).min(wounds::MAX_BLOOD);
-    }
-
     // --- Effective stats (base + wound penalties) ---
 
     /// Effective strength after wound penalties.

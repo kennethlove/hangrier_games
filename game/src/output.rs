@@ -7,7 +7,6 @@ use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 // Collection on strings to be used as output for the game
-#[allow(dead_code)]
 pub enum GameOutput<'a> {
     GameDayStart(u32),
     GameDayEnd(u32),

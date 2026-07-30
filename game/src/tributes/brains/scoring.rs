@@ -115,7 +115,6 @@ pub fn stamina_override(
 /// Baseline favors low-HP targets (`-target.health`). When the actor is Fresh
 /// and the target is Winded or Exhausted, adds
 /// `tuning.fresh_target_visibly_tired_bonus` (predator instinct).
-#[allow(dead_code)]
 pub fn target_attack_score(
     actor: &Tribute,
     target: &Tribute,

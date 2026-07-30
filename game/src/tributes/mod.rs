@@ -418,6 +418,7 @@ impl Tribute {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn new_with_rng(
         name: String,
         district: Option<u32>,

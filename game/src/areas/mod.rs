@@ -133,7 +133,9 @@ pub struct DestinationInfo {
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct AreaDetails {
+    #[serde(default)]
     pub identifier: String,
+    #[serde(default)]
     pub name: String,
     pub area: Option<Area>,
     #[serde(default)]

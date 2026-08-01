@@ -1671,6 +1671,7 @@ pub struct Statistics {
     /// How many fights ended in a draw?
     pub draws: u32,
     /// Which game do these stats relate to?
+    #[serde(default)]
     pub game: String,
 }
 

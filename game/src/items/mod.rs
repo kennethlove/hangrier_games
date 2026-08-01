@@ -95,7 +95,9 @@ pub trait OwnsItems {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Item {
+    #[serde(default)]
     pub identifier: String,
+    #[serde(default)]
     pub name: String,
     pub item_type: ItemType,
     // Legacy `item` rows written before games.rs:1099's CONTENT-bind fix

@@ -102,7 +102,7 @@ pub(crate) async fn save_area_items(
         let mut relation_parts = Vec::new();
         for item in &items_to_update {
             relation_parts.push(format!(
-                "RELATE {}->items->item:⟨{}⟩",
+                "RELATE ⟨{}⟩->items->item:⟨{}⟩",
                 crate::rid_to_string(&owner),
                 item.identifier
             ));
@@ -213,7 +213,7 @@ pub(crate) async fn save_tribute_items(
         let mut relation_parts = Vec::new();
         for item in &items_to_update {
             relation_parts.push(format!(
-                "RELATE {}->owns->item:⟨{}⟩",
+                "RELATE ⟨{}⟩->owns->item:⟨{}⟩",
                 crate::rid_to_string(&owner),
                 item.identifier
             ));

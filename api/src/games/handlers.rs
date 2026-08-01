@@ -170,10 +170,9 @@ pub async fn quickstart(
 
     // Start the game and run first cycle
     super::update_game_status(&db, &game_rid, GameStatus::InProgress).await?;
-    let mut game = super::get_full_game(Uuid::parse_str(&game_identifier).unwrap(), &db)
+    let mut game = super::get_full_game(&game_identifier, &db)
         .await
-        .map_err(|e| AppError::InternalServerError(format!("Failed to load game: {e}")))?
-        .0;
+        .map_err(|e| AppError::InternalServerError(format!("Failed to load game: {e}")))?;
     game.status = GameStatus::InProgress;
 
     super::run_game_cycles(
@@ -545,7 +544,7 @@ pub async fn next_step(
     match game_status {
         GameStatus::NotStarted => {
             super::update_game_status(&db, &record_id, GameStatus::InProgress).await?;
-            let mut game = super::get_full_game(identifier, &db).await?.0;
+            let mut game = super::get_full_game(&id, &db).await?;
             game.status = GameStatus::InProgress;
 
             // Broadcast game started
@@ -564,7 +563,7 @@ pub async fn next_step(
                 super::update_game_status(&db, &record_id, GameStatus::Finished).await?;
 
                 // Find and broadcast winner
-                let game = super::get_full_game(identifier, &db).await?.0;
+                let game = super::get_full_game(&id, &db).await?;
                 let winner = game
                     .tributes
                     .iter()
@@ -574,7 +573,7 @@ pub async fn next_step(
 
                 Ok(Json(None))
             } else {
-                let mut game = super::get_full_game(identifier, &db).await?.0;
+                let mut game = super::get_full_game(&id, &db).await?;
                 super::run_game_cycles(
                     &mut game,
                     &db,

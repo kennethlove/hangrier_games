@@ -5,7 +5,6 @@ pub(crate) mod persist;
 
 use crate::tributes::TRIBUTES_ROUTER;
 use crate::{AppError, AppState};
-use axum::Json;
 use axum::Router;
 use axum::routing::{get, post, put};
 use chrono::{DateTime, Utc};
@@ -582,22 +581,22 @@ async fn run_game_cycles(
     Ok(())
 }
 
-async fn get_full_game(identifier: Uuid, db: &Surreal<Any>) -> Result<Json<Game>, AppError> {
-    let identifier = identifier.to_string();
+pub async fn get_full_game(
+    identifier: &str,
+    db: &Surreal<Any>,
+) -> Result<Game, AppError> {
     let mut result = db
         .query("SELECT * FROM fn::get_full_game($identifier)")
-        .bind(("identifier", identifier.clone()))
+        .bind(("identifier", identifier))
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to fetch game: {}", e)))?;
-    if let Some(game) = result
-        .take::<Option<SerdeWrapper<Game>>>(0)
-        .map_err(|e| AppError::InternalServerError(format!("Failed to take game: {}", e)))?
-        .map(|w| w.0)
-    {
-        Ok(Json::<Game>(game))
-    } else {
-        Err(AppError::NotFound("Failed to find game".into()))
-    }
+
+    let game: Option<SerdeWrapper<Game>> = result
+        .take(0)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to take game: {}", e)))?;
+
+    game.map(|w| w.0)
+        .ok_or_else(|| AppError::NotFound(format!("Game {} not found", identifier)))
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

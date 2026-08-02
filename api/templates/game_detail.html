@@ -35,26 +35,24 @@
     <div class="day-nav">
       <div class="day-left">
         <span class="day-label">DAY</span>
-        <div class="day-arrows">
-          {% if current_day > 1 %}
-            <a href="/games/{{ game.identifier }}?day={{ current_day - 1 }}" class="day-arrow" title="Previous day">&laquo;</a>
-          {% else %}
-            <span class="day-arrow disabled">&laquo;</span>
-          {% endif %}
-          {% if current_day < game.day %}
-            <a href="/games/{{ game.identifier }}?day={{ current_day + 1 }}" class="day-arrow" title="Next day">&raquo;</a>
-          {% else %}
-            <span class="day-arrow disabled">&raquo;</span>
-          {% endif %}
-        </div>
+        {% if current_day > 1 %}
+          <a href="/games/{{ game.identifier }}?day={{ current_day - 1 }}" class="day-arrow" title="Previous day">&laquo;</a>
+        {% else %}
+          <span class="day-arrow disabled">&laquo;</span>
+        {% endif %}
         <select class="day-nav-select" onchange="window.location.href='/games/{{ game.identifier }}?day=' + this.value + '&phase={{ current_phase }}'">
-          {% for day_num in day_numbers %}
-            <option value="{{ day_num }}" {% if day_num == current_day %}selected{% endif %}>Day {{ day_num }}</option>
+          {% for d in range(start=1, end=day_count) %}
+            <option value="{{ d }}" {% if d == current_day %}selected{% endif %}>{{ d }}</option>
           {% endfor %}
         </select>
+        {% if current_day < game.day %}
+          <a href="/games/{{ game.identifier }}?day={{ current_day + 1 }}" class="day-arrow" title="Next day">&raquo;</a>
+        {% else %}
+          <span class="day-arrow disabled">&raquo;</span>
+        {% endif %}
         <span class="day-nav-divider">/</span>
+        {% set all_phases = ["dawn", "day", "dusk", "night"] %}
         <select class="day-nav-select" onchange="window.location.href='/games/{{ game.identifier }}?day={{ current_day }}&phase=' + this.value">
-          {% set all_phases = ["dawn", "day", "dusk", "night"] %}
           {% for p in all_phases %}
             <option value="{{ p }}" {% if current_phase == p %}selected{% endif %}>{{ p | upper }}</option>
           {% endfor %}

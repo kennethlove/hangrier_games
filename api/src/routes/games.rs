@@ -346,6 +346,8 @@ SELECT (
     ctx.insert("event_cards", &event_cards);
     ctx.insert("messages", &messages);
     ctx.insert("segments", &segments);
+    let day_count = game.day.unwrap_or(0) + 1;
+    ctx.insert("day_count", &day_count);
 
     html_with_csrf(tera_engine::render("game_detail.html", &ctx), &csrf)
 }

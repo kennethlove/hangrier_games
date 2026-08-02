@@ -1896,9 +1896,9 @@ h1, h2, h3, h4 {
   font-family: var(--font-mono);
 }
 .day-nav .day-left {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
 }
 .day-nav .day-label {
   font-family: var(--font-condensed);
@@ -1907,10 +1907,6 @@ h1, h2, h3, h4 {
   text-transform: uppercase;
   font-size: var(--fs-sm);
   color: var(--broad-fg-muted);
-}
-.day-nav .day-arrows {
-  display: flex;
-  gap: 2px;
 }
 .day-arrow {
   text-decoration: none;
@@ -1942,6 +1938,10 @@ h1, h2, h3, h4 {
   color: var(--broad-accent);
   background: var(--broad-accent-glow, rgba(0,184,217,0.08));
 }
+.day-nav .day-nav-divider {
+  color: var(--broad-fg-muted);
+  font-size: var(--fs-sm);
+}
 .day-nav .day-nav-select {
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
@@ -1958,10 +1958,6 @@ h1, h2, h3, h4 {
 .day-nav .day-nav-select:hover {
   border-color: var(--broad-accent);
   color: var(--broad-accent);
-}
-.day-nav .day-nav-divider {
-  color: var(--broad-fg-muted);
-  font-size: var(--fs-sm);
 }
 .day-nav .day-right {
   display: flex;

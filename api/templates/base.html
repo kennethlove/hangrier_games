@@ -28,6 +28,9 @@
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
       if ((localStorage.getItem('theme') || 'auto') === 'auto') apply('auto');
     });
+    document.addEventListener('DOMContentLoaded', function() {
+      apply(localStorage.getItem('theme') || 'auto');
+    });
   })();
   </script>
   <link rel="stylesheet" href="/assets/main.css?v=2">

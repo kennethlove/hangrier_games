@@ -591,12 +591,19 @@ pub async fn get_full_game(
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to fetch game: {}", e)))?;
 
-    let game: Option<SerdeWrapper<Game>> = result
+    // Take as raw JSON to bypass SurrealDB SDK deserializer issues with null fields.
+    let raw: Vec<serde_json::Value> = result
         .take(0)
         .map_err(|e| AppError::InternalServerError(format!("Failed to take game: {}", e)))?;
 
-    game.map(|w| w.0)
-        .ok_or_else(|| AppError::NotFound(format!("Game {} not found", identifier)))
+    let value = raw
+        .into_iter()
+        .next()
+        .ok_or_else(|| AppError::NotFound(format!("Game {} not found", identifier)))?;
+
+    serde_json::from_value(value).map_err(|e| {
+        AppError::InternalServerError(format!("Failed to deserialize game: {e}"))
+    })
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

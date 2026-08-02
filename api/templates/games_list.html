@@ -209,4 +209,32 @@
     </div>
   </div>
 </section>
+<script>
+document.body.addEventListener("htmx:afterRequest", function(evt) {
+  if (evt.detail.xhr.status === 204 && evt.detail.requestConfig.verb === "delete") {
+    var target = evt.detail.target || evt.detail.elt.closest(".game-card");
+    if (!target) return;
+    var status = target.getAttribute("data-status");
+    var statsEl = document.querySelector(".stats-col");
+    if (!statsEl) return;
+    var labels = statsEl.querySelectorAll(".summary-card");
+    labels.forEach(function(el) {
+      var label = el.querySelector(".s-label");
+      var val = el.querySelector(".s-val");
+      if (!label || !val) return;
+      var text = label.textContent.trim().toLowerCase();
+      var n = parseInt(val.textContent) || 0;
+      if (text === "total games") {
+        val.textContent = Math.max(0, n - 1);
+      } else if (status === "running" && text === "running") {
+        val.textContent = Math.max(0, n - 1);
+      } else if (status === "waiting" && text === "waiting") {
+        val.textContent = Math.max(0, n - 1);
+      } else if (status === "finished" && text === "finished") {
+        val.textContent = Math.max(0, n - 1);
+      }
+    });
+  }
+});
+</script>
 {% endblock %}

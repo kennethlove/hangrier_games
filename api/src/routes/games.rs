@@ -150,8 +150,20 @@ pub async fn game_detail_handler(
     let (auth, csrf) = extract_auth(&headers);
     let identifier = game_identifier.to_string();
 
-    let result = state
-        .db
+    // Authenticate DB for $auth-gated queries (is_mine)
+    let token = read_cookie(&headers, SESSION_COOKIE)
+        .map(|s| s.to_owned())
+        .unwrap_or_default();
+    let db = if !token.is_empty() {
+        match authenticate_db(&state, &token).await {
+            Ok(db) => db,
+            Err(_) => (*state.db).clone(),  // fallback to unauthenticated
+        }
+    } else {
+        (*state.db).clone()
+    };
+
+    let result = db
         .query("SELECT * FROM fn::get_display_game($identifier);")
         .bind(("identifier", identifier.clone()))
         .await;

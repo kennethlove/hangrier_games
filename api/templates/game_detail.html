@@ -14,12 +14,7 @@
         </span>
         <span class="location">{{ game.name | upper }}</span>
       </div>
-      <div class="broad-header-meta">
-        <div class="phase-badge {{ phase_class }}">
-          <span class="dot"></span>
-          <span>{{ phase_label }}</span>
-        </div>
-      </div>
+      <div class="broad-header-meta"></div>
       <div class="broad-stats">
         <div class="stat">
           <span class="num alive">{{ alive }}</span>
@@ -39,24 +34,29 @@
     {# ══ DAY NAV ══ #}
     <div class="day-nav">
       <div class="day-left">
-        <span class="day-label">
-          DAY <span class="hl">{{ current_day }}</span>
-        </span>
+        <span class="day-label">DAY</span>
         <div class="day-arrows">
           {% if current_day > 1 %}
-            <a href="/games/{{ game.identifier }}?day={{ current_day - 1 }}" class="day-arrow" title="Previous day" hx-boost="true">&lt;</a>
+            <a href="/games/{{ game.identifier }}?day={{ current_day - 1 }}" class="day-arrow" title="Previous day">&laquo;</a>
           {% else %}
-            <span class="day-arrow disabled">&lt;</span>
+            <span class="day-arrow disabled">&laquo;</span>
           {% endif %}
           {% if current_day < game.day %}
-            <a href="/games/{{ game.identifier }}?day={{ current_day + 1 }}" class="day-arrow" title="Next day" hx-boost="true">&gt;</a>
+            <a href="/games/{{ game.identifier }}?day={{ current_day + 1 }}" class="day-arrow" title="Next day">&raquo;</a>
           {% else %}
-            <span class="day-arrow disabled">&gt;</span>
+            <span class="day-arrow disabled">&raquo;</span>
           {% endif %}
         </div>
-        <select class="day-select" id="daySelect" onchange="window.location.href='/games/{{ game.identifier }}?day=' + this.value">
+        <select class="day-nav-select" onchange="window.location.href='/games/{{ game.identifier }}?day=' + this.value + '&phase={{ current_phase }}'">
           {% for day_num in day_numbers %}
             <option value="{{ day_num }}" {% if day_num == current_day %}selected{% endif %}>Day {{ day_num }}</option>
+          {% endfor %}
+        </select>
+        <span class="day-nav-divider">/</span>
+        <select class="day-nav-select" onchange="window.location.href='/games/{{ game.identifier }}?day={{ current_day }}&phase=' + this.value">
+          {% set all_phases = ["dawn", "day", "dusk", "night"] %}
+          {% for p in all_phases %}
+            <option value="{{ p }}" {% if current_phase == p %}selected{% endif %}>{{ p | upper }}</option>
           {% endfor %}
         </select>
       </div>

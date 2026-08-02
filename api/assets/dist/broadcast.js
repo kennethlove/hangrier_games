@@ -5,36 +5,12 @@
   var feedTabs = document.querySelectorAll(".feed-tab");
   var feedScroll = document.getElementById("feedScroll");
 
-  // Restore saved filter from localStorage
-  var savedFilter = localStorage.getItem("feedFilter") || "all";
-  feedTabs.forEach(function(tab) {
-    if (tab.textContent.trim().toLowerCase() === savedFilter) {
-      tab.classList.add("active");
-    } else {
-      tab.classList.remove("active");
-    }
-  });
-
-  // Apply filter on load
-  if (feedScroll) {
-    var filter = savedFilter === "all" ? "" : savedFilter;
-    var cards = feedScroll.querySelectorAll(".event-card");
-    cards.forEach(function(card) {
-      if (!filter || card.classList.contains(filter)) {
-        card.style.display = "";
-      } else {
-        card.style.display = "none";
-      }
-    });
-  }
-
   feedTabs.forEach(function(tab) {
     tab.addEventListener("click", function() {
       feedTabs.forEach(function(t) { t.classList.remove("active"); });
       tab.classList.add("active");
 
       var filter = tab.textContent.trim().toLowerCase();
-      localStorage.setItem("feedFilter", filter);
       if (filter === "all") filter = "";
 
       var cards = feedScroll.querySelectorAll(".event-card");

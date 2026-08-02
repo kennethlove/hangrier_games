@@ -137,6 +137,7 @@ fn filter_games_by_status(games: &[ListDisplayGame], status: Option<&str>) -> Ve
 #[derive(Deserialize, Default)]
 pub struct DayQuery {
     pub day: Option<u32>,
+    pub phase: Option<String>,
 }
 
 /// GET /games/{id} — game detail page (broadcast interface).
@@ -219,18 +220,36 @@ SELECT (
     // Override current_day if query param provided
     let current_day = query.day.unwrap_or(current_day);
 
+    let current_phase = query.phase.as_deref().unwrap_or("all");
+
     let messages_result = if current_day > 0 {
-        state
-            .db
-            .query(
-                r#"SELECT * FROM message
-                WHERE string::starts_with(subject, $identifier)
-                AND game_day = $day
-                ORDER BY game_day, phase, tick, emit_index;"#,
-            )
-            .bind(("identifier", identifier.clone()))
-            .bind(("day", current_day))
-            .await
+        if current_phase != "all" {
+            state
+                .db
+                .query(
+                    r#"SELECT * FROM message
+                    WHERE string::starts_with(subject, $identifier)
+                    AND game_day = $day
+                    AND phase = $phase
+                    ORDER BY game_day, phase, tick, emit_index;"#,
+                )
+                .bind(("identifier", identifier.clone()))
+                .bind(("day", current_day))
+                .bind(("phase", current_phase))
+                .await
+        } else {
+            state
+                .db
+                .query(
+                    r#"SELECT * FROM message
+                    WHERE string::starts_with(subject, $identifier)
+                    AND game_day = $day
+                    ORDER BY game_day, phase, tick, emit_index;"#,
+                )
+                .bind(("identifier", identifier.clone()))
+                .bind(("day", current_day))
+                .await
+        }
     } else {
         state
             .db
@@ -320,6 +339,7 @@ SELECT (
     ctx.insert("phase_label", phase_label);
     ctx.insert("day_numbers", &day_numbers);
     ctx.insert("current_day", &current_day);
+    ctx.insert("current_phase", current_phase);
     ctx.insert("sse_events", sse_events);
     ctx.insert("tribute_rows", &tribute_rows);
     ctx.insert("hex_map", &hex_map);

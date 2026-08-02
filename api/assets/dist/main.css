@@ -1906,9 +1906,7 @@ h1, h2, h3, h4 {
   letter-spacing: 2px;
   text-transform: uppercase;
   font-size: var(--fs-sm);
-}
-.day-nav .day-label .hl {
-  color: var(--broad-accent);
+  color: var(--broad-fg-muted);
 }
 .day-nav .day-arrows {
   display: flex;
@@ -1944,14 +1942,26 @@ h1, h2, h3, h4 {
   color: var(--broad-accent);
   background: var(--broad-accent-glow, rgba(0,184,217,0.08));
 }
-.day-nav .day-select {
+.day-nav .day-nav-select {
   font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  padding: 2px 6px;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  padding: 4px 10px;
   border: 1px solid var(--broad-border);
+  border-radius: 4px;
   background: var(--broad-surface);
   color: var(--broad-fg);
   cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.day-nav .day-nav-select:hover {
+  border-color: var(--broad-accent);
+  color: var(--broad-accent);
+}
+.day-nav .day-nav-divider {
+  color: var(--broad-fg-muted);
+  font-size: var(--fs-sm);
 }
 .day-nav .day-right {
   display: flex;

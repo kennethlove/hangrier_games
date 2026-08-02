@@ -581,10 +581,7 @@ async fn run_game_cycles(
     Ok(())
 }
 
-pub async fn get_full_game(
-    identifier: &str,
-    db: &Surreal<Any>,
-) -> Result<Game, AppError> {
+pub async fn get_full_game(identifier: &str, db: &Surreal<Any>) -> Result<Game, AppError> {
     let mut result = db
         .query("SELECT * FROM fn::get_full_game($identifier)")
         .bind(("identifier", identifier))
@@ -601,9 +598,8 @@ pub async fn get_full_game(
         .next()
         .ok_or_else(|| AppError::NotFound(format!("Game {} not found", identifier)))?;
 
-    serde_json::from_value(value).map_err(|e| {
-        AppError::InternalServerError(format!("Failed to deserialize game: {e}"))
-    })
+    serde_json::from_value(value)
+        .map_err(|e| AppError::InternalServerError(format!("Failed to deserialize game: {e}")))
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

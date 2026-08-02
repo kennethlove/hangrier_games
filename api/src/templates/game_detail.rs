@@ -274,7 +274,7 @@ pub fn render_commentary_card(seg: &announcers::CommentarySegment) -> String {
     )
 }
 
-pub fn render_tribute_row(tribute: &game::tributes::Tribute) -> String {
+pub fn render_tribute_row(tribute: &game::tributes::Tribute, game_id: &str) -> String {
     let is_alive = tribute.is_alive();
     let health = tribute.effective_health();
     let health_class = if health > 60 {
@@ -295,21 +295,24 @@ pub fn render_tribute_row(tribute: &game::tributes::Tribute) -> String {
     let status_class = if is_alive { "alive" } else { "dead" };
     let status_text = if is_alive { "ALIVE" } else { "DEAD" };
     let dead_class = if !is_alive { " dead" } else { "" };
+    let tribute_id = &tribute.identifier;
 
     format!(
-        r#"<div class="roster-row{dead_class}">
-          <div class="roster-avatar" style="border-color:{avatar_color};color:{avatar_color}">{initial}</div>
-          <div class="roster-info">
-            <span class="roster-name">{name}</span>
-            <span class="roster-district">D{district}</span>
-          </div>
-          <div class="roster-health">
-            <div class="roster-health-bar">
-              <div class="roster-health-fill {health_class}" style="width:{health}%;"></div>
+        r#"<a href="/games/{game_id}/tributes/{tribute_id}" class="roster-row{dead_class}" style="text-decoration:none;color:inherit;display:block;">
+          <div>
+            <div class="roster-avatar" style="border-color:{avatar_color};color:{avatar_color}">{initial}</div>
+            <div class="roster-info">
+              <span class="roster-name">{name}</span>
+              <span class="roster-district">D{district}</span>
             </div>
+            <div class="roster-health">
+              <div class="roster-health-bar">
+                <div class="roster-health-fill {health_class}" style="width:{health}%;"></div>
+              </div>
+            </div>
+            <span class="roster-status {status_class}">{status_text}</span>
           </div>
-          <span class="roster-status {status_class}">{status_text}</span>
-        </div>"#,
+        </a>"#,
         name = html_escape(&tribute.name),
         district = tribute.district,
     )
@@ -544,6 +547,7 @@ pub fn build_alliance_groups(tributes: &[&game::tributes::Tribute]) -> Vec<Allia
 pub fn render_alliance_group(
     group: &AllianceGroup,
     tributes: &[&game::tributes::Tribute],
+    game_id: &str,
 ) -> String {
     let alive_count = group
         .tributes
@@ -553,7 +557,7 @@ pub fn render_alliance_group(
 
     let mut rows = String::new();
     for &idx in &group.tributes {
-        rows.push_str(&render_tribute_row(tributes[idx]));
+        rows.push_str(&render_tribute_row(tributes[idx], game_id));
     }
 
     format!(
@@ -567,6 +571,56 @@ pub fn render_alliance_group(
         color = group.color,
         name = group.name,
         total = group.tributes.len(),
+    )
+}
+
+pub struct DistrictGroup<'a> {
+    pub district: u32,
+    pub alive_count: usize,
+    pub total: usize,
+    pub tributes: Vec<&'a game::tributes::Tribute>,
+}
+
+pub fn build_district_groups<'a>(
+    tributes: &[&'a game::tributes::Tribute],
+) -> Vec<DistrictGroup<'a>> {
+    let mut groups: std::collections::HashMap<u32, Vec<&game::tributes::Tribute>> =
+        std::collections::HashMap::new();
+    for &tribute in tributes {
+        groups.entry(tribute.district).or_default().push(tribute);
+    }
+    let mut result: Vec<DistrictGroup<'a>> = groups
+        .into_iter()
+        .map(|(district, members)| {
+            let alive_count = members.iter().filter(|t| t.is_alive()).count();
+            DistrictGroup {
+                district,
+                alive_count,
+                total: members.len(),
+                tributes: members,
+            }
+        })
+        .collect();
+    result.sort_by_key(|g| g.district);
+    result
+}
+
+pub fn render_district_group(group: &DistrictGroup, game_id: &str) -> String {
+    let mut rows = String::new();
+    for tribute in &group.tributes {
+        rows.push_str(&render_tribute_row(tribute, game_id));
+    }
+    format!(
+        r#"<div class="district-group">
+          <div class="alliance-header" style="border-left-color:var(--broad-accent);">
+            <span class="alliance-name">DISTRICT {district}</span>
+            <span class="alliance-count">{alive}/{total} alive</span>
+          </div>
+          {rows}
+        </div>"#,
+        district = group.district,
+        alive = group.alive_count,
+        total = group.total,
     )
 }
 

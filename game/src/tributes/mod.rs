@@ -6,6 +6,7 @@ pub mod combat;
 pub mod combat_beat;
 pub mod combat_tuning;
 pub mod events;
+mod helpers;
 pub mod incidents;
 pub mod inventory;
 pub mod lifecycle;
@@ -308,7 +309,12 @@ pub struct Tribute {
     pub sleep_shelter: Option<crate::tributes::incidents::SleepShelter>,
     /// Active afflictions keyed by (kind, body_part). Empty by default;
     /// serde skips serialization when empty to keep payloads lean.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        serialize_with = "helpers::serialize_affliction_map",
+        deserialize_with = "helpers::deserialize_affliction_map"
+    )]
     pub afflictions: BTreeMap<AfflictionKey, Affliction>,
     /// Current game day (cycle). Used for affliction cycle tracking.
     #[serde(default)]

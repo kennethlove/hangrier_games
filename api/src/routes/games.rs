@@ -275,11 +275,11 @@ SELECT (
         event_cards.push_str(&game_detail::render_commentary_card(seg));
     }
 
-    // Pre-render tribute rows — grouped by alliance
-    let alliance_groups = game_detail::build_alliance_groups(&sorted_tributes);
+    // Pre-render tribute rows — grouped by district
+    let district_groups = game_detail::build_district_groups(&sorted_tributes);
     let mut tribute_rows = String::new();
-    for group in &alliance_groups {
-        tribute_rows.push_str(&game_detail::render_alliance_group(group, &sorted_tributes));
+    for group in &district_groups {
+        tribute_rows.push_str(&game_detail::render_district_group(group, &identifier));
     }
 
     // Build hex arena map SVG

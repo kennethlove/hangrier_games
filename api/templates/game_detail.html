@@ -63,10 +63,10 @@
           <button
             class="phase-btn"
             hx-put="/api/games/{{ game.identifier }}/next"
-            hx-target="#game-status"
-            hx-swap="innerHTML"
+            hx-swap="none"
             hx-disabled-elt="this"
-            hx-indicator="#play-spinner">
+            hx-indicator="#play-spinner"
+            hx-on::after-request="window.location.href='/games/{{ game.identifier }}'">
             ADVANCE +
             <span id="play-spinner" class="htmx-indicator">
               <svg class="spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -79,10 +79,10 @@
           <button
             class="phase-btn"
             hx-put="/api/games/{{ game.identifier }}/next"
-            hx-target="#game-status"
-            hx-swap="innerHTML"
+            hx-swap="none"
             hx-disabled-elt="this"
-            hx-indicator="#start-spinner">
+            hx-indicator="#start-spinner"
+            hx-on::after-request="window.location.href='/games/{{ game.identifier }}'">
             START
             <span id="start-spinner" class="htmx-indicator">
               <svg class="spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

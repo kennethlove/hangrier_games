@@ -972,6 +972,7 @@ impl Game {
         for &p in phases {
             self.run_phase(p)?;
         }
+        self.day = Some(next_day);
         Ok(())
     }
 }

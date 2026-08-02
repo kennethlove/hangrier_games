@@ -1791,6 +1791,7 @@ h1, h2, h3, h4 {
   flex-direction: column;
   gap: var(--gap-sm);
   min-height: 0;
+  overflow: hidden;
 }
 .broad-header {
   background: linear-gradient(135deg, var(--broad-surface), var(--broad-surface-alt));
@@ -1912,6 +1913,17 @@ h1, h2, h3, h4 {
 .day-nav .day-arrows {
   display: flex;
   gap: 2px;
+}
+.day-arrow {
+  text-decoration: none;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.day-arrow.disabled {
+  opacity: 0.3;
+  pointer-events: none;
 }
 .day-nav .day-arrow {
   width: 24px;
@@ -2316,6 +2328,7 @@ h1, h2, h3, h4 {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  max-height: 400px;
 }
 .roster-scroll::-webkit-scrollbar {
   width: 4px;

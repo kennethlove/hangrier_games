@@ -5,12 +5,36 @@
   var feedTabs = document.querySelectorAll(".feed-tab");
   var feedScroll = document.getElementById("feedScroll");
 
+  // Restore saved filter from localStorage
+  var savedFilter = localStorage.getItem("feedFilter") || "all";
+  feedTabs.forEach(function(tab) {
+    if (tab.textContent.trim().toLowerCase() === savedFilter) {
+      tab.classList.add("active");
+    } else {
+      tab.classList.remove("active");
+    }
+  });
+
+  // Apply filter on load
+  if (feedScroll) {
+    var filter = savedFilter === "all" ? "" : savedFilter;
+    var cards = feedScroll.querySelectorAll(".event-card");
+    cards.forEach(function(card) {
+      if (!filter || card.classList.contains(filter)) {
+        card.style.display = "";
+      } else {
+        card.style.display = "none";
+      }
+    });
+  }
+
   feedTabs.forEach(function(tab) {
     tab.addEventListener("click", function() {
       feedTabs.forEach(function(t) { t.classList.remove("active"); });
       tab.classList.add("active");
 
       var filter = tab.textContent.trim().toLowerCase();
+      localStorage.setItem("feedFilter", filter);
       if (filter === "all") filter = "";
 
       var cards = feedScroll.querySelectorAll(".event-card");
@@ -110,33 +134,49 @@
   var rosterScroll = document.querySelector(".roster-scroll");
   if (rosterScroll) {
     var sortBtn = document.querySelector(".roster-sort");
-    var sortModes = ["alliance", "health", "district"];
-    var sortIdx = 0;
+    var sortModes = ["district", "health"];
+
+    // Save original HTML (with group wrappers) for restoring district view
+    var originalRosterHTML = rosterScroll.innerHTML;
+
+    // Restore saved sort mode from localStorage
+    var savedMode = localStorage.getItem("rosterSort") || "district";
+    var sortIdx = sortModes.indexOf(savedMode);
+    if (sortIdx < 0) sortIdx = 0;
+    if (sortBtn) sortBtn.textContent = sortModes[sortIdx].toUpperCase();
 
     if (sortBtn) {
       sortBtn.addEventListener("click", function() {
         sortIdx = (sortIdx + 1) % sortModes.length;
         var mode = sortModes[sortIdx];
         sortBtn.textContent = mode.toUpperCase();
+        localStorage.setItem("rosterSort", mode);
 
-        var rows = Array.from(rosterScroll.querySelectorAll(".roster-row"));
-        rows.sort(function(a, b) {
-          if (mode === "health") {
-            var aW = a.querySelector(".roster-health-fill");
-            var bW = b.querySelector(".roster-health-fill");
-            var aPct = aW ? parseInt(aW.style.width) || 0 : 0;
-            var bPct = bW ? parseInt(bW.style.width) || 0 : 0;
-            return bPct - aPct;
-          } else if (mode === "district") {
-            var aD = a.querySelector(".roster-district");
-            var bD = b.querySelector(".roster-district");
-            var aN = aD ? parseInt(aD.textContent.replace("D", "")) || 0 : 0;
-            var bN = bD ? parseInt(bD.textContent.replace("D", "")) || 0 : 0;
-            return aN - bN;
-          }
-          return 0;
-        });
-        rows.forEach(function(r) { rosterScroll.appendChild(r); });
+        if (mode === "district") {
+          // Restore original server-rendered HTML (with district group wrappers)
+          rosterScroll.innerHTML = originalRosterHTML;
+        } else {
+          // Flatten: extract roster-rows from group wrappers, discard headers
+          var groups = rosterScroll.querySelectorAll(".district-group, .alliance-group");
+          groups.forEach(function(g) {
+            var rows = g.querySelectorAll(".roster-row");
+            rows.forEach(function(r) { rosterScroll.appendChild(r); });
+            g.remove();
+          });
+
+          var rows = Array.from(rosterScroll.querySelectorAll(".roster-row"));
+          rows.sort(function(a, b) {
+            if (mode === "health") {
+              var aW = a.querySelector(".roster-health-fill");
+              var bW = b.querySelector(".roster-health-fill");
+              var aPct = aW ? parseInt(aW.style.width) || 0 : 0;
+              var bPct = bW ? parseInt(bW.style.width) || 0 : 0;
+              return bPct - aPct;
+            }
+            return 0;
+          });
+          rows.forEach(function(r) { rosterScroll.appendChild(r); });
+        }
       });
     }
   }

@@ -97,21 +97,17 @@ pub(crate) async fn save_area_items(
                 })?;
         }
 
-        // Batch insert relations. Hyphenated UUIDs must be wrapped in
-        // ⟨angle brackets⟩ or Surreal's SQL parser splits them on `-`.
-        let mut relation_parts = Vec::new();
+        // Create relations using parameterized queries (avoids UUID quoting issues)
         for item in &items_to_update {
-            relation_parts.push(format!(
-                "RELATE ⟨{}⟩->items->item:⟨{}⟩",
-                crate::rid_to_string(&owner),
-                item.identifier
-            ));
+            let item_rid = RecordId::new("item", item.identifier.as_str());
+            db.query("RELATE $owner->items->$item")
+                .bind(("owner", owner.clone()))
+                .bind(("item", item_rid))
+                .await
+                .map_err(|e| {
+                    AppError::InternalServerError(format!("Failed to create relation: {}", e))
+                })?;
         }
-
-        let bulk_relations = relation_parts.join(";\n");
-        db.query(&bulk_relations).await.map_err(|e| {
-            AppError::InternalServerError(format!("Failed to batch create relations: {}", e))
-        })?;
     }
 
     Ok(())
@@ -208,21 +204,17 @@ pub(crate) async fn save_tribute_items(
                 })?;
         }
 
-        // Batch insert relations. Hyphenated UUIDs must be wrapped in
-        // ⟨angle brackets⟩ or Surreal's SQL parser splits them on `-`.
-        let mut relation_parts = Vec::new();
+        // Create relations using parameterized queries (avoids UUID quoting issues)
         for item in &items_to_update {
-            relation_parts.push(format!(
-                "RELATE ⟨{}⟩->owns->item:⟨{}⟩",
-                crate::rid_to_string(&owner),
-                item.identifier
-            ));
+            let item_rid = RecordId::new("item", item.identifier.as_str());
+            db.query("RELATE $owner->owns->$item")
+                .bind(("owner", owner.clone()))
+                .bind(("item", item_rid))
+                .await
+                .map_err(|e| {
+                    AppError::InternalServerError(format!("Failed to create relation: {}", e))
+                })?;
         }
-
-        let bulk_relations = relation_parts.join(";\n");
-        db.query(&bulk_relations).await.map_err(|e| {
-            AppError::InternalServerError(format!("Failed to batch create relations: {}", e))
-        })?;
     }
 
     Ok(())

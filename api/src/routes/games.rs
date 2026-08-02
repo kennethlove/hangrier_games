@@ -134,11 +134,17 @@ fn filter_games_by_status(games: &[ListDisplayGame], status: Option<&str>) -> Ve
     }
 }
 
+#[derive(Deserialize, Default)]
+pub struct DayQuery {
+    pub day: Option<u32>,
+}
+
 /// GET /games/{id} — game detail page (broadcast interface).
 pub async fn game_detail_handler(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
     axum::extract::Path(game_identifier): axum::extract::Path<uuid::Uuid>,
+    Query(query): Query<DayQuery>,
 ) -> Response {
     let (auth, csrf) = extract_auth(&headers);
     let identifier = game_identifier.to_string();
@@ -209,15 +215,33 @@ SELECT (
         Err(_) => vec![],
     };
 
-    let messages_result = state
-        .db
-        .query(
-            r#"SELECT * FROM message
-            WHERE string::starts_with(subject, $identifier)
-            ORDER BY game_day, phase, tick, emit_index;"#,
-        )
-        .bind(("identifier", identifier.clone()))
-        .await;
+    let current_day = game.day.unwrap_or(0);
+    // Override current_day if query param provided
+    let current_day = query.day.unwrap_or(current_day);
+
+    let messages_result = if current_day > 0 {
+        state
+            .db
+            .query(
+                r#"SELECT * FROM message
+                WHERE string::starts_with(subject, $identifier)
+                AND game_day = $day
+                ORDER BY game_day, phase, tick, emit_index;"#,
+            )
+            .bind(("identifier", identifier.clone()))
+            .bind(("day", current_day))
+            .await
+    } else {
+        state
+            .db
+            .query(
+                r#"SELECT * FROM message
+                WHERE string::starts_with(subject, $identifier)
+                ORDER BY game_day, phase, tick, emit_index;"#,
+            )
+            .bind(("identifier", identifier.clone()))
+            .await
+    };
 
     let messages: Vec<shared::messages::GameMessage> = match messages_result {
         Ok(mut logs) => {
@@ -260,11 +284,9 @@ SELECT (
     let mut sorted_tributes: Vec<_> = tributes.iter().collect();
     sorted_tributes.sort_by(|a, b| b.is_alive().cmp(&a.is_alive()).then(a.name.cmp(&b.name)));
 
-    // Day numbers from messages
-    let mut day_numbers: Vec<u32> = messages.iter().map(|m| m.game_day).collect();
-    day_numbers.sort();
-    day_numbers.dedup();
-    let current_day = game.day.unwrap_or(0);
+    // Day numbers: generate range 1..=game.day (includes all days, not just days with messages)
+    let max_day = game.day.unwrap_or(0);
+    let day_numbers: Vec<u32> = if max_day > 0 { (1..=max_day).collect() } else { vec![] };
 
     // Pre-render event cards
     let mut event_cards = String::new();

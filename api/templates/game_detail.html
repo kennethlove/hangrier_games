@@ -10,7 +10,7 @@
           <div class="broad-emblem-inner"></div>
         </div>
         <span class="round-id">
-          ROUND <span class="hl">{{ game.day | default(value=0) }}</span>
+          DAY <span class="hl">{{ current_day }}</span>
         </span>
         <span class="location">{{ game.name | upper }}</span>
       </div>
@@ -40,13 +40,21 @@
     <div class="day-nav">
       <div class="day-left">
         <span class="day-label">
-          DAY <span class="hl">{{ game.day | default(value=0) }}</span>
+          DAY <span class="hl">{{ current_day }}</span>
         </span>
         <div class="day-arrows">
-          <button class="day-arrow" title="Previous day">&lt;</button>
-          <button class="day-arrow" title="Next day">&gt;</button>
+          {% if current_day > 1 %}
+            <a href="/games/{{ game.identifier }}?day={{ current_day - 1 }}" class="day-arrow" title="Previous day" hx-boost="true">&lt;</a>
+          {% else %}
+            <span class="day-arrow disabled">&lt;</span>
+          {% endif %}
+          {% if current_day < game.day %}
+            <a href="/games/{{ game.identifier }}?day={{ current_day + 1 }}" class="day-arrow" title="Next day" hx-boost="true">&gt;</a>
+          {% else %}
+            <span class="day-arrow disabled">&gt;</span>
+          {% endif %}
         </div>
-        <select class="day-select" id="daySelect">
+        <select class="day-select" id="daySelect" onchange="window.location.href='/games/{{ game.identifier }}?day=' + this.value">
           {% for day_num in day_numbers %}
             <option value="{{ day_num }}" {% if day_num == current_day %}selected{% endif %}>Day {{ day_num }}</option>
           {% endfor %}
@@ -160,9 +168,9 @@
           <div class="feed-tabs">
             <button class="feed-tab active">ALL</button>
             <button class="feed-tab">ACTION</button>
-            <button class="feed-tab">DEATHS</button>
-            <button class="feed-tab">EVENTS</button>
-            <button class="feed-tab">COMMS</button>
+            <button class="feed-tab">DEATH</button>
+            <button class="feed-tab">EVENT</button>
+            <button class="feed-tab">COMMENTARY</button>
           </div>
         </div>
         <div class="feed-scroll" id="feedScroll"
